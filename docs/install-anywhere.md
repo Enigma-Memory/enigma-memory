@@ -7,9 +7,23 @@ Current status: Enigma has a local production foundation and installable package
 ## Requirements
 
 - Node.js `>=24`
+- Git for the source-checkout path
 - A local filesystem path for the Enigma vault bundle
 - No network for the local CLI/MCP/verifier path after the package or checkout is present
 - Optional: Docker for containerized relay/gateway operation
+
+## Fastest path from GitHub today
+
+```sh
+git clone https://github.com/Enigma-Memory/enigma-memory.git
+cd enigma-memory
+npm run install:local -- --execute --init-vault --bundle ./.enigma/bundle.json
+enigma doctor
+enigma-relay demo
+enigma-gateway demo
+```
+
+This path installs from the checked-out source tree. It does not require Cloudflare, hosted relay/gateway access, provider API keys, a database, an npm publishing token, or a package registry account.
 
 ## Source checkout versus package install
 
@@ -22,7 +36,6 @@ For a complete surface map, see [`public-api-reference.md`](public-api-reference
 From the repository root, use the local installer in preview mode first:
 
 ```sh
-cd enigma
 npm run install:local
 npm run install:local -- --init-vault --bundle ./.enigma/bundle.json
 ```
@@ -32,8 +45,8 @@ npm run install:local -- --init-vault --bundle ./.enigma/bundle.json
 To perform the local global install from the checkout and initialize a local vault bundle:
 
 ```sh
-cd enigma
 npm run install:local -- --execute --init-vault --bundle ./.enigma/bundle.json
+enigma doctor
 enigma --help
 enigma-verify --help
 enigma-relay demo
@@ -43,9 +56,9 @@ enigma-gateway demo
 Equivalent explicit steps:
 
 ```sh
-cd enigma
 npm install -g .
 enigma init --bundle ./.enigma/bundle.json --subject local-user --display-name "Local user"
+enigma doctor
 enigma --help
 enigma-verify --help
 enigma-relay demo
@@ -55,7 +68,6 @@ enigma-gateway demo
 If you do not want a global install, run the bins directly:
 
 ```sh
-cd enigma
 node apps/cli/bin/enigma.mjs --help
 node apps/verifier/bin/enigma-verify.mjs --help
 node apps/relay/bin/enigma-relay.mjs demo
