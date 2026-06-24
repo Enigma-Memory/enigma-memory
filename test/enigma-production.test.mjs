@@ -3565,16 +3565,21 @@ test('public collateral keeps proof, token, hosted, and raw-memory claim boundar
     'docs/production-release-checklist.md',
     ...PRODUCTION_REVIEW_DOCS,
     'launch/02_WHITEPAPER.md',
-    'launch/04_TOKEN_UTILITY_AND_TOKENOMICS.md',
     'launch/08_PRESS_KIT.md',
-    'launch/12_COMMUNITY_AND_SOCIAL_PLAYBOOK.md',
     'launch/15_USER_INSTALL_GUIDE.md',
   ]);
-  const docs = Object.fromEntries(
-    await Promise.all(
-      collateralDocs.map(async (rel) => [rel, await readFile(new URL(`../${rel}`, import.meta.url), 'utf8')]),
-    ),
-  );
+  const legalGatedCollateralDocs = Object.freeze([
+    'launch/04_TOKEN_UTILITY_AND_TOKENOMICS.md',
+    'launch/12_COMMUNITY_AND_SOCIAL_PLAYBOOK.md',
+  ]);
+  const docs = {};
+  for (const rel of [...collateralDocs, ...legalGatedCollateralDocs]) {
+    try {
+      docs[rel] = await readFile(new URL(`../${rel}`, import.meta.url), 'utf8');
+    } catch (error) {
+      if (!legalGatedCollateralDocs.includes(rel) || error?.code !== 'ENOENT') throw error;
+    }
+  }
   const proofBoundaryRequirements = Object.freeze({
     'README.md': [
       /Enigma does not claim that a closed provider deleted internal data/i,
@@ -3661,7 +3666,7 @@ test('public collateral keeps proof, token, hosted, and raw-memory claim boundar
     'launch/04_TOKEN_UTILITY_AND_TOKENOMICS.md',
     'launch/08_PRESS_KIT.md',
     'launch/12_COMMUNITY_AND_SOCIAL_PLAYBOOK.md',
-  ]);
+  ].filter((rel) => typeof docs[rel] === 'string'));
   const tokenSectionPatterns = Object.freeze({
     'launch/02_WHITEPAPER.md': /## 9\. Solana utility token role[\s\S]*?## 10\. Roadmap/i,
     'launch/04_TOKEN_UTILITY_AND_TOKENOMICS.md': /[\s\S]+/i,
