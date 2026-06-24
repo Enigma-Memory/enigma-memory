@@ -22,12 +22,25 @@ Enigma does not claim that a closed provider deleted internal data, that model w
 Prerequisites:
 
 - Node.js `>=24`
+- Git for the source-checkout path
 - No database, package registry account, provider credential, or cloud credential for the local no-network path
 
-From this repository:
+Fastest path from GitHub:
 
 ```sh
-cd enigma
+git clone https://github.com/Enigma-Memory/enigma-memory.git
+cd enigma-memory
+npm run install:local -- --execute --init-vault --bundle ./.enigma/bundle.json
+enigma doctor
+enigma-relay demo
+enigma-gateway demo
+```
+
+`install:local` is dry-run unless `--execute` is present. The command above installs the checked-out package globally, creates a local vault bundle, and never needs Cloudflare, OpenAI, Anthropic, npm publish credentials, a database, or hosted infrastructure.
+
+If the repository is already checked out:
+
+```sh
 npm install -g .
 enigma --help
 enigma-verify --help
