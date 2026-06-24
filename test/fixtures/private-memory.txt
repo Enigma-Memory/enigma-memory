@@ -1,0 +1,1 @@
+release-smoke private memory: alpha sparrow keeps the local-only recovery phrase in the vault

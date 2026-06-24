@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.enigma.ai/deletion-tombstone-v1.schema.json",
+  "title": "Enigma Deletion Tombstone v1",
+  "type": "object",
+  "required": ["schema", "tombstone_id", "delete_receipt_hash", "target_memory_addrs", "effective_epoch", "active_memory_root_after", "deleted_memory_root_after", "erasure_scope", "not_proven", "issued_at"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "enigma.deletion_tombstone.v1" },
+    "tombstone_id": { "type": "string", "minLength": 8 },
+    "delete_receipt_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "target_memory_addrs": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "effective_epoch": { "type": "integer", "minimum": 0 },
+    "active_memory_root_after": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "deleted_memory_root_after": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "erasure_scope": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["active_store", "local_cache", "device_sync_peer", "encrypted_backup", "enterprise_tenant_store", "user_export_bundle"] }
+    },
+    "key_refs_destroyed": { "type": "array", "items": { "type": "string" } },
+    "downstream_delete_request_hashes": { "type": "array", "items": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" } },
+    "backup_treatment": { "type": "string", "enum": ["not_applicable", "purged", "tombstoned_unreadable_by_destroyed_key", "legal_hold_retained", "outside_scope"] },
+    "not_proven": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+    "issued_at": { "type": "string", "format": "date-time" }
+  }
+}

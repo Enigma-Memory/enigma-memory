@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.enigma.ai/memory-event-v1.schema.json",
+  "title": "Enigma Memory Event v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "event_id",
+    "operation",
+    "tenant_id",
+    "subject_id",
+    "actor_id",
+    "timestamp",
+    "sequence",
+    "policy_id"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "enigma.memory_event.v1" },
+    "event_id": { "type": "string", "minLength": 8 },
+    "operation": {
+      "type": "string",
+      "enum": ["create", "read", "update", "supersede", "delete", "retrieve", "inject", "export", "import", "deny", "quarantine", "boundary_cross"]
+    },
+    "tenant_id": { "type": "string", "minLength": 1 },
+    "subject_id": { "type": "string", "minLength": 1 },
+    "actor_id": { "type": "string", "minLength": 1 },
+    "memory_addr": { "type": "string", "pattern": "^[a-z0-9_.:-]+$" },
+    "source_addr": { "type": "string", "pattern": "^[a-z0-9_.:-]+$" },
+    "provider": { "type": "string" },
+    "model": { "type": "string" },
+    "purpose": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "policy_id": { "type": "string", "minLength": 1 },
+    "decision": { "type": "string", "enum": ["allow", "deny", "quarantine", "out_of_scope"] },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": { "type": ["string", "number", "boolean", "null"] }
+    }
+  }
+}

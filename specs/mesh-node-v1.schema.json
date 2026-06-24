@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.enigma.ai/mesh-node-v1.schema.json",
+  "title": "Enigma Mesh Node and Mesh Artifact v1",
+  "type": "object",
+  "oneOf": [
+    { "$ref": "#/$defs/meshNode" },
+    { "$ref": "#/$defs/capsuleManifest" },
+    { "$ref": "#/$defs/witnessCheckpoint" },
+    { "$ref": "#/$defs/relayRecord" },
+    { "$ref": "#/$defs/federationGrant" }
+  ],
+  "$defs": {
+    "sha256Root": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "signature": {
+      "type": "object",
+      "required": ["alg", "key_id", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "alg": { "const": "Ed25519" },
+        "key_id": { "type": "string", "minLength": 1 },
+        "value": { "type": "string", "minLength": 64 }
+      }
+    },
+    "meshNode": {
+      "type": "object",
+      "required": ["schema", "node_id", "role", "key", "public_key", "capabilities", "trust_roots", "endpoints", "created_at", "signature", "descriptor_hash"],
+      "additionalProperties": false,
+      "properties": {
+        "schema": { "const": "enigma.mesh_node.v1" },
+        "node_id": { "type": "string", "minLength": 8 },
+        "role": { "type": "string", "minLength": 1 },
+        "key": {
+          "type": "object",
+          "required": ["alg", "key_id", "public_key"],
+          "additionalProperties": false,
+          "properties": {
+            "alg": { "const": "Ed25519" },
+            "key_id": { "type": "string", "minLength": 1 },
+            "public_key": { "type": "string", "minLength": 64 }
+          }
+        },
+        "public_key": { "type": "string", "minLength": 64 },
+        "capabilities": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "trust_roots": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "endpoints": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "created_at": { "type": "string", "format": "date-time" },
+        "signature": { "$ref": "#/$defs/signature" },
+        "descriptor_hash": { "$ref": "#/$defs/sha256Root" }
+      }
+    },
+    "capsuleManifest": {
+      "type": "object",
+      "required": ["schema", "capsule_id", "encrypted_payload_hash", "receipt_log_root", "active_set_root", "owner_scope_hash", "issuer", "holder", "issued_at", "expires_at", "signature", "capsule_hash"],
+      "additionalProperties": false,
+      "properties": {
+        "schema": { "const": "enigma.capsule_manifest.v1" },
+        "capsule_id": { "type": "string", "minLength": 8 },
+        "encrypted_payload_hash": { "$ref": "#/$defs/sha256Root" },
+        "receipt_log_root": { "$ref": "#/$defs/sha256Root" },
+        "active_set_root": { "$ref": "#/$defs/sha256Root" },
+        "owner_scope_hash": { "$ref": "#/$defs/sha256Root" },
+        "issuer": { "type": "string", "minLength": 1 },
+        "holder": { "type": "string", "minLength": 1 },
+        "issued_at": { "type": "string", "format": "date-time" },
+        "expires_at": { "type": "string", "format": "date-time" },
+        "signature": { "$ref": "#/$defs/signature" },
+        "capsule_hash": { "$ref": "#/$defs/sha256Root" }
+      }
+    },
+    "witnessCheckpoint": {
+      "type": "object",
+      "required": ["schema", "witness_checkpoint_id", "witness_node_id", "subject_node_id", "epoch", "checkpoint_root", "receipt_log_root", "active_set_root", "previous_witness_hash", "issued_at", "signature", "witness_hash"],
+      "additionalProperties": false,
+      "properties": {
+        "schema": { "const": "enigma.witness_checkpoint.v1" },
+        "witness_checkpoint_id": { "type": "string", "minLength": 8 },
+        "witness_node_id": { "type": "string", "minLength": 1 },
+        "subject_node_id": { "type": "string", "minLength": 1 },
+        "epoch": { "type": "integer", "minimum": 0 },
+        "checkpoint_root": { "$ref": "#/$defs/sha256Root" },
+        "receipt_log_root": { "$ref": "#/$defs/sha256Root" },
+        "active_set_root": { "$ref": "#/$defs/sha256Root" },
+        "previous_witness_hash": { "$ref": "#/$defs/sha256Root" },
+        "issued_at": { "type": "string", "format": "date-time" },
+        "signature": { "$ref": "#/$defs/signature" },
+        "witness_hash": { "$ref": "#/$defs/sha256Root" }
+      }
+    },
+    "relayRecord": {
+      "type": "object",
+      "required": ["schema", "record_id", "store_id", "capsule_id", "encrypted_payload_hash", "opaque_encrypted_record", "received_at", "expires_at"],
+      "additionalProperties": false,
+      "properties": {
+        "schema": { "const": "enigma.relay_record.v1" },
+        "record_id": { "type": "string", "minLength": 8 },
+        "relay_record_id": { "type": "string", "minLength": 8 },
+        "store_id": { "type": "string", "minLength": 1 },
+        "capsule_id": { "type": ["string", "null"] },
+        "encrypted_payload_hash": { "$ref": "#/$defs/sha256Root" },
+        "opaque_encrypted_record": { "type": "string", "minLength": 1 },
+        "received_at": { "type": "string", "format": "date-time" },
+        "expires_at": { "type": ["string", "null"], "format": "date-time" },
+        "signature": { "$ref": "#/$defs/signature" }
+      }
+    },
+    "federationGrant": {
+      "type": "object",
+      "required": ["schema", "grant_id", "issuer", "holder", "subjects", "operations", "purpose", "issued_at", "expires_at", "signature", "grant_hash"],
+      "additionalProperties": false,
+      "properties": {
+        "schema": { "const": "enigma.federation_grant.v1" },
+        "grant_id": { "type": "string", "minLength": 8 },
+        "issuer": { "type": "string", "minLength": 1 },
+        "holder": { "type": "string", "minLength": 1 },
+        "subjects": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "operations": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "purpose": { "type": "string", "minLength": 1 },
+        "issued_at": { "type": "string", "format": "date-time" },
+        "expires_at": { "type": "string", "format": "date-time" },
+        "signature": { "$ref": "#/$defs/signature" },
+        "grant_hash": { "$ref": "#/$defs/sha256Root" }
+      }
+    }
+  }
+}

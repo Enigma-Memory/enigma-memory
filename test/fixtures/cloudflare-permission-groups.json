@@ -1,0 +1,12 @@
+{
+  "success": true,
+  "result": [
+    { "id": "account-settings-read-fixture", "name": "Account Settings Read", "scopes": ["com.cloudflare.api.account"] },
+    { "id": "cloudflare-pages-read-fixture", "name": "Cloudflare Pages Read", "scopes": ["com.cloudflare.api.account"] },
+    { "id": "cloudflare-pages-edit-fixture", "name": "Cloudflare Pages Edit", "scopes": ["com.cloudflare.api.account"] },
+    { "id": "registrar-read-fixture", "name": "Registrar Read", "scopes": ["com.cloudflare.api.account"] },
+    { "id": "registrar-edit-fixture", "name": "Registrar Edit", "scopes": ["com.cloudflare.api.account"] },
+    { "id": "workers-scripts-read-fixture", "name": "Workers Scripts Read", "scopes": ["com.cloudflare.api.account"] },
+    { "id": "workers-scripts-edit-fixture", "name": "Workers Scripts Edit", "scopes": ["com.cloudflare.api.account"] }
+  ]
+}

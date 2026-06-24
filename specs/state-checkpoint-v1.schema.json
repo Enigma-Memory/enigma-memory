@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.enigma.ai/state-checkpoint-v1.schema.json",
+  "title": "Enigma State Checkpoint v1",
+  "type": "object",
+  "required": ["schema", "checkpoint_id", "tenant_hash", "owner_scope_hash", "epoch", "active_memory_root", "deleted_memory_root", "receipt_log_root", "key_registry_root", "policy_registry_root", "previous_checkpoint_hash", "issued_at", "signatures"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "enigma.state_checkpoint.v1" },
+    "checkpoint_id": { "type": "string", "minLength": 8 },
+    "tenant_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "owner_scope_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "epoch": { "type": "integer", "minimum": 0 },
+    "active_memory_root": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "deleted_memory_root": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "receipt_log_root": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "key_registry_root": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "policy_registry_root": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "previous_checkpoint_hash": { "type": "string", "pattern": "^(sha256:[a-f0-9]{64}|GENESIS)$" },
+    "witness_policy": { "type": "string" },
+    "issued_at": { "type": "string", "format": "date-time" },
+    "signatures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["alg", "key_id", "value"],
+        "additionalProperties": false,
+        "properties": {
+          "alg": { "type": "string", "enum": ["Ed25519", "Ed25519+ML-DSA-policy"] },
+          "key_id": { "type": "string", "minLength": 1 },
+          "value": { "type": "string", "minLength": 64 }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://enigma.memory/specs/goal-completion-audit-v1.schema.json",
+  "title": "Enigma Goal Completion Audit v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "generated_at",
+    "objective",
+    "complete",
+    "release_posture",
+    "go_live_ready",
+    "local_static_artifact_ready",
+    "deliverables",
+    "backend_readiness_smoke",
+    "blockers",
+    "next_actions",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": { "const": "enigma.goal_completion_audit.v1" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "objective": { "type": "string", "minLength": 1 },
+    "complete": { "type": "boolean" },
+    "release_posture": { "type": "string", "minLength": 1 },
+    "go_live_ready": { "type": "boolean" },
+    "local_static_artifact_ready": { "type": "boolean" },
+    "deliverables": { "type": "array", "items": { "$ref": "#/$defs/deliverable" } },
+    "backend_readiness_smoke": { "$ref": "#/$defs/backendReadinessSmoke" },
+    "blockers": { "type": "array", "items": { "type": "string" } },
+    "next_actions": { "type": "array", "items": { "$ref": "#/$defs/action" } },
+    "claim_boundary": { "type": "array", "items": { "type": "string" } }
+  },
+  "$defs": {
+    "deliverable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "requirement", "ok", "evidence", "blockers"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "requirement": { "type": "string", "minLength": 1 },
+        "ok": { "type": "boolean" },
+        "evidence": { "type": "array", "items": { "type": "string" } },
+        "blockers": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "backendReadinessSmoke": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "check_count", "loopback_only"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "check_count": { "type": "integer", "minimum": 0 },
+        "loopback_only": { "type": "boolean" }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "owner", "command", "evidence"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "owner": { "type": "string", "minLength": 1 },
+        "command": { "type": "string", "minLength": 1 },
+        "evidence": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.enigma.ai/passport-v1.schema.json",
+  "title": "Enigma Passport v1",
+  "type": "object",
+  "required": ["schema", "passport_id", "owner", "created_at", "updated_at", "vault", "policies", "checkpoints"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "enigma.passport.v1" },
+    "passport_id": { "type": "string", "minLength": 8 },
+    "owner": {
+      "type": "object",
+      "required": ["subject_id", "display_name"],
+      "additionalProperties": false,
+      "properties": {
+        "subject_id": { "type": "string", "minLength": 1 },
+        "display_name": { "type": "string" },
+        "identity_refs": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "vault": {
+      "type": "object",
+      "required": ["vault_id", "encryption", "active_set_root", "receipt_log_root"],
+      "additionalProperties": false,
+      "properties": {
+        "vault_id": { "type": "string", "minLength": 1 },
+        "encryption": { "type": "string", "enum": ["local_aead", "kms_envelope", "external"] },
+        "active_set_root": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "receipt_log_root": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "policies": { "type": "array", "items": { "type": "string" } },
+    "checkpoints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["sequence", "active_set_root", "receipt_log_root", "timestamp"],
+        "additionalProperties": false,
+        "properties": {
+          "sequence": { "type": "integer", "minimum": 0 },
+          "active_set_root": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+          "receipt_log_root": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+          "timestamp": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}

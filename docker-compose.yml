@@ -1,0 +1,30 @@
+services:
+  relay:
+    build:
+      context: .
+    image: enigma-local:dev
+    entrypoint: ["enigma-relay"]
+    command: ["serve", "--host", "0.0.0.0", "--port", "8787"]
+    environment:
+      NODE_ENV: production
+    ports:
+      - "127.0.0.1:8787:8787"
+    read_only: true
+    tmpfs:
+      - /tmp
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: .
+    image: enigma-local:dev
+    entrypoint: ["enigma-gateway"]
+    command: ["serve", "--host", "0.0.0.0", "--port", "8797"]
+    environment:
+      NODE_ENV: production
+    ports:
+      - "127.0.0.1:8797:8797"
+    read_only: true
+    tmpfs:
+      - /tmp
+    restart: unless-stopped

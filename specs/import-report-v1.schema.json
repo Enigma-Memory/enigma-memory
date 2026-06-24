@@ -1,0 +1,214 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.enigma.ai/import-report-v1.schema.json",
+  "title": "Enigma Import Report v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "report_id",
+    "importer",
+    "source_type",
+    "source_fingerprint",
+    "generated_at",
+    "complete",
+    "completeness",
+    "source_refs",
+    "limitations",
+    "confidence",
+    "memory_candidates",
+    "vault_writes"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "enigma.import_report.v1" },
+    "report_id": { "type": "string", "pattern": "^imp_[a-f0-9]{32}$" },
+    "importer": {
+      "type": "string",
+      "enum": [
+        "importChatGptExport",
+        "importClaudeMemory",
+        "importMem0Export",
+        "importLettaAgentFile",
+        "importLangGraphStore",
+        "importZepGraphitiExport"
+      ]
+    },
+    "source_type": {
+      "type": "string",
+      "enum": [
+        "chatgpt_export",
+        "claude_memory",
+        "mem0_export",
+        "letta_agent_file",
+        "langgraph_store",
+        "zep_graphiti_export"
+      ]
+    },
+    "source_fingerprint": { "$ref": "#/$defs/sha256Root" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "complete": { "type": "boolean" },
+    "completeness": { "type": "string", "enum": ["explicit_complete", "partial_or_unknown"] },
+    "completeness_evidence": { "$ref": "#/$defs/completenessEvidence" },
+    "recognized_candidate_count": { "type": "integer", "minimum": 0 },
+    "unsupported_item_count": { "type": "integer", "minimum": 0 },
+    "private_plaintext_boundary": { "$ref": "#/$defs/privatePlaintextBoundary" },
+    "source_refs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/sourceRef" }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "confidence": { "$ref": "#/$defs/confidence" },
+    "memory_candidates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/memoryCandidate" }
+    },
+    "vault_writes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/vaultWrite" }
+    }
+  },
+  "$defs": {
+    "sha256Root": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "confidence": { "type": "string", "enum": ["low", "medium", "high", "source_asserted", "user_confirmed"] },
+    "completenessEvidence": {
+      "type": "object",
+      "required": ["recognized_count", "unsupported_count", "conflicting", "explicit_assertion", "complete"],
+      "additionalProperties": false,
+      "properties": {
+        "recognized_count": { "type": "integer", "minimum": 0 },
+        "unsupported_count": { "type": "integer", "minimum": 0 },
+        "conflicting": { "type": "boolean" },
+        "explicit_assertion": { "type": "boolean" },
+        "complete": { "type": "boolean" }
+      }
+    },
+    "privatePlaintextBoundary": {
+      "type": "object",
+      "required": ["contains_private_plaintext", "private_fields", "public_artifact_policy"],
+      "additionalProperties": false,
+      "properties": {
+        "contains_private_plaintext": { "type": "boolean" },
+        "private_fields": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "public_artifact_policy": { "type": "string", "enum": ["hashes_and_commitments_only", "manifest_and_verifier_metadata_only", "hashes_roots_counts_and_trusted_descriptor_only"] }
+      }
+    },
+    "sourceRef": {
+      "type": "object",
+      "required": ["source_type", "path", "source_hash"],
+      "additionalProperties": false,
+      "properties": {
+        "source_type": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "source_id": { "type": "string", "minLength": 1 },
+        "source_hash": { "$ref": "#/$defs/sha256Root" }
+      }
+    },
+    "memoryCandidate": {
+      "type": "object",
+      "required": ["schema", "candidate_id", "kind", "content", "source_refs", "limitations", "confidence", "metadata"],
+      "additionalProperties": false,
+      "properties": {
+        "schema": { "const": "enigma.memory_candidate.v1" },
+        "candidate_id": { "type": "string", "pattern": "^cand_[a-f0-9]{32}$" },
+        "kind": { "type": "string", "minLength": 1 },
+        "content": { "type": "string", "minLength": 1 },
+        "source_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/sourceRef" }
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": {
+            "type": ["string", "number", "boolean", "null"]
+          }
+        }
+      }
+    },
+    "vaultWrite": {
+      "type": "object",
+      "required": ["candidate_id", "memory_addr", "receipt_hash"],
+      "additionalProperties": false,
+      "properties": {
+        "candidate_id": { "type": "string", "pattern": "^cand_[a-f0-9]{32}$" },
+        "memory_addr": { "type": "string", "minLength": 1 },
+        "receipt_hash": { "$ref": "#/$defs/sha256Root" },
+        "event_id": { "type": "string", "minLength": 1 },
+        "receipt_public_key": { "type": "string", "minLength": 1 },
+        "receipt": { "$ref": "#/$defs/receipt" }
+      }
+    },
+    "receipt": {
+      "type": "object",
+      "required": [
+        "schema",
+        "receipt_id",
+        "event_hash",
+        "operation",
+        "tenant_id",
+        "subject_id",
+        "sequence",
+        "previous_receipt_hash",
+        "active_set_root",
+        "receipt_log_root",
+        "timestamp",
+        "signer",
+        "signature"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schema": { "const": "enigma.receipt.v1" },
+        "receipt_id": { "type": "string", "pattern": "^rcpt_[a-f0-9]{32}$" },
+        "event_hash": { "$ref": "#/$defs/sha256Root" },
+        "operation": { "type": "string", "minLength": 1 },
+        "tenant_id": { "type": "string", "minLength": 1 },
+        "subject_id": { "type": "string", "minLength": 1 },
+        "memory_addr": { "type": "string", "minLength": 1 },
+        "source_addr": { "type": "string", "minLength": 1 },
+        "provider": { "type": "string", "minLength": 1 },
+        "model": { "type": "string", "minLength": 1 },
+        "policy_id": { "type": "string", "minLength": 1 },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "previous_receipt_hash": {
+          "anyOf": [
+            { "const": "GENESIS" },
+            { "$ref": "#/$defs/sha256Root" }
+          ]
+        },
+        "active_set_root": { "$ref": "#/$defs/sha256Root" },
+        "receipt_log_root": { "$ref": "#/$defs/sha256Root" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "signer": {
+          "type": "object",
+          "required": ["alg", "key_id"],
+          "additionalProperties": false,
+          "properties": {
+            "alg": { "const": "Ed25519" },
+            "key_id": { "type": "string", "minLength": 1 }
+          }
+        },
+        "signature": {
+          "type": "object",
+          "required": ["alg", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "alg": { "const": "Ed25519" },
+            "value": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    }
+}
+}

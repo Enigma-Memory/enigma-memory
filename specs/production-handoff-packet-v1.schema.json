@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://enigma.memory/specs/production-handoff-packet-v1.schema.json",
+  "title": "Enigma Production Handoff Packet v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "generated_at",
+    "project",
+    "go_live_ready",
+    "local_static_artifact_ready",
+    "credentials_present",
+    "pages",
+    "infrastructure",
+    "operator_acceptance",
+    "next_actions",
+    "blockers",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": { "const": "enigma.production_handoff_packet.v1" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "project": { "$ref": "#/$defs/project" },
+    "go_live_ready": { "type": "boolean" },
+    "local_static_artifact_ready": { "type": "boolean" },
+    "credentials_present": { "$ref": "#/$defs/credentials" },
+    "pages": { "$ref": "#/$defs/pages" },
+    "infrastructure": { "$ref": "#/$defs/infrastructure" },
+    "operator_acceptance": { "$ref": "#/$defs/operatorAcceptance" },
+    "next_actions": { "type": "array", "items": { "$ref": "#/$defs/action" } },
+    "blockers": { "type": "array", "items": { "type": "string" } },
+    "claim_boundary": { "type": "array", "items": { "type": "string" } }
+  },
+  "$defs": {
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "domain", "cloudflare_pages_project", "site"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "domain": { "type": ["string", "null"] },
+        "cloudflare_pages_project": { "type": "string", "minLength": 1 },
+        "site": { "type": "string", "minLength": 1 }
+      }
+    },
+    "credentials": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cloudflare_api_token", "cloudflare_account_id"],
+      "properties": {
+        "cloudflare_api_token": { "type": "boolean" },
+        "cloudflare_account_id": { "type": "boolean" }
+      }
+    },
+    "pages": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "local_artifact_ready",
+        "automated_deploy_ready",
+        "credential_present",
+        "artifact_file_count",
+        "artifact_root_hash",
+        "security_blocker_count",
+        "deployment_blockers",
+        "live_observation"
+      ],
+      "properties": {
+        "schema": { "const": "enigma.cloudflare_pages_release_packet.v1" },
+        "local_artifact_ready": { "type": "boolean" },
+        "automated_deploy_ready": { "type": "boolean" },
+        "credential_present": { "type": "boolean" },
+        "artifact_file_count": { "type": ["integer", "null"], "minimum": 0 },
+        "artifact_root_hash": { "type": ["string", "null"], "pattern": "^sha256:[a-fA-F0-9]{64}$" },
+        "security_blocker_count": { "type": ["integer", "null"], "minimum": 0 },
+        "deployment_blockers": { "type": "array", "items": { "type": "string" } },
+        "live_observation": { "$ref": "#/$defs/nullableLiveObservation" }
+      }
+    },
+    "nullableLiveObservation": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["ok", "live_url", "status", "title", "title_matched", "blockers"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "live_url": { "type": ["string", "null"] },
+        "status": { "type": ["integer", "null"] },
+        "title": { "type": ["string", "null"] },
+        "title_matched": { "type": "boolean" },
+        "blockers": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "infrastructure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "ok",
+        "mode",
+        "contract_ready",
+        "hosted_live_ready",
+        "public_live_ready",
+        "cloudflare_observed",
+        "hosted_required_ref_count",
+        "hosted_required_ref_missing_count",
+        "external_blocker_count",
+        "external_blockers"
+      ],
+      "properties": {
+        "schema": { "const": "enigma.infrastructure_readiness.v1" },
+        "ok": { "type": "boolean" },
+        "mode": { "type": "string" },
+        "contract_ready": { "type": "boolean" },
+        "hosted_live_ready": { "type": "boolean" },
+        "public_live_ready": { "type": "boolean" },
+        "cloudflare_observed": { "type": "boolean" },
+        "hosted_required_ref_count": { "type": ["integer", "null"], "minimum": 0 },
+        "hosted_required_ref_missing_count": { "type": ["integer", "null"], "minimum": 0 },
+        "external_blocker_count": { "type": ["integer", "null"], "minimum": 0 },
+        "external_blockers": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "operatorAcceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "ok", "decision", "blocker_count", "warning_count"],
+      "properties": {
+        "schema": { "const": "enigma.operator_acceptance_result.v1" },
+        "ok": { "type": "boolean" },
+        "decision": { "type": "string" },
+        "blocker_count": { "type": "integer", "minimum": 0 },
+        "warning_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "owner", "command", "evidence"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "owner": { "type": "string", "minLength": 1 },
+        "command": { "type": "string", "minLength": 1 },
+        "evidence": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

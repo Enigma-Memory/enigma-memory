@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.enigma.ai/receipt-v1.schema.json",
+  "title": "Enigma Receipt v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "receipt_id",
+    "event_hash",
+    "operation",
+    "tenant_id",
+    "subject_id",
+    "sequence",
+    "previous_receipt_hash",
+    "active_set_root",
+    "receipt_log_root",
+    "timestamp",
+    "signer",
+    "signature"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "enigma.receipt.v1" },
+    "receipt_id": { "type": "string", "minLength": 8 },
+    "event_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "operation": {
+      "type": "string",
+      "enum": ["create", "read", "update", "supersede", "delete", "retrieve", "inject", "export", "import", "deny", "quarantine", "boundary_cross"]
+    },
+    "tenant_id": { "type": "string", "minLength": 1 },
+    "subject_id": { "type": "string", "minLength": 1 },
+    "memory_addr": { "type": "string" },
+    "source_addr": { "type": "string" },
+    "provider": { "type": "string" },
+    "model": { "type": "string" },
+    "policy_id": { "type": "string" },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "previous_receipt_hash": { "type": "string", "pattern": "^(sha256:[a-f0-9]{64}|GENESIS)$" },
+    "active_set_root": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "receipt_log_root": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "signer": {
+      "type": "object",
+      "required": ["key_id", "alg"],
+      "additionalProperties": false,
+      "properties": {
+        "key_id": { "type": "string", "minLength": 1 },
+        "alg": { "const": "Ed25519" }
+      }
+    },
+    "signature": {
+      "type": "object",
+      "required": ["alg", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "alg": { "const": "Ed25519" },
+        "value": { "type": "string", "minLength": 64 }
+      }
+    }
+  }
+}

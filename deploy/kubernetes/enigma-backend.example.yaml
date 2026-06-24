@@ -1,0 +1,580 @@
+# Enigma backend Kubernetes reference manifest.
+# This is production-shaped scaffolding only. It is not backend availability evidence.
+# Operators must provide real storage, KMS/signing material, SIEM export, backups,
+# monitoring, ingress hosts/TLS, and acceptance evidence before any go-live decision.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: enigma-backend
+  labels:
+    app.kubernetes.io/part-of: enigma
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: enigma-backend-config
+  namespace: enigma-backend
+  labels:
+    app.kubernetes.io/part-of: enigma
+data:
+  NODE_ENV: "production"
+  ENIGMA_BACKEND_MODE: "production"
+  ENIGMA_REQUIRE_EXTERNAL_STORAGE: "true"
+  ENIGMA_REQUIRE_EXTERNAL_KMS: "true"
+  ENIGMA_REQUIRE_SIEM_EXPORT: "true"
+  ENIGMA_REQUIRE_BACKUP_TARGET: "true"
+  ENIGMA_DISABLE_LOCAL_DEMO_FALLBACK: "true"
+  ENIGMA_REQUIRE_OPERATOR_ACCEPTANCE_EVIDENCE: "true"
+  ENIGMA_READINESS_FAIL_CLOSED: "true"
+  ENIGMA_RELAY_PUBLIC_BASE_URL: "https://relay.example.invalid"
+  ENIGMA_GATEWAY_PUBLIC_BASE_URL: "https://gateway.example.invalid"
+  ENIGMA_ADMIN_BASE_URL: "https://admin.example.invalid"
+  ENIGMA_RELAY_BACKEND_HOST_REF: "operator-required-relay-backend-host-ref"
+  ENIGMA_RELAY_DNS_TLS_REF: "operator-required-relay-dns-tls-ref"
+  ENIGMA_RELAY_RUNTIME_AUTH_REF: "operator-required-relay-runtime-auth-ref"
+  ENIGMA_RELAY_MONITORING_REF: "operator-required-relay-monitoring-ref"
+  ENIGMA_GATEWAY_BACKEND_HOST_REF: "operator-required-gateway-backend-host-ref"
+  ENIGMA_GATEWAY_DNS_TLS_REF: "operator-required-gateway-dns-tls-ref"
+  ENIGMA_GATEWAY_MONITORING_REF: "operator-required-gateway-monitoring-ref"
+  ENIGMA_GATEWAY_ADMIN_AUTH_REF: "operator-required-gateway-admin-auth-ref"
+  ENIGMA_GATEWAY_DATA_PLANE_AUTH_REF: "operator-required-gateway-data-plane-auth-ref"
+  ENIGMA_GATEWAY_ADMIN_AUTH_BEARER_SHA256: "operator-required-admin-bearer-sha256"
+  ENIGMA_GATEWAY_DATA_PLANE_AUTH_BEARER_SHA256: "operator-required-data-plane-bearer-sha256"
+  ENIGMA_BACKUP_TARGET_REF: "operator-required-backup-target-ref"
+  ENIGMA_NETWORK_ACCESS_POLICY_REF: "operator-required-network-access-policy-ref"
+  ENIGMA_KMS_CUSTODY_REF: "operator-required-kms-custody-ref"
+  ENIGMA_TENANT_POLICY_APPROVAL_REF: "operator-required-tenant-policy-approval-ref"
+  ENIGMA_USAGE_METERING_REF: "operator-required-usage-metering-ref"
+  ENIGMA_SERVICE_SETTLEMENT_REF: "operator-required-service-settlement-ref"
+  ENIGMA_MONITORING_ALERTING_REF: "operator-required-monitoring-alerting-ref"
+  ENIGMA_SIEM_REF: "operator-required-siem-ref"
+  ENIGMA_PUBLIC_SITE_SECURITY_REF: "operator-required-public-site-security-ref"
+  ENIGMA_SECURITY_THREAT_MODEL_REF: "operator-required-security-threat-model-ref"
+  ENIGMA_LEGAL_COMPLIANCE_APPROVAL_REF: "operator-required-legal-compliance-approval-ref"
+  ENIGMA_SUPPORT_SLA_REF: "operator-required-support-sla-ref"
+  ENIGMA_INCIDENT_DRILL_REF: "operator-required-incident-drill-ref"
+  ENIGMA_BACKUP_RESTORE_DRILL_REF: "operator-required-backup-restore-drill-ref"
+  ENIGMA_OPERATOR_ACCEPTANCE_DECISION: "operator-required-go-decision"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: enigma-backend-secrets
+  namespace: enigma-backend
+  labels:
+    app.kubernetes.io/part-of: enigma
+type: Opaque
+# Placeholder only: create required keys out-of-band with the cluster secret manager.
+# Expected keys include:
+# - relay-signing-key
+# - gateway-signing-key
+# - external-storage-dsn
+# - kms-key-ref
+# - siem-export-endpoint
+# - backup-target-uri
+# - operator-acceptance-evidence-uri
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: enigma-relay
+  namespace: enigma-backend
+  labels:
+    app.kubernetes.io/name: enigma-relay
+    app.kubernetes.io/part-of: enigma
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: enigma-relay
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: enigma-relay
+        app.kubernetes.io/part-of: enigma
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: relay
+          image: ghcr.io/enigma-ai/enigma:operator-pinned-digest-required
+          imagePullPolicy: IfNotPresent
+          command: ["enigma-relay"]
+          args: ["serve", "--host", "0.0.0.0", "--port", "8787"]
+          ports:
+            - name: http
+              containerPort: 8787
+          envFrom:
+            - configMapRef:
+                name: enigma-backend-config
+          env:
+            - name: ENIGMA_RELAY_SIGNING_KEY_REF
+              valueFrom:
+                secretKeyRef:
+                  name: enigma-backend-secrets
+                  key: relay-signing-key
+                  optional: false
+            - name: ENIGMA_EXTERNAL_STORAGE_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: enigma-backend-secrets
+                  key: external-storage-dsn
+                  optional: false
+            - name: ENIGMA_KMS_KEY_REF
+              valueFrom:
+                secretKeyRef:
+                  name: enigma-backend-secrets
+                  key: kms-key-ref
+                  optional: false
+            - name: ENIGMA_BACKUP_TARGET_URI
+              valueFrom:
+                secretKeyRef:
+                  name: enigma-backend-secrets
+                  key: backup-target-uri
+                  optional: false
+            - name: ENIGMA_OPERATOR_ACCEPTANCE_EVIDENCE_URI
+              valueFrom:
+                secretKeyRef:
+                  name: enigma-backend-secrets
+                  key: operator-acceptance-evidence-uri
+                  optional: false
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 2
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: enigma-relay
+  namespace: enigma-backend
+  labels:
+    app.kubernetes.io/name: enigma-relay
+    app.kubernetes.io/part-of: enigma
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: enigma-relay
+  ports:
+    - name: http
+      port: 8787
+      targetPort: http
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: enigma-relay
+  namespace: enigma-backend
+  labels:
+    app.kubernetes.io/name: enigma-relay
+    app.kubernetes.io/part-of: enigma
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: enigma-relay
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: enigma-gateway
+  namespace: enigma-backend
+  labels:
+    app.kubernetes.io/name: enigma-gateway
+    app.kubernetes.io/part-of: enigma
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: enigma-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: enigma-gateway
+        app.kubernetes.io/part-of: enigma
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: gateway
+          image: ghcr.io/enigma-ai/enigma:operator-pinned-digest-required
+          imagePullPolicy: IfNotPresent
+          command: ["enigma-gateway"]
+          args: ["serve", "--host", "0.0.0.0", "--port", "8797"]
+          ports:
+            - name: http
+              containerPort: 8797
+          envFrom:
+            - configMapRef:
+                name: enigma-backend-config
+          env:
+            - name: ENIGMA_GATEWAY_SIGNING_KEY_REF
+              valueFrom:
+                secretKeyRef:
+                  name: enigma-backend-secrets
+                  key: gateway-signing-key
+                  optional: false
+            - name: ENIGMA_KMS_KEY_REF
+              valueFrom:
+                secretKeyRef:
+                  name: enigma-backend-secrets
+                  key: kms-key-ref
+                  optional: false
+            - name: ENIGMA_EXTERNAL_STORAGE_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: enigma-backend-secrets
+                  key: external-storage-dsn
+                  optional: false
+            - name: ENIGMA_SIEM_EXPORT_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: enigma-backend-secrets
+                  key: siem-export-endpoint
+                  optional: false
+            - name: ENIGMA_BACKUP_TARGET_URI
+              valueFrom:
+                secretKeyRef:
+                  name: enigma-backend-secrets
+                  key: backup-target-uri
+                  optional: false
+            - name: ENIGMA_OPERATOR_ACCEPTANCE_EVIDENCE_URI
+              valueFrom:
+                secretKeyRef:
+                  name: enigma-backend-secrets
+                  key: operator-acceptance-evidence-uri
+                  optional: false
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 2
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: enigma-gateway
+  namespace: enigma-backend
+  labels:
+    app.kubernetes.io/name: enigma-gateway
+    app.kubernetes.io/part-of: enigma
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: enigma-gateway
+  ports:
+    - name: http
+      port: 8797
+      targetPort: http
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: enigma-gateway
+  namespace: enigma-backend
+  labels:
+    app.kubernetes.io/name: enigma-gateway
+    app.kubernetes.io/part-of: enigma
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: enigma-gateway
+---
+# Public ingress is intentionally path-bounded. Do not enable catch-all routing;
+# publish only the explicitly reviewed health endpoints here.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: enigma-public
+  namespace: enigma-backend
+  annotations:
+    kubernetes.io/ingress.class: operator-selected-public-ingress-class
+    cert-manager.io/cluster-issuer: operator-selected-issuer
+    enigma.ai/operator-note: public ingress exposes exact /readyz and /livez only; no root, admin, or data-plane routing
+spec:
+  tls:
+    - hosts:
+        - relay.example.invalid
+        - gateway.example.invalid
+      secretName: operator-public-tls-secret
+  rules:
+    - host: relay.example.invalid
+      http:
+        paths:
+          - path: /readyz
+            pathType: Exact
+            backend:
+              service:
+                name: enigma-relay
+                port:
+                  name: http
+          - path: /livez
+            pathType: Exact
+            backend:
+              service:
+                name: enigma-relay
+                port:
+                  name: http
+    - host: gateway.example.invalid
+      http:
+        paths:
+          - path: /readyz
+            pathType: Exact
+            backend:
+              service:
+                name: enigma-gateway
+                port:
+                  name: http
+          - path: /livez
+            pathType: Exact
+            backend:
+              service:
+                name: enigma-gateway
+                port:
+                  name: http
+---
+# Private/admin ingress placeholder. Keep this controller internal-only and add
+# operator-managed auth, allowlisted source networks, audit logging, and matching
+# NetworkPolicy before enabling relay/gateway admin or data-plane routes.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: enigma-admin
+  namespace: enigma-backend
+  annotations:
+    kubernetes.io/ingress.class: operator-selected-private-ingress-class
+    cert-manager.io/cluster-issuer: operator-selected-issuer
+    enigma.ai/operator-note: private/admin ingress placeholder; require auth, private network reachability, audit logging, and NetworkPolicy
+spec:
+  tls:
+    - hosts:
+        - admin.example.invalid
+      secretName: operator-admin-tls-secret
+  rules:
+    - host: admin.example.invalid
+      http:
+        # Non-health relay/gateway routes are private placeholders only. If the
+        # backing service expects root-relative paths, configure the private
+        # ingress controller's rewrite/auth policy out-of-band; never mirror
+        # these data-plane or admin routes on the public ingress.
+        paths:
+          - path: /relay
+            pathType: Prefix
+            backend:
+              service:
+                name: enigma-relay
+                port:
+                  name: http
+          - path: /witness
+            pathType: Prefix
+            backend:
+              service:
+                name: enigma-relay
+                port:
+                  name: http
+          - path: /pairing
+            pathType: Prefix
+            backend:
+              service:
+                name: enigma-relay
+                port:
+                  name: http
+          - path: /gateway
+            pathType: Prefix
+            backend:
+              service:
+                name: enigma-gateway
+                port:
+                  name: http
+          - path: /policy
+            pathType: Exact
+            backend:
+              service:
+                name: enigma-gateway
+                port:
+                  name: http
+          - path: /siem/export
+            pathType: Exact
+            backend:
+              service:
+                name: enigma-gateway
+                port:
+                  name: http
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: enigma-default-deny
+  namespace: enigma-backend
+  labels:
+    app.kubernetes.io/part-of: enigma
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: enigma-allow-ingress-controllers-to-services
+  namespace: enigma-backend
+  labels:
+    app.kubernetes.io/part-of: enigma
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values: ["enigma-relay", "enigma-gateway"]
+  policyTypes:
+    - Ingress
+  # Placeholder: NetworkPolicy is controller-level, not HTTP path-level. Keep the
+  # public controller bound to the exact /readyz and /livez paths above, and replace the
+  # private selector with the internal/admin ingress namespace plus auth/source
+  # allowlists before enabling admin or data-plane routes.
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: operator-public-ingress-namespace
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: operator-private-ingress-namespace
+      ports:
+        - protocol: TCP
+          port: 8787
+        - protocol: TCP
+          port: 8797
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: enigma-allow-required-egress-placeholders
+  namespace: enigma-backend
+  labels:
+    app.kubernetes.io/part-of: enigma
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values: ["enigma-relay", "enigma-gateway"]
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 192.0.2.0/32
+      ports:
+        - protocol: TCP
+          port: 443
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: enigma-backup-placeholder
+  namespace: enigma-backend
+  labels:
+    app.kubernetes.io/name: enigma-backup
+    app.kubernetes.io/part-of: enigma
+spec:
+  schedule: "17 3 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: enigma-backup
+            app.kubernetes.io/part-of: enigma
+        spec:
+          restartPolicy: OnFailure
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: backup-placeholder
+              image: ghcr.io/enigma-ai/enigma:operator-pinned-digest-required
+              imagePullPolicy: IfNotPresent
+              command: ["/bin/sh", "-c"]
+              args:
+                - "echo backup target must be wired by operator; exit 1"
+              env:
+                - name: ENIGMA_BACKUP_TARGET_URI
+                  valueFrom:
+                    secretKeyRef:
+                      name: enigma-backend-secrets
+                      key: backup-target-uri
+                      optional: false
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]

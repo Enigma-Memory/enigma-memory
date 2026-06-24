@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.enigma.ai/infrastructure-readiness-manifest-v1.schema.json",
+  "title": "Enigma Infrastructure Readiness Manifest v1",
+  "type": "object",
+  "required": ["schema", "claim_boundary"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "enigma.infrastructure_readiness_manifest.v1" },
+    "name": { "type": "string", "minLength": 1 },
+    "mode": { "type": "string", "enum": ["contract-only", "hosted-live"] },
+    "public_site": { "$ref": "#/$defs/endpoint" },
+    "github": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repository": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+        "repo": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+        "repository_full_name": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+        "url": { "type": "string", "format": "uri" },
+        "repository_url": { "type": "string", "format": "uri" },
+        "ref": { "type": "string", "minLength": 1 },
+        "commit": { "type": "string", "minLength": 1 },
+        "release_ref": { "type": "string", "minLength": 1 },
+        "pages_branch": { "type": "string", "minLength": 1 },
+        "workflow_ref": { "type": "string", "minLength": 1 }
+      }
+    },
+    "cloudflare": { "$ref": "#/$defs/cloudflare" },
+    "cloudflare_pages": { "$ref": "#/$defs/cloudflare" },
+    "relay": { "$ref": "#/$defs/endpoint" },
+    "gateway": { "$ref": "#/$defs/endpoint" },
+    "refs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "relay": { "type": "string", "minLength": 1 },
+        "gateway": { "type": "string", "minLength": 1 },
+        "relay_deployment": { "type": "string", "minLength": 1 },
+        "relay_ref": { "type": "string", "minLength": 1 },
+        "gateway_deployment": { "type": "string", "minLength": 1 },
+        "gateway_ref": { "type": "string", "minLength": 1 },
+        "backend_host": { "type": "string", "minLength": 1 },
+        "dns_tls": { "type": "string", "minLength": 1 },
+        "durable_storage": { "type": "string", "minLength": 1 },
+        "kms": { "type": "string", "minLength": 1 },
+        "kms_or_secret_custody": { "type": "string", "minLength": 1 },
+        "siem_or_log_sink": { "type": "string", "minLength": 1 },
+        "backup_restore": { "type": "string", "minLength": 1 },
+        "monitoring": { "type": "string", "minLength": 1 },
+        "runtime_auth": { "type": "string", "minLength": 1 },
+        "admin_auth": { "type": "string", "minLength": 1 },
+        "data_plane_auth": { "type": "string", "minLength": 1 },
+        "siem": { "type": "string", "minLength": 1 },
+        "backup": { "type": "string", "minLength": 1 },
+        "operator_acceptance": { "type": "string", "minLength": 1 },
+        "network_access_policy": { "type": "string", "minLength": 1 },
+        "kms_custody": { "type": "string", "minLength": 1 },
+        "tenant_policy_approval": { "type": "string", "minLength": 1 },
+        "usage_metering": { "type": "string", "minLength": 1 },
+        "service_settlement": { "type": "string", "minLength": 1 },
+        "monitoring_alerting": { "type": "string", "minLength": 1 },
+        "public_site_security": { "type": "string", "minLength": 1 },
+        "security_threat_model": { "type": "string", "minLength": 1 },
+        "legal_compliance_approval": { "type": "string", "minLength": 1 },
+        "support_sla": { "type": "string", "minLength": 1 },
+        "incident_drill": { "type": "string", "minLength": 1 },
+        "backup_restore_drill": { "type": "string", "minLength": 1 },
+        "token_approval": { "type": "string", "minLength": 1 }
+      }
+    },
+    "operator_acceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "decision": { "type": "string", "enum": ["go", "no-go", "no_go", "pending"] },
+        "status": { "type": "string", "enum": ["go", "no-go", "no_go", "pending"] },
+        "ref": { "type": "string", "minLength": 1 },
+        "packet_ref": { "type": "string", "minLength": 1 },
+        "evidence_ref": { "type": "string", "minLength": 1 },
+        "owner": { "type": "string", "minLength": 1 }
+      }
+    },
+    "external_blockers": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "claim_boundary": {
+      "type": ["string", "array"],
+      "minLength": 1,
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "endpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "url": { "type": "string", "format": "uri" },
+        "ready_url": { "type": "string", "format": "uri" },
+        "health_url": { "type": "string", "format": "uri" },
+        "live_url": { "type": "string", "format": "uri" },
+        "expected_status": { "type": "integer", "minimum": 100, "maximum": 599 },
+        "expected_text": { "type": "array", "items": { "type": "string" } },
+        "required": { "type": "boolean" },
+        "ref": { "type": "string", "minLength": 1 },
+        "reference": { "type": "string", "minLength": 1 },
+        "deployment_ref": { "type": "string", "minLength": 1 },
+        "unauthenticated_local_demo": { "type": "boolean" },
+        "internal": { "type": "boolean" }
+      }
+    },
+    "cloudflare": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "account_id": { "type": "string", "minLength": 1 },
+        "project_name": { "type": "string", "minLength": 1 },
+        "pages_project": { "type": "string", "minLength": 1 },
+        "pages_project_name": { "type": "string", "minLength": 1 },
+        "pages_url": { "type": "string", "format": "uri" },
+        "project_url": { "type": "string", "format": "uri" },
+        "custom_domains": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "ref": { "type": "string", "minLength": 1 },
+        "deployment_ref": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

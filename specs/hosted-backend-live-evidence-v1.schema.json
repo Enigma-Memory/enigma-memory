@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://enigma.memory/specs/hosted-backend-live-evidence-v1.schema.json",
+  "title": "Enigma Hosted Backend Live Evidence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "observed_at",
+    "environment",
+    "refs",
+    "probes",
+    "operator_acceptance",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema": { "const": "enigma.hosted_backend_live_evidence.v1" },
+    "observed_at": { "type": "string", "format": "date-time" },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["environment_id", "domain", "cloud_provider", "region", "owner", "status"],
+      "properties": {
+        "environment_id": { "type": "string", "minLength": 1 },
+        "domain": { "type": "string", "minLength": 1 },
+        "cloud_provider": { "type": "string", "minLength": 1 },
+        "region": { "type": "string", "minLength": 1 },
+        "owner": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["observed", "verified", "go", "accepted"] }
+      }
+    },
+    "refs": {
+      "type": "object",
+      "required": [
+        "backend_host",
+        "dns_tls",
+        "durable_storage",
+        "kms_or_secret_custody",
+        "backup_restore",
+        "monitoring",
+        "siem_or_log_sink",
+        "operator_acceptance",
+        "runtime_auth",
+        "admin_auth",
+        "data_plane_auth",
+        "network_access_policy",
+        "kms_custody",
+        "tenant_policy_approval",
+        "usage_metering",
+        "service_settlement",
+        "monitoring_alerting",
+        "public_site_security",
+        "security_threat_model",
+        "legal_compliance_approval",
+        "support_sla",
+        "incident_drill",
+        "backup_restore_drill",
+        "relay_deployment",
+        "gateway_deployment"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "backend_host": { "type": "string", "minLength": 1 },
+        "dns_tls": { "type": "string", "minLength": 1 },
+        "durable_storage": { "type": "string", "minLength": 1 },
+        "kms_or_secret_custody": { "type": "string", "minLength": 1 },
+        "backup_restore": { "type": "string", "minLength": 1 },
+        "monitoring": { "type": "string", "minLength": 1 },
+        "siem_or_log_sink": { "type": "string", "minLength": 1 },
+        "operator_acceptance": { "type": "string", "minLength": 1 },
+        "runtime_auth": { "type": "string", "minLength": 1 },
+        "admin_auth": { "type": "string", "minLength": 1 },
+        "data_plane_auth": { "type": "string", "minLength": 1 },
+        "network_access_policy": { "type": "string", "minLength": 1 },
+        "kms_custody": { "type": "string", "minLength": 1 },
+        "tenant_policy_approval": { "type": "string", "minLength": 1 },
+        "usage_metering": { "type": "string", "minLength": 1 },
+        "service_settlement": { "type": "string", "minLength": 1 },
+        "monitoring_alerting": { "type": "string", "minLength": 1 },
+        "public_site_security": { "type": "string", "minLength": 1 },
+        "security_threat_model": { "type": "string", "minLength": 1 },
+        "legal_compliance_approval": { "type": "string", "minLength": 1 },
+        "support_sla": { "type": "string", "minLength": 1 },
+        "incident_drill": { "type": "string", "minLength": 1 },
+        "backup_restore_drill": { "type": "string", "minLength": 1 },
+        "relay_deployment": { "type": "string", "minLength": 1 },
+        "gateway_deployment": { "type": "string", "minLength": 1 }
+      }
+    },
+    "probes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["relay_livez", "relay_readyz", "gateway_livez", "gateway_readyz"],
+      "properties": {
+        "relay_livez": { "$ref": "#/$defs/probe" },
+        "relay_readyz": { "$ref": "#/$defs/probe" },
+        "gateway_livez": { "$ref": "#/$defs/probe" },
+        "gateway_readyz": { "$ref": "#/$defs/probe" }
+      }
+    },
+    "operator_acceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "packet_ref", "approved_at", "approved_by"],
+      "properties": {
+        "decision": { "const": "go" },
+        "packet_ref": { "type": "string", "minLength": 1 },
+        "approved_at": { "type": "string", "format": "date-time" },
+        "approved_by": { "type": "string", "minLength": 1 }
+      }
+    },
+    "claim_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hosted_backend_live",
+        "public_site_live",
+        "cloudflare_credentials_claim",
+        "token_roi_claim",
+        "provider_deletion_claim",
+        "model_forgetting_claim"
+      ],
+      "properties": {
+        "hosted_backend_live": { "const": true },
+        "public_site_live": { "const": false },
+        "cloudflare_credentials_claim": { "const": false },
+        "token_roi_claim": { "const": false },
+        "provider_deletion_claim": { "const": false },
+        "model_forgetting_claim": { "const": false }
+      }
+    }
+  },
+  "$defs": {
+    "probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "status_code", "body", "observed_at", "response_hash"],
+      "properties": {
+        "url": { "type": "string", "format": "uri" },
+        "status_code": { "const": 200 },
+        "body": { "type": "object" },
+        "observed_at": { "type": "string", "format": "date-time" },
+        "response_hash": { "type": "string", "pattern": "^sha256:[a-fA-F0-9]{64}$" }
+      }
+    }
+  }
+}
