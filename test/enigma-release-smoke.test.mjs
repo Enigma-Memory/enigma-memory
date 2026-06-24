@@ -196,7 +196,7 @@ function assertReleaseProvenanceOutput(provenance, pkg) {
   assert.equal(provenance.schema, RELEASE_PROVENANCE_SCHEMA);
   assert.equal(provenance.package?.name, pkg.name);
   assert.equal(provenance.package?.version, pkg.version);
-  assert.equal(provenance.package?.bins?.[NATIVE_HOST_BIN_NAME], `./${NATIVE_HOST_BIN_REL}`);
+  assert.equal(provenance.package?.bins?.[NATIVE_HOST_BIN_NAME], NATIVE_HOST_BIN_REL);
   assert.match(provenance.root_hash, SHA256_PREFIXED_DIGEST);
   assert.ok(Array.isArray(provenance.files), 'local provenance must include file hash records');
   assert.equal(provenance.files.length, provenance.counts?.files, 'local provenance count must match file records');
@@ -552,7 +552,7 @@ test('infrastructure readiness smoke wiring is packaged and release-audit option
 
 test('native host release artifacts are package-visible and claim-bounded', async () => {
   const pkg = JSON.parse(await readFile(PACKAGE_JSON_URL, 'utf8'));
-  const nativeHostBinTarget = `./${NATIVE_HOST_BIN_REL}`;
+  const nativeHostBinTarget = NATIVE_HOST_BIN_REL;
   assert.equal(pkg.bin?.[NATIVE_HOST_BIN_NAME], nativeHostBinTarget, 'package bin must expose the native host');
   assert.equal(packageFilesCover(pkg, NATIVE_HOST_BIN_REL), true, 'native host bin must be included in the package file list');
 

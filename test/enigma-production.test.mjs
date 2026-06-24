@@ -249,7 +249,7 @@ function assertReleaseProvenanceDocument(provenance, pkg) {
   for (const binName of REQUIRED_BIN_NAMES) {
     assert.equal(provenance.package?.bins?.[binName], pkg.bin[binName], `release provenance omitted package bin ${binName}`);
   }
-  assert.equal(provenance.package?.bins?.['enigma-native-host'], './apps/native-host/bin/enigma-native-host.mjs');
+  assert.equal(provenance.package?.bins?.['enigma-native-host'], 'apps/native-host/bin/enigma-native-host.mjs');
   assert.ok(Number.isSafeInteger(provenance.counts?.files) && provenance.counts.files > 0, 'release provenance must count packaged files');
   assert.ok(Number.isSafeInteger(provenance.counts?.specs), 'release provenance must count specs');
   assert.ok(Number.isSafeInteger(provenance.counts?.tests), 'release provenance must count tests');
@@ -3476,7 +3476,7 @@ test('native host manifest generator covers browser formats and CLI output modes
 
 test('native host bin is packaged for browser native messaging', async () => {
   const pkg = await readJson(PACKAGE_JSON_URL);
-  assert.equal(pkg.bin?.['enigma-native-host'], './apps/native-host/bin/enigma-native-host.mjs');
+  assert.equal(pkg.bin?.['enigma-native-host'], 'apps/native-host/bin/enigma-native-host.mjs');
   assert.equal(packageFilesCover(pkg, pkg.bin['enigma-native-host']), true);
   assert.equal(packageFilesCover(pkg, 'apps/native-host/README.md'), true);
   for (const browser of ['chrome', 'edge', 'firefox']) {

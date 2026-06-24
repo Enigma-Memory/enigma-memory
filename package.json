@@ -105,12 +105,12 @@
     "specs/"
   ],
   "bin": {
-    "enigma": "./apps/cli/bin/enigma.mjs",
-    "enigma-verify": "./apps/verifier/bin/enigma-verify.mjs",
-    "enigma-mcp": "./packages/mcp-server/bin/enigma-mcp.mjs",
-    "enigma-relay": "./apps/relay/bin/enigma-relay.mjs",
-    "enigma-gateway": "./apps/gateway/bin/enigma-gateway.mjs",
-    "enigma-native-host": "./apps/native-host/bin/enigma-native-host.mjs"
+    "enigma": "apps/cli/bin/enigma.mjs",
+    "enigma-verify": "apps/verifier/bin/enigma-verify.mjs",
+    "enigma-mcp": "packages/mcp-server/bin/enigma-mcp.mjs",
+    "enigma-relay": "apps/relay/bin/enigma-relay.mjs",
+    "enigma-gateway": "apps/gateway/bin/enigma-gateway.mjs",
+    "enigma-native-host": "apps/native-host/bin/enigma-native-host.mjs"
   },
   "scripts": {
     "check": "node scripts/check.mjs",
