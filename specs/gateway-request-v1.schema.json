@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.enigma.ai/gateway-request-v1.schema.json",
+  "title": "Enigma Gateway Request v1",
+  "type": "object",
+  "required": ["schema", "operation", "provider", "model", "region", "purpose", "sensitivity"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "enigma.gateway_request.v1" },
+    "operation": { "type": "string", "enum": ["retrieve", "write", "delete", "compile_context", "search"] },
+    "provider": { "type": "string", "minLength": 1 },
+    "model": { "type": "string", "minLength": 1 },
+    "region": { "type": "string", "minLength": 1 },
+    "purpose": { "type": "string", "minLength": 1 },
+    "sensitivity": { "type": "string", "minLength": 1 },
+    "memory_addr": { "type": "string", "minLength": 1 },
+    "memory_id": { "type": "string", "minLength": 1 },
+    "subject_id": { "type": "string", "minLength": 1 },
+    "legal_hold_delete": { "type": "boolean" }
+  },
+  "not": {
+    "anyOf": [
+      { "required": ["memory"] },
+      { "required": ["memory_text"] },
+      { "required": ["memory_plaintext"] },
+      { "required": ["plaintext"] },
+      { "required": ["raw_memory"] },
+      { "required": ["content"] },
+      { "required": ["value"] }
+    ]
+  }
+}

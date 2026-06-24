@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package-gates:
+    name: Package gates (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Run package metadata check
+        run: npm run check
+
+      - name: Run test suite
+        run: npm test
+
+      - name: Verify package dry run
+        run: npm pack --dry-run
+
+      - name: Run release audit when available
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          if node -e "const pkg = require('./package.json'); process.exit(pkg.scripts && pkg.scripts['release:audit'] ? 0 : 1);"; then
+            npm run release:audit
+          else
+            echo "release:audit script not present; skipping optional audit"
+          fi

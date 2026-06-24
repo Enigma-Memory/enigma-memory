@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.enigma.ai/enterprise-policy-v1.schema.json",
+  "title": "Enigma Enterprise Policy v1",
+  "type": "object",
+  "required": ["schema", "policy_id", "tenant_id", "mode", "created_at", "updated_at", "default_action", "allowed_providers", "allowed_models", "allowed_regions", "denied_sensitivities", "allowed_purposes", "legal_holds", "retention_days", "kms", "provider_native_memory", "policy_hash"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "enigma.enterprise_policy.v1" },
+    "policy_id": { "type": "string", "minLength": 1 },
+    "tenant_id": { "type": "string", "minLength": 1 },
+    "mode": { "type": "string", "enum": ["hosted", "byoc", "on_prem"] },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "default_action": { "const": "deny_unknown" },
+    "allowed_providers": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "allowed_models": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "allowed_regions": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "denied_sensitivities": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "allowed_purposes": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "legal_holds": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["hold_id", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "hold_id": { "type": "string", "minLength": 1 },
+          "memory_addr": { "type": "string", "minLength": 1 },
+          "memory_id": { "type": "string", "minLength": 1 },
+          "subject_id": { "type": "string", "minLength": 1 },
+          "scope_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+          "reason_code": { "type": "string", "minLength": 1 },
+          "status": { "type": "string", "enum": ["active", "released"] }
+        },
+        "anyOf": [
+          { "required": ["memory_addr"] },
+          { "required": ["memory_id"] },
+          { "required": ["subject_id"] },
+          { "required": ["scope_hash"] }
+        ]
+      }
+    },
+    "retention_days": { "type": "integer", "minimum": 0 },
+    "kms": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "provider": { "type": "string", "minLength": 1 },
+        "key_id": { "type": "string", "minLength": 1 },
+        "key_version": { "type": "string", "minLength": 1 },
+        "region": { "type": "string", "minLength": 1 },
+        "evidence_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "provider_native_memory": { "const": "cache_only" },
+    "policy_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+  }
+}

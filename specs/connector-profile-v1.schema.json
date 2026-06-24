@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.enigma.ai/connector-profile-v1.schema.json",
+  "title": "Enigma Connector Profile v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "client_id",
+    "display_name",
+    "platforms",
+    "default_config_path",
+    "default_config_paths",
+    "config_format",
+    "server_container_path",
+    "server_name",
+    "command",
+    "required_env"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "enigma.connector_profile.v1" },
+    "client_id": {
+      "type": "string",
+      "enum": ["claude-desktop", "cursor", "kimi-code", "vscode-cline", "roo", "opencode", "generic-mcp"]
+    },
+    "display_name": { "type": "string", "minLength": 1 },
+    "description": { "type": "string", "minLength": 1 },
+    "platforms": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "type": "string", "enum": ["win32", "darwin", "linux"] },
+      "uniqueItems": true
+    },
+    "default_config_path": { "type": "string", "minLength": 1 },
+    "default_config_paths": {
+      "type": "object",
+      "required": ["win32", "darwin", "linux"],
+      "additionalProperties": false,
+      "properties": {
+        "win32": { "type": "string", "minLength": 1 },
+        "darwin": { "type": "string", "minLength": 1 },
+        "linux": { "type": "string", "minLength": 1 }
+      }
+    },
+    "config_format": { "const": "json" },
+    "server_container_path": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "server_name": { "type": "string", "minLength": 1 },
+    "command": { "const": "enigma-mcp" },
+    "required_env": {
+      "type": "array",
+      "contains": { "const": "ENIGMA_BUNDLE" },
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "platform": { "type": "string", "enum": ["win32", "darwin", "linux"] }
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.enigma.ai/trust-bundle-v1.schema.json",
+  "title": "Enigma Trust Bundle v1",
+  "type": "object",
+  "required": ["schema", "bundle_id", "created_at", "trusted_issuers", "trusted_witnesses", "accepted_algorithms", "revocations"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "enigma.trust_bundle.v1" },
+    "bundle_id": { "type": "string", "minLength": 8 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "trusted_issuers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["issuer_id", "key_id", "public_key", "scope"],
+        "additionalProperties": false,
+        "properties": {
+          "issuer_id": { "type": "string", "minLength": 1 },
+          "key_id": { "type": "string", "minLength": 1 },
+          "public_key": { "type": "string", "minLength": 1 },
+          "scope": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "trusted_witnesses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["witness_id", "key_id", "public_key"],
+        "additionalProperties": false,
+        "properties": {
+          "witness_id": { "type": "string", "minLength": 1 },
+          "key_id": { "type": "string", "minLength": 1 },
+          "public_key": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "accepted_algorithms": { "type": "array", "items": { "type": "string", "enum": ["Ed25519", "Ed25519+ML-DSA-policy", "sha256", "hmac-sha256"] } },
+    "import_capsule_policy": {
+      "type": "object",
+      "required": ["private_plaintext_boundary", "completeness_evidence_required", "recognized_importer_count", "unsupported_importer_count"],
+      "additionalProperties": false,
+      "properties": {
+        "private_plaintext_boundary": {
+          "type": "string",
+          "enum": ["payload_private_public_artifacts_hash_only"]
+        },
+        "completeness_evidence_required": { "type": "boolean" },
+        "recognized_importer_count": { "type": "integer", "minimum": 0 },
+        "unsupported_importer_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "revocations": { "type": "array", "items": { "type": "string" } }
+  }
+}

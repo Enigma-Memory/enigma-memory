@@ -1,0 +1,9 @@
+{
+  "name": "com.enigma.native_host",
+  "description": "Enigma local native messaging host for explicit browser context requests.",
+  "path": "/ABSOLUTE/PATH/TO/enigma-native-host",
+  "type": "stdio",
+  "allowed_extensions": [
+    "REPLACE_WITH_FIREFOX_EXTENSION_ID"
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.enigma.ai/relay-record-v1.schema.json",
+  "title": "Enigma Relay Record v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "record_id",
+    "store_id",
+    "capsule_id",
+    "encrypted_payload_hash",
+    "opaque_encrypted_record",
+    "received_at",
+    "expires_at",
+    "signature"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "enigma.relay_record.v1" },
+    "record_id": { "type": "string", "minLength": 8 },
+    "relay_record_id": { "type": "string", "minLength": 8 },
+    "store_id": { "type": "string", "minLength": 1 },
+    "capsule_id": { "type": ["string", "null"] },
+    "encrypted_payload_hash": { "$ref": "#/$defs/sha256Root" },
+    "opaque_encrypted_record": { "type": "string", "minLength": 1 },
+    "received_at": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": ["string", "null"], "format": "date-time" },
+    "signature": { "$ref": "#/$defs/signature" }
+  },
+  "$defs": {
+    "sha256Root": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "signature": {
+      "type": "object",
+      "required": ["alg", "key_id", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "alg": { "const": "Ed25519" },
+        "key_id": { "type": "string", "minLength": 1 },
+        "value": { "type": "string", "minLength": 64 }
+      }
+    }
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "schema": "enigma.demo_assets_manifest.v1",
+  "version": "2026-06-24.demo-assets.v1",
+  "deterministic": true,
+  "generated_by": "scripts/build-demo-assets.mjs",
+  "output_files": [
+    {
+      "path": "receipt-flow-demo.svg",
+      "media_type": "image/svg+xml",
+      "bytes": 5441,
+      "sha256": "cc1f82b7efdabe2f39d1747c918d190b947d2c5be2b0295f0fc9de652f493ccd",
+      "role": "animated storyboard source"
+    }
+  ],
+  "storyboard_flow": [
+    {
+      "order": 1,
+      "id": "vault",
+      "label": "Vault",
+      "subtitle": "Committed local memory address"
+    },
+    {
+      "order": 2,
+      "id": "policy",
+      "label": "Policy",
+      "subtitle": "Purpose + boundary checks"
+    },
+    {
+      "order": 3,
+      "id": "context-pack",
+      "label": "Context Pack",
+      "subtitle": "Plaintext-minimized payload"
+    },
+    {
+      "order": 4,
+      "id": "model-boundary",
+      "label": "Model Boundary",
+      "subtitle": "Provider memory treated as cache"
+    },
+    {
+      "order": 5,
+      "id": "receipt",
+      "label": "Receipt",
+      "subtitle": "Signed Enigma lifecycle event"
+    },
+    {
+      "order": 6,
+      "id": "verifier",
+      "label": "Verifier",
+      "subtitle": "Offline proof check"
+    }
+  ],
+  "root_sha256": "387d19ec76fb4f221770bfe2fd71ff93cf764e191580205c6d0b265a8c6eb99a",
+  "claim_boundary": [
+    "Demo assets are public-safe source artifacts for storyboard and explainer use.",
+    "They illustrate Enigma-controlled vault, policy, context-pack, receipt, and verifier flow only.",
+    "They do not prove provider deletion, model forgetting, compliance certification, hosted readiness, or customer deployment status."
+  ]
+}

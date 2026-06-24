@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.enigma.ai/capsule-v1.schema.json",
+  "title": "Enigma Capsule v1",
+  "type": "object",
+  "required": ["schema", "capsule_id", "capsule_type", "issuer", "created_at", "expires_at", "scope", "payload", "proofs"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "enigma.capsule.v1" },
+    "capsule_id": { "type": "string", "minLength": 8 },
+    "capsule_type": { "type": "string", "enum": ["personal_passport", "project", "session", "audit", "migration"] },
+    "issuer": { "type": "string", "minLength": 1 },
+    "holder": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "scope": {
+      "type": "object",
+      "required": ["subjects", "operations"],
+      "additionalProperties": false,
+      "properties": {
+        "subjects": { "type": "array", "items": { "type": "string" } },
+        "memory_addrs": { "type": "array", "items": { "type": "string" } },
+        "operations": { "type": "array", "items": { "type": "string" } },
+        "purpose": { "type": "string" }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "required": ["encryption", "objects_ref"],
+      "additionalProperties": false,
+      "properties": {
+        "encryption": { "type": "string", "enum": ["encrypted", "receipt_only", "plaintext_user_requested"] },
+        "objects_ref": { "type": "string" }
+      }
+    },
+    "proofs": {
+      "type": "object",
+      "required": ["receipt_log_root", "active_set_root"],
+      "additionalProperties": false,
+      "properties": {
+        "receipt_log_root": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "description": "Canonical custody roots must be derived from receipt objects that are available for verification; receipt-hash-only claims are candidate evidence."
+        },
+        "active_set_root": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "description": "Canonical custody roots must commit only memory addresses backed by matching receipt objects, not arbitrary receipt hashes."
+        },
+        "receipt_bundle_ref": { "type": "string" }
+      }
+    }
+  }
+}

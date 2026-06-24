@@ -1,0 +1,150 @@
+# Enigma backend Docker Compose production reference.
+# Operator reference only: this file is not go-live evidence and does not prove
+# backend availability. Provide real external storage, KMS/signing material,
+# SIEM export, backups, monitoring, ingress/TLS, and acceptance evidence first.
+
+services:
+  relay:
+    image: ghcr.io/enigma-ai/enigma:operator-pinned-digest-required
+    entrypoint: ["enigma-relay"]
+    command: ["serve", "--host", "0.0.0.0", "--port", "8787"]
+    env_file:
+      - ./operator-env/relay.production.env
+    secrets:
+      - relay_signing_key
+      - external_storage_dsn
+      - kms_key_ref
+      - backup_target_uri
+      - operator_acceptance_evidence_uri
+    environment:
+      NODE_ENV: production
+      ENIGMA_BACKEND_MODE: production
+      ENIGMA_REQUIRE_EXTERNAL_STORAGE: "true"
+      ENIGMA_REQUIRE_EXTERNAL_KMS: "true"
+      ENIGMA_DISABLE_LOCAL_DEMO_FALLBACK: "true"
+      ENIGMA_REQUIRE_OPERATOR_ACCEPTANCE_EVIDENCE: "true"
+      ENIGMA_READINESS_FAIL_CLOSED: "true"
+      ENIGMA_RELAY_BACKEND_HOST_REF: operator-required-relay-backend-host-ref
+      ENIGMA_RELAY_DNS_TLS_REF: operator-required-relay-dns-tls-ref
+      ENIGMA_RELAY_RUNTIME_AUTH_REF: operator-required-relay-runtime-auth-ref
+      ENIGMA_RELAY_MONITORING_REF: operator-required-relay-monitoring-ref
+      ENIGMA_SIEM_REF: operator-required-siem-ref
+      ENIGMA_BACKUP_TARGET_URI_FILE: /run/secrets/backup_target_uri
+      ENIGMA_NETWORK_ACCESS_POLICY_REF: operator-required-network-access-policy-ref
+      ENIGMA_KMS_CUSTODY_REF: operator-required-kms-custody-ref
+      ENIGMA_KMS_KEY_REF: operator-required-kms-key-ref
+      ENIGMA_TENANT_POLICY_APPROVAL_REF: operator-required-tenant-policy-approval-ref
+      ENIGMA_USAGE_METERING_REF: operator-required-usage-metering-ref
+      ENIGMA_SERVICE_SETTLEMENT_REF: operator-required-service-settlement-ref
+      ENIGMA_MONITORING_ALERTING_REF: operator-required-monitoring-alerting-ref
+      ENIGMA_PUBLIC_SITE_SECURITY_REF: operator-required-public-site-security-ref
+      ENIGMA_SECURITY_THREAT_MODEL_REF: operator-required-security-threat-model-ref
+      ENIGMA_LEGAL_COMPLIANCE_APPROVAL_REF: operator-required-legal-compliance-approval-ref
+      ENIGMA_SUPPORT_SLA_REF: operator-required-support-sla-ref
+      ENIGMA_INCIDENT_DRILL_REF: operator-required-incident-drill-ref
+      ENIGMA_BACKUP_RESTORE_DRILL_REF: operator-required-backup-restore-drill-ref
+      ENIGMA_OPERATOR_ACCEPTANCE_DECISION: operator-required-go-decision
+      ENIGMA_RELAY_SIGNING_KEY_FILE: /run/secrets/relay_signing_key
+      ENIGMA_EXTERNAL_STORAGE_DSN_FILE: /run/secrets/external_storage_dsn
+      ENIGMA_KMS_KEY_REF_FILE: /run/secrets/kms_key_ref
+      ENIGMA_OPERATOR_ACCEPTANCE_EVIDENCE_URI_FILE: /run/secrets/operator_acceptance_evidence_uri
+    ports:
+      - "127.0.0.1:8787:8787"
+    read_only: true
+    user: "1000:1000"
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"Promise.all([fetch('http://127.0.0.1:8787/livez'),fetch('http://127.0.0.1:8787/readyz')]).then(rs=>process.exit(rs.every(r=>r.ok)?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  gateway:
+    image: ghcr.io/enigma-ai/enigma:operator-pinned-digest-required
+    entrypoint: ["enigma-gateway"]
+    command: ["serve", "--host", "0.0.0.0", "--port", "8797"]
+    env_file:
+      - ./operator-env/gateway.production.env
+    secrets:
+      - gateway_signing_key
+      - external_storage_dsn
+      - kms_key_ref
+      - siem_export_endpoint
+      - backup_target_uri
+      - operator_acceptance_evidence_uri
+    environment:
+      NODE_ENV: production
+      ENIGMA_BACKEND_MODE: production
+      ENIGMA_REQUIRE_EXTERNAL_KMS: "true"
+      ENIGMA_REQUIRE_EXTERNAL_STORAGE: "true"
+      ENIGMA_REQUIRE_SIEM_EXPORT: "true"
+      ENIGMA_DISABLE_LOCAL_DEMO_FALLBACK: "true"
+      ENIGMA_REQUIRE_OPERATOR_ACCEPTANCE_EVIDENCE: "true"
+      ENIGMA_READINESS_FAIL_CLOSED: "true"
+      ENIGMA_GATEWAY_BACKEND_HOST_REF: operator-required-gateway-backend-host-ref
+      ENIGMA_GATEWAY_DNS_TLS_REF: operator-required-gateway-dns-tls-ref
+      ENIGMA_GATEWAY_MONITORING_REF: operator-required-gateway-monitoring-ref
+      ENIGMA_GATEWAY_STORAGE_REF: operator-required-gateway-storage-ref
+      ENIGMA_SIEM_REF: operator-required-siem-ref
+      ENIGMA_GATEWAY_ADMIN_AUTH_REF: operator-required-gateway-admin-auth-ref
+      ENIGMA_GATEWAY_DATA_PLANE_AUTH_REF: operator-required-gateway-data-plane-auth-ref
+      ENIGMA_BACKUP_TARGET_URI_FILE: /run/secrets/backup_target_uri
+      ENIGMA_NETWORK_ACCESS_POLICY_REF: operator-required-network-access-policy-ref
+      ENIGMA_KMS_CUSTODY_REF: operator-required-kms-custody-ref
+      ENIGMA_KMS_KEY_REF: operator-required-kms-key-ref
+      ENIGMA_TENANT_POLICY_APPROVAL_REF: operator-required-tenant-policy-approval-ref
+      ENIGMA_USAGE_METERING_REF: operator-required-usage-metering-ref
+      ENIGMA_SERVICE_SETTLEMENT_REF: operator-required-service-settlement-ref
+      ENIGMA_MONITORING_ALERTING_REF: operator-required-monitoring-alerting-ref
+      ENIGMA_PUBLIC_SITE_SECURITY_REF: operator-required-public-site-security-ref
+      ENIGMA_SECURITY_THREAT_MODEL_REF: operator-required-security-threat-model-ref
+      ENIGMA_LEGAL_COMPLIANCE_APPROVAL_REF: operator-required-legal-compliance-approval-ref
+      ENIGMA_SUPPORT_SLA_REF: operator-required-support-sla-ref
+      ENIGMA_INCIDENT_DRILL_REF: operator-required-incident-drill-ref
+      ENIGMA_BACKUP_RESTORE_DRILL_REF: operator-required-backup-restore-drill-ref
+      ENIGMA_OPERATOR_ACCEPTANCE_DECISION: operator-required-go-decision
+      ENIGMA_GATEWAY_ADMIN_AUTH_BEARER_SHA256: operator-required-admin-bearer-sha256
+      ENIGMA_GATEWAY_DATA_PLANE_AUTH_BEARER_SHA256: operator-required-data-plane-bearer-sha256
+      ENIGMA_GATEWAY_SIGNING_KEY_FILE: /run/secrets/gateway_signing_key
+      ENIGMA_KMS_KEY_REF_FILE: /run/secrets/kms_key_ref
+      ENIGMA_SIEM_EXPORT_ENDPOINT_FILE: /run/secrets/siem_export_endpoint
+      ENIGMA_EXTERNAL_STORAGE_DSN_FILE: /run/secrets/external_storage_dsn
+      ENIGMA_OPERATOR_ACCEPTANCE_EVIDENCE_URI_FILE: /run/secrets/operator_acceptance_evidence_uri
+    ports:
+      - "127.0.0.1:8797:8797"
+    read_only: true
+    user: "1000:1000"
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"Promise.all([fetch('http://127.0.0.1:8797/livez'),fetch('http://127.0.0.1:8797/readyz')]).then(rs=>process.exit(rs.every(r=>r.ok)?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+secrets:
+  relay_signing_key:
+    file: ./operator-secrets/relay-signing-key
+  gateway_signing_key:
+    file: ./operator-secrets/gateway-signing-key
+  external_storage_dsn:
+    file: ./operator-secrets/external-storage-dsn
+  kms_key_ref:
+    file: ./operator-secrets/kms-key-ref
+  backup_target_uri:
+    file: ./operator-secrets/backup-target-uri
+  siem_export_endpoint:
+    file: ./operator-secrets/siem-export-endpoint
+  operator_acceptance_evidence_uri:
+    file: ./operator-secrets/operator-acceptance-evidence-uri
