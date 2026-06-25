@@ -8,15 +8,27 @@ node scripts/run-memory-benchmarks.mjs
 node scripts/run-memory-benchmarks.mjs --out ./.enigma/memory-benchmark.json
 ```
 
+For official-dataset retrieval/evidence proxy scoring over operator-downloaded files:
+
+```sh
+cd enigma
+node scripts/run-standard-memory-benchmarks.mjs --locomo ./data/locomo10.json --out ./.enigma/locomo-standard-memory-benchmark.json
+node scripts/run-standard-memory-benchmarks.mjs --longmemeval ./data/longmemeval_s_cleaned.json --top-k 5 --out ./.enigma/longmemeval-standard-memory-benchmark.json
+node scripts/run-standard-memory-benchmarks.mjs --locomo ./data/locomo10.json --longmemeval ./data/longmemeval_s_cleaned.json --max-locomo-qa 100 --max-longmemeval-items 100 --out ./.enigma/standard-memory-benchmark.json
+```
+
+The standard report schema is `enigma.standard_memory_benchmark_suite.v1`. It reads local official dataset JSON files only, scores deterministic retrieval/evidence coverage proxies, and still excludes raw question, answer, and conversation text from reports.
+
 The report schema is `enigma.memory_benchmark_suite.v1`. It is public-safe by design: aggregate metrics, commitments, citations, boundaries, and cross-provider profile labels are emitted, but raw fixture memory, question text, and answer text are not included.
 
 ## External standards and boundaries
 
 - LoCoMo is the relevant long-term conversational-memory standard for multi-session QA, event summarization, and multimodal generation over long conversations. See https://snap-research.github.io/locomo/.
 - LongMemEval is the relevant standard for information extraction, multi-session reasoning, temporal reasoning, knowledge updates, and abstention. See https://arxiv.org/abs/2410.10813.
+- Official local inputs for the standard runner are LoCoMo `locomo10.json` from `https://raw.githubusercontent.com/snap-research/locomo/main/data/locomo10.json` and LongMemEval cleaned files `longmemeval_oracle.json`, `longmemeval_s_cleaned.json`, or `longmemeval_m_cleaned.json` from the upstream Hugging Face dataset repository.
 - Letta's benchmark discussion is a useful boundary reminder: measured memory quality depends on the agent/framework/tool loop as well as memory-store mechanics. See https://www.letta.com/blog/benchmarking-ai-agent-memory/.
 
-This repository harness does not download or run LoCoMo, LongMemEval, provider APIs, or third-party agents. It mirrors their task categories with a deterministic local fixture so Enigma can make narrow package claims about local vault operations, context-pack generation, optimizer token estimates, export/import, verification, deduplication, abstention behavior, and latency.
+The fixture harness does not download or run LoCoMo, LongMemEval, provider APIs, or third-party agents. The standard harness (`run-standard-memory-benchmarks.mjs`) can score operator-supplied local LoCoMo and LongMemEval JSON files without credentials, provider APIs, or third-party SDKs.
 
 ## What the harness measures
 
@@ -37,6 +49,27 @@ Reported metrics include exact-answer recall, abstention correctness, estimated 
 Enigma context-pack token improvements are achieved by local selection, not external-provider behavior: the passport compiler narrows active local memories to the deterministic query/purpose/address-relevant set before optimizer tiering and deduplication. This lowers estimated prompt tokens by excluding locally irrelevant fixture memories while preserving the same recall and abstention scoring boundary.
 
 Numeric token and latency values in generated reports are local fixture measurements. They can change with hardware, Node/runtime version, script version, and fixture contents, so copy should cite the command and report artifact rather than treating one run as a universal score.
+
+## Official dataset retrieval/proxy runner
+
+`scripts/run-standard-memory-benchmarks.mjs` is the dependency-free runner for official dataset files already present on disk. It supports `--locomo <path>`, `--longmemeval <path>`, `--max-locomo-qa <n>`, `--max-longmemeval-items <n>`, `--top-k <n>` (default `5`), and optional `--out <path>`. Supplying only one dataset path scores only that dataset.
+
+Reports include only the input file name plus the input SHA-256, not the full local path, so operator usernames or workstation directories are not persisted.
+
+The runner parses LoCoMo `conversation` session turns as memory records and maps evidence labels such as `D1:3` or `D8:6; D9:17` to dialog IDs. It parses LongMemEval `haystack_sessions` turns as memory records, uses `has_answer: true` turns plus `answer_session_ids` as gold evidence, and treats `_abs` question IDs as abstention cases.
+
+Rows are local methods only: `full_context`, `recency_last_n`, `keyword_filter`, and `enigma_relevance`. `keyword_filter` remains a simple deterministic lexical baseline: it selects records whose public-safe normalized terms overlap the query. `enigma_relevance` is the more production-like local Enigma approximation: it uses deterministic query expansion, term normalization and stemming, task/category and temporal/date hints, role/session metadata, phrase/proximity scoring, and final reranking for evidence diversity. It does not use LLMs, provider APIs, competitor SDKs, hosted services, raw answers, or `has_answer` evidence flags to select records.
+
+| Standard-runner row | Retrieval boundary |
+| --- | --- |
+| `full_context` | Scores every parsed local memory record for the dataset item without retrieval filtering. |
+| `recency_last_n` | Scores the most recent parsed records as a deterministic recency baseline. |
+| `keyword_filter` | Scores direct normalized query/content term overlap only, so it remains intentionally easy to audit. |
+| `enigma_relevance` | Scores deterministic Enigma-style retrieval signals before `--top-k`: query expansion, stemming, role/session metadata, temporal hints, phrase/proximity matches, and evidence-diversity reranking. |
+
+Because `enigma_relevance` can match normalized variants, session/role cues, temporal wording, nearby phrases, and diverse evidence-bearing turns that a direct keyword overlap can miss, the benchmark report may show it improving over `keyword_filter` on retrieval/evidence proxy metrics. Those results are whatever the generated report records for the operator-supplied files; do not hard-code unreviewed scores or restate them as LLM answer accuracy, provider quality, competitor ranking, or benchmark-leadership evidence.
+
+The standard runner reports retrieval/evidence proxy metrics: LoCoMo evidence-hit@k and exact evidence coverage; LongMemEval turn evidence-hit@k, session evidence-hit@k, exact coverage, and abstention correctness; plus estimated prompt tokens, selected memory counts, and local latency. These are not LLM-generated answer-accuracy scores and must not be described as provider, competitor, or benchmark-leadership results.
 
 ## Local baseline comparison
 
@@ -70,19 +103,18 @@ The `official_positioning` field records only source-attributed context needed t
 
 ## Claim limits
 
-The benchmark report is evidence for this local deterministic fixture only. Reported score improvements mean Enigma selected fewer locally irrelevant context-pack candidates under the same fixture questions; they are not provider deletion proof, model forgetting proof, compliance certification, ROI evidence, provider invoice savings evidence, benchmark leadership proof, hosted cloud readiness, or a substitute for external LoCoMo/LongMemEval evaluation.
+The fixture benchmark report is evidence for the local deterministic fixture only. The standard benchmark report is evidence for retrieval/evidence proxy scoring over the operator-supplied LoCoMo or LongMemEval file only. Reported `enigma_relevance` improvements mean the local deterministic retrieval method surfaced evidence more effectively than the simpler keyword row for that run's questions, top-k, parser, and dataset file; they are not provider deletion proof, model forgetting proof, compliance certification, ROI evidence, provider invoice savings evidence, benchmark leadership proof, hosted cloud readiness, or LLM answer-accuracy evidence.
 
 Cross-provider rows are profile labels using the same Enigma context-pack boundary. External competitor rows are adapter requirements only; they do not call, score, or rank live provider models.
 
 `public_claims_allowed` is intentionally narrow: deterministic local fixture execution, local recall/abstention metrics, local baseline comparison, local token estimates, duplicate removal where applicable, p50/p95 local latency, Enigma bundle/context-pack verification, and explicit withholding of third-party scores until the required external artifacts exist.
 
-## Extending with external datasets later
+## Running official datasets safely
 
-To extend this harness with real external benchmark datasets without weakening claim boundaries:
+To run real LoCoMo or LongMemEval retrieval/proxy scores without weakening claim boundaries:
 
-1. Add an explicit dataset loader that reads a local file supplied by the operator; do not add network downloads to the benchmark command.
-2. Preserve source license, version, split, and checksum metadata in the report.
+1. Download the official dataset files separately and pass local paths to `run-standard-memory-benchmarks.mjs`; the benchmark command itself does not fetch network resources.
+2. Preserve source URL, license, split/file name, and checksum metadata beside private run artifacts when publishing internally.
 3. Keep raw conversations, private memory, questions, and answers out of public reports unless the dataset license and review process explicitly allow publication.
-4. Route every candidate through the same Enigma vault, context-pack, optimizer, export, and verify operations measured here.
-5. Add separate agent/model evaluation only when the evaluated agent loop is fixed and documented; do not attribute agent/tool behavior solely to the memory store.
-6. Keep release notes bounded to the observed command, dataset, timestamp, and review approval.
+4. Treat standard-runner metrics as retrieval/evidence proxy scores only. Add separate LLM answer-accuracy evaluation only when the evaluated agent/model loop is fixed, documented, and credentialed by the operator.
+5. Keep release notes bounded to the observed command, dataset file name, input SHA-256, timestamp, top-k, max-item limits, and review approval.

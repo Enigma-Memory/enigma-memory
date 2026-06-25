@@ -2,6 +2,15 @@ name: Enigma Memory smoke
 
 on:
   workflow_dispatch:
+    inputs:
+      run_standard_benchmark:
+        description: 'Download official LoCoMo/LongMemEval data and run the bounded standard benchmark sample'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
   pull_request:
   push:
     branches:
@@ -22,7 +31,7 @@ jobs:
         run: npm init -y
 
       - name: Install Enigma Memory
-        run: npm install enigma-memory@0.1.3
+        run: npm install enigma-memory@0.1.4
 
       - name: Expose local benchmark script
         run: |
@@ -47,6 +56,23 @@ jobs:
           mkdir -p artifacts
           cp benchmark-report.json artifacts/benchmark-report.json
           echo "Saved public-safe benchmark report placeholder at artifacts/benchmark-report.json"
+
+      - name: Dry-run standard benchmark dataset download
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_standard_benchmark == 'true' }}
+        run: node ./node_modules/enigma-memory/scripts/download-standard-benchmarks.mjs --dry-run
+
+      - name: Download official benchmark datasets
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_standard_benchmark == 'true' }}
+        run: |
+          node ./node_modules/enigma-memory/scripts/download-standard-benchmarks.mjs --execute --dataset all --out-dir .enigma/benchmarks/datasets --manifest .enigma/benchmarks/dataset-manifest.json
+
+      - name: Run standard benchmark sample
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_standard_benchmark == 'true' }}
+        run: |
+          node ./node_modules/enigma-memory/scripts/run-standard-memory-benchmarks.mjs --locomo .enigma/benchmarks/datasets/locomo10.json --longmemeval .enigma/benchmarks/datasets/longmemeval_s_cleaned.json --max-locomo-qa 25 --max-longmemeval-items 25 --top-k 5 --out .enigma/standard-memory-benchmark-sample.json
+          mkdir -p artifacts
+          cp .enigma/benchmarks/dataset-manifest.json artifacts/dataset-manifest.json
+          cp .enigma/standard-memory-benchmark-sample.json artifacts/standard-memory-benchmark-sample.json
 
       # Optional artifact upload placeholder:
       # If your repository already permits actions/upload-artifact, uncomment a

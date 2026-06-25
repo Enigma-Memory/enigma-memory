@@ -1,23 +1,68 @@
 # Benchmark reproducibility
 
-This guide explains how to reproduce the current local Enigma memory benchmark, save the public-safe JSON report, cite the external benchmark standards it is modeled after, and understand what is still required before publishing live third-party comparisons.
+This guide explains how to reproduce the current local Enigma memory benchmark, run official-dataset retrieval/evidence proxy benchmarks against LoCoMo and LongMemEval inputs, save public-safe JSON reports, cite source datasets honestly, and understand what is still required before publishing live LLM answer-accuracy or competitor comparisons.
 
 ## What is reproducible today
 
-The current package is `enigma-memory@0.1.4`. The local benchmark is available through the package script and the script file it wraps:
+The current package is `enigma-memory@0.1.4`. Two benchmark paths are reproducible without provider credentials:
+
+1. The local deterministic memory suite, available through the package script and the script file it wraps:
+
+   ```sh
+   cd enigma
+   npm run benchmark:memory-suite
+   npm run benchmark:memory-suite -- --out benchmark-report.json
+   node scripts/run-memory-benchmarks.mjs --out benchmark-report.json
+   ```
+
+   The `--out` form writes the report to the requested path and prints only a small status object. Without `--out`, the command writes the full JSON report to stdout. The report schema is `enigma.memory_benchmark_suite.v1`.
+
+2. The official-dataset standard runner, which consumes locally downloaded LoCoMo and/or LongMemEval JSON files:
+
+   ```sh
+   node scripts/run-standard-memory-benchmarks.mjs --locomo .enigma/benchmarks/datasets/locomo10.json --longmemeval .enigma/benchmarks/datasets/longmemeval_s_cleaned.json --max-locomo-qa 25 --max-longmemeval-items 25 --top-k 5 --out .enigma/standard-memory-benchmark-sample.json
+   ```
+
+   The standard report schema is `enigma.standard_memory_benchmark_suite.v1`. It scores retrieval/evidence coverage over official dataset records with local deterministic methods only. It does not call LLM providers, generate final answers, grade natural-language answer correctness, call competitor SDKs, or create provider/competitor scores.
+
+   In that standard report, `keyword_filter` is intentionally the simpler lexical baseline. `enigma_relevance` is the deterministic Enigma retrieval approximation: it uses deterministic query expansion, term normalization and stemming, task/category and temporal/date hints, role/session metadata, phrase/proximity scoring, and final reranking for evidence diversity. It does not use raw answer text, evidence labels, or `has_answer` flags to choose records. It must be interpreted only as retrieval/evidence proxy scoring over the local dataset file named in the report, not as LLM answer accuracy, provider performance, competitor performance, or leaderboard standing.
+
+   | Standard-runner row | Retrieval boundary |
+   | --- | --- |
+   | `full_context` | Scores every parsed local memory record for the dataset item without retrieval filtering. |
+   | `recency_last_n` | Scores the most recent parsed records as a deterministic recency baseline. |
+   | `keyword_filter` | Scores direct normalized query/content term overlap only. |
+   | `enigma_relevance` | Scores deterministic Enigma-style retrieval signals before `--top-k`: query expansion, stemming, role/session metadata, temporal hints, phrase/proximity matches, and evidence-diversity reranking. |
+
+Both report families are designed to be public-safe: they contain aggregate metrics, commitments, citations, profile labels, source metadata, and claim boundaries. They do not include raw fixture memory, raw dataset conversation text, private question text, private answer text, provider transcripts, credentials, account ids, or local absolute paths.
+
+## Official dataset download runbook
+
+Use `scripts/download-standard-benchmarks.mjs` to stage official LoCoMo and LongMemEval files for future standard benchmark runs without adding raw data to the repository. The default mode is a public-safe dry run:
 
 ```sh
 cd enigma
-npm run benchmark:memory-suite
-npm run benchmark:memory-suite -- --out benchmark-report.json
-node scripts/run-memory-benchmarks.mjs --out benchmark-report.json
+node scripts/download-standard-benchmarks.mjs --dry-run
 ```
 
-The `--out` form writes the report to the requested path and prints only a small status object. Without `--out`, the command writes the full JSON report to stdout.
+The dry-run output lists planned fetches only: dataset ids, source URLs, licenses or upstream license-review notes, usage boundaries, expected output files under `.enigma/benchmarks/datasets`, and the manifest path. It does not fetch data, print raw dataset snippets, include credentials, or emit local absolute paths when the default relative paths are used.
 
-The report schema is `enigma.memory_benchmark_suite.v1`. It is designed to be public-safe: it contains aggregate metrics, commitments, citations, cross-provider profile labels, and claim boundaries. It does not include raw fixture memory, private question text, private answer text, provider transcripts, credentials, account ids, or local absolute paths.
+To download all supported datasets and capture hashes/sizes, opt in explicitly:
 
-## Reproduce and save JSON
+```sh
+node scripts/download-standard-benchmarks.mjs --execute --dataset all --out-dir .enigma/benchmarks/datasets --manifest .enigma/benchmarks/dataset-manifest.json
+```
+
+For a single dataset, use `--dataset locomo`, `--dataset longmemeval-oracle`, `--dataset longmemeval-s`, or `--dataset longmemeval-m`. The manifest schema is `enigma.standard_benchmark_dataset_manifest.v1`; it records source URLs, output file names, byte sizes, SHA-256 hashes, licenses/usage boundaries, and `raw_dataset_content_included: false`.
+
+Expected official source facts:
+
+- LoCoMo data source: `https://raw.githubusercontent.com/snap-research/locomo/main/data/locomo10.json`; license: CC BY-NC 4.0.
+- LongMemEval cleaned source files: `https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/longmemeval_oracle.json`, `https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/longmemeval_s_cleaned.json`, and `https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/longmemeval_m_cleaned.json`. LongMemEval covers information extraction, multi-session reasoning, temporal reasoning, knowledge updates, and abstention.
+
+Do not commit downloaded files or raw benchmark conversations. The package `.gitignore` excludes `.enigma/`; keep `.enigma/benchmarks/datasets` and the manifest as local/review artifacts unless a separate publication review approves what can be shared. LoCoMo is licensed CC BY-NC 4.0. LongMemEval cleaned files are hosted by the upstream Hugging Face dataset/repository; review the upstream terms before use or redistribution. Downloading these files enables retrieval/evidence-coverage or other reviewed benchmark scoring, not provider deletion proof, model forgetting proof, ROI/savings claims, compliance certification, live competitor scores, or benchmark-leadership claims.
+
+## Reproduce and save local fixture JSON
 
 1. Use a clean checkout containing `enigma-memory@0.1.4`.
 2. From a repository root that contains `enigma/package.json`, enter the package directory:
@@ -47,6 +92,42 @@ The local fixture measures Enigma-controlled operations only: vault remember/upd
 
 Interpret improvements as local fixture behavior. Enigma reduces context-pack estimated prompt tokens by selecting the deterministic query/purpose/address-relevant local memories before optimizer tiering and deduplication; it does not measure provider invoice savings, token ROI, live model quality, or third-party memory superiority. Token estimates and p50/p95 timings can change across hardware, Node/runtime versions, script revisions, and fixture updates.
 
+## Run the official-dataset standard benchmark
+
+The standard runner reads local dataset files produced by the downloader and writes a public-safe proxy report to the path supplied with `--out`. A bounded sample is the safest first run:
+
+```sh
+node scripts/run-standard-memory-benchmarks.mjs --locomo .enigma/benchmarks/datasets/locomo10.json --longmemeval .enigma/benchmarks/datasets/longmemeval_s_cleaned.json --max-locomo-qa 25 --max-longmemeval-items 25 --top-k 5 --out .enigma/standard-memory-benchmark-sample.json
+```
+
+Useful runner options:
+
+- `--locomo <path>` supplies a local LoCoMo JSON file.
+- `--longmemeval <path>` supplies a local LongMemEval JSON file. Use one cleaned split per run when you want split-specific evidence.
+- `--max-locomo-qa <n>` and `--max-longmemeval-items <n>` bound the sample size.
+- `--top-k <n>` controls retrieval depth; the default is `5`.
+- `--out <path>` writes public-safe JSON to that path. Without `--out`, the report is printed to stdout.
+
+If only `--locomo` or only `--longmemeval` is supplied, the runner scores only that dataset.
+
+For a full local proxy run, remove the sample caps:
+
+```sh
+node scripts/run-standard-memory-benchmarks.mjs --locomo .enigma/benchmarks/datasets/locomo10.json --longmemeval .enigma/benchmarks/datasets/longmemeval_s_cleaned.json --top-k 5 --out .enigma/standard-memory-benchmark.json
+```
+
+Full runs may take materially longer, may produce larger JSON reports, and may change with Node/runtime, hardware, script revision, dataset split, retrieval depth, and any future parsing fixes. They still remain retrieval/evidence proxy runs: no LLM answer generation, no provider APIs, no hosted memory services, and no competitor adapters are exercised. If the generated report shows `enigma_relevance` ahead of `keyword_filter`, describe the improvement as a local deterministic retrieval/evidence proxy result produced by that report, not as a hard-coded final score or any provider/model/competitor claim.
+
+When preserving or publishing official-dataset benchmark artifacts, keep the benchmark report and dataset manifest together. The report path is chosen with `--out`; the dataset hash/size capture is the manifest path passed to `--manifest`, usually `.enigma/benchmarks/dataset-manifest.json`.
+
+Public sharing should include the generated benchmark report JSON and generated dataset manifest JSON, not raw dataset files or raw conversations. Before publishing generated JSON, verify:
+
+1. The report schema is `enigma.standard_memory_benchmark_suite.v1`.
+2. The report does not contain raw conversation text, raw questions, raw answers, secrets, provider transcripts, account ids, or local absolute paths.
+3. The companion manifest schema is `enigma.standard_benchmark_dataset_manifest.v1`.
+4. The manifest includes source URLs, byte sizes, SHA-256 hashes, license/usage boundaries, and local file names for the exact dataset files used.
+5. Any public claim says "retrieval/evidence coverage proxy", quotes scores only from the generated report for the exact dataset hash/top-k/sample bounds, and avoids provider/model/competitor implications unless a separate reviewed provider answer-accuracy run exists.
+
 ## Local baseline rows in the report
 
 The report now includes `metrics.local_baseline_comparisons`, which compares deterministic local baselines over the same private fixture questions. These rows are local package evidence only: they do not call hosted providers, use provider APIs, or support invoice savings, ROI, compliance, model-forgetting, or benchmark-leadership claims.
@@ -62,34 +143,48 @@ The report also includes `public_claims_allowed`; keep public copy within those 
 
 ## How to cite external benchmark standards
 
-Use these standards as citations and task-category references, not as claimed Enigma results unless the exact external benchmark has been run and reviewed:
+Use these standards as dataset sources, citations, and task-category references, not as claimed Enigma leaderboard-equivalent results unless the exact external benchmark, scoring setup, and source-data hashes have been run and reviewed:
 
-- LoCoMo: https://snap-research.github.io/locomo/ — cite for long-term conversational-memory QA, event summarization, and multimodal generation over long conversations.
-- LongMemEval: https://arxiv.org/abs/2410.10813 — cite for information extraction, multi-session reasoning, temporal reasoning, knowledge updates, and abstention.
+- LoCoMo: https://snap-research.github.io/locomo/ and `https://raw.githubusercontent.com/snap-research/locomo/main/data/locomo10.json` — cite for long-term conversational-memory QA, event summarization, and multimodal generation over long conversations. The LoCoMo dataset license is CC BY-NC 4.0.
+- LongMemEval: https://arxiv.org/abs/2410.10813 and cleaned HuggingFace JSON files `https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/longmemeval_oracle.json`, `https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/longmemeval_s_cleaned.json`, and `https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/longmemeval_m_cleaned.json` — cite for information extraction, multi-session reasoning, temporal reasoning, knowledge updates, and abstention.
 
-The current local report mirrors some task categories from those benchmarks, but it does not download LoCoMo or LongMemEval data, run their official evaluation pipelines, or claim leaderboard-equivalent results.
+The local report mirrors some task categories from those benchmarks but does not download or score official records. The standard runner consumes official local dataset files and scores retrieval/evidence coverage; it does not run the original papers' full LLM evaluation pipelines or claim leaderboard-equivalent answer accuracy.
+
+## Future provider answer-accuracy runs
+
+A real answer-accuracy run is a different benchmark from the current standard runner. It would need all of the following before any answer-correctness or model-quality claim is published:
+
+1. Provider API keys supplied at run time through reviewed environment names only, with secret values never printed, persisted, or copied into reports.
+2. Frozen model ids for generator and, if used, evaluator models. Model aliases are not enough for reproducibility.
+3. Budget caps before execution: maximum records, maximum generated tokens, maximum retries, timeout policy, and maximum provider spend.
+4. Frozen prompts for memory ingestion, retrieval, answer generation, abstention, evaluator grading, and any tool-use instructions.
+5. A fixed evaluator choice: exact-match/structured checks where the dataset supports them, human review where required, or a separately versioned LLM-as-judge prompt/model with known limitations.
+6. Dataset manifest hashes, split names, record counts, source licenses, and any excluded-record policy.
+7. Raw provider inputs/outputs retained only in private reviewed storage when license and policy permit; public reports should expose safe aggregates and hashes, not raw conversations.
+
+The current standard runner is intentionally retrieval/evidence proxy only because it can run without provider keys, prompt variance, evaluator-model drift, provider billing risk, or provider transcript handling. It can say whether the local retrieval/evidence path surfaced expected supporting material, including whether deterministic Enigma relevance outperformed the simpler keyword row in the generated report. It cannot say whether an LLM would answer correctly, abstain correctly, forget something, comply with a deletion request, or outperform a provider/native memory product.
 
 ## Why live third-party comparisons are not claimed yet
 
-The current benchmark does not call external provider APIs, external SDKs, hosted memory services, ChatGPT native memory, Claude memory tooling, or third-party agent loops. Cross-provider rows in the report are profile labels that reuse the same Enigma context-pack boundary; they do not call or compare live provider models and are not live provider rankings.
+The current benchmarks do not call external provider APIs, external SDKs, hosted memory services, ChatGPT native memory, Claude memory tooling, or third-party agent loops. Cross-provider rows in the local report are profile labels that reuse the same Enigma context-pack boundary; they do not call or compare live provider models and are not live provider rankings. The official-dataset standard report is likewise local retrieval/evidence scoring only.
 
-Real comparisons require fixed adapters, fixed datasets, fixed agent/tool loops, explicit provider terms review, and reviewed handling of secrets and raw benchmark data. Memory quality can change with the surrounding agent framework and tool loop, so a fair comparison must document more than the memory store. Until those inputs exist, external competitor rows stay requirements-only and must not carry recall, abstention, token, latency, or ranking scores.
+Real comparisons require fixed adapters, fixed datasets, fixed agent/tool loops, explicit provider terms review, reviewed handling of secrets and raw benchmark data, and a no-score-without-run rule. Memory quality can change with the surrounding agent framework and tool loop, so a fair comparison must document more than the memory store. Until those inputs exist and the adapter is actually run in the same harness, external competitor rows stay requirements-only and must not carry recall, abstention, token, latency, answer-accuracy, cost, or ranking scores.
 
-The current report must not be used as evidence of provider-side deletion, model forgetting, compliance certification, token ROI, provider invoice savings, benchmark leadership, hosted-cloud readiness, or “best in world” superiority.
+The current reports must not be used as evidence of provider-side deletion, model forgetting, compliance certification, token ROI, provider invoice savings, benchmark leadership, hosted-cloud readiness, or “best in world” superiority.
 
-## External comparison requirements
+## Competitor comparison plan and no-score-without-run rule
 
-Use placeholder environment names only. Do not commit real tokens, API keys, account ids, provider transcripts, raw benchmark conversations, or private memory.
+Use placeholder environment names only. Do not commit real tokens, API keys, account ids, provider transcripts, raw benchmark conversations, raw provider answers, or private memory.
 
-The report field `external_competitor_adapters` is a requirements matrix, not a score table. External rows are expected to remain requirements-only until credentials, runtimes, and datasets are supplied and reviewed: `can_run_in_this_harness: false`, `scores_included: false`, and no recall, abstention, token, latency, or ranking scores.
+The report field `external_competitor_adapters` is a requirements matrix, not a score table. External rows are expected to remain requirements-only until credentials, runtimes, datasets, fixed prompts, fixed model ids, budget caps, reset policies, and scoring code are supplied and reviewed. A competitor row must have `can_run_in_this_harness: false`, `scores_included: false`, and no recall, abstention, token, latency, answer-accuracy, cost, or ranking score unless that exact adapter was run over the same dataset manifest in the same harness.
 
 | Target | Runtime or SDK needed | Placeholder secrets and local inputs | Dataset requirement | Adapter boundary before results can be claimed |
 | --- | --- | --- | --- | --- |
-| Letta | Letta SDK/runtime; documented SDK packages include `@letta-ai/letta-client` and `letta-client`; API-key-backed service access may be required. | `LETTA_API_KEY`, `LETTA_BASE_URL`, `LETTA_PROJECT_ID`, `BENCHMARK_DATASET_PATH` | Local reviewed LoCoMo/LongMemEval split or another reviewed local dataset file with license, version, split, and checksum metadata. | Build a Letta adapter that fixes the agent loop, memory write/read policy, model settings, and scoring path. Results may describe that configured Letta run only, not generic provider deletion or model forgetting. |
-| LangGraph memory | LangGraph runtime with short-term checkpointer memory and long-term namespaced store. | `LANGGRAPH_CHECKPOINTER_URI`, `LANGGRAPH_STORE_URI`, `BENCHMARK_DATASET_PATH` | Same local dataset file and split used for Enigma and every competitor. | Fix graph topology, checkpoint scope, namespace policy, retrieval policy, model/tool loop, and scorer. Do not attribute graph/tool behavior solely to the memory store. |
+| Letta/MemGPT | Letta SDK/runtime and MemGPT-style memory agent configuration; documented SDK packages include `@letta-ai/letta-client` and `letta-client`; API-key-backed service access may be required. | `LETTA_API_KEY`, `LETTA_BASE_URL`, `LETTA_PROJECT_ID`, `BENCHMARK_DATASET_PATH` | Local reviewed LoCoMo/LongMemEval split or another reviewed local dataset file with license, version, split, and checksum metadata. | Build a Letta adapter that fixes the agent loop, memory write/read policy, model settings, and scoring path. Results may describe that configured Letta/MemGPT run only, not generic provider deletion or model forgetting. |
+| LangGraph | LangGraph runtime with short-term checkpointer memory and long-term namespaced store. | `LANGGRAPH_CHECKPOINTER_URI`, `LANGGRAPH_STORE_URI`, `BENCHMARK_DATASET_PATH` | Same local dataset file and split used for Enigma and every competitor. | Fix graph topology, checkpoint scope, namespace policy, retrieval policy, model/tool loop, and scorer. Do not attribute graph/tool behavior solely to the memory store. |
 | Zep | Zep service/runtime positioned around temporal Context Graph and Context Lake retrieval. | `ZEP_API_KEY`, `ZEP_PROJECT_ID`, `ZEP_BASE_URL`, `BENCHMARK_DATASET_PATH` | Same local dataset file and split; include source checksum and whether any provider-side graph state is reused or reset. | Build a Zep adapter that records ingest, session, retrieval, reset, and scoring policy. Zep’s sub-200ms retrieval positioning is a vendor/source fact, not an Enigma-measured claim until measured in the same harness. |
 | Mem0 | Mem0 platform or open-source stack; positioned as a universal self-improving memory layer. | `MEM0_API_KEY`, `MEM0_BASE_URL`, `MEM0_PROJECT_ID`, `BENCHMARK_DATASET_PATH` | Same local dataset file and split; record Mem0 deployment flavor/version. | Build a Mem0 adapter with fixed extraction, update, retrieval, reset, and scorer behavior. Self-improving or platform behavior must be bounded to the configured run. |
-| OpenAI native ChatGPT memory | ChatGPT consumer-app/native memory environment. It is not directly available through a public API in this harness. | No usable harness secret; `OPENAI_API_KEY` alone is not sufficient to exercise ChatGPT native memory. | No fair automated dataset run until an approved interface can load/reset/query native memory reproducibly. | Do not claim live native ChatGPT memory comparison from this repository. A future adapter would need an approved public interface, reproducible memory reset/load semantics, and provider-policy review. |
+| OpenAI native memory (ChatGPT memory) | ChatGPT consumer-app/native memory environment. It is not directly available through a public API in this harness. | No usable harness secret; `OPENAI_API_KEY` alone is not sufficient to exercise ChatGPT native memory. | No fair automated dataset run until an approved interface can load/reset/query native memory reproducibly. | Do not claim live native ChatGPT memory comparison from this repository. A future adapter would need an approved public interface, reproducible memory reset/load semantics, and provider-policy review. |
 | Claude memory tool | Client-side/provider-specific memory tool environment. | `CLAUDE_MEMORY_TOOL_CONFIG`, `ANTHROPIC_API_KEY`, `BENCHMARK_DATASET_PATH` | Same local dataset file and split, plus reviewed tool-state reset/export rules. | Build an adapter around the exact client/tool environment, not generic Claude model behavior. Results can only cover that configured memory-tool setup. |
 
 ## Source references for adapter planning
@@ -106,10 +201,11 @@ The report field `external_competitor_adapters` is a requirements matrix, not a 
 Before publishing external comparison language, capture all of the following in the benchmark report or an adjacent reviewed evidence file:
 
 1. Package version, benchmark schema, command, timestamp, OS/runtime, and adapter version.
-2. Dataset name, source URL, license review status, local file checksum, split, and record count.
+2. Dataset name, source URL, license review status, local file checksum, split, record count, and manifest schema/hash.
 3. Secret names used as placeholders, with confirmation that no secret values are printed or persisted.
-4. Adapter configuration: SDK/runtime version, model where applicable, memory write/read policy, reset policy, context limits, retry policy, and scoring code.
-5. Per-target raw scoring inputs retained privately when license permits, with public reports limited to safe aggregates.
-6. Explicit boundaries separating memory-store behavior, agent-loop behavior, model behavior, provider-hosted state, and Enigma receipt verification.
+4. Adapter configuration: SDK/runtime version, model ids where applicable, memory write/read policy, reset policy, context limits, retry policy, budget caps, frozen prompts, and scoring code.
+5. Evaluator choice and version: exact deterministic scorer, human rubric/version, or LLM-as-judge model id and frozen prompt.
+6. Per-target raw scoring inputs retained privately when license permits, with public reports limited to safe aggregates and hashes.
+7. Explicit boundaries separating memory-store behavior, agent-loop behavior, model behavior, provider-hosted state, and Enigma receipt verification.
 
-Until that evidence exists, use only the local benchmark claim: Enigma can reproduce deterministic local memory-fixture operations and emit a public-safe `enigma.memory_benchmark_suite.v1` JSON report.
+Until that evidence exists, use only the supported benchmark claims: Enigma can reproduce deterministic local memory-fixture operations with `enigma.memory_benchmark_suite.v1`, and Enigma can run official-dataset retrieval/evidence proxy scoring with `enigma.standard_memory_benchmark_suite.v1` when the local dataset files and manifest are supplied.

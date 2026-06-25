@@ -33,9 +33,19 @@ npx enigma doctor
 npm run benchmark:memory-suite -- --out benchmark-report.json
 ```
 
-and then runs a small ESM import smoke. It does not require GitHub secrets, cloud provider credentials, npm tokens, private bundles, or local path assumptions. The benchmark step writes a public-safe local JSON report using schema `enigma.memory_benchmark_suite.v1`; see the benchmark reproducibility guide for claim boundaries and the requirements for any future live third-party comparison.
+and then runs a small ESM import smoke. It does not require GitHub secrets, cloud provider credentials, npm tokens, private bundles, local path assumptions, or official dataset network downloads in normal CI. The benchmark step writes a public-safe local JSON report using schema `enigma.memory_benchmark_suite.v1`; see the benchmark reproducibility guide for claim boundaries and the requirements for any future live third-party comparison.
 
-Use the workflow as a template in a consumer repository. It is intentionally limited to install/import/doctor smoke coverage, local proof generation, and deterministic local benchmark evidence; it does not publish packages, deploy infrastructure, contact hosted Enigma cloud, or call external memory providers.
+The workflow also includes optional official-dataset benchmark preparation steps gated behind the manual `workflow_dispatch` input `run_standard_benchmark: true`. Normal `push` and `pull_request` runs skip them, so official dataset downloads are not required in normal CI. Enable the manual path only after the repository has reviewed network use and dataset-license handling:
+
+```sh
+node ./node_modules/enigma-memory/scripts/download-standard-benchmarks.mjs --dry-run
+node ./node_modules/enigma-memory/scripts/download-standard-benchmarks.mjs --execute --dataset all --out-dir .enigma/benchmarks/datasets --manifest .enigma/benchmarks/dataset-manifest.json
+node ./node_modules/enigma-memory/scripts/run-standard-memory-benchmarks.mjs --locomo .enigma/benchmarks/datasets/locomo10.json --longmemeval .enigma/benchmarks/datasets/longmemeval_s_cleaned.json --max-locomo-qa 25 --max-longmemeval-items 25 --top-k 5 --out .enigma/standard-memory-benchmark-sample.json
+```
+
+Those commands produce a dataset manifest with source URLs, byte sizes, and SHA-256 hashes plus a standard benchmark report using schema `enigma.standard_memory_benchmark_suite.v1`. The standard runner is retrieval/evidence proxy scoring only: it does not call providers, grade generated answers, or produce competitor scores.
+
+Use the workflow as a template in a consumer repository. It is intentionally limited to install/import/doctor smoke coverage, local proof generation, and deterministic local benchmark evidence by default; it does not publish packages, deploy infrastructure, contact hosted Enigma cloud, call external memory providers, or download official benchmark datasets unless you intentionally enable `run_standard_benchmark` for a manual workflow run.
 
 ## MCP client loop
 
