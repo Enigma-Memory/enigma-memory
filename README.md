@@ -5,7 +5,7 @@ Enigma is a provider-agnostic AI memory custody and proof layer. It gives a user
 Current status:
 
 - Local production foundation: CLI, verifier, vault, passport, boundary, MCP server, connector, importer, relay, gateway, enterprise, mesh, browser-extension, and desktop scaffold code exist in this repository.
-- Installable package scaffolding: package bins and module entry points are present. Until `@enigma-ai/enigma` is published from release credentials, use the repository path install below.
+- Installable package scaffolding: package bins and module entry points are present. Until `enigma-memory` is published from the authorized npm account, use the repository path install below.
 - Source-only artifacts: `docs/`, `Dockerfile`, and `docker-compose.yml` live in the source checkout. The package README and CLI help are the package-included install guides; the full runbooks require the repository or hosted docs.
 - Hosted cloud is not included by default. Hosted relay/gateway/cloud operation requires deployment credentials, a domain, TLS, production durable storage, KMS/secrets, monitoring, backups, operator policy, and a completed operator acceptance packet. Local relay/gateway `--state-file` demo state does not satisfy those hosted/BYOC requirements.
 - Cloudflare API/domain/hosting automation is documented but safe-by-default: [`docs/cloudflare-token-and-domain-runbook.md`](docs/cloudflare-token-and-domain-runbook.md) gives the token recipe, Registrar prerequisites, local token storage rule, search/check flow, explicit domain+price purchase gate, Pages deploy gate, custom-domain steps, and post-setup token rotation.
@@ -64,11 +64,12 @@ npm run provenance:local -- --out ./.enigma/release-provenance.json
 
 The provenance/SBOM command writes package-surface file inventory and SHA-256 values for reviewer comparison, then prints `{ ok, path, file_count, root_hash }`; without `--out`, it prints the full `enigma.release_provenance.v1` JSON to stdout. It complements `npm pack --dry-run` by giving checksums for inventoried local package-surface files; it does not sign the release, publish to a registry, prove a git commit, claim SLSA/compliance status, prove a Docker image digest, or prove hosted/cloud deployment.
 
-When the public package is available:
+When the public `enigma-memory` package is available:
 
 ```sh
-npm install -g @enigma-ai/enigma
-npx --yes --package @enigma-ai/enigma enigma --help
+npm install -g enigma-memory
+npx --yes --package enigma-memory enigma --help
+npx --yes --package enigma-memory enigma doctor
 ```
 
 Create a no-network local vault, write one local memory from a file, compile a context pack, export a proof bundle, and verify it. Use a tenant-approved smoke file; do not expand private memory into shell argv.
