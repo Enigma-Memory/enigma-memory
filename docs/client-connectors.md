@@ -1,6 +1,6 @@
 # Client connectors
 
-Enigma connects to assistant clients through MCP. The client starts `enigma-mcp` over stdio, and Enigma reads/writes the local vault bundle named by `ENIGMA_BUNDLE`. Install once, run setup once, then connect the same AI Memory Passport everywhere.
+Enigma connects to assistant clients through MCP. The client starts `enigma-mcp` over stdio, and Enigma reads/writes the local vault bundle named by `ENIGMA_BUNDLE`. Start with the public test drive, then create a regular local workspace, then explicitly connect installed/config-present clients when you are ready.
 
 Supported connector IDs:
 
@@ -12,9 +12,20 @@ Supported connector IDs:
 - `opencode`
 - `generic-mcp`
 
+## Public test drive first
+
+Prove the live npm package path without credentials, hosted SaaS, provider calls, or client-config writes:
+
+```sh
+npm install -g enigma-memory
+enigma test-drive --overwrite
+```
+
+`enigma test-drive --overwrite` writes an isolated demo under `.enigma/test-drive` by default, emits one public-safe JSON summary, and does not print raw private memory plaintext. Use `--dry-run` to preview without writing, or `--out-dir <path>` to choose another isolated demo directory. The local proof/demo is bounded to Enigma-controlled vault state, receipts, checkpoints, committed roots, exported bundle shape, and declared boundary operations; it is not hosted SaaS evidence and does not prove provider deletion or model forgetting.
+
 ## One clear path
 
-Start with the safe local setup:
+After the test drive, create a regular local workspace:
 
 ```sh
 npm install -g enigma-memory
@@ -51,10 +62,10 @@ enigma connect claude-desktop --dry-run
 
 Provider-native memory is non-canonical cache only in this architecture. The Enigma vault remains canonical, and Enigma receipts prove Enigma-controlled lifecycle events; they do not prove that a hosted provider deleted hidden copies or that a model forgot anything.
 
-One-off execution without a global install:
+One-off public test drive without a global install:
 
 ```sh
-npx --yes --package enigma-memory enigma setup --overwrite
+npx --yes --package enigma-memory enigma test-drive --overwrite
 ```
 
 From a source checkout, use this only for package development or source-only docs:
