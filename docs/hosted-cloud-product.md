@@ -13,9 +13,12 @@ The source package now has pure contract builders and validators in `packages/ho
 - usage billing records;
 - dashboard summaries;
 - backup drill records;
-- incident and SLA reference records.
+- incident and SLA reference records;
+- customer lifecycle packets that aggregate those surfaces for launch-readiness evidence.
 
 These functions are contract and validation code only. They do not call an auth provider, billing provider, cloud deployment, KMS, backup target, support desk, status page, SIEM, or model provider. They are safe to import as package code because they do not start servers, read user files, mutate deployment state, publish packages, or contact external accounts.
+
+The lifecycle packet public API is `buildCustomerLifecyclePacket(input)` and `validateCustomerLifecyclePacket(packet)` under `enigma-memory/hosted-cloud`; the script command below emits the same schema for release evidence.
 
 The validators enforce hosted-cloud boundaries:
 
@@ -27,7 +30,7 @@ The validators enforce hosted-cloud boundaries:
 - hosted vault contracts are opaque-record and plaintext-minimized contracts only;
 - billing records remain contract records until an external billing provider invoice flow is wired.
 
-Every builder emits `readiness.contract_ready: true` and `readiness.integration_kind: "contract_validator_only"`. It also emits `readiness.hosted_cloud_sellable: false` because contract readiness is not provider wiring, legal approval, security review, or operator go-live approval.
+Individual surface builders emit `readiness.contract_ready: true`, `readiness.integration_kind: "contract_validator_only"`, and `readiness.hosted_cloud_sellable: false` because contract readiness is not provider wiring, legal approval, security review, or operator go-live approval. A customer lifecycle packet may only mark `hosted_cloud_sellable: true` when every lifecycle surface has a provided evidence ref and an explicit operator go-live approval ref is supplied; the packet remains evidence validation, not live hosted SaaS or provider wiring.
 
 ## Externally blocked before hosted cloud can be sold
 
@@ -43,6 +46,12 @@ Hosted cloud remains blocked until an operator wires and records evidence for al
 | External security review | External security review or audit scope, remediation tracking, approval record, and release sign-off. |
 
 A `provided` operator evidence ref means the contract can point to external evidence. It still does not by itself make hosted cloud sellable; an operator must complete the release checklist and issue go-live approval. A `blocked_external_dependency` ref is an explicit blocker, not fake evidence.
+
+## Customer lifecycle packet
+
+`npm run production:hosted-customer -- --tenant <id> --domain <domain> --environment <env> --out <file>` builds `enigma.hosted_cloud.customer_lifecycle_packet.v1` readiness evidence for a tenant launch packet. Operators may pass repeatable `--evidence-ref <key=status:ref>` values and `--operator-go-live-ref <ref>` when real external evidence exists. The command writes public-safe validation evidence only: it creates no hosted account, tenant, vault, API key, invoice, support ticket, backup, Cloudflare resource, provider resource, secret, or deployment.
+
+The lifecycle packet records lifecycle phases, required surfaces, external blockers, missing evidence refs, no-secret/no-plaintext guarantees, and the sellability gate. Missing surfaces, blocked evidence refs, or absent operator go-live approval keep `hosted_cloud_sellable:false`.
 
 ## Non-claims
 

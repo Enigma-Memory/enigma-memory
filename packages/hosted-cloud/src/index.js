@@ -8,6 +8,7 @@ export const HOSTED_CLOUD_USAGE_BILLING_SCHEMA = 'enigma.hosted_cloud.usage_bill
 export const HOSTED_CLOUD_DASHBOARD_SCHEMA = 'enigma.hosted_cloud.dashboard_summary.v1';
 export const HOSTED_CLOUD_BACKUP_DRILL_SCHEMA = 'enigma.hosted_cloud.backup_drill.v1';
 export const HOSTED_CLOUD_INCIDENT_SLA_SCHEMA = 'enigma.hosted_cloud.incident_sla_refs.v1';
+export const HOSTED_CLOUD_CUSTOMER_LIFECYCLE_PACKET_SCHEMA = 'enigma.hosted_cloud.customer_lifecycle_packet.v1';
 
 export const HOSTED_CLOUD_EXTERNAL_BLOCKERS = Object.freeze([
   'auth_provider',
@@ -34,6 +35,48 @@ const BLOCKER_LABELS = Object.freeze({
   data_processing_terms: 'Data processing terms are not approved.',
   support_ownership: 'Support ownership is not assigned.',
   external_security_review: 'External security review is not complete.',
+});
+
+export const HOSTED_CLOUD_CUSTOMER_LIFECYCLE_PHASES = Object.freeze([
+  'account',
+  'tenant',
+  'vault',
+  'api_key',
+  'billing',
+  'dashboard',
+  'backup',
+  'incident_sla',
+  'support',
+  'monitoring',
+  'legal',
+  'security_review',
+  'operator_go_live',
+]);
+const CUSTOMER_LIFECYCLE_CONTRACT_PHASES = Object.freeze([
+  'account',
+  'tenant',
+  'vault',
+  'api_key',
+  'billing',
+  'dashboard',
+  'backup',
+  'incident_sla',
+]);
+const CUSTOMER_LIFECYCLE_REQUIRED_EVIDENCE_PHASES = Object.freeze(HOSTED_CLOUD_CUSTOMER_LIFECYCLE_PHASES.filter((phase) => phase !== 'operator_go_live'));
+const CUSTOMER_LIFECYCLE_BLOCKER_LABELS = Object.freeze({
+  account: 'Hosted account contract evidence is not provided.',
+  tenant: 'Hosted tenant contract evidence is not provided.',
+  vault: 'Hosted vault contract evidence is not provided.',
+  api_key: 'Hosted API key metadata evidence is not provided.',
+  billing: 'Hosted billing evidence is not provided.',
+  dashboard: 'Hosted dashboard evidence is not provided.',
+  backup: 'Hosted backup drill evidence is not provided.',
+  incident_sla: 'Hosted incident/SLA evidence is not provided.',
+  support: 'Hosted support ownership evidence is not provided.',
+  monitoring: 'Hosted monitoring evidence is not provided.',
+  legal: 'Hosted legal approval evidence is not provided.',
+  security_review: 'Hosted security review evidence is not provided.',
+  operator_go_live: 'Explicit operator go-live approval is not provided.',
 });
 const FORBIDDEN_KEY_RE = /(?:^|_)(?:raw_?memory|plaintext|plain_text|prompt|prompts|completion|completions|message_body|transcript|conversation|provider_?response|response_?body|credential|credentials|secret|password|private_?key|bearer|access_token|refresh_token|token_value|api_key_value|api_secret|token_?roi|token_?profit|roi_claim|profit_claim|provider_?deletion|provider_?erasure|model_?forgetting|model_?erasure)(?:$|_)/iu;
 const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|raw memory|private prompt|provider response|full transcript|decrypted memory)/iu;
@@ -534,5 +577,408 @@ export function validateIncidentSlaRefs(contract) {
   requiredTrue(contract.incident_boundary.customer_commitment_requires_approved_sla, 'incident_boundary.customer_commitment_requires_approved_sla');
   requiredTrue(contract.incident_boundary.support_owner_required, 'incident_boundary.support_owner_required');
   requiredTrue(contract.incident_boundary.external_review_required, 'incident_boundary.external_review_required');
+  return true;
+}
+
+function lifecycleContractIdKey(phase) {
+  switch (phase) {
+    case 'account': return 'account_id';
+    case 'tenant': return 'tenant_id';
+    case 'vault': return 'vault_id';
+    case 'api_key': return 'api_key_id';
+    case 'billing': return 'billing_record_id';
+    case 'dashboard': return 'dashboard_id';
+    case 'backup': return 'backup_drill_id';
+    case 'incident_sla': return 'incident_sla_id';
+    default: throw new TypeError(`unknown lifecycle phase: ${phase}`);
+  }
+}
+
+function lifecycleContractSource(input, aliases) {
+  if (isPlainObject(input.contracts)) {
+    for (const alias of aliases) {
+      if (input.contracts[alias] !== undefined) return input.contracts[alias];
+    }
+  }
+  for (const alias of aliases) {
+    if (input[alias] !== undefined) return input[alias];
+  }
+  return undefined;
+}
+
+function buildOrValidateLifecycleContract(phase, source) {
+  if (source === undefined || source === null) return null;
+  if (!isPlainObject(source)) throw new TypeError(`contracts.${phase} must be an object`);
+  switch (phase) {
+    case 'account':
+      if (source.schema === HOSTED_CLOUD_USER_ACCOUNT_SCHEMA) {
+        validateUserAccountContract(source);
+        return source;
+      }
+      return buildUserAccountContract(source);
+    case 'tenant':
+      if (source.schema === HOSTED_CLOUD_TENANT_SCHEMA) {
+        validateTenantContract(source);
+        return source;
+      }
+      return buildTenantContract(source);
+    case 'vault':
+      if (source.schema === HOSTED_CLOUD_VAULT_SCHEMA) {
+        validateHostedVaultContract(source);
+        return source;
+      }
+      return buildHostedVaultContract(source);
+    case 'api_key':
+      if (source.schema === HOSTED_CLOUD_API_KEY_SCHEMA) {
+        validateApiKeyContract(source);
+        return source;
+      }
+      return buildApiKeyContract(source);
+    case 'billing':
+      if (source.schema === HOSTED_CLOUD_USAGE_BILLING_SCHEMA) {
+        validateUsageBillingRecord(source);
+        return source;
+      }
+      return buildUsageBillingRecord(source);
+    case 'dashboard':
+      if (source.schema === HOSTED_CLOUD_DASHBOARD_SCHEMA) {
+        validateDashboardSummary(source);
+        return source;
+      }
+      return buildDashboardSummary(source);
+    case 'backup':
+      if (source.schema === HOSTED_CLOUD_BACKUP_DRILL_SCHEMA) {
+        validateBackupDrillContract(source);
+        return source;
+      }
+      return buildBackupDrillContract(source);
+    case 'incident_sla':
+      if (source.schema === HOSTED_CLOUD_INCIDENT_SLA_SCHEMA) {
+        validateIncidentSlaRefs(source);
+        return source;
+      }
+      return buildIncidentSlaRefs(source);
+    default:
+      throw new TypeError(`unknown lifecycle phase: ${phase}`);
+  }
+}
+
+function lifecycleContractsFrom(input) {
+  return {
+    account: buildOrValidateLifecycleContract('account', lifecycleContractSource(input, ['account', 'user_account', 'userAccount', 'account_contract', 'accountContract', 'user_account_contract', 'userAccountContract'])),
+    tenant: buildOrValidateLifecycleContract('tenant', lifecycleContractSource(input, ['tenant', 'tenant_contract', 'tenantContract'])),
+    vault: buildOrValidateLifecycleContract('vault', lifecycleContractSource(input, ['vault', 'hosted_vault', 'hostedVault', 'vault_contract', 'vaultContract', 'hosted_vault_contract', 'hostedVaultContract'])),
+    api_key: buildOrValidateLifecycleContract('api_key', lifecycleContractSource(input, ['api_key', 'apiKey', 'api_key_contract', 'apiKeyContract'])),
+    billing: buildOrValidateLifecycleContract('billing', lifecycleContractSource(input, ['billing', 'usage_billing_record', 'usageBillingRecord', 'billing_record', 'billingRecord', 'billing_contract', 'billingContract'])),
+    dashboard: buildOrValidateLifecycleContract('dashboard', lifecycleContractSource(input, ['dashboard', 'dashboard_summary', 'dashboardSummary', 'dashboard_contract', 'dashboardContract'])),
+    backup: buildOrValidateLifecycleContract('backup', lifecycleContractSource(input, ['backup', 'backup_drill', 'backupDrill', 'backup_contract', 'backupContract', 'backup_drill_contract', 'backupDrillContract'])),
+    incident_sla: buildOrValidateLifecycleContract('incident_sla', lifecycleContractSource(input, ['incident_sla', 'incidentSla', 'incident_sla_refs', 'incidentSlaRefs', 'incident_sla_contract', 'incidentSlaContract'])),
+  };
+}
+
+function explicitLifecycleEvidenceRefs(input) {
+  const refs = input.required_evidence_refs ?? input.requiredEvidenceRefs ?? input.lifecycle_evidence_refs ?? input.lifecycleEvidenceRefs ?? input.evidence_refs ?? input.evidenceRefs ?? input.operator_evidence_refs ?? input.operatorEvidenceRefs;
+  if (refs === undefined || refs === null) return {};
+  if (!isPlainObject(refs)) throw new TypeError('required_evidence_refs must be an object');
+  return refs;
+}
+
+function requirePublicSafeLifecycleRef(value, name) {
+  const ref = requiredString(value, name);
+  assertNoForbiddenPayload(ref, name);
+  if (ref.startsWith('blocked:')) throw new TypeError(`${name} must be a public-safe evidence ref, not a blocker ref`);
+  return ref;
+}
+
+function lifecycleEvidenceRefFor(key, value) {
+  const fallback = { ref: `blocked:${key}`, status: BLOCKED, blocker: CUSTOMER_LIFECYCLE_BLOCKER_LABELS[key] };
+  if (value === undefined || value === null) return fallback;
+  if (typeof value === 'string') return { ref: requirePublicSafeLifecycleRef(value, `required_evidence_refs.${key}`), status: PROVIDED };
+  if (!isPlainObject(value)) throw new TypeError(`required_evidence_refs.${key} must be a string or object`);
+  const status = stringOrDefault(value.status, PROVIDED);
+  if (!EVIDENCE_STATUSES.has(status)) throw new TypeError(`required_evidence_refs.${key}.status is invalid`);
+  const ref = status === PROVIDED
+    ? requirePublicSafeLifecycleRef(value.ref, `required_evidence_refs.${key}.ref`)
+    : requiredString(value.ref, `required_evidence_refs.${key}.ref`);
+  assertNoForbiddenPayload(ref, `required_evidence_refs.${key}.ref`);
+  const evidence = { ref, status };
+  const owner = optionalString(value.owner, `required_evidence_refs.${key}.owner`);
+  const blocker = optionalString(value.blocker, `required_evidence_refs.${key}.blocker`);
+  if (owner) evidence.owner = owner;
+  if (status === BLOCKED) evidence.blocker = blocker ?? CUSTOMER_LIFECYCLE_BLOCKER_LABELS[key];
+  return evidence;
+}
+
+function contractEvidenceRef(phase, contract) {
+  if (!contract) return lifecycleEvidenceRefFor(phase, undefined);
+  const idKey = lifecycleContractIdKey(phase);
+  return {
+    ref: requiredString(contract.contract_hash, `contracts.${phase}.contract_hash`),
+    status: PROVIDED,
+    contract_schema: requiredString(contract.schema, `contracts.${phase}.schema`),
+    contract_id: requiredString(contract[idKey], `contracts.${phase}.${idKey}`),
+  };
+}
+
+function lifecycleEvidenceRefsFrom(input, contracts) {
+  const explicitRefs = explicitLifecycleEvidenceRefs(input);
+  const evidenceRefs = {};
+  for (const phase of CUSTOMER_LIFECYCLE_REQUIRED_EVIDENCE_PHASES) {
+    evidenceRefs[phase] = explicitRefs[phase] === undefined && CUSTOMER_LIFECYCLE_CONTRACT_PHASES.includes(phase)
+      ? contractEvidenceRef(phase, contracts[phase])
+      : lifecycleEvidenceRefFor(phase, explicitRefs[phase]);
+  }
+  return evidenceRefs;
+}
+
+function operatorGoLiveRefFromInput(input) {
+  const value = input.operator_go_live_ref ?? input.operatorGoLiveRef;
+  if (value === undefined || value === null) return null;
+  return requirePublicSafeLifecycleRef(value, 'operator_go_live_ref');
+}
+
+function operatorGoLiveRefFromPacket(packet) {
+  if (!Object.prototype.hasOwnProperty.call(packet, 'operator_go_live_ref')) throw new TypeError('operator_go_live_ref must be present');
+  if (packet.operator_go_live_ref === null) return null;
+  return requirePublicSafeLifecycleRef(packet.operator_go_live_ref, 'operator_go_live_ref');
+}
+
+function missingLifecycleEvidenceRefs(requiredEvidenceRefs) {
+  return CUSTOMER_LIFECYCLE_REQUIRED_EVIDENCE_PHASES
+    .filter((phase) => requiredEvidenceRefs[phase].status !== PROVIDED)
+    .map((phase) => ({
+      key: phase,
+      ref: requiredEvidenceRefs[phase].ref,
+      blocker: requiredEvidenceRefs[phase].blocker ?? CUSTOMER_LIFECYCLE_BLOCKER_LABELS[phase],
+    }));
+}
+
+function lifecycleContractExternalBlockers(contracts) {
+  if (!isPlainObject(contracts)) return [];
+  const blockers = [];
+  for (const phase of CUSTOMER_LIFECYCLE_CONTRACT_PHASES) {
+    const contract = contracts[phase];
+    if (!isPlainObject(contract) || !Array.isArray(contract.readiness?.external_blockers)) continue;
+    for (const blocker of contract.readiness.external_blockers) {
+      blockers.push({
+        key: `${phase}.${requiredString(blocker.key, `contracts.${phase}.readiness.external_blockers.key`)}`,
+        ref: requiredString(blocker.ref, `contracts.${phase}.readiness.external_blockers.ref`),
+        blocker: stringOrDefault(blocker.blocker, CUSTOMER_LIFECYCLE_BLOCKER_LABELS[phase]),
+      });
+    }
+  }
+  return blockers;
+}
+
+function customerLifecycleExternalBlockers(requiredEvidenceRefs, operatorGoLiveRef, contracts = null) {
+  const blockers = missingLifecycleEvidenceRefs(requiredEvidenceRefs).concat(lifecycleContractExternalBlockers(contracts));
+  if (operatorGoLiveRef === null) {
+    blockers.push({
+      key: 'operator_go_live',
+      ref: 'blocked:operator_go_live',
+      blocker: CUSTOMER_LIFECYCLE_BLOCKER_LABELS.operator_go_live,
+    });
+  }
+  return blockers;
+}
+
+function missingLifecycleSurfaceRefs(contracts) {
+  return CUSTOMER_LIFECYCLE_CONTRACT_PHASES
+    .filter((phase) => contracts[phase] === null)
+    .map((phase) => ({
+      key: phase,
+      ref: `blocked:${phase}`,
+      blocker: CUSTOMER_LIFECYCLE_BLOCKER_LABELS[phase],
+    }));
+}
+
+function customerLifecycleReadiness(requiredEvidenceRefs, operatorGoLiveRef, contracts = null) {
+  const missingEvidenceRefs = missingLifecycleEvidenceRefs(requiredEvidenceRefs);
+  const contractBlockers = lifecycleContractExternalBlockers(contracts);
+  const externalLifecycleBlockers = customerLifecycleExternalBlockers(requiredEvidenceRefs, operatorGoLiveRef, contracts);
+  const sellable = missingEvidenceRefs.length === 0 && contractBlockers.length === 0 && operatorGoLiveRef !== null;
+  return {
+    ...HOSTED_CLOUD_CONTRACT_READY,
+    status: sellable ? 'operator_approved_evidence_packet' : 'blocked_lifecycle_evidence_or_operator_go_live',
+    evidence_validation_only: true,
+    lifecycle_evidence_complete: missingEvidenceRefs.length === 0,
+    operator_go_live_approved: operatorGoLiveRef !== null,
+    external_wiring_ready: externalLifecycleBlockers.length === 0,
+    hosted_cloud_sellable: sellable,
+    selling_gate: sellable ? 'evidence_complete_operator_go_live_approved' : 'blocked_until_lifecycle_evidence_and_operator_go_live',
+    external_blockers: externalLifecycleBlockers,
+    missing_evidence_refs: missingEvidenceRefs,
+  };
+}
+
+function lifecyclePhaseRows(requiredEvidenceRefs, contracts, operatorGoLiveRef) {
+  return HOSTED_CLOUD_CUSTOMER_LIFECYCLE_PHASES.map((phase) => {
+    if (phase === 'operator_go_live') {
+      return {
+        phase,
+        evidence_ref: operatorGoLiveRef ?? 'blocked:operator_go_live',
+        evidence_status: operatorGoLiveRef === null ? BLOCKED : PROVIDED,
+        ready: operatorGoLiveRef !== null,
+        blocker: operatorGoLiveRef === null ? CUSTOMER_LIFECYCLE_BLOCKER_LABELS.operator_go_live : undefined,
+      };
+    }
+    const evidence = requiredEvidenceRefs[phase];
+    const row = {
+      phase,
+      evidence_ref: evidence.ref,
+      evidence_status: evidence.status,
+      ready: evidence.status === PROVIDED,
+    };
+    if (evidence.status === BLOCKED) row.blocker = evidence.blocker ?? CUSTOMER_LIFECYCLE_BLOCKER_LABELS[phase];
+    if (CUSTOMER_LIFECYCLE_CONTRACT_PHASES.includes(phase) && contracts[phase]) {
+      row.contract_schema = contracts[phase].schema;
+      row.contract_id = contracts[phase][lifecycleContractIdKey(phase)];
+      row.contract_hash = contracts[phase].contract_hash;
+    }
+    return row;
+  });
+}
+
+function customerLifecycleSafetyGuarantees() {
+  return {
+    opaque_reference_only: true,
+    customer_content_absent: true,
+    sensitive_text_absent: true,
+    auth_material_absent: true,
+    provider_payloads_absent: true,
+    financial_outcome_claim_absent: true,
+    remote_erasure_claim_absent: true,
+  };
+}
+
+function validateCustomerLifecycleSafetyGuarantees(guarantees) {
+  if (!isPlainObject(guarantees)) throw new TypeError('public_safety_guarantees must be present');
+  requiredTrue(guarantees.opaque_reference_only, 'public_safety_guarantees.opaque_reference_only');
+  requiredTrue(guarantees.customer_content_absent, 'public_safety_guarantees.customer_content_absent');
+  requiredTrue(guarantees.sensitive_text_absent, 'public_safety_guarantees.sensitive_text_absent');
+  requiredTrue(guarantees.auth_material_absent, 'public_safety_guarantees.auth_material_absent');
+  requiredTrue(guarantees.provider_payloads_absent, 'public_safety_guarantees.provider_payloads_absent');
+  requiredTrue(guarantees.financial_outcome_claim_absent, 'public_safety_guarantees.financial_outcome_claim_absent');
+  requiredTrue(guarantees.remote_erasure_claim_absent, 'public_safety_guarantees.remote_erasure_claim_absent');
+}
+
+function assertSameLifecycleArray(actual, expected, name) {
+  if (!Array.isArray(actual)) throw new TypeError(`${name} must be an array`);
+  if (JSON.stringify(canonicalize(actual)) !== JSON.stringify(canonicalize(expected))) throw new TypeError(`${name} must match required_evidence_refs and operator_go_live_ref`);
+}
+
+function validateCustomerLifecycleEvidenceRefs(requiredEvidenceRefs) {
+  if (!isPlainObject(requiredEvidenceRefs)) throw new TypeError('required_evidence_refs must be present');
+  for (const phase of CUSTOMER_LIFECYCLE_REQUIRED_EVIDENCE_PHASES) {
+    if (!Object.prototype.hasOwnProperty.call(requiredEvidenceRefs, phase)) throw new TypeError(`required_evidence_refs.${phase} must be present`);
+    const evidence = lifecycleEvidenceRefFor(phase, requiredEvidenceRefs[phase]);
+    requiredEvidenceRefs[phase] = evidence;
+  }
+  return requiredEvidenceRefs;
+}
+
+function validateCustomerLifecycleContracts(contracts) {
+  if (!isPlainObject(contracts)) throw new TypeError('contracts must be present');
+  for (const phase of CUSTOMER_LIFECYCLE_CONTRACT_PHASES) {
+    if (!Object.prototype.hasOwnProperty.call(contracts, phase)) throw new TypeError(`contracts.${phase} must be present`);
+    const contract = contracts[phase];
+    if (contract === null) continue;
+    if (!isPlainObject(contract)) throw new TypeError(`contracts.${phase} must be an object or null`);
+    switch (phase) {
+      case 'account':
+        validateUserAccountContract(contract);
+        break;
+      case 'tenant':
+        validateTenantContract(contract);
+        break;
+      case 'vault':
+        validateHostedVaultContract(contract);
+        break;
+      case 'api_key':
+        validateApiKeyContract(contract);
+        break;
+      case 'billing':
+        validateUsageBillingRecord(contract);
+        break;
+      case 'dashboard':
+        validateDashboardSummary(contract);
+        break;
+      case 'backup':
+        validateBackupDrillContract(contract);
+        break;
+      case 'incident_sla':
+        validateIncidentSlaRefs(contract);
+        break;
+      default:
+        throw new TypeError(`unknown lifecycle phase: ${phase}`);
+    }
+  }
+}
+
+function validateCustomerLifecycleReadiness(readiness, expected) {
+  if (!isPlainObject(readiness)) throw new TypeError('readiness must be present');
+  requiredTrue(readiness.contract_ready, 'readiness.contract_ready');
+  if (readiness.integration_kind !== HOSTED_CLOUD_CONTRACT_READY.integration_kind) throw new TypeError('readiness.integration_kind must remain contract_validator_only');
+  requiredTrue(readiness.no_external_provider_calls, 'readiness.no_external_provider_calls');
+  requiredTrue(readiness.evidence_validation_only, 'readiness.evidence_validation_only');
+  if (readiness.status !== expected.status) throw new TypeError('readiness.status must match lifecycle evidence and operator go-live approval');
+  if (readiness.lifecycle_evidence_complete !== expected.lifecycle_evidence_complete) throw new TypeError('readiness.lifecycle_evidence_complete must match required_evidence_refs');
+  if (readiness.operator_go_live_approved !== expected.operator_go_live_approved) throw new TypeError('readiness.operator_go_live_approved must match operator_go_live_ref');
+  if (readiness.external_wiring_ready !== expected.external_wiring_ready) throw new TypeError('readiness.external_wiring_ready must match blockers');
+  if (readiness.hosted_cloud_sellable !== expected.hosted_cloud_sellable) throw new TypeError('readiness.hosted_cloud_sellable must match lifecycle evidence and operator go-live approval');
+  if (readiness.selling_gate !== expected.selling_gate) throw new TypeError('readiness.selling_gate must match lifecycle evidence and operator go-live approval');
+  assertSameLifecycleArray(readiness.external_blockers, expected.external_blockers, 'readiness.external_blockers');
+  assertSameLifecycleArray(readiness.missing_evidence_refs, expected.missing_evidence_refs, 'readiness.missing_evidence_refs');
+}
+
+export function buildCustomerLifecyclePacket(input = {}) {
+  if (!isPlainObject(input)) throw new TypeError('buildCustomerLifecyclePacket requires an options object');
+  assertNoForbiddenPayload(input, 'input');
+  const contracts = lifecycleContractsFrom(input);
+  const requiredEvidenceRefs = lifecycleEvidenceRefsFrom(input, contracts);
+  const operatorGoLiveRef = operatorGoLiveRefFromInput(input);
+  const missingSurfaceRefs = missingLifecycleSurfaceRefs(contracts);
+  const readiness = customerLifecycleReadiness(requiredEvidenceRefs, operatorGoLiveRef, contracts);
+  const body = {
+    schema: HOSTED_CLOUD_CUSTOMER_LIFECYCLE_PACKET_SCHEMA,
+    packet_id: stringOrDefault(input.packet_id ?? input.packetId, undefined),
+    generated_at: isoTimestamp(input.generated_at ?? input.generatedAt, 'generated_at'),
+    contracts,
+    required_evidence_refs: requiredEvidenceRefs,
+    lifecycle_phases: lifecyclePhaseRows(requiredEvidenceRefs, contracts, operatorGoLiveRef),
+    missing_surface_refs: missingSurfaceRefs,
+    external_blockers: readiness.external_blockers,
+    missing_evidence_refs: readiness.missing_evidence_refs,
+    operator_go_live_ref: operatorGoLiveRef,
+    readiness,
+    hosted_cloud_sellable: readiness.hosted_cloud_sellable,
+    guarantees: customerLifecycleSafetyGuarantees(),
+    public_safety_guarantees: customerLifecycleSafetyGuarantees(),
+  };
+  const packet = withContractIdentity(body, 'hcclp', 'packet_id');
+  validateCustomerLifecyclePacket(packet);
+  return packet;
+}
+
+export function validateCustomerLifecyclePacket(packet) {
+  if (!isPlainObject(packet)) throw new TypeError('packet must be an object');
+  assertNoForbiddenPayload(packet, 'packet');
+  if (packet.schema !== HOSTED_CLOUD_CUSTOMER_LIFECYCLE_PACKET_SCHEMA) throw new TypeError(`schema must be ${HOSTED_CLOUD_CUSTOMER_LIFECYCLE_PACKET_SCHEMA}`);
+  requiredString(packet.packet_id, 'packet_id');
+  isoTimestamp(packet.generated_at, 'generated_at');
+  requiredString(packet.contract_hash, 'contract_hash');
+  validateCustomerLifecycleContracts(packet.contracts);
+  if (!isPlainObject(packet.required_evidence_refs)) throw new TypeError('required_evidence_refs must be present');
+  const requiredEvidenceRefs = validateCustomerLifecycleEvidenceRefs({ ...packet.required_evidence_refs });
+  const operatorGoLiveRef = operatorGoLiveRefFromPacket(packet);
+  const expectedReadiness = customerLifecycleReadiness(requiredEvidenceRefs, operatorGoLiveRef, packet.contracts);
+  const expectedPhases = lifecyclePhaseRows(requiredEvidenceRefs, packet.contracts, operatorGoLiveRef);
+  assertSameLifecycleArray(packet.lifecycle_phases, expectedPhases, 'lifecycle_phases');
+  assertSameLifecycleArray(packet.external_blockers, expectedReadiness.external_blockers, 'external_blockers');
+  assertSameLifecycleArray(packet.missing_surface_refs, missingLifecycleSurfaceRefs(packet.contracts), 'missing_surface_refs');
+  assertSameLifecycleArray(packet.missing_evidence_refs, expectedReadiness.missing_evidence_refs, 'missing_evidence_refs');
+  validateCustomerLifecycleReadiness(packet.readiness, expectedReadiness);
+  if (packet.hosted_cloud_sellable !== expectedReadiness.hosted_cloud_sellable) throw new TypeError('hosted_cloud_sellable must match readiness.hosted_cloud_sellable');
+  validateCustomerLifecycleSafetyGuarantees(packet.guarantees ?? packet.public_safety_guarantees);
   return true;
 }
