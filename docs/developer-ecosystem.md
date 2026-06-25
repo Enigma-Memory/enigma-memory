@@ -7,6 +7,7 @@ Enigma Memory is a local-first SDK, CLI, MCP server, and service-contract packag
 - SDK/API guide: [`docs/sdk-api.md`](./sdk-api.md)
 - Node example app: [`examples/node-basic-memory.mjs`](../examples/node-basic-memory.mjs)
 - GitHub Actions example: [`examples/ci/github-actions.yml`](../examples/ci/github-actions.yml)
+- Benchmark reproducibility guide: [`docs/benchmark-reproducibility.md`](./benchmark-reproducibility.md)
 - Generic MCP client template: [`templates/mcp-client-config.json`](../templates/mcp-client-config.json)
 
 ## Local SDK loop
@@ -24,16 +25,17 @@ The example app prints ids, counts, roots, and verification status only. It does
 
 ## CLI and CI loop
 
-The CI example installs Node 24, installs the published `enigma-memory` package, runs:
+The CI example installs Node 24, installs the published `enigma-memory@0.1.4` package, runs:
 
 ```sh
 npx enigma quickstart --overwrite
 npx enigma doctor
+npm run benchmark:memory-suite -- --out benchmark-report.json
 ```
 
-and then runs a small ESM import smoke. It does not require GitHub secrets, cloud provider credentials, npm tokens, private bundles, or local path assumptions.
+and then runs a small ESM import smoke. It does not require GitHub secrets, cloud provider credentials, npm tokens, private bundles, or local path assumptions. The benchmark step writes a public-safe local JSON report using schema `enigma.memory_benchmark_suite.v1`; see the benchmark reproducibility guide for claim boundaries and the requirements for any future live third-party comparison.
 
-Use the workflow as a template in a consumer repository. It is intentionally limited to install/import/doctor smoke coverage and local proof generation; it does not publish packages, deploy infrastructure, or contact hosted Enigma cloud.
+Use the workflow as a template in a consumer repository. It is intentionally limited to install/import/doctor smoke coverage, local proof generation, and deterministic local benchmark evidence; it does not publish packages, deploy infrastructure, contact hosted Enigma cloud, or call external memory providers.
 
 ## MCP client loop
 

@@ -256,7 +256,7 @@ function reviewPacketCommandRunner() {
       return { stdout: `${JSON.stringify({ schema: 'enigma.release_audit.v1', ok: true, required_failed: [], gates: [{ name: 'review-packet-embedded-boundary', ok: true, status: 0 }] })}\n`, stderr: '' };
     }
     if (args.includes('pack') || joinedArgs.includes('npm pack --dry-run --json --ignore-scripts')) {
-      return { stdout: `${JSON.stringify([{ filename: 'enigma-memory-0.1.2.tgz', files: [{ path: 'README.md' }] }])}\n`, stderr: '' };
+      return { stdout: `${JSON.stringify([{ filename: 'enigma-memory-0.1.4.tgz', files: [{ path: 'README.md' }] }])}\n`, stderr: '' };
     }
     throw new Error(`Unexpected review packet command: ${joinedArgs}`);
   };

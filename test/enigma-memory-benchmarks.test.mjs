@@ -89,6 +89,83 @@ test('memory benchmark latency fields are present and nonnegative', () => {
   assert.equal(report.metrics.verification.context_pack_verify_valid, true);
 });
 
+test('memory benchmark reports local baseline comparison rows', () => {
+  const report = runMemoryBenchmarkSuite({ generated_at: NOW });
+  const rows = report.metrics.local_baseline_comparisons;
+  assert.deepEqual(report.local_baseline_comparisons, rows);
+
+  assert.deepEqual(rows.map((row) => row.id), ['full_context', 'recency_last_n', 'keyword_filter', 'enigma_context_pack']);
+  for (const row of rows) {
+    assert.equal(row.baseline, row.id);
+    assert.equal(row.local_fixture_only, true);
+    assert.equal(row.external_provider_called, false);
+    assert.equal(row.deterministic_fixture, true);
+    assert.equal(row.question_count, 5);
+    assert.equal(row.exact_answer_questions, 4);
+    assert.equal(row.abstention_questions, 1);
+    assert.equal(row.abstention_correct, 1);
+    assert.equal(row.abstention_correctness, 1);
+    assert.equal(row.public_question_text_included, false);
+    assert.equal(row.public_answer_text_included, false);
+    assert.equal(typeof row.estimated_prompt_tokens.total, 'number');
+    assert.ok(row.estimated_prompt_tokens.total > 0);
+    assert.match(row.estimated_prompt_tokens.estimator, /deterministic local estimator/u);
+    assert.equal(Number.isInteger(row.latency.samples), true);
+    assert.equal(row.latency.samples, 5);
+    assert.equal(typeof row.latency.p50_ms, 'number');
+    assert.equal(typeof row.latency.p95_ms, 'number');
+    assert.ok(row.latency.p50_ms >= 0);
+    assert.ok(row.latency.p95_ms >= 0);
+  }
+
+  const byId = Object.fromEntries(rows.map((row) => [row.id, row]));
+  assert.equal(byId.full_context.exact_answer_recall, 1);
+  assert.equal(byId.full_context.recall, byId.full_context.exact_answer_recall);
+  assert.ok(byId.recency_last_n.exact_answer_recall < byId.full_context.exact_answer_recall);
+  assert.equal(byId.keyword_filter.exact_answer_recall, 1);
+  assert.equal(byId.enigma_context_pack.exact_answer_recall, 1);
+  assert.equal(byId.enigma_context_pack.abstention_correctness, 1);
+  assert.ok(byId.enigma_context_pack.estimated_prompt_tokens.total < byId.full_context.estimated_prompt_tokens.total);
+  assert.ok(byId.enigma_context_pack.estimated_prompt_tokens.total < 281);
+  assert.ok(byId.enigma_context_pack.estimated_prompt_tokens.mean_per_question < 56.2);
+  assert.ok(byId.enigma_context_pack.selected_memory_count.total < byId.full_context.selected_memory_count.total);
+  assert.equal(byId.enigma_context_pack.duplicate_removal.applicable, true);
+  assert.equal(byId.enigma_context_pack.duplicate_removal.max_duplicate_candidates_removed, 1);
+  assert.equal(byId.full_context.duplicate_removal.applicable, false);
+});
+
+test('memory benchmark lists external adapter requirements without fake scores', () => {
+  const report = runMemoryBenchmarkSuite({ generated_at: NOW });
+  const expectedIds = [
+    'claude_memory_tool',
+    'langgraph_memory',
+    'letta_memgpt',
+    'mem0',
+    'openai_native_memory',
+    'zep',
+  ];
+
+  assert.deepEqual(report.external_competitor_adapters.map((row) => row.id).sort(), expectedIds);
+  for (const row of report.external_competitor_adapters) {
+    assert.match(row.status, /not_run_requires_credentials_or_runtime/u);
+    assert.equal(row.can_run_in_this_harness, false);
+    assert.equal(row.scores_included, false);
+    assert.match(row.official_doc, /^https:\/\//u);
+    assert.equal(typeof row.official_positioning, 'string');
+    assert.match(row.official_positioning, /harness|runtime|memory|stack|public-API/iu);
+    assert.ok(Array.isArray(row.required_artifacts));
+    assert.ok(row.required_artifacts.length >= 3);
+    assert.match(row.boundary_reason, /no .*score|no .*claim|not .*available|does not/iu);
+    assert.equal(Object.prototype.hasOwnProperty.call(row, 'exact_answer_recall'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(row, 'abstention_correctness'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(row, 'estimated_prompt_tokens'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(row, 'latency'), false);
+  }
+
+  assert.ok(report.public_claims_allowed.some((claim) => /local Enigma memory fixture/u.test(claim)));
+  assert.ok(report.public_claims_allowed.some((claim) => /withholds third-party scores/u.test(claim)));
+});
+
 test('memory benchmark states citations, boundaries, and same-boundary provider profile rows', () => {
   const report = runMemoryBenchmarkSuite({ generated_at: NOW });
   const citationIds = report.citations.map((citation) => citation.id).sort();
@@ -113,6 +190,8 @@ test('memory benchmark states citations, boundaries, and same-boundary provider 
     assert.equal(row.provider_runtime_observed, false);
     assert.equal(row.external_provider_called, false);
     assert.equal(row.same_enigma_context_pack_boundary, true);
+    assert.equal(row.scores_included, false);
+    assert.equal(row.not_external_competitor_score, true);
     assert.equal(row.boundary.max_estimated_tokens, 512);
     assert.equal(row.boundary.purpose, 'memory_benchmark_context_pack');
     assert.ok(row.memory_count > 0);

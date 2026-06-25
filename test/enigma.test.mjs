@@ -585,6 +585,78 @@ test('compileContextPack can attach plaintext-minimized optimizer evidence', asy
   assert.equal(verified.public_context_pack.optimization_receipts[0].content_hash_redacted, true);
 });
 
+test('compileContextPack applies query-aware optimizer relevance only for implicit active selection', async () => {
+  const vault = createVault({ subjectId: 'subject-query-relevance' });
+  const passport = createPassport({ vault, now: '2026-06-24T00:00:00.000Z' });
+  const relevant = await remember({
+    vault,
+    text: 'Project deployment note: staging region uses amethyst harbor.',
+    purpose: 'fixture',
+    kind: 'fact',
+    purpose_tags: ['deployment', 'region'],
+    now: '2026-06-24T00:01:00.000Z',
+  });
+  const irrelevant = await remember({
+    vault,
+    text: 'Personal cooking note: use 2026 breakfast oatmeal with cinnamon.',
+    purpose: 'fixture',
+    kind: 'preference',
+    purpose_tags: ['food'],
+    now: '2026-06-24T00:02:00.000Z',
+  });
+
+  const pack = compileContextPack({
+    vault,
+    passport,
+    query: 'Which deployment region should quasaronly use in 2026?',
+    optimize: true,
+    max_estimated_tokens: 512,
+    limit: 10,
+    now: '2026-06-24T00:03:00.000Z',
+  });
+  assert.deepEqual(pack.memory_addresses, [relevant.memory_addr]);
+  assert.equal(pack.optimization_plan.totals.input_candidates, 1);
+  assert.doesNotMatch(JSON.stringify(pack.optimization_plan), /quasaronly|amethyst harbor|breakfast oatmeal/iu);
+  const verified = verifyContextPack({ contextPack: pack, vault, passport, publicKey: vault.signingKeyPair.publicKey });
+  assert.equal(verified.valid, true);
+  assert.doesNotMatch(JSON.stringify(verified.public_context_pack.optimization_plan), /quasaronly|amethyst harbor|breakfast oatmeal/iu);
+
+  const explicitPack = compileContextPack({
+    vault,
+    passport,
+    memory_addresses: [irrelevant.memory_addr],
+    query: 'Which deployment region should quasaronly use in 2026?',
+    optimize: true,
+    max_estimated_tokens: 512,
+    limit: 10,
+    now: '2026-06-24T00:04:00.000Z',
+  });
+  assert.deepEqual(explicitPack.memory_addresses, [irrelevant.memory_addr]);
+
+  const fallbackPack = compileContextPack({
+    vault,
+    passport,
+    query: 'zzzxqonly',
+    optimize: true,
+    max_estimated_tokens: 512,
+    limit: 10,
+    now: '2026-06-24T00:05:00.000Z',
+  });
+  assert.equal(fallbackPack.memory_addresses.length, 2);
+
+  const strictPack = compileContextPack({
+    vault,
+    passport,
+    query: 'zzzxqonly',
+    optimize: true,
+    strict_relevance: true,
+    max_estimated_tokens: 512,
+    limit: 10,
+    now: '2026-06-24T00:06:00.000Z',
+  });
+  assert.deepEqual(strictPack.memory_addresses, []);
+});
+
 test('boundary harness detects committed crossing', () => {
   const report = runBoundarySimulation({ manifest: createBoundaryManifest() });
   const row = report.rows.find((item) => item.scenario === 'honest committed crossing');
