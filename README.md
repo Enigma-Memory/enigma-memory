@@ -1,48 +1,41 @@
 # Enigma
 
-Enigma is a provider-agnostic AI memory custody and proof layer. It gives a user or enterprise a local canonical memory vault, emits offline-verifiable receipts for Enigma-controlled lifecycle events, and connects that vault to assistants through CLI, MCP, browser, desktop, relay, gateway, and enterprise policy surfaces.
+Enigma Memory is a local-first AI Memory Passport. It gives you one canonical local memory vault, receipt-backed proof for Enigma-controlled events, and MCP connections into assistants such as Claude Desktop, Cursor, Kimi Code, and generic MCP clients.
 
-Current status:
+Start with the package path below. You do not need to understand relay, gateway, mesh, browser, desktop, or hosted infrastructure before trying Enigma locally.
 
-- Local production foundation: CLI, verifier, vault, passport, boundary, MCP server, connector, importer, relay, gateway, enterprise, mesh, browser-extension, and desktop scaffold code exist in this repository.
-- Published npm package: package bins and module entry points are available as `enigma-memory`; use the npm install path below for the simplest onboarding flow.
-- Source-only artifacts: `docs/`, `Dockerfile`, and `docker-compose.yml` live in the source checkout. The package README and CLI help are the package-included install guides; the full runbooks require the repository or hosted docs.
-- Hosted cloud is not included by default. Hosted relay/gateway/cloud operation requires deployment credentials, a domain, TLS, production durable storage, KMS/secrets, monitoring, backups, operator policy, and a completed operator acceptance packet. Local relay/gateway `--state-file` demo state does not satisfy those hosted/BYOC requirements.
-- Cloudflare API/domain/hosting automation is documented but safe-by-default: [`docs/cloudflare-token-and-domain-runbook.md`](docs/cloudflare-token-and-domain-runbook.md) gives the token recipe, Registrar prerequisites, local token storage rule, search/check flow, explicit domain+price purchase gate, Pages deploy gate, custom-domain steps, and post-setup token rotation.
-- Overnight execution plan: [`docs/overnight-build-master-plan.md`](docs/overnight-build-master-plan.md) defines the GPT-5.5/Kimi overnight build cadence, acceptance gates, exact non-claims, and hosted/BYOC blockers.
-- Security and production review artifacts: [`SECURITY.md`](SECURITY.md) defines reporting, safe harbor, disclosure, incident, secret-handling, plaintext-minimization, and proof-boundary policy; [`docs/security-threat-model.md`](docs/security-threat-model.md) maps assets, trust boundaries, controls, residual risks, and verification evidence; [`docs/operator-acceptance-packet.md`](docs/operator-acceptance-packet.md) is required before hosted/BYOC can be called live.
-- Public API reference: [`docs/public-api-reference.md`](docs/public-api-reference.md) lists package exports, CLI bins, MCP tools/resources/prompts, relay/gateway endpoints, importer/capsule APIs, connector profiles, verifier outputs, schemas, and local-vs-hosted boundaries.
-- Local release provenance/SBOM: [`docs/release-provenance-and-sbom.md`](docs/release-provenance-and-sbom.md) documents `npm run provenance:local -- --out ./.enigma/release-provenance.json` as unsigned local package-surface inventory and SHA-256 evidence only, not signed attestation, registry provenance, source-control proof, SLSA/compliance, Docker image, or hosted/cloud deployment evidence.
-- Reviewer packet: [`docs/reviewer-packet.md`](docs/reviewer-packet.md) documents `npm run review:packet -- --out ./.enigma-review-packet --public-site <path-to-_public_site>` as a local hand-review bundle for package, release-audit, provenance, and optional generated public-site evidence; it is not npm publication, live Cloudflare deployment, Docker runtime proof, hosted/BYOC readiness, legal approval, signed provenance, or compliance evidence.
+The package path needs no database, provider credential, cloud credential, npm publishing token, or external account. Hosted cloud and BYOC operation are separate advanced modes that require real deployment credentials, domains, TLS, durable storage, KMS/secrets, monitoring, backups, and operator acceptance.
 
 Enigma does not claim that a closed provider deleted internal data, that model weights forgot, or that provider-native memory disappeared. It proves facts about Enigma-controlled vault state, receipts, checkpoints, and declared boundary operations.
 
-## Install and run locally
+## Install once, use everywhere
 
 Prerequisites:
 
 - Node.js `>=24`
-- No database, package registry account, provider credential, or cloud credential for the local package quickstart
+- No database, package registry account, provider credential, or cloud credential for the local setup path
 - Git only when you choose the advanced source-checkout path
 
-## Quickstart from npm
-
-Use the published package first:
+Use Enigma as a one-time AI Memory Passport setup: install the package, create the local Enigma workspace once, then use the same memory/search/context/verify/connect loop from any supported client.
 
 ```sh
 npm install -g enigma-memory
-enigma quickstart --bundle ./.enigma/bundle.json --overwrite
-enigma doctor
-enigma-relay demo
-enigma-gateway demo
+enigma setup --overwrite
+enigma remember --text-file ./memory.txt
+enigma search --query "..."
+enigma context --query "..." --optimize
+enigma verify --export ./.enigma/export.json
+enigma connect claude-desktop --dry-run
 ```
 
-`enigma quickstart` creates a local Enigma workspace for proof review: a local vault bundle, a context pack, an export proof bundle, and a verify report. These artifacts prove Enigma-controlled local vault state, receipts, checkpoints, and verification results only; they do not prove provider deletion, provider model forgetting, provider-native memory removal, hosted availability, or compliance certification.
+`enigma setup --overwrite` writes local Enigma artifacts under the workspace `.enigma` path and emits deterministic, public-safe JSON. It does not write Claude, Cursor, Kimi, or other third-party app configs. Client config writes happen only when you explicitly run `enigma connect <client>` without `--dry-run`; keep `--dry-run` while reviewing the planned MCP entry.
+
+The local Enigma vault remains canonical. Provider-native memory should be treated as a convenience cache only. Enigma receipts prove Enigma-controlled vault state, receipts, checkpoints, and declared boundary operations; they do not prove provider deletion, provider model forgetting, provider-native memory removal, hosted availability, ROI/savings, or compliance certification.
 
 One-off execution without a global install:
 
 ```sh
-npx --yes --package enigma-memory enigma quickstart --bundle ./.enigma/bundle.json --overwrite
+npx --yes --package enigma-memory enigma setup --overwrite
 ```
 
 ## Advanced/source-only path
@@ -60,7 +53,7 @@ enigma-gateway demo
 
 `install:local` is dry-run unless `--execute` is present. The command above installs the checked-out package globally and creates a local vault bundle. It does not require Cloudflare, OpenAI, Anthropic, npm publish credentials, a database, or hosted infrastructure.
 
-Manual alternative: create a no-network local vault, write one local memory from a file, compile a context pack, export a proof bundle, and verify it. Use a tenant-approved smoke file; do not expand private memory into shell argv.
+Manual alternative: inspect the lower-level local vault steps that `enigma setup` prepares for you. Use a tenant-approved smoke file; do not expand private memory into shell argv.
 
 POSIX shell:
 
@@ -72,7 +65,7 @@ enigma init --bundle ./.enigma/bundle.json --subject local-user --display-name "
 enigma remember --bundle ./.enigma/bundle.json --text-file "$ENIGMA_DEMO_MEMORY_FILE" --purpose user_memory --tags local
 enigma context --bundle ./.enigma/bundle.json --query "local context" --purpose local_answer --out ./.enigma/context-pack.json
 enigma export --bundle ./.enigma/bundle.json --out ./.enigma/export.json
-enigma verify --bundle ./.enigma/export.json
+enigma verify --export ./.enigma/export.json
 ```
 
 Windows PowerShell:
@@ -85,7 +78,7 @@ enigma init --bundle .\.enigma\bundle.json --subject local-user --display-name "
 enigma remember --bundle .\.enigma\bundle.json --text-file $env:ENIGMA_DEMO_MEMORY_FILE --purpose user_memory --tags local
 enigma context --bundle .\.enigma\bundle.json --query "local context" --purpose local_answer --out .\.enigma\context-pack.json
 enigma export --bundle .\.enigma\bundle.json --out .\.enigma\export.json
-enigma verify --bundle .\.enigma\export.json
+enigma verify --export .\.enigma\export.json
 ```
 
 The bundle is local. Exported proof artifacts contain encrypted/committed vault state and receipt metadata; do not paste raw memory plaintext into relay records, witness checkpoints, SIEM events, public proof artifacts, or shell command lines.
@@ -150,16 +143,31 @@ Supported connector profiles are:
 - `opencode`
 - `generic-mcp`
 
-Use the config in `docs/client-connectors.md` from a source checkout for Claude Desktop, Cursor, Kimi Code, VS Code/Cline, Roo Code, OpenCode, or any MCP-compatible client. The generated entry defaults to command `enigma-mcp` and sets `ENIGMA_BUNDLE` to the local vault bundle.
-
-CLI connector commands:
+After `enigma setup --overwrite`, preview a client connection before writing anything:
 
 ```sh
-enigma doctor
-enigma install --bundle "$HOME/.enigma/bundle.json"
-enigma connect claude-desktop --bundle "$HOME/.enigma/bundle.json"
-enigma connect kimi-code --bundle "$HOME/.enigma/bundle.json" --mcp-command "/absolute/path/to/enigma-mcp"
-enigma disconnect claude-desktop
+enigma connect claude-desktop --dry-run
+enigma connect cursor --dry-run
+enigma connect kimi-code --dry-run
+enigma connect generic-mcp --dry-run
+```
+
+Remove `--dry-run` only after you are ready for Enigma to merge the `mcpServers.enigma` entry into that client config. The setup command itself never writes third-party app configs.
+
+Manual MCP entry for Claude Desktop, Cursor, Kimi Code, or any generic MCP client:
+
+```json
+{
+  "mcpServers": {
+    "enigma": {
+      "command": "enigma-mcp",
+      "args": [],
+      "env": {
+        "ENIGMA_BUNDLE": "/absolute/path/to/.enigma/bundle.json"
+      }
+    }
+  }
+}
 ```
 
 Use `--mcp-command` (alias `--command`) when a GUI app cannot find shell-installed binaries or needs a `.cmd` path on Windows.
@@ -291,7 +299,7 @@ test -f "$ENIGMA_DEMO_MEMORY_FILE"
 enigma init --bundle ./.enigma/bundle.json
 enigma remember --bundle ./.enigma/bundle.json --text-file "$ENIGMA_DEMO_MEMORY_FILE" --purpose local_test
 enigma export --bundle ./.enigma/bundle.json --out ./.enigma/export.json
-enigma verify --bundle ./.enigma/export.json
+enigma verify --export ./.enigma/export.json
 enigma boundary run --scenario committed_crossing
 ```
 

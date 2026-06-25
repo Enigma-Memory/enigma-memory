@@ -2,6 +2,22 @@
 
 Enigma Memory is a local-first SDK, CLI, MCP server, and service-contract package. The developer surfaces are designed to be copied without secrets, cloud credentials, hidden local paths, or account identifiers.
 
+## CLI memory passport loop
+
+For most developers, start with the installed CLI before reading the SDK internals or service contracts:
+
+```sh
+npm install -g enigma-memory
+enigma setup --overwrite
+enigma remember --text-file ./memory.txt
+enigma search --query "..."
+enigma context --query "..." --optimize
+enigma verify --export ./.enigma/export.json
+enigma connect claude-desktop --dry-run
+```
+
+`enigma setup --overwrite` writes local Enigma artifacts under the workspace `.enigma` path and emits deterministic, public-safe JSON. It does not write third-party app configs unless you explicitly run `enigma connect <client>` without `--dry-run`. Treat provider-native memory as cache only; the local Enigma vault is canonical.
+
 ## Copyable starting points
 
 - SDK/API guide: [`docs/sdk-api.md`](./sdk-api.md)
@@ -25,11 +41,11 @@ The example app prints ids, counts, roots, and verification status only. It does
 
 ## CLI and CI loop
 
-The CI example installs Node 24, installs the published `enigma-memory@0.1.4` package, runs:
+The CI example installs Node 24, installs the published `enigma-memory@0.1.6` package, runs:
 
 ```sh
-npx enigma quickstart --overwrite
-npx enigma doctor
+npx --yes --package enigma-memory enigma setup --overwrite
+npx --yes --package enigma-memory enigma doctor
 npm run benchmark:memory-suite -- --out benchmark-report.json
 ```
 
@@ -49,22 +65,73 @@ Use the workflow as a template in a consumer repository. It is intentionally lim
 
 ## MCP client loop
 
-The generic MCP template uses the installed `enigma-mcp` command and exactly one environment placeholder:
+The same installed package can be used by Claude Desktop, Cursor, Kimi Code, or any generic MCP client. Copy one snippet, replace the bundle path with the local path from your setup output, and restart the client.
+
+Claude Desktop:
 
 ```json
 {
   "mcpServers": {
     "enigma": {
       "command": "enigma-mcp",
+      "args": [],
       "env": {
-        "ENIGMA_BUNDLE": "<ENIGMA_BUNDLE>"
+        "ENIGMA_BUNDLE": "/absolute/path/to/.enigma/bundle.json"
       }
     }
   }
 }
 ```
 
-Replace `<ENIGMA_BUNDLE>` with the bundle file you control, or with the client-specific environment expansion syntax if your MCP client supports it. Do not commit private bundle paths if they reveal local usernames, workspace names, account ids, or other personal details.
+Cursor:
+
+```json
+{
+  "mcpServers": {
+    "enigma": {
+      "command": "enigma-mcp",
+      "args": [],
+      "env": {
+        "ENIGMA_BUNDLE": "/absolute/path/to/.enigma/bundle.json"
+      }
+    }
+  }
+}
+```
+
+Kimi Code:
+
+```json
+{
+  "mcpServers": {
+    "enigma": {
+      "command": "enigma-mcp",
+      "args": [],
+      "env": {
+        "ENIGMA_BUNDLE": "/absolute/path/to/.enigma/bundle.json"
+      }
+    }
+  }
+}
+```
+
+Generic MCP:
+
+```json
+{
+  "mcpServers": {
+    "enigma": {
+      "command": "enigma-mcp",
+      "args": [],
+      "env": {
+        "ENIGMA_BUNDLE": "/absolute/path/to/.enigma/bundle.json"
+      }
+    }
+  }
+}
+```
+
+Do not commit private bundle paths if they reveal local usernames, workspace names, account ids, or other personal details.
 
 ## Claim boundaries for developers
 
