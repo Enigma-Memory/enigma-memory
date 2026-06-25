@@ -1,6 +1,6 @@
 # SDK and API guide
 
-This guide covers the public package imports for `enigma-memory@0.1.11`. The SDK runs locally by default: vaults, passports, context packs, receipts, relay/gateway demo state, storage contracts, metering artifacts, settlement artifacts, and hosted-cloud contract packets are package-level developer surfaces. They are not evidence of hosted Enigma cloud, live customer API key issuance, provider-side deletion, provider model forgetting, token ROI, invoice savings, compliance certification, or benchmark leadership.
+This guide covers the public package imports for `enigma-memory@0.1.12`. The SDK runs locally by default: vaults, passports, context packs, receipts, relay/gateway demo state, storage contracts, metering artifacts, settlement artifacts, proof-network artifacts, and hosted-cloud contract packets are package-level developer surfaces. They are not evidence of hosted Enigma cloud, live customer API key issuance, provider-side deletion, provider model forgetting, token ROI, invoice savings, compliance certification, benchmark leadership, Solana transaction submission, or on-chain raw memory.
 
 ## Install and import style
 
@@ -32,8 +32,9 @@ The vault module creates local encrypted vault state and proof-carrying exports.
 ```js
 import { createVault, remember, exportBundle, importBundle } from 'enigma-memory/vault';
 
-const vault = createVault({ subject_id: 'demo-subject' });
-const remembered = remember({ vault, text: 'Demo project prefers local proof bundles.' });
+const vault = createVault({ subject_id: 'subject-ref-local-001' });
+const localOnlyMemoryText = String(process.env.ENIGMA_LOCAL_MEMORY_TEXT ?? '');
+const remembered = remember({ vault, text: localOnlyMemoryText });
 const bundle = exportBundle({ vault });
 ```
 
@@ -44,8 +45,9 @@ The passport module describes vault ownership/scope and compiles receipt-backed 
 ```js
 import { createPassport, compileContextPack, verifyContextPack } from 'enigma-memory/passport';
 
-const passport = createPassport({ vault, display_name: 'Demo Developer' });
-const pack = compileContextPack({ vault, passport, query: 'project preference', limit: 1 });
+const localOnlyQueryText = String(process.env.ENIGMA_LOCAL_QUERY_TEXT ?? '');
+const passport = createPassport({ vault, display_name: 'Public Demo Subject' });
+const pack = compileContextPack({ vault, passport, query: localOnlyQueryText, limit: 1 });
 const checked = verifyContextPack({ contextPack: pack, passport, vault, publicKey: bundle.keyring.publicKey });
 ```
 
@@ -56,9 +58,11 @@ The optimizer module builds deterministic, local memory-selection plans and plai
 ```js
 import { createMemoryOptimizationPlan, createMemoryAccessReceipt, estimateTextTokens } from 'enigma-memory/optimizer';
 
+const localOnlyCandidateText = String(process.env.ENIGMA_LOCAL_MEMORY_TEXT ?? '');
+const localOnlyQueryText = String(process.env.ENIGMA_LOCAL_QUERY_TEXT ?? '');
 const plan = createMemoryOptimizationPlan({
-  candidates: [{ address: remembered.memory_addr, content: 'Demo project prefers local proof bundles.' }],
-  prompt_tokens: estimateTextTokens('Current local app context'),
+  candidates: [{ address: 'memory-ref-public-001', content: localOnlyCandidateText }],
+  prompt_tokens: estimateTextTokens(localOnlyQueryText),
 });
 const receipt = createMemoryAccessReceipt({ item: plan.items[0], plan });
 ```
@@ -126,7 +130,7 @@ The metering module creates content-minimized usage events and deterministic agg
 import { createUsageEvent, aggregateUsageEvents } from 'enigma-memory/metering';
 
 const event = createUsageEvent({
-  tenant_id: 'demo-tenant',
+  tenant_id: 'subject-ref-public-001',
   provider: 'local',
   model: 'demo-model',
   prompt_tokens: 800,
@@ -145,7 +149,7 @@ The settlement module creates hash-only memory jobs, capacity profiles, quotes, 
 import { createPermissionlessMemoryJob, createOperatorServiceQuote, createServiceSettlementReceipt, verifyServiceSettlementReceipt } from 'enigma-memory/settlement';
 
 const job = createPermissionlessMemoryJob({
-  tenant_id: 'demo-tenant',
+  tenant_id: 'subject-ref-public-001',
   job_type: 'context.pack',
   memory_commitment_root: 'sha256:0000000000000000000000000000000000000000000000000000000000000000',
   policy_hash: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
@@ -155,6 +159,122 @@ const job = createPermissionlessMemoryJob({
   max_price_amount: 10,
   payment_asset: 'CREDITS',
 });
+```
+
+### `enigma-memory/proof-network`
+
+The proof-network module creates public-safe proof artifacts for AI-memory uniqueness: Solana-ready anchor batches, scoped capability grants/revocations, benchmark attestations, and proof packets. These functions are pure local builders and validators. They never submit transactions, write files, call Solana RPC, call external providers, or make raw memory public.
+
+Proof-network artifacts must contain only hashes, roots, opaque refs, counts, timestamps, and signatures. Do not include raw memory, prompts, transcripts, completions, embeddings, ACL bodies, tenant names, private keys, API keys, seed phrases, provider responses, or dataset rows. Anchor batches should explicitly preserve the boundary that no transaction was submitted and no raw memory goes on-chain:
+
+Claim boundaries:
+
+- `transaction_submitted:false` means the artifact is a local Solana-ready plan, not a submitted or finalized transaction.
+- `raw_memory_on_chain:false` means chain payloads carry only opaque hashes/roots/refs, never raw memory or private context.
+- `provider_deletion_claim:false`, `model_forgetting_claim:false`, and `hosted_saas_claim:false` mean proof-network packets are SDK artifacts, not provider deletion evidence, model-forgetting evidence, hosted-service evidence, compliance certification, or benchmark leadership claims.
+
+```js
+import {
+  createProofNetworkAnchorBatch,
+  validateProofNetworkAnchorBatch,
+} from 'enigma-memory/proof-network';
+
+const anchorBatch = createProofNetworkAnchorBatch({
+  anchor_ref: 'anchor:local-plan-001',
+  commitments: [
+    {
+      kind: 'memory.root',
+      root: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      ref: 'memory-root-ref-001',
+      count: 1,
+    },
+    {
+      kind: 'receipt.root',
+      root: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      ref: 'receipt-root-ref-001',
+      count: 1,
+    },
+    {
+      kind: 'policy.root',
+      root: 'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+      ref: 'policy-root-ref-001',
+      count: 1,
+    },
+  ],
+  transaction_submitted: false,
+  raw_memory_on_chain: false,
+});
+const anchorBatchValid = validateProofNetworkAnchorBatch(anchorBatch);
+```
+
+Capability grants are scoped permission artifacts. They are not live auth changes, account creation, delegated custody, provider access, or proof that a downstream system enforced the grant:
+
+```js
+import {
+  createCapabilityGrant,
+  validateCapabilityGrant,
+} from 'enigma-memory/proof-network';
+
+const grant = createCapabilityGrant({
+  issuer_ref: 'issuer-ref-public',
+  subject_ref: 'subject-ref-public',
+  capability: 'memory.read.receipt-summary',
+  resource_roots: ['sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd'],
+  max_uses: 1,
+  issued_at: '2026-01-01T00:00:00.000Z',
+  expires_at: '2026-01-02T00:00:00.000Z',
+});
+const grantValid = validateCapabilityGrant(grant);
+```
+
+Benchmark attestations bind public report hashes and reproducibility refs. They do not prove benchmark leadership, third-party certification, provider-side behavior, model forgetting, or private dataset contents:
+
+```js
+import {
+  createBenchmarkAttestation,
+  validateBenchmarkAttestation,
+} from 'enigma-memory/proof-network';
+
+const attestation = createBenchmarkAttestation({
+  report_hash: 'sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+  dataset_ref: 'dataset-ref-public',
+  runner_ref: 'runner-ref-public',
+  package_ref: 'npm:enigma-memory@0.1.12',
+  metric_roots: ['sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'],
+  sample_count: 120,
+  run_count: 1,
+  attested_at: '2026-01-01T00:00:00.000Z',
+});
+const attestationValid = validateBenchmarkAttestation(attestation);
+```
+
+Proof packets wrap one or more supported proof-network artifacts for local verification. Packet verification checks supported artifact structure and privacy boundaries; it is not chain finality, settlement, provider deletion evidence, customer deployment evidence, or a compliance certificate:
+
+```js
+import {
+  createProofNetworkAnchorBatch as createPacketAnchorBatch,
+  createProofNetworkPacket,
+  validateProofNetworkPacket,
+} from 'enigma-memory/proof-network';
+
+const anchorBatchForPacket = createPacketAnchorBatch({
+  anchor_ref: 'anchor:packet-demo',
+  commitments: [
+    {
+      kind: 'memory.root',
+      root: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      ref: 'memory-root-ref-001',
+      count: 1,
+    },
+  ],
+  transaction_submitted: false,
+  raw_memory_on_chain: false,
+});
+const packet = createProofNetworkPacket({
+  packet_ref: 'packet-ref-public',
+  artifacts: [anchorBatchForPacket],
+});
+const packetValid = validateProofNetworkPacket(packet);
 ```
 
 ### `enigma-memory/hosted-cloud`
@@ -168,7 +288,7 @@ import {
 } from 'enigma-memory/hosted-cloud';
 
 const packet = buildApiKeyLifecyclePacket({
-  tenant_id: 'tenant-alpha',
+  tenant_id: 'subject-ref-public-001',
   subject_ref: 'subject-ref-alpha',
   environment: 'production',
   operation: 'audit',

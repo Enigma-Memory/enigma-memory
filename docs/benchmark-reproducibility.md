@@ -4,7 +4,7 @@ This guide explains how to reproduce the current local Enigma memory benchmark, 
 
 ## What is reproducible today
 
-The current package is `enigma-memory@0.1.4`. Two benchmark paths are reproducible without provider credentials:
+The current planned package is `enigma-memory@0.1.12`. Two benchmark paths are reproducible without provider credentials:
 
 1. The local deterministic memory suite, available through the package script and the script file it wraps:
 
@@ -64,7 +64,7 @@ Do not commit downloaded files or raw benchmark conversations. The package `.git
 
 ## Reproduce and save local fixture JSON
 
-1. Use a clean checkout containing `enigma-memory@0.1.4`.
+1. Use a clean checkout containing `enigma-memory@0.1.12`.
 2. From a repository root that contains `enigma/package.json`, enter the package directory:
 
    ```sh
@@ -127,6 +127,23 @@ Public sharing should include the generated benchmark report JSON and generated 
 3. The companion manifest schema is `enigma.standard_benchmark_dataset_manifest.v1`.
 4. The manifest includes source URLs, byte sizes, SHA-256 hashes, license/usage boundaries, and local file names for the exact dataset files used.
 5. Any public claim says "retrieval/evidence coverage proxy", quotes scores only from the generated report for the exact dataset hash/top-k/sample bounds, and avoids provider/model/competitor implications unless a separate reviewed provider answer-accuracy run exists.
+
+## Proof-network benchmark attestations
+
+For the planned 0.1.12 proof-network layer, benchmark results should be represented as a public-safe local attestation rather than by publishing raw benchmark inputs. The attestation JSON uses `schema: "enigma.proof_network.benchmark_attestation.v1"` and may be bundled in `enigma.proof_network.packet.v1` for review. The benchmark attestation flow is local planning only: it does not submit transactions, and generated artifacts must keep `transaction_submitted: false` and `raw_memory_on_chain: false`.
+
+Hash the generated benchmark report and companion dataset manifest, then attest only the hashes, schema names, dataset refs, runner refs, package refs, aggregate metric names/values copied from the report, record counts, top-k/sample bounds, timestamps, and signatures or signer refs needed for review. The public artifact must not contain raw dataset rows, raw conversations, prompts, private questions, private answers, provider responses, embeddings, credentials, tenant names, account ids, local absolute paths, or unpublished benchmark scores.
+
+Use a `sha256:<hex>` commitment for the report and manifest. If the CLI derives the report commitment from `--report-file`, publish the resulting hash field only; if a reviewer precomputes a hash, hash the final public-safe JSON artifact that will be shared, not any raw source dataset or private run directory.
+
+After running one of the benchmark commands above and confirming the report is public-safe, create a local planning attestation with placeholder hashes and metric values replaced from the generated report and manifest:
+
+```sh
+enigma chain attest --report-file .enigma/standard-memory-benchmark-sample.json --dataset-ref "sha256:<public-dataset-or-manifest-hash>" --runner-ref "run-standard-memory-benchmarks.mjs@<reviewed-revision>" --package-ref "enigma-memory@0.1.12" --score "retrieval_evidence_proxy=<value-copied-from-report>" --out .enigma/standard-memory-benchmark-attestation.json
+enigma chain verify --file .enigma/standard-memory-benchmark-attestation.json
+```
+
+When a report file is supplied, the attestation command should derive a SHA-256 report commitment from the JSON report and store that commitment rather than copying the report body into the proof artifact. If a precomputed report hash is used instead, record the hash algorithm, report schema, dataset manifest hash, and the exact runner/package refs that produced it. Treat the proof-network attestation as a reproducibility receipt for a specific local report hash and explicitly recorded aggregate metrics, not as evidence of provider answer accuracy, competitor performance, Solana settlement, or live model behavior.
 
 ## Local baseline rows in the report
 

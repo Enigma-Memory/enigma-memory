@@ -25,6 +25,20 @@ Enigma is strongest where AI memory must be **portable, scoped, customer-control
 
 The SanDisk-level positioning is precise: **Enigma is not trying to own every model, agent, vector index, gateway, cloud, or hardware device. It is the portable memory and proof layer that those surfaces can adopt.** Like a memory card standard, the strategic goal is compatibility, portability, and trust—not ownership of every endpoint.
 
+## Enigma Proof Network vs Mem0, Zep, Letta, LangGraph, and native memory
+
+The Proof Network comparison should stay source-aware and narrow: public docs for [Mem0](https://docs.mem0.ai/introduction), [Zep](https://help.getzep.com/overview), [Letta](https://docs.letta.com/guides/core-concepts/stateful-agents), [LangGraph memory](https://docs.langchain.com/oss/python/concepts/memory), and provider-native memory such as [ChatGPT Memory](https://help.openai.com/en/articles/8590148-memory-faq) primarily describe memory, personalization, state, graph context, checkpoints, stores, or product controls. Enigma should not claim those systems lack private roadmaps, cannot integrate proofs, or perform worse on retrieval. The defensible distinction is that Enigma's Proof Network artifacts are designed to expose public-safe roots, refs, scoped capability grants, revocations/nullifiers, and benchmark attestations without putting raw memory, prompts, transcripts, completions, embeddings, tenant names, ACL bodies, or provider responses into public artifacts or chain payloads.
+
+| Alternative | Source-aware reading | Enigma Proof Network differentiation |
+| --- | --- | --- |
+| Mem0 | Public docs frame Mem0 as a universal/self-improving memory layer, with managed and self-hosted options and integrations. | Position against proof and permission surface, not memory quality: Enigma adds public-safe anchor batches, capability grants, revocations, and verifier-ready packets around Enigma-mediated memory boundaries. |
+| Zep | Public docs frame Zep around enterprise agent memory, a governed Context Lake, and temporal knowledge graphs. | Position Enigma as complementary proof infrastructure: opaque roots and attestations can evidence what Enigma committed or authorized without claiming better graph retrieval or latency. |
+| Letta | Public docs frame Letta around stateful agents, persisted messages, tools, and editable memory blocks. | Position Enigma beneath or beside agent state: scoped grants and revocations can govern portable memory access without claiming to replace the agent runtime. |
+| LangGraph | Public docs frame memory as short-term thread checkpoints and long-term stores/namespaces for agent applications. | Position Enigma as a neutral proof and permission layer for durable memory events, not as a graph orchestration or checkpointing replacement. |
+| Provider-native memory | Product docs describe personalization, memory settings, summaries/sources, and deletion controls within the provider experience. | Position Enigma as provider-neutral custody plus offline-verifiable evidence for Enigma-mediated boundaries; do not claim provider-internal deletion, model forgetting, or benchmark superiority. |
+
+For benchmarks, the safe claim is attestation integrity, not leaderboard rank: Enigma can package report hashes, dataset refs, runner refs, package refs, and signatures so a third party can inspect what was claimed. It must not say the Proof Network proves Enigma outperforms Mem0, Zep, Letta, LangGraph, or native memory unless a separate benchmark report supplies reproducible commands, inputs, and results.
+
 ## Memory optimization thesis
 
 Enigma's memory analogue to inference optimization is a centralized optimized memory fabric for high-performance memory optimization. The product value is to reduce repeated context spend through dedupe, tiering, scoped context selection, and receipt-backed access decisions while preserving portable custody. Blockchain/permissionless access, if present, is for access/settlement/anchoring boundaries only: access control, settlement, and proof/receipt anchoring. It is not ideological decentralization and it must not carry raw memory plaintext.

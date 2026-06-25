@@ -1,0 +1,71 @@
+{
+  "schema": "enigma.proof_network.packet.v1",
+  "packet_id": "pnp_example_0001",
+  "generated_at": "2026-01-01T00:00:00.000Z",
+  "package_version": "0.0.0-example",
+  "packet_root": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "artifact_count": 1,
+  "artifacts": [
+    {
+      "schema": "enigma.proof_network.benchmark_attestation.v1",
+      "artifact_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "artifact_ref": "ref:example-public-benchmark-attestation:v1"
+    }
+  ],
+  "benchmark_attestations": [
+    {
+      "schema": "enigma.proof_network.benchmark_attestation.v1",
+      "attestation_id": "pna_example_0001",
+      "generated_at": "2026-01-01T00:00:00.000Z",
+      "package_version": "0.0.0-example",
+      "dataset_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "runner_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "report_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "metrics_digest": {
+        "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "metric_count": 2,
+        "canonicalization": "json-c14n-sha256"
+      },
+      "leakage_scan": {
+        "scanned": true,
+        "passed": true,
+        "policy": "public_hashes_roots_refs_counts_only",
+        "public_payload_only": true,
+        "private_payload_detected": false,
+        "forbidden_field_names": []
+      },
+      "claim_boundaries": [
+        {
+          "claim_id": "example-boundary",
+          "claim": "This nested attestation records public proof digests only.",
+          "allowed_scope": "Schema-shaped demo artifact using fake hashes and public metadata.",
+          "not_proven": [
+            "Runtime availability",
+            "External audit outcome"
+          ]
+        }
+      ]
+    }
+  ],
+  "leakage_scan": {
+    "scanned": true,
+    "passed": true,
+    "policy": "public_hashes_roots_refs_counts_only",
+    "public_payload_only": true,
+    "private_payload_detected": false,
+    "forbidden_field_names": []
+  },
+  "claim_boundaries": [
+    {
+      "claim_id": "packet-boundary",
+      "claim": "This packet links public proof artifacts by fake hashes and refs.",
+      "allowed_scope": "Example packet for Enigma memory-control proof artifacts; optional Solana publication would carry only digests and refs.",
+      "not_proven": [
+        "Runtime availability",
+        "External audit outcome"
+      ]
+    }
+  ],
+  "transaction_submitted": false,
+  "public_payload_only": true
+}

@@ -14,6 +14,7 @@ build/
 .env
 .env.*
 *.env
+deploy/secrets-simulation/
 *.local
 *.key
 *.pem
@@ -35,6 +36,7 @@ wrangler.toml
 # OS/editor noise
 .DS_Store
 Thumbs.db
+tmp/
 .vscode/
 .idea/
 *.swp

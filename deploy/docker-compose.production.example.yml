@@ -3,6 +3,12 @@
 # backend availability. Provide real external storage, KMS/signing material,
 # SIEM export, backups, monitoring, ingress/TLS, and acceptance evidence first.
 
+# Network egress must be default-deny at the host or container-network layer.
+# Allow only the specific endpoints required for storage, KMS, SIEM, backups,
+# monitoring, and operator acceptance evidence. The loopback-only port bindings
+# below are not a public ingress; place an operator-managed reverse proxy or
+# API gateway in front for any public or private admin/data-plane routing.
+
 services:
   relay:
     image: ghcr.io/enigma-ai/enigma:operator-pinned-digest-required
@@ -64,6 +70,8 @@ services:
       retries: 3
       start_period: 10s
     restart: unless-stopped
+    networks:
+      - enigma-backend
 
   gateway:
     image: ghcr.io/enigma-ai/enigma:operator-pinned-digest-required
@@ -132,6 +140,8 @@ services:
       retries: 3
       start_period: 10s
     restart: unless-stopped
+    networks:
+      - enigma-backend
 
 secrets:
   relay_signing_key:
@@ -148,3 +158,12 @@ secrets:
     file: ./operator-secrets/siem-export-endpoint
   operator_acceptance_evidence_uri:
     file: ./operator-secrets/operator-acceptance-evidence-uri
+
+networks:
+  # Isolated backend bridge. Egress is not restricted by Docker Compose itself;
+  # the operator must enforce default-deny outbound policy at the host firewall
+  # or an egress proxy, allowing only the storage/KMS/SIEM/backup/monitoring
+  # endpoints declared by the secrets and refs above.
+  enigma-backend:
+    driver: bridge
+    internal: false
