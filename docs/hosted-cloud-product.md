@@ -10,6 +10,7 @@ The source package now has pure contract builders and validators in `packages/ho
 - tenant records;
 - hosted vault records;
 - API key metadata records;
+- API key lifecycle packets for issue/rotate/revoke/audit readiness;
 - usage billing records;
 - dashboard summaries;
 - backup drill records;
@@ -18,7 +19,7 @@ The source package now has pure contract builders and validators in `packages/ho
 
 These functions are contract and validation code only. They do not call an auth provider, billing provider, cloud deployment, KMS, backup target, support desk, status page, SIEM, or model provider. They are safe to import as package code because they do not start servers, read user files, mutate deployment state, publish packages, or contact external accounts.
 
-The lifecycle packet public API is `buildCustomerLifecyclePacket(input)` and `validateCustomerLifecyclePacket(packet)` under `enigma-memory/hosted-cloud`; the script command below emits the same schema for release evidence.
+The lifecycle packet public APIs are `buildCustomerLifecyclePacket(input)` / `validateCustomerLifecyclePacket(packet)` and `buildApiKeyLifecyclePacket(input)` / `validateApiKeyLifecyclePacket(packet)` under `enigma-memory/hosted-cloud`; the script commands below emit the same schemas for release evidence.
 
 The validators enforce hosted-cloud boundaries:
 
@@ -27,10 +28,11 @@ The validators enforce hosted-cloud boundaries:
 - raw memory, plaintext prompts, provider responses, transcripts, credential-looking values, token values, private keys, and API key secret material are rejected;
 - financial outcome claims, token ROI/profit claims, provider-side deletion claims, and model-forgetting claims are rejected;
 - API key contracts store identifiers, fingerprints, scopes, rotation refs, and timestamps only, not key material;
+- API key lifecycle packets store issue/rotate/revoke/audit evidence refs, event refs, fingerprints, opaque subjects, readiness status, and operator approval refs only; they reject raw key material, provider payloads, customer memory, plaintext prompts, credentials, ROI claims, provider-deletion claims, and model-forgetting claims;
 - hosted vault contracts are opaque-record and plaintext-minimized contracts only;
 - billing records remain contract records until an external billing provider invoice flow is wired.
 
-Individual surface builders emit `readiness.contract_ready: true`, `readiness.integration_kind: "contract_validator_only"`, and `readiness.hosted_cloud_sellable: false` because contract readiness is not provider wiring, legal approval, security review, or operator go-live approval. A customer lifecycle packet may only mark `hosted_cloud_sellable: true` when every lifecycle surface has a provided evidence ref and an explicit operator go-live approval ref is supplied; the packet remains evidence validation, not live hosted SaaS or provider wiring.
+Individual surface builders emit `readiness.contract_ready: true`, `readiness.integration_kind: "contract_validator_only"`, and `readiness.hosted_cloud_sellable: false` because contract readiness is not provider wiring, legal approval, security review, or operator go-live approval. A customer lifecycle packet may only mark `hosted_cloud_sellable: true` when every lifecycle surface has a provided evidence ref and an explicit operator go-live approval ref is supplied; the packet remains evidence validation, not live hosted SaaS or provider wiring. An API key lifecycle packet keeps `customer_api_keys_live:false` by default and can become live-ready only when every required issue/rotate/revoke/audit evidence ref is provided and an operator approval ref is supplied. That live-ready state is still evidence validation only: it does not issue a customer API key, create a secret, call an auth provider, rotate/revoke a provider credential, or prove provider-side deletion.
 
 ## Externally blocked before hosted cloud can be sold
 
@@ -52,6 +54,14 @@ A `provided` operator evidence ref means the contract can point to external evid
 `npm run production:hosted-customer -- --tenant <id> --domain <domain> --environment <env> --out <file>` builds `enigma.hosted_cloud.customer_lifecycle_packet.v1` readiness evidence for a tenant launch packet. Operators may pass repeatable `--evidence-ref <key=status:ref>` values and `--operator-go-live-ref <ref>` when real external evidence exists. The command writes public-safe validation evidence only: it creates no hosted account, tenant, vault, API key, invoice, support ticket, backup, Cloudflare resource, provider resource, secret, or deployment.
 
 The lifecycle packet records lifecycle phases, required surfaces, external blockers, missing evidence refs, no-secret/no-plaintext guarantees, and the sellability gate. Missing surfaces, blocked evidence refs, or absent operator go-live approval keep `hosted_cloud_sellable:false`.
+
+## API key lifecycle packet
+
+`npm run production:hosted-api-key -- --tenant <id> --subject <opaque-subject-ref> --operation <issue|rotate|revoke|audit> --out <file>` builds `enigma.hosted_cloud.api_key_lifecycle_packet.v1` readiness evidence for one customer API key lifecycle operation. Operators may pass repeatable `--evidence-ref <phase=status:ref>` values for the phases required by that operation, plus `--operator-approval-ref <ref>` when a reviewed operator approval exists.
+
+The command writes public-safe validation evidence only. It must not receive or print raw API keys, bearer tokens, credentials, provider response bodies, plaintext prompts, raw memory, customer content, financial ROI claims, provider deletion claims, or model forgetting claims. It creates no hosted account, customer API key, provider secret, KMS key, rotation job, revocation job, audit export, invoice, support ticket, Cloudflare resource, provider resource, or deployment.
+
+The packet records lifecycle events, required evidence refs, missing evidence refs, malformed operation blockers, the operator approval ref, readiness status, `customer_api_keys_live`, and no-secret/no-plaintext guarantees. Missing evidence refs, blocked evidence refs, malformed operation surfaces, or absent operator approval keep `customer_api_keys_live:false`.
 
 ## Non-claims
 

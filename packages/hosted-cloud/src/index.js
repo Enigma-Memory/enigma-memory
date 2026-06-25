@@ -9,6 +9,7 @@ export const HOSTED_CLOUD_DASHBOARD_SCHEMA = 'enigma.hosted_cloud.dashboard_summ
 export const HOSTED_CLOUD_BACKUP_DRILL_SCHEMA = 'enigma.hosted_cloud.backup_drill.v1';
 export const HOSTED_CLOUD_INCIDENT_SLA_SCHEMA = 'enigma.hosted_cloud.incident_sla_refs.v1';
 export const HOSTED_CLOUD_CUSTOMER_LIFECYCLE_PACKET_SCHEMA = 'enigma.hosted_cloud.customer_lifecycle_packet.v1';
+export const HOSTED_CLOUD_API_KEY_LIFECYCLE_PACKET_SCHEMA = 'enigma.hosted_cloud.api_key_lifecycle_packet.v1';
 
 export const HOSTED_CLOUD_EXTERNAL_BLOCKERS = Object.freeze([
   'auth_provider',
@@ -63,6 +64,23 @@ const CUSTOMER_LIFECYCLE_CONTRACT_PHASES = Object.freeze([
   'incident_sla',
 ]);
 const CUSTOMER_LIFECYCLE_REQUIRED_EVIDENCE_PHASES = Object.freeze(HOSTED_CLOUD_CUSTOMER_LIFECYCLE_PHASES.filter((phase) => phase !== 'operator_go_live'));
+export const HOSTED_CLOUD_API_KEY_LIFECYCLE_OPERATIONS = Object.freeze(['issue', 'rotate', 'revoke', 'audit']);
+export const HOSTED_CLOUD_API_KEY_LIFECYCLE_PHASES = Object.freeze([
+  'current_key_metadata',
+  'next_key_metadata',
+  'revoked_key_metadata',
+  'issue_policy',
+  'rotation_policy',
+  'revocation_policy',
+  'audit_log',
+]);
+const API_KEY_LIFECYCLE_OPERATION_PHASES = Object.freeze({
+  issue: Object.freeze(['next_key_metadata', 'issue_policy', 'audit_log']),
+  rotate: Object.freeze(['current_key_metadata', 'next_key_metadata', 'rotation_policy', 'audit_log']),
+  revoke: Object.freeze(['current_key_metadata', 'revoked_key_metadata', 'revocation_policy', 'audit_log']),
+  audit: Object.freeze(['current_key_metadata', 'audit_log']),
+});
+const API_KEY_LIFECYCLE_KEY_SLOTS = Object.freeze(['current', 'next', 'revoked']);
 const CUSTOMER_LIFECYCLE_BLOCKER_LABELS = Object.freeze({
   account: 'Hosted account contract evidence is not provided.',
   tenant: 'Hosted tenant contract evidence is not provided.',
@@ -78,8 +96,19 @@ const CUSTOMER_LIFECYCLE_BLOCKER_LABELS = Object.freeze({
   security_review: 'Hosted security review evidence is not provided.',
   operator_go_live: 'Explicit operator go-live approval is not provided.',
 });
+const API_KEY_LIFECYCLE_BLOCKER_LABELS = Object.freeze({
+  current_key_metadata: 'Current hosted API key metadata evidence is not provided.',
+  next_key_metadata: 'Next hosted API key metadata evidence is not provided.',
+  revoked_key_metadata: 'Revoked hosted API key metadata evidence is not provided.',
+  issue_policy: 'Hosted API key issue policy evidence is not provided.',
+  rotation_policy: 'Hosted API key rotation policy evidence is not provided.',
+  revocation_policy: 'Hosted API key revocation policy evidence is not provided.',
+  audit_log: 'Hosted API key lifecycle audit evidence is not provided.',
+  operator_approval: 'Explicit public-safe operator API key lifecycle approval is not provided.',
+});
+const API_KEY_SECRET_MATERIAL_KEY_RE = /(?:^|_)(?:raw_?api_?key|raw_?key|plaintext_?api_?key|plain_text_?api_?key|plaintext_?key|plain_text_?key|api_?key_?value|key_?value|key_?material|secret_?key|key_?secret|value)(?:$|_)/iu;
 const FORBIDDEN_KEY_RE = /(?:^|_)(?:raw_?memory|plaintext|plain_text|prompt|prompts|completion|completions|message_body|transcript|conversation|provider_?response|response_?body|credential|credentials|secret|password|private_?key|bearer|access_token|refresh_token|token_value|api_key_value|api_secret|token_?roi|token_?profit|roi_claim|profit_claim|provider_?deletion|provider_?erasure|model_?forgetting|model_?erasure)(?:$|_)/iu;
-const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|raw memory|private prompt|provider response|full transcript|decrypted memory)/iu;
+const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|\b(?:raw memory|plaintext prompts?|plain text prompts?|private prompts?|provider responses?|full transcript|decrypted memory|credentials?|secrets?|passwords?|private keys?|api key secret|api secrets?|access tokens?|refresh tokens?|token values?|credential material)\b)/iu;
 const FORBIDDEN_CLAIM_RE = /(?:token\s+(?:roi|profit|return|investment|price)|(?:roi|profit|return)\s+(?:from|on)\s+token|guaranteed\s+(?:savings|profit|return)|provider(?:-side|\s+side)?\s+(?:deletion|erasure)|model\s+(?:forgetting|forgot|erasure)|makes?\s+models?\s+forget|deleted\s+from\s+every\s+provider)/iu;
 
 function isPlainObject(value) {
@@ -880,7 +909,7 @@ function validateCustomerLifecycleEvidenceRefs(requiredEvidenceRefs) {
 function validateCustomerLifecycleContracts(contracts) {
   if (!isPlainObject(contracts)) throw new TypeError('contracts must be present');
   for (const phase of CUSTOMER_LIFECYCLE_CONTRACT_PHASES) {
-    if (!Object.prototype.hasOwnProperty.call(contracts, phase)) throw new TypeError(`contracts.${phase} must be present`);
+    if (!Object.prototype.hasOwnProperty.call(contracts, phase)) throw new TypeError(`contracts.${phase} must be present; missing_surface_refs must match contracts`);
     const contract = contracts[phase];
     if (contract === null) continue;
     if (!isPlainObject(contract)) throw new TypeError(`contracts.${phase} must be an object or null`);
@@ -980,5 +1009,394 @@ export function validateCustomerLifecyclePacket(packet) {
   validateCustomerLifecycleReadiness(packet.readiness, expectedReadiness);
   if (packet.hosted_cloud_sellable !== expectedReadiness.hosted_cloud_sellable) throw new TypeError('hosted_cloud_sellable must match readiness.hosted_cloud_sellable');
   validateCustomerLifecycleSafetyGuarantees(packet.guarantees ?? packet.public_safety_guarantees);
+  return true;
+}
+
+function assertNoApiKeySecretMaterial(value, path = 'api_key_lifecycle') {
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => assertNoApiKeySecretMaterial(item, `${path}[${index}]`));
+    return;
+  }
+  if (!isPlainObject(value)) return;
+  for (const [key, child] of Object.entries(value)) {
+    const allowedBoundaryKey = key === 'key_material_boundary' || key === 'key_material_in_contract' || key === 'api_key_material_absent';
+    const keyMetadataContext = /(?:^|\.)(?:current|next|revoked|current_key|currentKey|current_api_key|currentApiKey|next_key|nextKey|next_api_key|nextApiKey|revoked_key|revokedKey|revoked_api_key|revokedApiKey|key_contracts\.(?:current|next|revoked)|keyContracts\.(?:current|next|revoked)|key_metadata_contracts\.(?:current|next|revoked)|keyMetadataContracts\.(?:current|next|revoked)|contracts\.(?:current|next|revoked))$/u.test(path);
+    const bareSecretKey = key === 'api_key' || key === 'apiKey' || (keyMetadataContext && key === 'key');
+    if (!allowedBoundaryKey && (bareSecretKey || API_KEY_SECRET_MATERIAL_KEY_RE.test(key))) {
+      throw new TypeError(`${path}.${key} is not allowed in API key lifecycle packets`);
+    }
+    assertNoApiKeySecretMaterial(child, `${path}.${key}`);
+  }
+}
+
+function apiKeyLifecycleOperation(input) {
+  const operation = requiredString(input.operation, 'operation');
+  if (!HOSTED_CLOUD_API_KEY_LIFECYCLE_OPERATIONS.includes(operation)) {
+    throw new TypeError(`operation must be one of ${HOSTED_CLOUD_API_KEY_LIFECYCLE_OPERATIONS.join(', ')}`);
+  }
+  return operation;
+}
+
+function apiKeyLifecycleRequiredPhases(operation) {
+  return API_KEY_LIFECYCLE_OPERATION_PHASES[operation];
+}
+
+function apiKeyLifecycleSlotAliases(slot) {
+  switch (slot) {
+    case 'current':
+      return ['current', 'current_key', 'currentKey', 'current_api_key', 'currentApiKey', 'current_key_contract', 'currentKeyContract', 'current_api_key_contract', 'currentApiKeyContract'];
+    case 'next':
+      return ['next', 'next_key', 'nextKey', 'next_api_key', 'nextApiKey', 'next_key_contract', 'nextKeyContract', 'next_api_key_contract', 'nextApiKeyContract'];
+    case 'revoked':
+      return ['revoked', 'revoked_key', 'revokedKey', 'revoked_api_key', 'revokedApiKey', 'revoked_key_contract', 'revokedKeyContract', 'revoked_api_key_contract', 'revokedApiKeyContract'];
+    default:
+      throw new TypeError(`unknown API key lifecycle slot: ${slot}`);
+  }
+}
+
+function apiKeyLifecycleContractSource(input, slot) {
+  const aliases = apiKeyLifecycleSlotAliases(slot);
+  const contractCollections = [
+    input.key_contracts,
+    input.keyContracts,
+    input.key_metadata_contracts,
+    input.keyMetadataContracts,
+    input.contracts,
+  ];
+  for (const collection of contractCollections) {
+    if (!isPlainObject(collection)) continue;
+    for (const alias of aliases) {
+      if (collection[alias] !== undefined) return collection[alias];
+    }
+  }
+  for (const alias of aliases) {
+    if (input[alias] !== undefined) return input[alias];
+  }
+  return undefined;
+}
+
+function validateApiKeyLifecycleContractTenantSubject(contract, tenantId, subjectRef, name) {
+  if (contract.tenant_id !== tenantId) throw new TypeError(`${name}.tenant_id must match packet tenant_id`);
+  if (contract.subject_ref !== subjectRef) throw new TypeError(`${name}.subject_ref must match packet subject_ref`);
+}
+
+function buildOrValidateApiKeyLifecycleContract(slot, source, tenantId, subjectRef, generatedAt) {
+  if (source === undefined || source === null) return null;
+  if (!isPlainObject(source)) throw new TypeError(`key_contracts.${slot} must be an object`);
+  const name = `key_contracts.${slot}`;
+  if (source.schema === HOSTED_CLOUD_API_KEY_SCHEMA) {
+    validateApiKeyContract(source);
+    validateApiKeyLifecycleContractTenantSubject(source, tenantId, subjectRef, name);
+    return source;
+  }
+  const contract = buildApiKeyContract({
+    ...source,
+    tenant_id: source.tenant_id ?? source.tenantId ?? tenantId,
+    subject_ref: source.subject_ref ?? source.subjectRef ?? subjectRef,
+    generated_at: source.generated_at ?? source.generatedAt ?? generatedAt,
+  });
+  validateApiKeyLifecycleContractTenantSubject(contract, tenantId, subjectRef, name);
+  return contract;
+}
+
+function apiKeyLifecycleContractsFrom(input, tenantId, subjectRef, generatedAt) {
+  return Object.fromEntries(API_KEY_LIFECYCLE_KEY_SLOTS.map((slot) => [
+    slot,
+    buildOrValidateApiKeyLifecycleContract(slot, apiKeyLifecycleContractSource(input, slot), tenantId, subjectRef, generatedAt),
+  ]));
+}
+
+function explicitApiKeyLifecycleEvidenceRefs(input) {
+  const refs = input.required_evidence_refs ?? input.requiredEvidenceRefs ?? input.api_key_evidence_refs ?? input.apiKeyEvidenceRefs ?? input.lifecycle_evidence_refs ?? input.lifecycleEvidenceRefs ?? input.evidence_refs ?? input.evidenceRefs;
+  if (refs === undefined || refs === null) return {};
+  if (!isPlainObject(refs)) throw new TypeError('required_evidence_refs must be an object');
+  return refs;
+}
+
+function apiKeyLifecycleEvidenceRefFor(phase, value) {
+  const fallback = { ref: `blocked:${phase}`, status: BLOCKED, blocker: API_KEY_LIFECYCLE_BLOCKER_LABELS[phase] };
+  if (value === undefined || value === null) return fallback;
+  if (typeof value === 'string') return { ref: requirePublicSafeLifecycleRef(value, `required_evidence_refs.${phase}`), status: PROVIDED };
+  if (!isPlainObject(value)) throw new TypeError(`required_evidence_refs.${phase} must be a string or object`);
+  const status = stringOrDefault(value.status, PROVIDED);
+  if (!EVIDENCE_STATUSES.has(status)) throw new TypeError(`required_evidence_refs.${phase}.status is invalid`);
+  const ref = status === PROVIDED
+    ? requirePublicSafeLifecycleRef(value.ref, `required_evidence_refs.${phase}.ref`)
+    : requiredString(value.ref, `required_evidence_refs.${phase}.ref`);
+  assertNoForbiddenPayload(ref, `required_evidence_refs.${phase}.ref`);
+  assertNoApiKeySecretMaterial(ref, `required_evidence_refs.${phase}.ref`);
+  const evidence = { ref, status };
+  const owner = optionalString(value.owner, `required_evidence_refs.${phase}.owner`);
+  const blocker = optionalString(value.blocker, `required_evidence_refs.${phase}.blocker`);
+  const contractSchema = optionalString(value.contract_schema, `required_evidence_refs.${phase}.contract_schema`);
+  const contractId = optionalString(value.contract_id, `required_evidence_refs.${phase}.contract_id`);
+  if (owner) evidence.owner = owner;
+  if (contractSchema) evidence.contract_schema = contractSchema;
+  if (contractId) evidence.contract_id = contractId;
+  if (status === BLOCKED) evidence.blocker = blocker ?? API_KEY_LIFECYCLE_BLOCKER_LABELS[phase];
+  return evidence;
+}
+
+function apiKeyLifecycleSlotForPhase(phase) {
+  switch (phase) {
+    case 'current_key_metadata':
+      return 'current';
+    case 'next_key_metadata':
+      return 'next';
+    case 'revoked_key_metadata':
+      return 'revoked';
+    default:
+      return null;
+  }
+}
+
+function apiKeyLifecycleContractEvidenceRef(phase, contract) {
+  if (!contract) return apiKeyLifecycleEvidenceRefFor(phase, undefined);
+  return {
+    ref: requiredString(contract.contract_hash, `key_contracts.${apiKeyLifecycleSlotForPhase(phase)}.contract_hash`),
+    status: PROVIDED,
+    contract_schema: requiredString(contract.schema, `key_contracts.${apiKeyLifecycleSlotForPhase(phase)}.schema`),
+    contract_id: requiredString(contract.api_key_id, `key_contracts.${apiKeyLifecycleSlotForPhase(phase)}.api_key_id`),
+  };
+}
+
+function apiKeyLifecycleEvidenceRefsFrom(input, operation, keyContracts) {
+  const explicitRefs = explicitApiKeyLifecycleEvidenceRefs(input);
+  const requiredPhases = apiKeyLifecycleRequiredPhases(operation);
+  const evidenceRefs = {};
+  for (const phase of requiredPhases) {
+    const slot = apiKeyLifecycleSlotForPhase(phase);
+    evidenceRefs[phase] = explicitRefs[phase] === undefined && slot !== null
+      ? apiKeyLifecycleContractEvidenceRef(phase, keyContracts[slot])
+      : apiKeyLifecycleEvidenceRefFor(phase, explicitRefs[phase]);
+  }
+  return evidenceRefs;
+}
+
+function apiKeyLifecycleOperatorApprovalRefFromInput(input) {
+  const value = input.operator_approval_ref ?? input.operatorApprovalRef ?? input.operator_go_live_ref ?? input.operatorGoLiveRef;
+  if (value === undefined || value === null) return null;
+  return requirePublicSafeLifecycleRef(value, 'operator_approval_ref');
+}
+
+function apiKeyLifecycleOperatorApprovalRefFromPacket(packet) {
+  if (!Object.prototype.hasOwnProperty.call(packet, 'operator_approval_ref')) throw new TypeError('operator_approval_ref must be present');
+  if (packet.operator_approval_ref === null) return null;
+  return requirePublicSafeLifecycleRef(packet.operator_approval_ref, 'operator_approval_ref');
+}
+
+function missingApiKeyLifecycleEvidenceRefs(requiredEvidenceRefs, operation) {
+  return apiKeyLifecycleRequiredPhases(operation)
+    .filter((phase) => requiredEvidenceRefs[phase].status !== PROVIDED)
+    .map((phase) => ({
+      key: phase,
+      ref: requiredEvidenceRefs[phase].ref,
+      blocker: requiredEvidenceRefs[phase].blocker ?? API_KEY_LIFECYCLE_BLOCKER_LABELS[phase],
+    }));
+}
+
+function apiKeyLifecycleExternalBlockers(requiredEvidenceRefs, operation, operatorApprovalRef) {
+  const blockers = missingApiKeyLifecycleEvidenceRefs(requiredEvidenceRefs, operation);
+  if (operatorApprovalRef === null) {
+    blockers.push({
+      key: 'operator_approval',
+      ref: 'blocked:operator_approval',
+      blocker: API_KEY_LIFECYCLE_BLOCKER_LABELS.operator_approval,
+    });
+  }
+  return blockers;
+}
+
+function apiKeyLifecycleReadiness(operation, requiredEvidenceRefs, operatorApprovalRef) {
+  const missingEvidenceRefs = missingApiKeyLifecycleEvidenceRefs(requiredEvidenceRefs, operation);
+  const externalLifecycleBlockers = apiKeyLifecycleExternalBlockers(requiredEvidenceRefs, operation, operatorApprovalRef);
+  const evidenceApproved = missingEvidenceRefs.length === 0 && operatorApprovalRef !== null;
+  return {
+    ...HOSTED_CLOUD_CONTRACT_READY,
+    operation,
+    status: evidenceApproved ? 'operator_approved_api_key_lifecycle_evidence' : 'blocked_api_key_lifecycle_evidence_or_operator_approval',
+    evidence_validation_only: true,
+    no_provider_wiring: true,
+    actual_key_issuance: false,
+    lifecycle_evidence_complete: missingEvidenceRefs.length === 0,
+    operator_approval_provided: operatorApprovalRef !== null,
+    external_wiring_ready: externalLifecycleBlockers.length === 0,
+    customer_api_keys_live: evidenceApproved,
+    live_readiness_gate: evidenceApproved ? 'evidence_complete_operator_approved' : 'blocked_until_lifecycle_evidence_and_operator_approval',
+    external_blockers: externalLifecycleBlockers,
+    missing_evidence_refs: missingEvidenceRefs,
+  };
+}
+
+function apiKeyLifecycleKeyMetadataRefs(operation, requiredEvidenceRefs) {
+  const requiredPhases = apiKeyLifecycleRequiredPhases(operation);
+  return Object.fromEntries(API_KEY_LIFECYCLE_KEY_SLOTS.map((slot) => {
+    const phase = `${slot}_key_metadata`;
+    return [slot, requiredPhases.includes(phase) ? requiredEvidenceRefs[phase] : null];
+  }));
+}
+
+function apiKeyLifecycleEvents(operation, requiredEvidenceRefs, keyContracts) {
+  return apiKeyLifecycleRequiredPhases(operation).map((phase) => {
+    const evidence = requiredEvidenceRefs[phase];
+    const event = {
+      operation,
+      phase,
+      evidence_ref: evidence.ref,
+      evidence_status: evidence.status,
+      ready: evidence.status === PROVIDED,
+    };
+    if (evidence.status === BLOCKED) event.blocker = evidence.blocker ?? API_KEY_LIFECYCLE_BLOCKER_LABELS[phase];
+    const slot = apiKeyLifecycleSlotForPhase(phase);
+    if (slot !== null && keyContracts[slot]) {
+      event.key_slot = slot;
+      event.contract_schema = keyContracts[slot].schema;
+      event.contract_id = keyContracts[slot].api_key_id;
+      event.contract_hash = keyContracts[slot].contract_hash;
+    }
+    return event;
+  });
+}
+
+function apiKeyLifecycleSafetyGuarantees() {
+  return {
+    opaque_reference_only: true,
+    customer_content_absent: true,
+    sensitive_text_absent: true,
+    auth_material_absent: true,
+    api_key_material_absent: true,
+    provider_payloads_absent: true,
+    provider_wiring_absent: true,
+    evidence_validation_only: true,
+    actual_key_issuance_absent: true,
+    financial_outcome_claim_absent: true,
+    remote_erasure_claim_absent: true,
+  };
+}
+
+function validateApiKeyLifecycleSafetyGuarantees(guarantees) {
+  if (!isPlainObject(guarantees)) throw new TypeError('public_safety_guarantees must be present');
+  requiredTrue(guarantees.opaque_reference_only, 'public_safety_guarantees.opaque_reference_only');
+  requiredTrue(guarantees.customer_content_absent, 'public_safety_guarantees.customer_content_absent');
+  requiredTrue(guarantees.sensitive_text_absent, 'public_safety_guarantees.sensitive_text_absent');
+  requiredTrue(guarantees.auth_material_absent, 'public_safety_guarantees.auth_material_absent');
+  requiredTrue(guarantees.api_key_material_absent, 'public_safety_guarantees.api_key_material_absent');
+  requiredTrue(guarantees.provider_payloads_absent, 'public_safety_guarantees.provider_payloads_absent');
+  requiredTrue(guarantees.provider_wiring_absent, 'public_safety_guarantees.provider_wiring_absent');
+  requiredTrue(guarantees.evidence_validation_only, 'public_safety_guarantees.evidence_validation_only');
+  requiredTrue(guarantees.actual_key_issuance_absent, 'public_safety_guarantees.actual_key_issuance_absent');
+  requiredTrue(guarantees.financial_outcome_claim_absent, 'public_safety_guarantees.financial_outcome_claim_absent');
+  requiredTrue(guarantees.remote_erasure_claim_absent, 'public_safety_guarantees.remote_erasure_claim_absent');
+}
+
+function validateApiKeyLifecycleContracts(keyContracts, tenantId, subjectRef) {
+  if (!isPlainObject(keyContracts)) throw new TypeError('key_contracts must be present');
+  for (const slot of API_KEY_LIFECYCLE_KEY_SLOTS) {
+    if (!Object.prototype.hasOwnProperty.call(keyContracts, slot)) throw new TypeError(`key_contracts.${slot} must be present`);
+    const contract = keyContracts[slot];
+    if (contract === null) continue;
+    if (!isPlainObject(contract)) throw new TypeError(`key_contracts.${slot} must be an object or null`);
+    validateApiKeyContract(contract);
+    validateApiKeyLifecycleContractTenantSubject(contract, tenantId, subjectRef, `key_contracts.${slot}`);
+  }
+}
+
+function validateApiKeyLifecycleEvidenceRefs(requiredEvidenceRefs, operation) {
+  if (!isPlainObject(requiredEvidenceRefs)) throw new TypeError('required_evidence_refs must be present');
+  const expectedPhases = apiKeyLifecycleRequiredPhases(operation);
+  for (const phase of Object.keys(requiredEvidenceRefs)) {
+    if (!expectedPhases.includes(phase)) throw new TypeError(`required_evidence_refs.${phase} is not required for ${operation}`);
+  }
+  const normalized = {};
+  for (const phase of expectedPhases) {
+    if (!Object.prototype.hasOwnProperty.call(requiredEvidenceRefs, phase)) throw new TypeError(`required_evidence_refs.${phase} must be present`);
+    normalized[phase] = apiKeyLifecycleEvidenceRefFor(phase, requiredEvidenceRefs[phase]);
+  }
+  return normalized;
+}
+
+function assertSameLifecycleObject(actual, expected, name) {
+  if (!isPlainObject(actual)) throw new TypeError(`${name} must be an object`);
+  if (JSON.stringify(canonicalize(actual)) !== JSON.stringify(canonicalize(expected))) throw new TypeError(`${name} must match API key lifecycle evidence`);
+}
+
+function validateApiKeyLifecycleReadiness(readiness, expected) {
+  if (!isPlainObject(readiness)) throw new TypeError('readiness must be present');
+  requiredTrue(readiness.contract_ready, 'readiness.contract_ready');
+  if (readiness.integration_kind !== HOSTED_CLOUD_CONTRACT_READY.integration_kind) throw new TypeError('readiness.integration_kind must remain contract_validator_only');
+  requiredTrue(readiness.no_external_provider_calls, 'readiness.no_external_provider_calls');
+  if (readiness.operation !== expected.operation) throw new TypeError('readiness.operation must match operation');
+  if (readiness.status !== expected.status) throw new TypeError('readiness.status must match API key lifecycle evidence and operator approval');
+  requiredTrue(readiness.evidence_validation_only, 'readiness.evidence_validation_only');
+  requiredTrue(readiness.no_provider_wiring, 'readiness.no_provider_wiring');
+  requiredFalse(readiness.actual_key_issuance, 'readiness.actual_key_issuance');
+  if (readiness.lifecycle_evidence_complete !== expected.lifecycle_evidence_complete) throw new TypeError('readiness.lifecycle_evidence_complete must match required_evidence_refs');
+  if (readiness.operator_approval_provided !== expected.operator_approval_provided) throw new TypeError('readiness.operator_approval_provided must match operator_approval_ref');
+  if (readiness.external_wiring_ready !== expected.external_wiring_ready) throw new TypeError('readiness.external_wiring_ready must match blockers');
+  if (readiness.customer_api_keys_live !== expected.customer_api_keys_live) throw new TypeError('readiness.customer_api_keys_live must match lifecycle evidence and operator approval');
+  if (readiness.live_readiness_gate !== expected.live_readiness_gate) throw new TypeError('readiness.live_readiness_gate must match lifecycle evidence and operator approval');
+  assertSameLifecycleArray(readiness.external_blockers, expected.external_blockers, 'readiness.external_blockers');
+  assertSameLifecycleArray(readiness.missing_evidence_refs, expected.missing_evidence_refs, 'readiness.missing_evidence_refs');
+}
+
+export function buildApiKeyLifecyclePacket(input = {}) {
+  if (!isPlainObject(input)) throw new TypeError('buildApiKeyLifecyclePacket requires an options object');
+  assertNoForbiddenPayload(input, 'input');
+  assertNoApiKeySecretMaterial(input, 'input');
+  const tenantId = requiredString(input.tenant_id ?? input.tenantId, 'tenant_id');
+  const subjectRef = requiredString(input.subject_ref ?? input.subjectRef, 'subject_ref');
+  const generatedAt = isoTimestamp(input.generated_at ?? input.generatedAt, 'generated_at');
+  const operation = apiKeyLifecycleOperation(input);
+  const keyContracts = apiKeyLifecycleContractsFrom(input, tenantId, subjectRef, generatedAt);
+  const requiredEvidenceRefs = apiKeyLifecycleEvidenceRefsFrom(input, operation, keyContracts);
+  const operatorApprovalRef = apiKeyLifecycleOperatorApprovalRefFromInput(input);
+  const readiness = apiKeyLifecycleReadiness(operation, requiredEvidenceRefs, operatorApprovalRef);
+  const body = {
+    schema: HOSTED_CLOUD_API_KEY_LIFECYCLE_PACKET_SCHEMA,
+    packet_id: stringOrDefault(input.packet_id ?? input.packetId, undefined),
+    generated_at: generatedAt,
+    tenant_id: tenantId,
+    subject_ref: subjectRef,
+    operation,
+    key_contracts: keyContracts,
+    key_metadata_refs: apiKeyLifecycleKeyMetadataRefs(operation, requiredEvidenceRefs),
+    lifecycle_events: apiKeyLifecycleEvents(operation, requiredEvidenceRefs, keyContracts),
+    required_evidence_refs: requiredEvidenceRefs,
+    external_blockers: readiness.external_blockers,
+    missing_evidence_refs: readiness.missing_evidence_refs,
+    operator_approval_ref: operatorApprovalRef,
+    readiness,
+    customer_api_keys_live: readiness.customer_api_keys_live,
+    guarantees: apiKeyLifecycleSafetyGuarantees(),
+    public_safety_guarantees: apiKeyLifecycleSafetyGuarantees(),
+  };
+  const packet = withContractIdentity(body, 'hcaklp', 'packet_id');
+  validateApiKeyLifecyclePacket(packet);
+  return packet;
+}
+
+export function validateApiKeyLifecyclePacket(packet) {
+  if (!isPlainObject(packet)) throw new TypeError('packet must be an object');
+  assertNoForbiddenPayload(packet, 'packet');
+  assertNoApiKeySecretMaterial(packet, 'packet');
+  if (packet.schema !== HOSTED_CLOUD_API_KEY_LIFECYCLE_PACKET_SCHEMA) throw new TypeError(`schema must be ${HOSTED_CLOUD_API_KEY_LIFECYCLE_PACKET_SCHEMA}`);
+  requiredString(packet.packet_id, 'packet_id');
+  isoTimestamp(packet.generated_at, 'generated_at');
+  requiredString(packet.contract_hash, 'contract_hash');
+  const tenantId = requiredString(packet.tenant_id, 'tenant_id');
+  const subjectRef = requiredString(packet.subject_ref, 'subject_ref');
+  const operation = apiKeyLifecycleOperation(packet);
+  validateApiKeyLifecycleContracts(packet.key_contracts, tenantId, subjectRef);
+  const requiredEvidenceRefs = validateApiKeyLifecycleEvidenceRefs(packet.required_evidence_refs, operation);
+  const operatorApprovalRef = apiKeyLifecycleOperatorApprovalRefFromPacket(packet);
+  const expectedReadiness = apiKeyLifecycleReadiness(operation, requiredEvidenceRefs, operatorApprovalRef);
+  assertSameLifecycleObject(packet.key_metadata_refs, apiKeyLifecycleKeyMetadataRefs(operation, requiredEvidenceRefs), 'key_metadata_refs');
+  assertSameLifecycleArray(packet.lifecycle_events, apiKeyLifecycleEvents(operation, requiredEvidenceRefs, packet.key_contracts), 'lifecycle_events');
+  assertSameLifecycleArray(packet.external_blockers, expectedReadiness.external_blockers, 'external_blockers');
+  assertSameLifecycleArray(packet.missing_evidence_refs, expectedReadiness.missing_evidence_refs, 'missing_evidence_refs');
+  validateApiKeyLifecycleReadiness(packet.readiness, expectedReadiness);
+  if (packet.customer_api_keys_live !== expectedReadiness.customer_api_keys_live) throw new TypeError('customer_api_keys_live must match readiness.customer_api_keys_live');
+  validateApiKeyLifecycleSafetyGuarantees(packet.guarantees ?? packet.public_safety_guarantees);
+  validateApiKeyLifecycleSafetyGuarantees(packet.public_safety_guarantees ?? packet.guarantees);
   return true;
 }
