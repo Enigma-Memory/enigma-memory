@@ -1,6 +1,6 @@
 {
   "name": "enigma-memory",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Provider-agnostic AI memory passport and offline-verifiable proof layer.",
   "license": "Apache-2.0",
@@ -56,6 +56,7 @@
     "deploy/kubernetes/enigma-backend.example.yaml",
     "scripts/check.mjs",
     "scripts/install-enigma-local.mjs",
+    "scripts/verify-registry-install.mjs",
     "scripts/build-production-readiness-manifest.mjs",
     "scripts/build-production-backend-env-kit.mjs",
     "scripts/cloudflare-secret-env.mjs",
@@ -116,6 +117,7 @@
     "check": "node scripts/check.mjs",
     "test": "node --test test/*.test.mjs",
     "install:local": "node scripts/install-enigma-local.mjs",
+    "registry:verify": "node scripts/verify-registry-install.mjs",
     "boundary": "node harnesses/boundary-sim/boundary_harness.mjs",
     "release:audit": "node scripts/release-audit.mjs",
     "provenance:local": "node scripts/release-provenance.mjs",

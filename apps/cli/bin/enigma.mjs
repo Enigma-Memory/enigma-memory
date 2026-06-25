@@ -29,6 +29,7 @@ import {
 const DEFAULT_BUNDLE = '.enigma/bundle.json';
 export const DEFAULT_RELAY_PORT = 8787;
 export const DEFAULT_GATEWAY_PORT = 8797;
+const DEFAULT_QUICKSTART_MEMORY = 'Enigma quickstart demo memory: local proof bundles can be created and verified without provider or cloud credentials.';
 const PACKAGE_JSON_URL = new URL('../../../package.json', import.meta.url);
 const SPECS_URL = new URL('../../../specs/', import.meta.url);
 const IMPORTERS = Object.freeze({
@@ -143,6 +144,51 @@ async function fileExists(path) {
   } catch {
     return false;
   }
+}
+
+function pathFlag(flags, names, fallback) {
+  const value = getFlag(flags, names, fallback);
+  if (value === true || value === '') throw new Error(`Missing required --${names[0]}.`);
+  return String(value);
+}
+
+function quickstartPathDisplay(outDirInput, name) {
+  const base = String(outDirInput);
+  if (base === '' || base === '.') return name;
+  return `${base.replace(/[\\/]+$/, '')}/${name}`;
+}
+
+function ensureDistinctOutputPaths(paths) {
+  const normalized = paths.map((path) => (process.platform === 'win32' ? path.toLowerCase() : path));
+  if (new Set(normalized).size !== paths.length) {
+    throw new Error('Quickstart output paths must be distinct.');
+  }
+}
+
+async function assertCanWriteQuickstartOutputs(outputs, overwrite) {
+  if (overwrite) return;
+  const existing = [];
+  for (const output of outputs) {
+    if (await fileExists(output.path)) existing.push(output.display);
+  }
+  if (existing.length > 0) {
+    throw new Error(`Quickstart output already exists: ${existing.join(', ')}. Pass --overwrite to replace it.`);
+  }
+}
+
+async function quickstartMemoryTextFromFlags(flags) {
+  const inlineText = getFlag(flags, ['memory-text', 'memoryText']);
+  const textFile = getFlag(flags, ['memory-file', 'memoryFile', 'text-file', 'textFile']);
+  if (inlineText !== undefined && textFile !== undefined) throw new Error('Use either --memory-text or --memory-file, not both.');
+  if (inlineText !== undefined) {
+    if (inlineText === true || inlineText === '') throw new Error('Missing required --memory-text.');
+    return String(inlineText);
+  }
+  if (textFile !== undefined) {
+    if (textFile === true || textFile === '') throw new Error('Missing required --memory-file.');
+    return readFile(resolve(String(textFile)), 'utf8');
+  }
+  return DEFAULT_QUICKSTART_MEMORY;
 }
 
 async function readPackageJson() {
@@ -359,6 +405,87 @@ async function initCommand(flags, io) {
   const bundle = await persistState(bundlePath, vault);
   print({ ok: true, bundle: bundlePath, schema: bundle.schema, subject_id: bundle.vault?.subject_id }, io);
   return 0;
+}
+
+export async function quickstartCommand(flags, io) {
+  const bundleInput = pathFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE);
+  const outDirInput = pathFlag(flags, ['out-dir', 'outDir'], dirname(bundleInput));
+  const bundlePath = resolve(bundleInput);
+  const outDirPath = resolve(outDirInput);
+  const contextPackPath = resolve(outDirPath, 'context-pack.json');
+  const exportPath = resolve(outDirPath, 'export.json');
+  const verifyReportPath = resolve(outDirPath, 'verify-report.json');
+  const contextPackDisplay = quickstartPathDisplay(outDirInput, 'context-pack.json');
+  const exportDisplay = quickstartPathDisplay(outDirInput, 'export.json');
+  const verifyReportDisplay = quickstartPathDisplay(outDirInput, 'verify-report.json');
+  const outputs = [
+    { path: bundlePath, display: bundleInput },
+    { path: contextPackPath, display: contextPackDisplay },
+    { path: exportPath, display: exportDisplay },
+    { path: verifyReportPath, display: verifyReportDisplay },
+  ];
+  ensureDistinctOutputPaths(outputs.map((output) => output.path));
+  const overwrite = getFlag(flags, ['overwrite'], false) === true || getFlag(flags, ['overwrite'], false) === 'true';
+  await assertCanWriteQuickstartOutputs(outputs, overwrite);
+
+  const vault = createVault({
+    subjectId: String(getFlag(flags, ['subject', 'subject-id'], 'local-user')),
+    displayName: String(getFlag(flags, ['display-name', 'name'], 'Local user')),
+    passphrase: String(getFlag(flags, ['passphrase'], 'local-development-passphrase')),
+  });
+  const passport = createPassport({
+    vault,
+    subjectId: vault.subject_id,
+    displayName: String(getFlag(flags, ['display-name', 'name'], 'Local user')),
+  });
+  remember({
+    vault,
+    passport,
+    text: await quickstartMemoryTextFromFlags(flags),
+    purpose: 'quickstart_local_proof',
+    purpose_tags: ['quickstart'],
+    metadata: { source: 'enigma quickstart' },
+  });
+  const contextPack = compileContextPack({
+    vault,
+    passport,
+    query: '',
+    purpose: 'quickstart_local_context',
+    limit: 8,
+  });
+  const exported = exportBundle({ vault, includePlaintext: false });
+  const bundle = exported.bundle ?? exported;
+  const verifyReport = verifyBundle(bundle);
+
+  await writeJson(bundlePath, bundle);
+  await writeJson(contextPackPath, contextPack);
+  await writeJson(exportPath, bundle);
+  await writeJson(verifyReportPath, verifyReport);
+
+  print({
+    ok: verifyReport.ok === true,
+    bundle: bundleInput,
+    context_pack: contextPackDisplay,
+    export: exportDisplay,
+    verify_report: verifyReportDisplay,
+    memory_count: Array.isArray(bundle.memory_objects) ? bundle.memory_objects.length : 0,
+    receipt_count: Array.isArray(bundle.receipts) ? bundle.receipts.length : 0,
+    context_item_count: Array.isArray(contextPack.memories) ? contextPack.memories.length : 0,
+    verify_ok: verifyReport.ok === true,
+    next_commands: [
+      `enigma verify --export ${exportDisplay}`,
+      `enigma connect generic-mcp --bundle ${bundleInput} --dry-run`,
+    ],
+    claim_boundaries: {
+      local_only: true,
+      provider_credentials_required: false,
+      provider_deletion_proof: false,
+      model_forgetting_proof: false,
+      roi_or_savings_guarantee: false,
+      compliance_certification: false,
+    },
+  }, io);
+  return verifyReport.ok === true ? 0 : 1;
 }
 
 async function rememberCommand(flags, io) {
@@ -946,6 +1073,7 @@ function usage() {
     usage: 'enigma <command> [options]',
     commands: [
       'init',
+      'quickstart',
       'doctor',
       'install',
       'connect <client>',
@@ -989,6 +1117,15 @@ function usage() {
     remember_options: {
       '--text <text>': 'Inline local memory text. Avoid for private content because argv can be logged by process tooling.',
       '--text-file <path>': 'Read local memory text from a file so private smoke input is not exposed in shell argv. Aliases: --memory-file, --textFile, --memoryFile.',
+    },
+    quickstart_options: {
+      '--bundle <path>': 'Bundle JSON to create. Defaults to .enigma/bundle.json.',
+      '--out-dir <path>': 'Directory for context-pack.json, export.json, and verify-report.json. Defaults to the bundle directory.',
+      '--subject <id>': 'Local subject id. Defaults to local-user.',
+      '--display-name <name>': 'Local display name. Defaults to Local user.',
+      '--memory-file <path>': 'Read local memory text from a file. Alias: --text-file.',
+      '--memory-text <text>': 'Inline demo memory text for non-private demos only.',
+      '--overwrite': 'Replace existing quickstart output files.',
     },
     native_host: {
       bin: 'enigma-native-host',
@@ -1064,6 +1201,7 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
   }
   try {
     if (command === 'init') return await initCommand(flags, io);
+    if (command === 'quickstart') return await quickstartCommand(flags, io);
     if (command === 'doctor') return await doctorCommand(flags, io);
     if (command === 'install') return await installCommand(flags, io);
     if (command === 'connect') return await connectCommand(subcommand, flags, io);

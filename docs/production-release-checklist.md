@@ -2,7 +2,7 @@
 
 This checklist is for publishing and operating Enigma as an installable package and production-facing local/hosted system.
 
-Current release posture: local production foundation, installable package scaffolding, and the static public website on `https://enigmamemory.com/` are present. Hosted cloud relay/gateway requires deployment credentials and operator infrastructure before it can be sold or described as live.
+Current release posture: local production foundation, published npm package `enigma-memory`, and the static public website on `https://enigmamemory.com/` are present. Hosted cloud relay/gateway requires deployment credentials and operator infrastructure before it can be sold or described as live.
 
 Use the [overnight build master plan](overnight-build-master-plan.md) as the execution plan for overnight phase order, GPT-5.5/Kimi ownership, acceptance gates, and blocker handling before changing any release posture.
 
@@ -33,8 +33,11 @@ Before enabling live monitoring, analytics, or token rotation, use [`live-endpoi
 ## Package and installability
 
 - [ ] Package name is `enigma-memory`.
-- [ ] Public install command is `npm install -g enigma-memory`; one-off CLI examples use `npx --yes --package enigma-memory <bin> ...`.
-- [ ] Published npm package is visible as `enigma-memory@0.1.0` before public npm-install claims are made.
+- [ ] Public install command is `npm install -g enigma-memory`; one-off quickstart command is `npx --yes --package enigma-memory enigma quickstart --bundle ./.enigma/bundle.json --overwrite`.
+- [ ] Published npm package is visible as `enigma-memory` before public npm-install claims are made.
+- [ ] Registry verification script is present and run as `npm run registry:verify -- --execute` before public npm-install claims; keep its evidence bounded to registry installability only.
+- [ ] Published-package quickstart smoke uses `npm install -g enigma-memory`, `enigma quickstart --bundle ./.enigma/bundle.json --overwrite`, `enigma doctor`, `enigma-relay demo`, and `enigma-gateway demo` in that order.
+- [ ] Quickstart output is described as a local vault bundle, context pack, export proof bundle, and verify report; that evidence is local Enigma-controlled proof only, not provider deletion, model forgetting, hosted/BYOC readiness, legal approval, or compliance certification.
 - [ ] `docs/npm-publishing.md` is followed before any future npm publication attempt, including package preflight, `npm pack --dry-run`, manual approval, `NPM_TOKEN` secret handling, provenance/SBOM boundaries, and rollback/deprecation notes.
 - [ ] `private` is not set for the publish artifact.
 - [ ] Node engine is `>=24`.
@@ -112,9 +115,10 @@ cd enigma
 node --input-type=module -e "const { execFileSync } = await import('node:child_process'); const pack = JSON.parse(execFileSync('npm', ['pack', '--dry-run', '--json'], { encoding: 'utf8' }))[0]; const files = new Set(pack.files.map((file) => file.path)); for (const required of ['package.json', 'README.md']) { if (!files.has(required)) throw new Error(`missing packed file ${required}`); } if (![...files].some((file) => /^LICENSE(\\.|$)/.test(file))) throw new Error('missing packed LICENSE artifact'); console.log('packed README/package/LICENSE coverage checked')"
 node --input-type=module -e "const { readFile } = await import('node:fs/promises'); const pkg = JSON.parse(await readFile('package.json', 'utf8')); const bins = Object.entries(pkg.bin); for (const [name, file] of bins) { const text = await readFile(file, 'utf8'); if (!text.startsWith('#!/usr/bin/env node')) throw new Error(`${name} missing node shebang`); } if (pkg.license !== 'Apache-2.0') throw new Error('license metadata mismatch'); console.log('bin shebangs and license metadata checked')"
 node --input-type=module -e "await import('./packages/core/src/index.js'); await import('./packages/connectors/src/index.js'); await import('./packages/importers/src/index.js'); await import('./apps/relay/src/server.mjs'); await import('./apps/gateway/src/server.mjs'); const { readFile } = await import('node:fs/promises'); await readFile('./apps/desktop/src/index.html', 'utf8'); console.log('source imports checked')"
-npm install -g .
-enigma --help
-enigma-verify --help
+npm run registry:verify -- --execute
+npm install -g enigma-memory
+enigma quickstart --bundle ./.enigma/bundle.json --overwrite
+enigma doctor
 enigma-relay demo
 enigma-gateway demo
 printf '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"manual\",\"version\":\"0\"}}}\\n' | ENIGMA_BUNDLE=\"$PWD/.enigma/bundle.json\" enigma-mcp

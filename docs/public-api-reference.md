@@ -149,9 +149,28 @@ Package bins declared in `package.json`:
 | `enigma-gateway` | `./apps/gateway/bin/enigma-gateway.mjs` | stable local/package local service bin | Local gateway demo/server. Hosted/BYOC use requires deployment infrastructure. |
 | `enigma-native-host` | `./apps/native-host/bin/enigma-native-host.mjs` | stable local/package native messaging bin | Chrome/Edge/Firefox native messaging host over stdio. It reads the local bundle selected by `ENIGMA_BUNDLE` or `--bundle`. |
 
+Published-package quickstart:
+
+```sh
+npm install -g enigma-memory
+enigma quickstart --bundle ./.enigma/bundle.json --overwrite
+enigma doctor
+enigma-relay demo
+enigma-gateway demo
+```
+
+One-off quickstart without a global install:
+
+```sh
+npx --yes --package enigma-memory enigma quickstart --bundle ./.enigma/bundle.json --overwrite
+```
+
+`enigma quickstart` creates a local vault bundle, context pack, export proof bundle, and verify report. The proof is local Enigma-controlled evidence only; it is not provider deletion proof, model forgetting proof, hosted/BYOC readiness evidence, token ROI evidence, or compliance certification.
+
 `enigma` command names:
 
 - `enigma init`
+- `enigma quickstart`
 - `enigma doctor`
 - `enigma install`
 - `enigma connect <client>`
@@ -181,6 +200,7 @@ Common local options and outputs:
 
 | Command | Inputs | Output boundary |
 | --- | --- | --- |
+| `enigma quickstart --bundle <path> --overwrite` | `--bundle`, optional `--overwrite` | Creates a local review workspace with a vault bundle, context pack, export proof bundle, and verify report. The result proves only local Enigma-controlled state and receipt verification. |
 | `enigma init --bundle <path>` | `--subject`/`--subject-id`, `--display-name`/`--name`, `--passphrase` | Creates local `enigma.vault_bundle.v1` state and prints `{ ok, bundle, schema, subject_id }`. |
 | `enigma remember --bundle <path> --text <private local text>` | `--purpose`, `--tags`, `--metadata` | Prints `memory_addr` and `receipt_id`. Do not place private memory text in public proof artifacts. |
 | `enigma recall --bundle <path> --id <memory_addr>` | `--purpose` | Reads from local vault and emits recall result plus receipt data. |
@@ -320,7 +340,7 @@ The native-host bridge stays local and explicit-approval only. Provider-native m
 
 ## MCP server surface
 
-Transport: stdio JSON-RPC through `enigma-mcp` or `enigma mcp serve`. Protocol version advertised by the server is `2024-11-05`; server info is `enigma-mcp-server` version `0.1.0`.
+Transport: stdio JSON-RPC through `enigma-mcp` or `enigma mcp serve`. Protocol version advertised by the server is `2024-11-05`; server info is `enigma-mcp-server` version `0.1.1`.
 
 Supported JSON-RPC methods are `initialize`, `notifications/initialized`, `ping`, `tools/list`, `tools/call`, `resources/list`, `resources/templates/list`, `resources/read`, `prompts/list`, and `prompts/get`. Unknown methods return JSON-RPC method-not-found errors; request ids must be strings/numbers/null matching the server's id validation.
 
