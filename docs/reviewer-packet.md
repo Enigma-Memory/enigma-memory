@@ -82,7 +82,7 @@ For package-surface checksums, inspect `evidence/local-provenance.json` separate
 
 Do not use a review packet as evidence of:
 
-- npm publication or package availability from `@enigma-ai/enigma`.
+- npm publication or package availability from `enigma-memory`.
 - signed provenance, registry attestation, source-control commit identity, clean git state, SLSA level, or compliance certification.
 - Docker image digest, container runtime behavior, hosted relay/gateway deployment, Cloudflare Pages deployment, DNS/TLS, cache state, or live website availability.
 - hosted Enigma cloud or customer BYOC readiness; those require deployment credentials, domain/TLS, durable storage, KMS/secrets, monitoring, backups, incident ownership, tenant/operator policy, SIEM/log routing, support/SLA approval, legal/compliance status, and a completed operator acceptance packet.

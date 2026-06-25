@@ -1,6 +1,6 @@
 # Install Enigma anywhere
 
-This guide covers paths that work from a local checkout today and the paths to use after the package is published as `@enigma-ai/enigma`.
+This guide covers paths that work from a local checkout today and the paths to use after the public package is published as `enigma-memory`.
 
 Current status: Enigma has a local production foundation and installable package scaffolding. Hosted cloud and BYOC operation require real deployment credentials, domains, TLS, durable storage, KMS/secrets, monitoring, backups, and operator/customer infrastructure; they are not activated by installing the package.
 
@@ -76,12 +76,12 @@ node apps/gateway/bin/enigma-gateway.mjs demo
 
 ## Install from npm after publication
 
-After the package is published:
+After the public `enigma-memory` package is published:
 
-Publication boundary: the source-checkout installer does not publish the package and does not install from the registry. Use the npm commands below only after an operator has published `@enigma-ai/enigma`; until then, use the source checkout flow above or direct local bins.
+Publication boundary: the source-checkout installer does not publish the package and does not install from the registry. Use the npm commands below only after an operator has published `enigma-memory` from the authorized npm account; until then, use the source checkout flow above or direct local bins.
 
 ```sh
-npm install -g @enigma-ai/enigma
+npm install -g enigma-memory
 enigma --help
 enigma-verify --help
 enigma-relay demo
@@ -91,10 +91,11 @@ enigma-gateway demo
 One-off execution without a global install:
 
 ```sh
-npx --yes --package @enigma-ai/enigma enigma --help
-npx --yes --package @enigma-ai/enigma enigma-verify --help
-npx --yes --package @enigma-ai/enigma enigma-relay demo
-npx --yes --package @enigma-ai/enigma enigma-gateway demo
+npx --yes --package enigma-memory enigma --help
+npx --yes --package enigma-memory enigma doctor
+npx --yes --package enigma-memory enigma-verify --help
+npx --yes --package enigma-memory enigma-relay demo
+npx --yes --package enigma-memory enigma-gateway demo
 ```
 
 ## Local no-network path

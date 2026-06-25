@@ -1,6 +1,6 @@
 # Public API reference
 
-This reference lists the public surfaces currently exposed by the `@enigma-ai/enigma` package and source checkout. It is intentionally boundary-aware:
+This reference lists the public surfaces currently exposed by the `enigma-memory` package and source checkout. It is intentionally boundary-aware:
 
 - **Stable local/package** surfaces are declared in `package.json` `bin` or `exports`, run locally, and do not require hosted Enigma cloud.
 - **Demo/source-only** surfaces are useful for review, local demos, or source checkout operation, but are not evidence of a hosted production service.
@@ -13,11 +13,11 @@ Enigma proofs cover Enigma-controlled or Enigma-mediated vault state, receipts, 
 Import from the package root or explicit subpath after installing the source checkout or the published package:
 
 ```js
-import { createVault, remember, exportBundle } from '@enigma-ai/enigma/vault';
-import { verifyReceiptChain } from '@enigma-ai/enigma/core';
-import { createMemoryOptimizationPlan } from '@enigma-ai/enigma/optimizer';
-import { createUsageEvent, aggregateUsageEvents } from '@enigma-ai/enigma/metering';
-import { createPermissionlessMemoryJob, createConsumerGpuCapacityProfile, createServiceSettlementReceipt } from '@enigma-ai/enigma/settlement';
+import { createVault, remember, exportBundle } from 'enigma-memory/vault';
+import { verifyReceiptChain } from 'enigma-memory/core';
+import { createMemoryOptimizationPlan } from 'enigma-memory/optimizer';
+import { createUsageEvent, aggregateUsageEvents } from 'enigma-memory/metering';
+import { createPermissionlessMemoryJob, createConsumerGpuCapacityProfile, createServiceSettlementReceipt } from 'enigma-memory/settlement';
 ```
 
 The verifier's `verifyBundle(bundle)` helper is implemented in the `enigma-verify` bin source; package consumers should prefer the `enigma-verify` bin, `enigma verify`, or the MCP `enigma_verify_receipts` tool unless working from a source checkout.
@@ -26,24 +26,24 @@ Use package subpath exports for public module imports:
 
 | Package subpath | `package.json` export key | Target | Status | Public exports |
 | --- | --- | --- | --- | --- |
-| `@enigma-ai/enigma` | `.` | `packages/core/src/index.js` | stable local/package | Same as `./core`. |
-| `@enigma-ai/enigma/core` | `./core` | `packages/core/src/index.js` | stable local/package | `SHA256_PREFIX`, `EMPTY_MERKLE_ROOT`, `canonicalize`, `sha256Hex`, `hmacSha256Hex`, `generateSigningKeyPair`, `signPayload`, `verifySignature`, `receiptHash`, `createReceipt`, `verifyReceipt`, `verifyReceiptChain`, `MerkleSet`, `createCheckpoint`, `verifyCheckpoint`, `createMemoryAddress`. |
-| `@enigma-ai/enigma/vault` | `./vault` | `packages/vault/src/index.js` | stable local/package | `createVault`, `remember`, `recall`, `updateMemory`, `deleteMemory`, `exportBundle`, `importBundle`. |
-| `@enigma-ai/enigma/passport` | `./passport` | `packages/passport/src/index.js` | stable local/package | `createPassport`, `compileContextPack`, `verifyContextPack`. |
-| `@enigma-ai/enigma/boundary` | `./boundary` | `packages/boundary/src/index.js` | stable local/package | `createBoundaryManifest`, `verifyBoundaryManifest`, `classifyBoundaryPath`, `runBoundarySimulation`, `boundarySurfaces`, `boundaryClassifications`. |
-| `@enigma-ai/enigma/mcp-server` | `./mcp-server` | `packages/mcp-server/src/index.js` | stable local/package | `toolDescriptors`, `resourceDescriptors`, `promptDescriptors`, `handlers`, memory tools, `enigma_meter_usage`, settlement tools, `enigma_passport_summary_resource`, `enigma_standard_memory_prompt`, `handleJsonRpcRequest`, `startStdioServer`, `default`. |
-| `@enigma-ai/enigma/connectors` | `./connectors` | `packages/connectors/src/index.js` | stable local/package | `supportedClients`, `platformDefaultConfigPath`, `getClientProfile`, `renderMcpConfig`, `connectClient`, `disconnectClient`, `doctorConnectors`, `runConnectorDemo`. |
-| `@enigma-ai/enigma/importers` | `./importers` | `packages/importers/src/index.js` | stable local/package | `importChatGptExport`, `importClaudeMemory`, `importMem0Export`, `importLettaAgentFile`, `importLangGraphStore`, `importZepGraphitiExport`, `exportEnigmaCapsule`, `importEnigmaCapsule`, `runImporterDemo`, `default`. |
-| `@enigma-ai/enigma/mesh` | `./mesh` | `packages/mesh/src/index.js` | stable local/package | `createMeshNode`, `createCapsuleManifest`, `verifyCapsuleManifest`, `createWitnessCheckpoint`, `verifyWitnessCheckpoint`, `createRelayStore`, `pushRelayRecord`, `pullRelayRecord`, `createFederationGrant`, `verifyFederationGrant`, `runMeshDemo`, `default`. |
-| `@enigma-ai/enigma/enterprise` | `./enterprise` | `packages/enterprise/src/index.js` | stable local/package | `createEnterprisePolicy`, `evaluateEnterprisePolicy`, `minimizeEnterpriseEvaluation`, `minimizeEnterprisePolicy`, `createGatewayDecision`, `verifyGatewayDecision`, `exportSiemEvent`, `runEnterpriseDemo`, `default`. |
-| `@enigma-ai/enigma/optimizer` | `./optimizer` | `packages/optimizer/src/index.js` | stable local/package | `MEMORY_OPTIMIZATION_PRODUCT_THESIS`, `MEMORY_OPTIMIZATION_PLAN_SCHEMA`, `MEMORY_ACCESS_RECEIPT_SCHEMA`, `estimateTextTokens`, `estimateTokenCost`, `createMemoryOptimizationPlan`, `createMemoryAccessReceipt`, `assertNoRawMemoryOutput`. |
-| `@enigma-ai/enigma/metering` | `./metering` | `packages/metering/src/index.js` | stable local/package | `USAGE_EVENT_SCHEMA`, `USAGE_AGGREGATE_SCHEMA`, `USAGE_METERING_PRODUCT_THESIS`, `createUsageEvent`, `aggregateUsageEvents`. |
-| `@enigma-ai/enigma/settlement` | `./settlement` | `packages/settlement/src/index.js` | stable local/package | `PERMISSIONLESS_MEMORY_JOB_SCHEMA`, `CONSUMER_GPU_CAPACITY_PROFILE_SCHEMA`, `OPERATOR_SERVICE_QUOTE_SCHEMA`, `SERVICE_SETTLEMENT_RECEIPT_SCHEMA`, `SETTLEMENT_BATCH_SCHEMA`, `SETTLEMENT_PRODUCT_THESIS`, `CONSUMER_GPU_MEMORY_MARKET_THESIS`, `createPermissionlessMemoryJob`, `createConsumerGpuCapacityProfile`, `createOperatorServiceQuote`, `createServiceSettlementReceipt`, `verifyServiceSettlementReceipt`, `createSettlementBatch`. |
-| `@enigma-ai/enigma/storage` | `./storage` | `packages/storage/src/index.js` | stable local/package contract module | `PRODUCTION_STORAGE_SCHEMA`, `POSTGRES_MIGRATION_SCHEMA`, `PRODUCTION_STORAGE_OPERATION_SCHEMA`, `PRODUCTION_STORAGE_TABLES`, `postgresProductionSchemaSql`, `buildPostgresMigration`, `assertProductionStorageSqlSafe`, `productionStorageContract`, parameterized operation builders for relay records, witness checkpoints, pairings, gateway policy versions, decisions, SIEM events, and readiness evidence refs. |
-| `@enigma-ai/enigma/relay` | `./relay` | `apps/relay/src/server.mjs` | stable local/package service module | `createRelayState`, `createRelayServer`, `handleRelayRequest`, `serializeRelayState`, `hydrateRelayState`, `loadRelayStateFromFile`, `saveRelayStateToFile`, `runRelayDemo`. |
-| `@enigma-ai/enigma/gateway` | `./gateway` | `apps/gateway/src/server.mjs` | stable local/package service module | `createGatewayState`, `createGatewayServer`, `handleGatewayRequest`, `serializeGatewayState`, `hydrateGatewayState`, `loadGatewayStateFromFile`, `saveGatewayStateToFile`, `runGatewayDemo`, `default`. |
-| `@enigma-ai/enigma/desktop` | `./desktop` | `apps/desktop/src/app.js` | package-included desktop scaffold API | `DESKTOP_SCREENS`, `createDesktopState`, `desktopReducer`, `renderDesktopModel`, `startMcp`, `stopMcp`, `createVault`, `rememberMemory`, `deleteMemory`, `searchMemories`, `verifyReceipts`, `connectClient`, `disconnectClient`, `importBundle`, `exportBundle`, `updateMeshStatus`, `updateEnterpriseStatus`, `selectDesktopScreen`, `setDesktopDraft`, `desktopActions`, `actions`, `startMCP`, `stopMCP`, `remember`, `removeMemory`, `searchMemory`, `verifyReceiptOutput`, `connectDesktopClient`, `importDesktopBundle`, `exportDesktopBundle`, `desktopApi`. Desktop state is operational evidence only; cryptographic proof still comes from receipts and verifier output. |
-| `@enigma-ai/enigma/package.json` | `./package.json` | `package.json` | stable package metadata | Package metadata for tooling. |
+| `enigma-memory` | `.` | `packages/core/src/index.js` | stable local/package | Same as `./core`. |
+| `enigma-memory/core` | `./core` | `packages/core/src/index.js` | stable local/package | `SHA256_PREFIX`, `EMPTY_MERKLE_ROOT`, `canonicalize`, `sha256Hex`, `hmacSha256Hex`, `generateSigningKeyPair`, `signPayload`, `verifySignature`, `receiptHash`, `createReceipt`, `verifyReceipt`, `verifyReceiptChain`, `MerkleSet`, `createCheckpoint`, `verifyCheckpoint`, `createMemoryAddress`. |
+| `enigma-memory/vault` | `./vault` | `packages/vault/src/index.js` | stable local/package | `createVault`, `remember`, `recall`, `updateMemory`, `deleteMemory`, `exportBundle`, `importBundle`. |
+| `enigma-memory/passport` | `./passport` | `packages/passport/src/index.js` | stable local/package | `createPassport`, `compileContextPack`, `verifyContextPack`. |
+| `enigma-memory/boundary` | `./boundary` | `packages/boundary/src/index.js` | stable local/package | `createBoundaryManifest`, `verifyBoundaryManifest`, `classifyBoundaryPath`, `runBoundarySimulation`, `boundarySurfaces`, `boundaryClassifications`. |
+| `enigma-memory/mcp-server` | `./mcp-server` | `packages/mcp-server/src/index.js` | stable local/package | `toolDescriptors`, `resourceDescriptors`, `promptDescriptors`, `handlers`, memory tools, `enigma_meter_usage`, settlement tools, `enigma_passport_summary_resource`, `enigma_standard_memory_prompt`, `handleJsonRpcRequest`, `startStdioServer`, `default`. |
+| `enigma-memory/connectors` | `./connectors` | `packages/connectors/src/index.js` | stable local/package | `supportedClients`, `platformDefaultConfigPath`, `getClientProfile`, `renderMcpConfig`, `connectClient`, `disconnectClient`, `doctorConnectors`, `runConnectorDemo`. |
+| `enigma-memory/importers` | `./importers` | `packages/importers/src/index.js` | stable local/package | `importChatGptExport`, `importClaudeMemory`, `importMem0Export`, `importLettaAgentFile`, `importLangGraphStore`, `importZepGraphitiExport`, `exportEnigmaCapsule`, `importEnigmaCapsule`, `runImporterDemo`, `default`. |
+| `enigma-memory/mesh` | `./mesh` | `packages/mesh/src/index.js` | stable local/package | `createMeshNode`, `createCapsuleManifest`, `verifyCapsuleManifest`, `createWitnessCheckpoint`, `verifyWitnessCheckpoint`, `createRelayStore`, `pushRelayRecord`, `pullRelayRecord`, `createFederationGrant`, `verifyFederationGrant`, `runMeshDemo`, `default`. |
+| `enigma-memory/enterprise` | `./enterprise` | `packages/enterprise/src/index.js` | stable local/package | `createEnterprisePolicy`, `evaluateEnterprisePolicy`, `minimizeEnterpriseEvaluation`, `minimizeEnterprisePolicy`, `createGatewayDecision`, `verifyGatewayDecision`, `exportSiemEvent`, `runEnterpriseDemo`, `default`. |
+| `enigma-memory/optimizer` | `./optimizer` | `packages/optimizer/src/index.js` | stable local/package | `MEMORY_OPTIMIZATION_PRODUCT_THESIS`, `MEMORY_OPTIMIZATION_PLAN_SCHEMA`, `MEMORY_ACCESS_RECEIPT_SCHEMA`, `estimateTextTokens`, `estimateTokenCost`, `createMemoryOptimizationPlan`, `createMemoryAccessReceipt`, `assertNoRawMemoryOutput`. |
+| `enigma-memory/metering` | `./metering` | `packages/metering/src/index.js` | stable local/package | `USAGE_EVENT_SCHEMA`, `USAGE_AGGREGATE_SCHEMA`, `USAGE_METERING_PRODUCT_THESIS`, `createUsageEvent`, `aggregateUsageEvents`. |
+| `enigma-memory/settlement` | `./settlement` | `packages/settlement/src/index.js` | stable local/package | `PERMISSIONLESS_MEMORY_JOB_SCHEMA`, `CONSUMER_GPU_CAPACITY_PROFILE_SCHEMA`, `OPERATOR_SERVICE_QUOTE_SCHEMA`, `SERVICE_SETTLEMENT_RECEIPT_SCHEMA`, `SETTLEMENT_BATCH_SCHEMA`, `SETTLEMENT_PRODUCT_THESIS`, `CONSUMER_GPU_MEMORY_MARKET_THESIS`, `createPermissionlessMemoryJob`, `createConsumerGpuCapacityProfile`, `createOperatorServiceQuote`, `createServiceSettlementReceipt`, `verifyServiceSettlementReceipt`, `createSettlementBatch`. |
+| `enigma-memory/storage` | `./storage` | `packages/storage/src/index.js` | stable local/package contract module | `PRODUCTION_STORAGE_SCHEMA`, `POSTGRES_MIGRATION_SCHEMA`, `PRODUCTION_STORAGE_OPERATION_SCHEMA`, `PRODUCTION_STORAGE_TABLES`, `postgresProductionSchemaSql`, `buildPostgresMigration`, `assertProductionStorageSqlSafe`, `productionStorageContract`, parameterized operation builders for relay records, witness checkpoints, pairings, gateway policy versions, decisions, SIEM events, and readiness evidence refs. |
+| `enigma-memory/relay` | `./relay` | `apps/relay/src/server.mjs` | stable local/package service module | `createRelayState`, `createRelayServer`, `handleRelayRequest`, `serializeRelayState`, `hydrateRelayState`, `loadRelayStateFromFile`, `saveRelayStateToFile`, `runRelayDemo`. |
+| `enigma-memory/gateway` | `./gateway` | `apps/gateway/src/server.mjs` | stable local/package service module | `createGatewayState`, `createGatewayServer`, `handleGatewayRequest`, `serializeGatewayState`, `hydrateGatewayState`, `loadGatewayStateFromFile`, `saveGatewayStateToFile`, `runGatewayDemo`, `default`. |
+| `enigma-memory/desktop` | `./desktop` | `apps/desktop/src/app.js` | package-included desktop scaffold API | `DESKTOP_SCREENS`, `createDesktopState`, `desktopReducer`, `renderDesktopModel`, `startMcp`, `stopMcp`, `createVault`, `rememberMemory`, `deleteMemory`, `searchMemories`, `verifyReceipts`, `connectClient`, `disconnectClient`, `importBundle`, `exportBundle`, `updateMeshStatus`, `updateEnterpriseStatus`, `selectDesktopScreen`, `setDesktopDraft`, `desktopActions`, `actions`, `startMCP`, `stopMCP`, `remember`, `removeMemory`, `searchMemory`, `verifyReceiptOutput`, `connectDesktopClient`, `importDesktopBundle`, `exportDesktopBundle`, `desktopApi`. Desktop state is operational evidence only; cryptographic proof still comes from receipts and verifier output. |
+| `enigma-memory/package.json` | `./package.json` | `package.json` | stable package metadata | Package metadata for tooling. |
 
 `./relay`, `./gateway`, and `./desktop` expose local modules and demos. Running them locally does not make hosted Enigma cloud or a customer BYOC deployment live.
 
@@ -53,13 +53,13 @@ Use object-style arguments for forward compatibility where supported by the impl
 
 ### Memory optimization thesis and API boundary
 
-`@enigma-ai/enigma/optimizer` is the memory analogue to inference optimization: a centralized optimized memory fabric for high-performance memory optimization through dedupe, tiering, scoped context selection, token estimation, cost estimation from explicit inputs, and plaintext-minimized receipts. Use `createMemoryOptimizationPlan` for local/offline candidate planning and `createMemoryAccessReceipt` for the access, settlement, and proof/receipt-anchoring boundary around a selected plan. `estimateTextTokens` and `estimateTokenCost` are estimates only; they do not prove measured discounts or provider billing outcomes.
+`enigma-memory/optimizer` is the memory analogue to inference optimization: a centralized optimized memory fabric for high-performance memory optimization through dedupe, tiering, scoped context selection, token estimation, cost estimation from explicit inputs, and plaintext-minimized receipts. Use `createMemoryOptimizationPlan` for local/offline candidate planning and `createMemoryAccessReceipt` for the access, settlement, and proof/receipt-anchoring boundary around a selected plan. `estimateTextTokens` and `estimateTokenCost` are estimates only; they do not prove measured discounts or provider billing outcomes.
 
 Users buy lower memory/context cost, proof, portability, and no lock-in; they do not need ideological decentralization to use the optimizer API.
 
-`@enigma-ai/enigma/metering` turns memory baseline/optimized token counts into deterministic, content-minimized `enigma.usage_event.v1` and `enigma.usage_aggregate.v1` evidence. It computes Enigma-side estimated memory credit from explicit counts and pricing only; it does not claim provider invoice savings, token ROI, decentralized inference, provider-side deletion, model forgetting, or compliance certification.
+`enigma-memory/metering` turns memory baseline/optimized token counts into deterministic, content-minimized `enigma.usage_event.v1` and `enigma.usage_aggregate.v1` evidence. It computes Enigma-side estimated memory credit from explicit counts and pricing only; it does not claim provider invoice savings, token ROI, decentralized inference, provider-side deletion, model forgetting, or compliance certification.
 
-`@enigma-ai/enigma/settlement` is the permissionless-access layer: it creates hash-only memory jobs, consumer/workstation GPU capacity profiles, operator quotes, service settlement receipts, and settlement batches. Jobs carry memory commitment roots, policy hashes, and usage-event hashes only. Capacity profiles carry public pricing/capacity metadata and claim boundaries only. Receipts prove job/quote/settlement linkage; they do not claim decentralized raw-memory inference, token ROI/profit/equity, provider invoice savings, provider deletion, model forgetting, or compliance status.
+`enigma-memory/settlement` is the permissionless-access layer: it creates hash-only memory jobs, consumer/workstation GPU capacity profiles, operator quotes, service settlement receipts, and settlement batches. Jobs carry memory commitment roots, policy hashes, and usage-event hashes only. Capacity profiles carry public pricing/capacity metadata and claim boundaries only. Receipts prove job/quote/settlement linkage; they do not claim decentralized raw-memory inference, token ROI/profit/equity, provider invoice savings, provider deletion, model forgetting, or compliance status.
 
 The optimizer may accept private plaintext candidate content as local input, but exported plans, receipts, output artifacts, public examples, SIEM, and chain/witness artifacts must not include raw memory plaintext. Public optimizer output should contain commitments, hashes, counts, tiers, and token/cost estimates. Use `assertNoRawMemoryOutput` before exposing optimizer artifacts. Blockchain/permissionless access is for access/settlement/anchoring boundaries only: access control, settlement, and proof/receipt anchoring. Enigma does not claim raw memory on-chain storage, token ROI, provider deletion proof, model forgetting, compliance status, benchmark leadership, or measured discount claims without measured repository evidence.
 
@@ -74,7 +74,7 @@ The optimizer may accept private plaintext candidate content as local input, but
 | `createMemoryAccessReceipt(input)` | Emits a receipt for optimizer access/settlement/proof anchoring. | Anchor commitments and metadata only; do not include raw memory content. |
 | `assertNoRawMemoryOutput(artifact)` | Fails closed if optimizer output exposes raw memory-like fields. | Use before public docs examples, receipts, SIEM exports, or chain/witness artifacts. |
 
-### Core (`@enigma-ai/enigma/core`)
+### Core (`enigma-memory/core`)
 
 | Export | Use | Notes |
 | --- | --- | --- |
@@ -95,7 +95,7 @@ The optimizer may accept private plaintext candidate content as local input, but
 | `verifyCheckpoint(args)` | Verifies checkpoint signature/root fields. | Returns `{ ok, valid, errors }`. |
 | `createMemoryAddress(args)` | Creates deterministic memory addresses from secret/value/scope inputs. | Address is commitment-like metadata, not plaintext. |
 
-### Vault and passport (`@enigma-ai/enigma/vault`, `@enigma-ai/enigma/passport`)
+### Vault and passport (`enigma-memory/vault`, `enigma-memory/passport`)
 
 | Export | Use | Notes |
 | --- | --- | --- |
@@ -114,25 +114,25 @@ The optimizer may accept private plaintext candidate content as local input, but
 
 | Module | Export | Use |
 | --- | --- | --- |
-| `@enigma-ai/enigma/boundary` | `createBoundaryManifest(options)` | Creates `enigma.boundary_manifest.v1` path/classification manifest. |
-| `@enigma-ai/enigma/boundary` | `verifyBoundaryManifest(manifest)` | Validates manifest shape, surfaces, and classifications. |
-| `@enigma-ai/enigma/boundary` | `classifyBoundaryPath(manifest, pathRef)` | Classifies one declared path as committed/blocked/out-of-scope/broken. |
-| `@enigma-ai/enigma/boundary` | `runBoundarySimulation(options)` | Local demo harness for boundary classification evidence. |
-| `@enigma-ai/enigma/boundary` | `boundarySurfaces`, `boundaryClassifications` | Enumerations used by manifests. |
-| `@enigma-ai/enigma/mesh` | `createMeshNode(options)` | Creates signed `enigma.mesh_node.v1` descriptor. |
-| `@enigma-ai/enigma/mesh` | `createCapsuleManifest(options)`, `verifyCapsuleManifest(manifest, options)` | Creates/verifies signed capsule root metadata. |
-| `@enigma-ai/enigma/mesh` | `createWitnessCheckpoint(options)`, `verifyWitnessCheckpoint(checkpoint, options)` | Creates/verifies witness checkpoint roots. |
-| `@enigma-ai/enigma/mesh` | `createRelayStore(options)`, `pushRelayRecord(store, record)`, `pullRelayRecord(store, recordRef)` | Local in-memory relay record store for opaque encrypted records. |
-| `@enigma-ai/enigma/mesh` | `createFederationGrant(options)`, `verifyFederationGrant(grant, options)` | Creates/verifies signed federation grants. |
-| `@enigma-ai/enigma/mesh` | `runMeshDemo(options)` | Local mesh demo; not hosted availability evidence. |
-| `@enigma-ai/enigma/enterprise` | `createEnterprisePolicy(options)` | Creates default-deny `enigma.enterprise_policy.v1` with `provider_native_memory: \"cache_only\"`. |
-| `@enigma-ai/enigma/enterprise` | `evaluateEnterprisePolicy(policy, request)` | Evaluates provider/model/region/purpose/sensitivity/legal-hold request metadata. |
-| `@enigma-ai/enigma/enterprise` | `minimizeEnterpriseEvaluation(evaluation)`, `minimizeEnterprisePolicy(policy)` | Produces public/minimized views. |
-| `@enigma-ai/enigma/enterprise` | `createGatewayDecision(args)`, `verifyGatewayDecision(args)` | Creates/verifies signed gateway decisions. |
-| `@enigma-ai/enigma/enterprise` | `exportSiemEvent(args)` | Emits plaintext-minimized SIEM event metadata. |
-| `@enigma-ai/enigma/enterprise` | `runEnterpriseDemo(options)` | Local enterprise policy demo; not hosted/BYOC evidence. |
+| `enigma-memory/boundary` | `createBoundaryManifest(options)` | Creates `enigma.boundary_manifest.v1` path/classification manifest. |
+| `enigma-memory/boundary` | `verifyBoundaryManifest(manifest)` | Validates manifest shape, surfaces, and classifications. |
+| `enigma-memory/boundary` | `classifyBoundaryPath(manifest, pathRef)` | Classifies one declared path as committed/blocked/out-of-scope/broken. |
+| `enigma-memory/boundary` | `runBoundarySimulation(options)` | Local demo harness for boundary classification evidence. |
+| `enigma-memory/boundary` | `boundarySurfaces`, `boundaryClassifications` | Enumerations used by manifests. |
+| `enigma-memory/mesh` | `createMeshNode(options)` | Creates signed `enigma.mesh_node.v1` descriptor. |
+| `enigma-memory/mesh` | `createCapsuleManifest(options)`, `verifyCapsuleManifest(manifest, options)` | Creates/verifies signed capsule root metadata. |
+| `enigma-memory/mesh` | `createWitnessCheckpoint(options)`, `verifyWitnessCheckpoint(checkpoint, options)` | Creates/verifies witness checkpoint roots. |
+| `enigma-memory/mesh` | `createRelayStore(options)`, `pushRelayRecord(store, record)`, `pullRelayRecord(store, recordRef)` | Local in-memory relay record store for opaque encrypted records. |
+| `enigma-memory/mesh` | `createFederationGrant(options)`, `verifyFederationGrant(grant, options)` | Creates/verifies signed federation grants. |
+| `enigma-memory/mesh` | `runMeshDemo(options)` | Local mesh demo; not hosted availability evidence. |
+| `enigma-memory/enterprise` | `createEnterprisePolicy(options)` | Creates default-deny `enigma.enterprise_policy.v1` with `provider_native_memory: \"cache_only\"`. |
+| `enigma-memory/enterprise` | `evaluateEnterprisePolicy(policy, request)` | Evaluates provider/model/region/purpose/sensitivity/legal-hold request metadata. |
+| `enigma-memory/enterprise` | `minimizeEnterpriseEvaluation(evaluation)`, `minimizeEnterprisePolicy(policy)` | Produces public/minimized views. |
+| `enigma-memory/enterprise` | `createGatewayDecision(args)`, `verifyGatewayDecision(args)` | Creates/verifies signed gateway decisions. |
+| `enigma-memory/enterprise` | `exportSiemEvent(args)` | Emits plaintext-minimized SIEM event metadata. |
+| `enigma-memory/enterprise` | `runEnterpriseDemo(options)` | Local enterprise policy demo; not hosted/BYOC evidence. |
 
-### Desktop scaffold (`@enigma-ai/enigma/desktop`)
+### Desktop scaffold (`enigma-memory/desktop`)
 
 The desktop export is a state/model scaffold. `createDesktopState`, `desktopReducer`, and `renderDesktopModel` drive state and view models. Action creators return reducer actions: `startMcp`, `stopMcp`, `createVault`, `rememberMemory`, `deleteMemory`, `searchMemories`, `verifyReceipts`, `connectClient`, `disconnectClient`, `importBundle`, `exportBundle`, `updateMeshStatus`, `updateEnterpriseStatus`, `selectDesktopScreen`, and `setDesktopDraft`. Aliases (`startMCP`, `stopMCP`, `remember`, `removeMemory`, `searchMemory`, `verifyReceiptOutput`, `connectDesktopClient`, `importDesktopBundle`, `exportDesktopBundle`) are also exported. `desktopActions`, `actions`, and `desktopApi` group the same functions. Desktop output is operational UI evidence only, not cryptographic proof.
 
@@ -354,11 +354,11 @@ Prompts:
 | --- | --- | --- |
 | `enigma_standard_memory_prompt` | `question`, `purpose` | Instructs an assistant to use Enigma as canonical memory/proof state and treat provider-native memory as cache only. |
 
-Programmatic MCP helpers are available from `@enigma-ai/enigma/mcp-server`: `handleJsonRpcRequest(request)` and `startStdioServer(io)`.
+Programmatic MCP helpers are available from `enigma-memory/mcp-server`: `handleJsonRpcRequest(request)` and `startStdioServer(io)`.
 
 ## Relay HTTP API
 
-Module: `@enigma-ai/enigma/relay`. Local bin: `enigma-relay serve --host 127.0.0.1 --port 8787`.
+Module: `enigma-memory/relay`. Local bin: `enigma-relay serve --host 127.0.0.1 --port 8787`.
 
 Programmatic relay API: `createRelayState(options)` creates relay state; `createRelayServer(options)` returns a Node HTTP server with `server.relayState`; `handleRelayRequest(state, req, res)` handles one Node HTTP request; `serializeRelayState(state)` and `hydrateRelayState(snapshot)` convert local state-file snapshots; `loadRelayStateFromFile(path)` and `saveRelayStateToFile(state, path)` load/save the optional file-backed demo state; `runRelayDemo(options)` returns a local demo result.
 
@@ -387,7 +387,7 @@ Relay `--state-file` persistence stores only local demo state needed to resume r
 
 ## Gateway HTTP API
 
-Module: `@enigma-ai/enigma/gateway`. Local bin: `enigma-gateway serve --host 127.0.0.1 --port 8797`.
+Module: `enigma-memory/gateway`. Local bin: `enigma-gateway serve --host 127.0.0.1 --port 8797`.
 
 Programmatic gateway API: `createGatewayState(options)` creates gateway policy/SIEM state; `createGatewayServer(options)` returns a Node HTTP server with `server.gatewayState`; `handleGatewayRequest(state, request, response?)` handles one Node HTTP request or returns a response object; `serializeGatewayState(state)` and `hydrateGatewayState(snapshot, options?)` convert local state-file snapshots; `loadGatewayStateFromFile(path, options?)` and `saveGatewayStateToFile(state, path)` load/save the optional file-backed demo state; `runGatewayDemo()` returns a local demo result.
 
@@ -416,7 +416,7 @@ Gateway `--state-file` persistence stores only local demo state needed to resume
 
 ## Connector profiles
 
-Module: `@enigma-ai/enigma/connectors`. CLI: `enigma install`, `enigma doctor`, `enigma connect <client>`, `enigma disconnect <client>`.
+Module: `enigma-memory/connectors`. CLI: `enigma install`, `enigma doctor`, `enigma connect <client>`, `enigma disconnect <client>`.
 
 Connector profiles render JSON under `mcpServers`, use server name `enigma`, command `enigma-mcp`, and require env key `ENIGMA_BUNDLE`.
 
@@ -434,7 +434,7 @@ Connector profiles render JSON under `mcpServers`, use server name `enigma`, com
 
 ## Importer and capsule API
 
-Module: `@enigma-ai/enigma/importers`. These functions normalize local export files or parsed JSON; they do not call provider services.
+Module: `enigma-memory/importers`. These functions normalize local export files or parsed JSON; they do not call provider services.
 
 | Function | Source type | CLI sources | Output |
 | --- | --- | --- | --- |
@@ -514,7 +514,7 @@ These are public review surfaces in the source checkout, not hosted production i
 - `apps/browser-extension` unpacked Manifest V3 scaffold and native messaging host name `com.enigma.native_host`. Generate a browser-specific native-host manifest with `enigma native-host manifest --browser <chrome|edge|firefox> --host-path <absolute path> --extension-id <id> [--out <file>]`, then preview the no-write registration plan with `enigma native-host install-plan --browser <chrome|edge|firefox> --manifest <absolute path> [--os <windows|macos|linux>] [--home <absolute path>]`. Install/copy the generated `com.enigma.native_host.json` into the browser/OS native-host location documented in `apps/native-host/README.md` only after an operator reviews the plan.
   Source-only bridge module exports in `apps/browser-extension/src/native-bridge.js` are `SUPPORTED_PROVIDERS`, `detectProviderFromUrl(url)`, `requestContextPack(input)`, `recordInsertionReceipt(input)`, and `serializeError(error)`. Supported provider ids are `chatgpt`, `claude`, `kimi`, and `perplexity`. The extension requires explicit user action before requesting or inserting context and must not store raw memory in browser sync storage.
 - Module demo helpers: `runConnectorDemo`, `runImporterDemo`, `runMeshDemo`, `runEnterpriseDemo`, `runRelayDemo`, `runGatewayDemo`, and `runBoundarySimulation`.
-- `apps/desktop/src/index.html` static desktop scaffold; package export `@enigma-ai/enigma/desktop` exposes its state/model API, but UI state remains operational evidence only.
+- `apps/desktop/src/index.html` static desktop scaffold; package export `enigma-memory/desktop` exposes its state/model API, but UI state remains operational evidence only.
 
 ## Local file-backed state boundary
 

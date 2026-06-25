@@ -332,7 +332,7 @@ Before BYOC is called live, the customer/operator acceptance owner must complete
 
 The following cannot be completed from this repository alone:
 
-- Publishing `@enigma-ai/enigma` to npm without release credentials.
+- Publishing `enigma-memory` to npm without release credentials.
 - Hosted domain, DNS, TLS, ingress, and public endpoint activation.
 - Cloudflare domain registration purchase, DNS mutation, Pages deploy, and custom-domain attachment without explicit operator execution approval and the Cloudflare runbook safeguards.
 - Cloud KMS/secrets provisioning and production key custody.

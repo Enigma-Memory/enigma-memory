@@ -8,7 +8,7 @@ This document describes the production-shaped relay and gateway backend surface.
 - Gateway service (`enigma-gateway`, default port `8797`) evaluates Enigma enterprise policy and returns minimized decisions/SIEM events. It does not call model providers and does not prove provider deletion or model forgetting.
 - In production mode both services are expected to fail closed unless required external dependencies are configured through operator-owned environment files, secret managers, and network policies.
 
-`@enigma-ai/enigma/storage` defines the production PostgreSQL storage contract used by operators before wiring a real database: relay records, witness checkpoints, pairings, gateway policy versions, gateway decisions, SIEM events, and readiness evidence refs. The schema is intentionally hash/opaque-ref based and excludes raw prompts, transcripts, decrypted memory, provider response bodies, embeddings, tokens, passwords, and private keys.
+`enigma-memory/storage` defines the production PostgreSQL storage contract used by operators before wiring a real database: relay records, witness checkpoints, pairings, gateway policy versions, gateway decisions, SIEM events, and readiness evidence refs. The schema is intentionally hash/opaque-ref based and excludes raw prompts, transcripts, decrypted memory, provider response bodies, embeddings, tokens, passwords, and private keys.
 
 ## Public probes and private service paths
 

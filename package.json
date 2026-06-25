@@ -1,12 +1,12 @@
 {
-  "name": "@enigma-ai/enigma",
+  "name": "enigma-memory",
   "version": "0.1.0",
   "type": "module",
   "description": "Provider-agnostic AI memory passport and offline-verifiable proof layer.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/enigma-ai/enigma.git"
+    "url": "git+https://github.com/Enigma-Memory/enigma-memory.git"
   },
   "publishConfig": {
     "access": "public"

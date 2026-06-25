@@ -31,7 +31,7 @@ Enigma's memory analogue to inference optimization is a centralized optimized me
 
 The buyer message is practical: lower memory/context cost from less repeated context, proof for what crossed Enigma boundaries, portability across providers and agents, and no lock-in to one provider-native memory system. Explicitly avoid measured discount claims, benchmark leadership, token ROI, investment return, provider deletion proof, model forgetting, compliance status, or raw on-chain memory. Discount language must stay qualitative until benchmarks exist with documented commands, inputs, and results.
 
-The implementation surface expected from the optimizer package is `@enigma-ai/enigma/optimizer` (`./optimizer`): `MEMORY_OPTIMIZATION_PRODUCT_THESIS`, `MEMORY_OPTIMIZATION_PLAN_SCHEMA`, `MEMORY_ACCESS_RECEIPT_SCHEMA`, `estimateTextTokens`, `estimateTokenCost`, `createMemoryOptimizationPlan`, `createMemoryAccessReceipt`, and `assertNoRawMemoryOutput`. The optimizer may evaluate private plaintext candidates locally, but its exported plans, receipts, and output artifacts should expose commitments, hashes, counts, tiers, and token/cost estimates rather than raw memory content.
+The implementation surface expected from the optimizer package is `enigma-memory/optimizer` (`./optimizer`): `MEMORY_OPTIMIZATION_PRODUCT_THESIS`, `MEMORY_OPTIMIZATION_PLAN_SCHEMA`, `MEMORY_ACCESS_RECEIPT_SCHEMA`, `estimateTextTokens`, `estimateTokenCost`, `createMemoryOptimizationPlan`, `createMemoryAccessReceipt`, and `assertNoRawMemoryOutput`. The optimizer may evaluate private plaintext candidates locally, but its exported plans, receipts, and output artifacts should expose commitments, hashes, counts, tiers, and token/cost estimates rather than raw memory content.
 
 ## Technical axes
 

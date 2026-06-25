@@ -10,7 +10,7 @@ import {
   normalizeEvidenceRef,
   readinessEvidenceRefs,
 } from '../packages/adapters/src/index.js';
-import * as adapterPackage from '@enigma-ai/enigma/adapters';
+import * as adapterPackage from 'enigma-memory/adapters';
 
 const OBSERVED_AT = '2026-06-23T12:00:00.000Z';
 

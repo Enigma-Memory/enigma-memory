@@ -21,16 +21,17 @@ cd enigma
 npm install -g .
 ```
 
-After publication:
+After the public `enigma-memory` package is published:
 
 ```sh
-npm install -g @enigma-ai/enigma
+npm install -g enigma-memory
 ```
 
-One-off package execution after publication:
+One-off `enigma-memory` package execution after publication:
 
 ```sh
-npx --yes --package @enigma-ai/enigma enigma doctor
+npx --yes --package enigma-memory enigma --help
+npx --yes --package enigma-memory enigma doctor
 ```
 
 ## Create the local vault first

@@ -74,7 +74,7 @@ Enigma's memory analogue to inference optimization is a centralized optimized me
 
 Users buy lower memory/context cost, proof, portability, and no lock-in. They do not need ideological decentralization to get value. Public collateral must say this as a memory-cost and proof product, not as token ROI, investment return, provider deletion proof, model forgetting, compliance status, or benchmark leadership. Explicitly avoid measured discount claims until repository benchmarks exist and document the command, inputs, and result.
 
-The package surface expected for this slice is `@enigma-ai/enigma/optimizer` (`./optimizer`) with `MEMORY_OPTIMIZATION_PRODUCT_THESIS`, `MEMORY_OPTIMIZATION_PLAN_SCHEMA`, `MEMORY_ACCESS_RECEIPT_SCHEMA`, `estimateTextTokens`, `estimateTokenCost`, `createMemoryOptimizationPlan`, `createMemoryAccessReceipt`, and `assertNoRawMemoryOutput`. These APIs may accept local plaintext candidates as private input, but public outputs and output artifacts must contain commitments/hashes and explicit token/cost estimates only.
+The package surface expected for this slice is `enigma-memory/optimizer` (`./optimizer`) with `MEMORY_OPTIMIZATION_PRODUCT_THESIS`, `MEMORY_OPTIMIZATION_PLAN_SCHEMA`, `MEMORY_ACCESS_RECEIPT_SCHEMA`, `estimateTextTokens`, `estimateTokenCost`, `createMemoryOptimizationPlan`, `createMemoryAccessReceipt`, and `assertNoRawMemoryOutput`. These APIs may accept local plaintext candidates as private input, but public outputs and output artifacts must contain commitments/hashes and explicit token/cost estimates only.
 
 ## Priority order
 
@@ -374,7 +374,7 @@ If any evidence item is missing, collateral must either omit the claim or label 
 
 The following cannot be completed by repository edits alone:
 
-- npm organization/package publishing credentials for `@enigma-ai/enigma`,
+- npm package publishing credentials for `enigma-memory`,
 - hosted backend deployment account/project credentials,
 - backend DNS/TLS ingress for public relay/gateway health probes, separate from the live static website,
 - durable storage account, database, volume, or bucket for hosted state,

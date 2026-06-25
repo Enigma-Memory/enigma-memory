@@ -23,7 +23,7 @@ import {
   postgresProductionSchemaSql,
   productionStorageContract,
 } from '../packages/storage/src/index.js';
-import * as storagePackage from '@enigma-ai/enigma/storage';
+import * as storagePackage from 'enigma-memory/storage';
 
 const execFileAsync = promisify(execFile);
 const DIGEST_A = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';

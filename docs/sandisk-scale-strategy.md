@@ -59,10 +59,10 @@ MCP is the shortest path to distribution across AI tools and harnesses. Enigma s
 The install promise:
 
 ```bash
-npx @enigma-ai/enigma install
-npx @enigma-ai/enigma connect claude-desktop
-npx @enigma-ai/enigma connect cursor
-npx @enigma-ai/enigma connect kimi-code
+npx --yes --package enigma-memory enigma install
+npx --yes --package enigma-memory enigma connect claude-desktop
+npx --yes --package enigma-memory enigma connect cursor
+npx --yes --package enigma-memory enigma connect kimi-code
 ```
 
 ### 3. Browser extension for subscription AI

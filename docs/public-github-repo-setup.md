@@ -6,7 +6,7 @@ Use this runbook when preparing a public GitHub repository for Enigma source rel
 
 - Work from the release checkout intended for public review.
 - Keep private launch collateral, local `.enigma` state, raw memory examples, provider exports, credentials, tokens, logs, account IDs, and unpublished regulated or public-sensitive collateral out of the public repository.
-- Confirm `package.json` still names the package `@enigma-ai/enigma`, uses Node `>=24`, and is not marked `private` for the publish artifact.
+- Confirm `package.json` still names the package `enigma-memory`, uses Node `>=24`, and is not marked `private` for the publish artifact.
 - Confirm `SECURITY.md` is present and public-safe before linking it in GitHub repository settings.
 
 ## Repository creation settings

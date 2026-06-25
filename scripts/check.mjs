@@ -226,8 +226,8 @@ async function validateCloudflareOpsScript(pkg) {
 
 function validatePackageMetadata(pkg) {
   if (pkg.private === true) throw new Error('package.json must be publishable, not private');
-  if (typeof pkg.name !== 'string' || !pkg.name.startsWith('@enigma-ai/')) {
-    throw new Error('package.json name must be scoped for public publishing');
+  if (pkg.name !== 'enigma-memory') {
+    throw new Error('package.json name must be enigma-memory for public npm publishing');
   }
   if (typeof pkg.license !== 'string' || pkg.license.length === 0) throw new Error('package.json missing license');
   if (!isPlainObject(pkg.repository) || typeof pkg.repository.url !== 'string') throw new Error('package.json missing repository placeholder');
