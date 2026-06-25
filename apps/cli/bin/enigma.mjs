@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { createServer as createHttpServer } from 'node:http';
 import { realpathSync } from 'node:fs';
 import { access, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createVault, remember, recall, updateMemory, deleteMemory, exportBundle } from '../../../packages/vault/src/index.js';
 import { createPassport, compileContextPack } from '../../../packages/passport/src/index.js';
@@ -32,6 +32,9 @@ import {
 } from '../../../packages/settlement/src/index.js';
 
 const DEFAULT_BUNDLE = '.enigma/bundle.json';
+const DEFAULT_TEST_DRIVE_DIR = '.enigma/test-drive';
+const DEFAULT_TEST_DRIVE_BUNDLE_NAME = 'bundle.json';
+const DEFAULT_TEST_DRIVE_CROSS_MODEL_REPORT_NAME = 'cross-model-report.json';
 export const DEFAULT_RELAY_PORT = 8787;
 export const DEFAULT_GATEWAY_PORT = 8797;
 const DEFAULT_QUICKSTART_MEMORY = 'Enigma quickstart demo memory: local proof bundles can be created and verified without provider or cloud credentials.';
@@ -279,10 +282,10 @@ function quickstartOutputs(bundleInput, outDirInput) {
   };
 }
 
-async function buildQuickstartArtifacts(flags, { bundleInput = DEFAULT_BUNDLE, outDirInput = dirname(bundleInput), overwrite = false, write = true } = {}) {
+async function buildQuickstartArtifacts(flags, { bundleInput = DEFAULT_BUNDLE, outDirInput = dirname(bundleInput), overwrite = false, write = true, checkExisting = true } = {}) {
   const paths = quickstartOutputs(bundleInput, outDirInput);
   ensureDistinctOutputPaths(paths.outputs.map((output) => output.path));
-  await assertCanWriteQuickstartOutputs(paths.outputs, overwrite);
+  if (checkExisting) await assertCanWriteQuickstartOutputs(paths.outputs, overwrite);
 
   const vault = createVault({
     subjectId: String(getFlag(flags, ['subject', 'subject-id'], 'local-user')),
@@ -1133,6 +1136,39 @@ export async function quickstartCommand(flags, io) {
   return artifacts.verifyReport.ok === true ? 0 : 1;
 }
 
+function buildCrossModelProfileSummaries({ vault, passport, demoMemoryAddr, limit }) {
+  const profiles = [];
+  for (const profile of CROSS_MODEL_PROFILES) {
+    const pack = compileContextPack({
+      vault,
+      passport,
+      provider: profile.provider,
+      model: profile.model,
+      query: 'memory follows me across models',
+      purpose: `cross_model_demo:${profile.id}`,
+      memory_addresses: [demoMemoryAddr],
+      limit,
+    });
+    const contextPack = publicContextPackSummary(pack);
+    profiles.push({
+      profile: profile.id,
+      label: profile.label,
+      provider: profile.provider,
+      model: profile.model,
+      context_pack_ref: contextPack.context_pack_ref,
+      context_pack_id: contextPack.context_pack_id,
+      context_pack_digest: contextPack.context_pack_digest,
+      context_pack: contextPack,
+      receipt_count: contextPack.receipt_count,
+      memory_count: contextPack.memory_count,
+      provider_native_memory_canonical: false,
+      receipts: contextPack.receipts,
+      claim_boundaries: { ...CROSS_MODEL_CLAIM_BOUNDARIES },
+    });
+  }
+  return profiles;
+}
+
 export async function crossModelDemoCommand(flags, io) {
   const bundleFlag = getFlag(flags, ['bundle', 'file']);
   if (bundleFlag === true || bundleFlag === '') throw new Error('Missing required --bundle.');
@@ -1189,35 +1225,7 @@ export async function crossModelDemoCommand(flags, io) {
   const limit = integerFlag(flags, ['limit'], 'limit', 1);
   if (limit < 1) throw new Error('--limit must be at least 1.');
   const receiptCountBeforeProfiles = Array.isArray(vault.receipts) ? vault.receipts.length : 0;
-  const profiles = [];
-  for (const profile of CROSS_MODEL_PROFILES) {
-    const pack = compileContextPack({
-      vault,
-      passport,
-      provider: profile.provider,
-      model: profile.model,
-      query: 'memory follows me across models',
-      purpose: `cross_model_demo:${profile.id}`,
-      memory_addresses: [demoMemoryAddr],
-      limit,
-    });
-    const contextPack = publicContextPackSummary(pack);
-    profiles.push({
-      profile: profile.id,
-      label: profile.label,
-      provider: profile.provider,
-      model: profile.model,
-      context_pack_ref: contextPack.context_pack_ref,
-      context_pack_id: contextPack.context_pack_id,
-      context_pack_digest: contextPack.context_pack_digest,
-      context_pack: contextPack,
-      receipt_count: contextPack.receipt_count,
-      memory_count: contextPack.memory_count,
-      provider_native_memory_canonical: false,
-      receipts: contextPack.receipts,
-      claim_boundaries: { ...CROSS_MODEL_CLAIM_BOUNDARIES },
-    });
-  }
+  const profiles = buildCrossModelProfileSummaries({ vault, passport, demoMemoryAddr, limit });
 
   const bundle = await persistState(bundlePath, vault);
   const report = {
@@ -1327,20 +1335,14 @@ async function contextCommand(flags, io) {
 }
 
 
-async function searchCommand(flags, io) {
-  const bundlePath = resolve(String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE)));
-  const query = String(requireFlag(flags, ['query', 'q'], 'query'));
-  const limit = integerFlag(flags, ['limit'], 'limit', 8);
-  if (limit < 0) throw new Error('--limit must be non-negative.');
-  const includeContent = getFlag(flags, ['include-content', 'includeContent']) === true || getFlag(flags, ['include-content', 'includeContent']) === 'true';
-  const { vault } = await loadState(bundlePath);
+function memorySearchReport({ bundlePath, vault, query, limit, includeContent = false, now = '2026-01-01T00:00:00.000Z' }) {
   const roots = vault.__computeRoots();
   const queryTokens = searchTokensFrom(query);
   const { candidates, byAddress } = searchCandidates(vault, queryTokens);
   const plan = createMemoryOptimizationPlan({
     candidates,
     prompt: query,
-    now: getFlag(flags, ['now'], '2026-01-01T00:00:00.000Z'),
+    now,
   });
   const planIndex = new Map(plan.items.map((item, index) => [item.address, index]));
   const selectedItems = plan.items
@@ -1381,7 +1383,7 @@ async function searchCommand(flags, io) {
       ...(includeContent ? { content: hit.content } : {}),
     };
   });
-  print({
+  return {
     ok: true,
     schema: 'enigma.memory_search.v1',
     bundle: bundlePath,
@@ -1395,18 +1397,33 @@ async function searchCommand(flags, io) {
     claim_boundary: includeContent
       ? 'Search ran against the selected local bundle and includes plaintext only because --include-content was explicit; this does not prove provider deletion, provider-native memory state, or model forgetting.'
       : 'Search ran against the selected local bundle and redacts plaintext by default; refs, scores, tags, roots, and receipt refs are not provider deletion proof or model forgetting proof.',
-  }, io);
+  };
+}
+
+async function searchCommand(flags, io) {
+  const bundlePath = resolve(String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE)));
+  const query = String(requireFlag(flags, ['query', 'q'], 'query'));
+  const limit = integerFlag(flags, ['limit'], 'limit', 8);
+  if (limit < 0) throw new Error('--limit must be non-negative.');
+  const includeContent = getFlag(flags, ['include-content', 'includeContent']) === true || getFlag(flags, ['include-content', 'includeContent']) === 'true';
+  const { vault } = await loadState(bundlePath);
+  print(memorySearchReport({
+    bundlePath,
+    vault,
+    query,
+    limit,
+    includeContent,
+    now: getFlag(flags, ['now'], '2026-01-01T00:00:00.000Z'),
+  }), io);
   return 0;
 }
 
-async function statusCommand(flags, io) {
-  const bundlePath = resolve(String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE)));
-  const { stored, vault, passport } = await loadState(bundlePath);
+function passportStatusReport({ bundlePath, stored = {}, vault, passport }) {
   const roots = vault.__computeRoots();
   const activeCount = activeMemoryCount(vault);
   const tombstoneCount = vault.tombstones instanceof Map ? vault.tombstones.size : 0;
   const receiptCount = Array.isArray(vault.receipts) ? vault.receipts.length : 0;
-  print({
+  return {
     ok: true,
     schema: 'enigma.passport_status.v1',
     bundle: bundlePath,
@@ -1434,8 +1451,315 @@ async function statusCommand(flags, io) {
       `enigma connect <client> --bundle "${bundlePath}"`,
     ],
     claim_boundary: 'Status reports local bundle counters, owner display fields, connector readiness hints, and commitment roots only; it does not expose raw memory, certify compliance, prove provider deletion, or prove model forgetting.',
-  }, io);
+  };
+}
+
+async function statusCommand(flags, io) {
+  const bundlePath = resolve(String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE)));
+  const { stored, vault, passport } = await loadState(bundlePath);
+  print(passportStatusReport({ bundlePath, stored, vault, passport }), io);
   return 0;
+}
+
+function testDrivePathDisplay(outDirInput, name) {
+  return isAbsolute(outDirInput) ? join(outDirInput, name) : quickstartPathDisplay(outDirInput, name);
+}
+
+function testDriveBundleDisplay(outDirInput) {
+  return testDrivePathDisplay(outDirInput, DEFAULT_TEST_DRIVE_BUNDLE_NAME);
+}
+
+function testDriveOutputs(outDirInput, bundleInput = testDriveBundleDisplay(outDirInput)) {
+  const quickstart = quickstartOutputs(bundleInput, outDirInput);
+  const contextPackDisplay = testDrivePathDisplay(outDirInput, QUICKSTART_ARTIFACT_NAMES.contextPack);
+  const exportDisplay = testDrivePathDisplay(outDirInput, QUICKSTART_ARTIFACT_NAMES.export);
+  const verifyReportDisplay = testDrivePathDisplay(outDirInput, QUICKSTART_ARTIFACT_NAMES.verifyReport);
+  const crossModelReportDisplay = testDrivePathDisplay(outDirInput, DEFAULT_TEST_DRIVE_CROSS_MODEL_REPORT_NAME);
+  const crossModelReportPath = resolve(quickstart.outDirPath, DEFAULT_TEST_DRIVE_CROSS_MODEL_REPORT_NAME);
+  const artifacts = [
+    { role: 'bundle', path: quickstart.bundlePath, display: bundleInput, schema: 'enigma.bundle.v1' },
+    { role: 'context_pack', path: quickstart.contextPackPath, display: contextPackDisplay, schema: 'enigma.context_pack.v1' },
+    { role: 'export', path: quickstart.exportPath, display: exportDisplay, schema: 'enigma.bundle.v1' },
+    { role: 'verify_report', path: quickstart.verifyReportPath, display: verifyReportDisplay, schema: 'enigma.verify_report.v1' },
+    { role: 'cross_model_report', path: crossModelReportPath, display: crossModelReportDisplay, schema: 'enigma.cross_model_demo.v1' },
+  ];
+  return {
+    ...quickstart,
+    contextPackDisplay,
+    exportDisplay,
+    verifyReportDisplay,
+    crossModelReportPath,
+    crossModelReportDisplay,
+    artifacts,
+    outputs: artifacts.map((artifact) => ({ path: artifact.path, display: artifact.display })),
+  };
+}
+
+function testDriveFileSummaries(artifacts, written) {
+  return artifacts.map((artifact) => ({
+    role: artifact.role,
+    path: artifact.display,
+    schema: artifact.schema,
+    written: Boolean(written),
+  }));
+}
+
+function firstActiveMemoryAddress(vault) {
+  if (!(vault.activeAddresses instanceof Set)) throw new Error('Test drive vault did not expose an active memory set.');
+  const first = vault.activeAddresses.values().next();
+  if (first.done) throw new Error('Test drive vault did not create a demo memory.');
+  return first.value;
+}
+
+function testDriveNextCommands(bundleDisplay, crossModelReportDisplay) {
+  const quotedBundle = commandPath(bundleDisplay);
+  const quotedReport = commandPath(crossModelReportDisplay);
+  return [
+    `enigma status --bundle ${quotedBundle}`,
+    `enigma search --bundle ${quotedBundle} --query "local proof bundle"`,
+    `enigma demo cross-model --bundle ${quotedBundle} --out ${quotedReport}`,
+    'node scripts/run-memory-benchmarks.mjs',
+  ];
+}
+
+function testDriveFlowCommands({ bundleDisplay, outDirInput, crossModelReportDisplay, overwrite }) {
+  const overwriteSuffix = overwrite ? ' --overwrite' : '';
+  const quotedBundle = commandPath(bundleDisplay);
+  const quotedOutDir = commandPath(outDirInput);
+  const quotedReport = commandPath(crossModelReportDisplay);
+  return [
+    `enigma quickstart --bundle ${quotedBundle} --out-dir ${quotedOutDir}${overwriteSuffix}`,
+    `enigma status --bundle ${quotedBundle}`,
+    `enigma search --bundle ${quotedBundle} --query "local proof bundle"`,
+    `enigma demo cross-model --bundle ${quotedBundle} --out ${quotedReport}`,
+  ];
+}
+
+function testDriveBenchmarkPointers() {
+  return [
+    {
+      command: 'node scripts/run-memory-benchmarks.mjs',
+      public_safe: true,
+      planned_only: true,
+      requires_repo_checkout: true,
+      external_provider_calls: false,
+      raw_memory_included: false,
+      claim_boundary: 'Runs deterministic local fixture operations only; it is not a provider comparison, hosted service proof, benchmark leadership claim, ROI claim, provider deletion proof, or model forgetting proof.',
+    },
+    {
+      command: 'node scripts/download-standard-benchmarks.mjs --dry-run',
+      public_safe: true,
+      planned_only: true,
+      requires_repo_checkout: true,
+      external_provider_calls: false,
+      raw_memory_included: false,
+      claim_boundary: 'Plans official dataset downloads without fetching by default; raw benchmark records are not included in the public plan.',
+    },
+    {
+      command: 'node scripts/run-standard-memory-benchmarks.mjs --locomo <path> --longmemeval <path>',
+      public_safe: true,
+      planned_only: true,
+      requires_repo_checkout: true,
+      external_provider_calls: false,
+      raw_memory_included: false,
+      claim_boundary: 'Runs local deterministic retrieval proxies against operator-supplied dataset files; it emits no provider API calls, competitor scores, benchmark leadership claim, or model-forgetting claim.',
+    },
+  ];
+}
+
+function testDriveClaimBoundaries() {
+  return {
+    local_only: true,
+    credentials_required: false,
+    external_provider_calls: false,
+    client_config_writes_performed: false,
+    plaintext_memory_echoed: false,
+    hosted_saas_live_claim: false,
+    provider_native_memory_canonical: false,
+    provider_deletion_proof: false,
+    model_forgetting_proof: false,
+    benchmark_leadership_claim: false,
+    compliance_certification: false,
+  };
+}
+
+function publicTestDriveStatusSummary(summary, bundleDisplay) {
+  return {
+    ...summary,
+    bundle: bundleDisplay,
+    connector_readiness: {
+      ...summary.connector_readiness,
+      bundle: bundleDisplay,
+    },
+    next_recommended_commands: [
+      `enigma remember --bundle ${commandPath(bundleDisplay)} --text-file <path>`,
+      `enigma search --bundle ${commandPath(bundleDisplay)} --query <text>`,
+      `enigma context --bundle ${commandPath(bundleDisplay)} --query <text>`,
+      `enigma verify --bundle ${commandPath(bundleDisplay)}`,
+      `enigma connect <client> --bundle ${commandPath(bundleDisplay)}`,
+    ],
+  };
+}
+
+function publicTestDriveSearchSummary(summary, bundleDisplay) {
+  return {
+    ...summary,
+    bundle: bundleDisplay,
+  };
+}
+
+function staticSetupSelection(requestedSelection) {
+  return {
+    ...requestedSelection,
+    fallback_used: false,
+    selected: requestedSelection.clients.map((clientId) => {
+      const profile = getClientProfile(clientId);
+      return publicSetupClientSelectionEntry({ client_id: clientId, display_name: profile.display_name }, requestedSelection.mode === 'default' ? 'default_setup_client' : 'explicit_client');
+    }),
+    skipped: [],
+    connectable_client_ids: null,
+  };
+}
+
+export async function testDriveCommand(flags, io) {
+  const outDirInput = pathFlag(flags, ['out-dir', 'outDir'], DEFAULT_TEST_DRIVE_DIR);
+  const bundleInput = pathFlag(flags, ['bundle', 'file'], testDriveBundleDisplay(outDirInput));
+  const overwrite = booleanFlag(flags, ['overwrite'], false);
+  const dryRun = booleanFlag(flags, ['dry-run', 'dryRun'], false);
+  const outputs = testDriveOutputs(outDirInput, bundleInput);
+  ensureDistinctOutputPaths(outputs.outputs.map((output) => output.path));
+  if (!dryRun) await assertCanWriteQuickstartOutputs(outputs.outputs, overwrite);
+
+  const artifacts = await buildQuickstartArtifacts(flags, {
+    bundleInput,
+    outDirInput,
+    overwrite,
+    write: false,
+    checkExisting: false,
+  });
+  const requestedSelection = setupClientIds(flags);
+  const selection = requestedSelection.auto
+    ? await setupAutoClientSelection(flags, artifacts, DEFAULT_SETUP_CLIENTS, 'auto')
+    : staticSetupSelection(requestedSelection);
+  const demoMemoryAddr = firstActiveMemoryAddress(artifacts.vault);
+  const crossModelLimit = integerFlag(flags, ['limit'], 'limit', 1);
+  if (crossModelLimit < 1) throw new Error('--limit must be at least 1.');
+  const receiptCountBeforeProfiles = Array.isArray(artifacts.vault.receipts) ? artifacts.vault.receipts.length : 0;
+  const profiles = buildCrossModelProfileSummaries({
+    vault: artifacts.vault,
+    passport: artifacts.passport,
+    demoMemoryAddr,
+    limit: crossModelLimit,
+  });
+  const finalExport = exportBundle({ vault: artifacts.vault, includePlaintext: false });
+  const finalBundle = finalExport.bundle ?? finalExport;
+  const finalVerifyReport = verifyBundle(finalBundle);
+  const crossModelReport = {
+    ok: true,
+    schema: 'enigma.cross_model_demo.v1',
+    command: 'enigma demo cross-model',
+    story: 'One local Enigma memory is packaged as public-safe context pack references and receipts for ChatGPT, Claude, Kimi, Cursor, and a local LLM. No provider is called.',
+    bundle_ref: bundleInput,
+    bundle_supplied: true,
+    bundle_created: true,
+    demo_only_vault: true,
+    memory_source: 'test_drive_demo',
+    demo_memory_addr: demoMemoryAddr,
+    profile_count: profiles.length,
+    profiles,
+    memory_count: activeMemoryCount(artifacts.vault),
+    receipt_count: Array.isArray(finalBundle.receipts) ? finalBundle.receipts.length : 0,
+    generated_receipt_count: (Array.isArray(finalBundle.receipts) ? finalBundle.receipts.length : 0) - receiptCountBeforeProfiles,
+    provider_credentials_required: false,
+    provider_native_memory_canonical: false,
+    out_written: !dryRun,
+    claim_boundaries: { ...CROSS_MODEL_CLAIM_BOUNDARIES },
+  };
+  const rawStatusSummary = passportStatusReport({
+    bundlePath: outputs.bundlePath,
+    vault: artifacts.vault,
+    passport: artifacts.passport,
+    stored: {
+      owner: {
+        subject_id: artifacts.vault.subject_id,
+        display_name: artifacts.vault.display_name,
+      },
+    },
+  });
+  const statusSummary = publicTestDriveStatusSummary(rawStatusSummary, bundleInput);
+  const rawSearchSummary = memorySearchReport({
+    bundlePath: outputs.bundlePath,
+    vault: artifacts.vault,
+    query: 'local proof bundle',
+    limit: 3,
+    includeContent: false,
+    now: getFlag(flags, ['now'], '2026-01-01T00:00:00.000Z'),
+  });
+  const searchSummary = publicTestDriveSearchSummary(rawSearchSummary, bundleInput);
+
+  if (!dryRun) {
+    await writeJson(outputs.bundlePath, finalBundle);
+    await writeJson(outputs.contextPackPath, publicContextPackSummary(artifacts.contextPack));
+    await writeJson(outputs.exportPath, finalBundle);
+    await writeJson(outputs.verifyReportPath, finalVerifyReport);
+    await writeJson(outputs.crossModelReportPath, crossModelReport);
+  }
+
+  const flowCommands = testDriveFlowCommands({
+    bundleDisplay: bundleInput,
+    outDirInput,
+    crossModelReportDisplay: outputs.crossModelReportDisplay,
+    overwrite,
+  });
+  const nextCommands = testDriveNextCommands(bundleInput, outputs.crossModelReportDisplay);
+  const files = testDriveFileSummaries(outputs.artifacts, !dryRun);
+  const packageJson = await readPackageJson();
+  const ok = finalVerifyReport.ok === true && crossModelReport.ok === true && statusSummary.ok === true && searchSummary.ok === true;
+  print({
+    ok,
+    schema: 'enigma.test_drive.v1',
+    command: 'enigma test-drive',
+    dry_run: dryRun,
+    out_dir: outDirInput,
+    bundle: bundleInput,
+    install_command: `npm install -g ${packageJson.name ?? 'enigma-memory'}`,
+    release_target: '0.1.11',
+    artifacts_written: !dryRun,
+    client_configs_written: false,
+    client_config_write_required: false,
+    memory_plaintext_echoed: false,
+    provider_credentials_required: false,
+    hosted_saas_live: false,
+    files,
+    files_written: dryRun ? [] : files.map((file) => file.path),
+    files_planned: files.map((file) => file.path),
+    commands_run: dryRun ? [] : flowCommands,
+    commands_planned: dryRun ? flowCommands : [],
+    next_commands: nextCommands,
+    benchmark_pointers: testDriveBenchmarkPointers(),
+    setup_summary: {
+      schema: 'enigma.setup.v1',
+      artifacts_written: !dryRun,
+      bundle: bundleInput,
+      context_pack: outputs.contextPackDisplay,
+      export: outputs.exportDisplay,
+      verify_report: outputs.verifyReportDisplay,
+      selected_clients: selection.clients,
+      client_selection: publicSetupClientSelection(selection),
+      client_configs_written: false,
+      provider_credentials_required: false,
+      memory_plaintext_echoed: false,
+      memory_count: Array.isArray(finalBundle.memory_objects) ? finalBundle.memory_objects.length : 0,
+      receipt_count: Array.isArray(finalBundle.receipts) ? finalBundle.receipts.length : 0,
+      context_item_count: Array.isArray(artifacts.contextPack.memories) ? artifacts.contextPack.memories.length : 0,
+      verify_ok: finalVerifyReport.ok === true,
+    },
+    status_summary: statusSummary,
+    search_summary: searchSummary,
+    cross_model_summary: crossModelReport,
+    claim_boundaries: testDriveClaimBoundaries(),
+  }, io);
+  return ok ? 0 : 1;
 }
 
 async function exportCommand(flags, io) {
@@ -1945,6 +2269,7 @@ function usage() {
       'init',
       'setup',
       'quickstart',
+      'test-drive',
       'demo cross-model',
       'doctor',
       'install',
@@ -2024,6 +2349,13 @@ function usage() {
       '--memory-text <text>': 'Inline demo memory text for non-private demos only.',
       '--overwrite': 'Replace existing quickstart output files.',
     },
+    test_drive_options: {
+      '--out-dir <path>': `Isolated demo directory. Defaults to ${DEFAULT_TEST_DRIVE_DIR}.`,
+      '--bundle <path>': `Bundle JSON to create. Defaults to ${DEFAULT_TEST_DRIVE_DIR}/${DEFAULT_TEST_DRIVE_BUNDLE_NAME}.`,
+      '--client <id|auto>': 'Client setup planning passthrough. No client config files are written by test-drive.',
+      '--overwrite': 'Replace existing test-drive artifact files.',
+      '--dry-run': 'Plan the local test drive without writing artifacts.',
+    },
     cross_model_demo_options: {
       '--bundle <path>': `Reuse a local Enigma bundle. If omitted, ${DEFAULT_CROSS_MODEL_DEMO_BUNDLE} is recreated as a demo-only local vault.`,
       '--memory-file <path>': 'Seed the demo from a local file without echoing plaintext. Alias: --text-file.',
@@ -2098,7 +2430,7 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
   const twoPartCommands = ['boundary', 'mcp', 'mesh', 'enterprise', 'capsule', 'relay', 'gateway', 'connect', 'disconnect', 'import', 'native-host', 'meter', 'settlement', 'demo', 'passport'];
   const flags = parseArgs(twoPartCommands.includes(command) ? argv.slice(2) : argv.slice(1));
   const positionalFile = optionalPositional(argv[2]);
-  if ((flags.has('help') || argv.includes('-h')) && (command === 'setup' || command === 'search' || command === 'status' || (command === 'passport' && subcommand === 'status') || ((command === 'relay' || command === 'gateway') && (subcommand === 'serve' || subcommand === 'demo')) || (command === 'native-host' && (subcommand === 'manifest' || subcommand === 'install-plan')) || (command === 'demo' && subcommand === 'cross-model'))) {
+  if ((flags.has('help') || argv.includes('-h')) && (command === 'setup' || command === 'test-drive' || command === 'search' || command === 'status' || (command === 'passport' && subcommand === 'status') || ((command === 'relay' || command === 'gateway') && (subcommand === 'serve' || subcommand === 'demo')) || (command === 'native-host' && (subcommand === 'manifest' || subcommand === 'install-plan')) || (command === 'demo' && subcommand === 'cross-model'))) {
     print(usage(), io);
     return 0;
   }
@@ -2106,6 +2438,7 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     if (command === 'init') return await initCommand(flags, io);
     if (command === 'setup') return await setupCommand(flags, io);
     if (command === 'quickstart') return await quickstartCommand(flags, io);
+    if (command === 'test-drive') return await testDriveCommand(flags, io);
     if (command === 'demo' && subcommand === 'cross-model') return await crossModelDemoCommand(flags, io);
     if (command === 'doctor') return await doctorCommand(flags, io);
     if (command === 'install') return await installCommand(flags, io);

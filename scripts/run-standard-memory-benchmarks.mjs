@@ -995,7 +995,7 @@ function buildSuiteReport(datasetRows, topK, options) {
     generated_at: options.generated_at ?? new Date().toISOString(),
     package: {
       name: 'enigma-memory',
-      version: '0.1.10',
+      version: '0.1.11',
     },
     public_safe: true,
     top_k: topK,
