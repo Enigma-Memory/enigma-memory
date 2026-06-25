@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 export const INSTALLER_ASSET_SCHEMA = 'enigma.installer_assets.v1';
 export const INSTALLER_ASSET_PACKAGE = 'enigma-memory';
-export const INSTALLER_ASSET_VERSION = '0.1.3';
+export const INSTALLER_ASSET_VERSION = '0.1.4';
 export const INSTALLER_ASSET_GENERATED_AT = '1970-01-01T00:00:00.000Z';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);

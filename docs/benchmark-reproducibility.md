@@ -4,7 +4,7 @@ This guide explains how to reproduce the current local Enigma memory benchmark, 
 
 ## What is reproducible today
 
-The current package is `enigma-memory@0.1.3`. The local benchmark is available through the package script and the script file it wraps:
+The current package is `enigma-memory@0.1.4`. The local benchmark is available through the package script and the script file it wraps:
 
 ```sh
 cd enigma
@@ -19,7 +19,7 @@ The report schema is `enigma.memory_benchmark_suite.v1`. It is designed to be pu
 
 ## Reproduce and save JSON
 
-1. Use a clean checkout containing `enigma-memory@0.1.3`.
+1. Use a clean checkout containing `enigma-memory@0.1.4`.
 2. From a repository root that contains `enigma/package.json`, enter the package directory:
 
    ```sh
@@ -40,10 +40,12 @@ The report schema is `enigma.memory_benchmark_suite.v1`. It is designed to be pu
    npm run benchmark:memory-suite -- --out benchmark-report.json
    ```
 
-5. Preserve the JSON file with the command, package version, operating system/runtime, and review context that produced it.
+5. Preserve the JSON file with the command, package version, operating system/runtime, hardware class when relevant, and review context that produced it.
 6. When sharing the result publicly, share the generated JSON report only after confirming it still has `public_safe: true` and `schema: "enigma.memory_benchmark_suite.v1"`.
 
-The local fixture measures Enigma-controlled operations only: vault remember/update, vault export/import, passport context-pack retrieval, optimizer token estimates and duplicate removal, bundle/context-pack verification, abstention behavior, exact-answer recall over the deterministic fixture, and p50/p95 operation latency from `performance.now`.
+The local fixture measures Enigma-controlled operations only: vault remember/update, vault export/import, passport context-pack retrieval, deterministic local relevance filtering before optimizer tiering, optimizer token estimates and duplicate removal, bundle/context-pack verification, abstention behavior, exact-answer recall over the deterministic fixture, and p50/p95 operation latency from `performance.now`.
+
+Interpret improvements as local fixture behavior. Enigma reduces context-pack estimated prompt tokens by selecting the deterministic query/purpose/address-relevant local memories before optimizer tiering and deduplication; it does not measure provider invoice savings, token ROI, live model quality, or third-party memory superiority. Token estimates and p50/p95 timings can change across hardware, Node/runtime versions, script revisions, and fixture updates.
 
 ## Local baseline rows in the report
 
@@ -54,7 +56,7 @@ The report now includes `metrics.local_baseline_comparisons`, which compares det
 | `full_context` | Supplies every active fixture memory without optimization or deduplication. |
 | `recency_last_n` | Supplies the three most recently updated active fixture memories. |
 | `keyword_filter` | Supplies active fixture memories whose content or tags match deterministic query terms. |
-| `enigma_context_pack` | Uses the Enigma passport context-pack compiler and optimizer boundary. |
+| `enigma_context_pack` | Uses the Enigma passport context-pack compiler with deterministic local relevance filtering before optimizer tiering and deduplication. |
 
 The report also includes `public_claims_allowed`; keep public copy within those local-fixture boundaries unless separate reviewed external evidence exists.
 
@@ -71,7 +73,7 @@ The current local report mirrors some task categories from those benchmarks, but
 
 The current benchmark does not call external provider APIs, external SDKs, hosted memory services, ChatGPT native memory, Claude memory tooling, or third-party agent loops. Cross-provider rows in the report are profile labels that reuse the same Enigma context-pack boundary; they do not call or compare live provider models and are not live provider rankings.
 
-Real comparisons require fixed adapters, fixed datasets, fixed agent/tool loops, explicit provider terms review, and reviewed handling of secrets and raw benchmark data. Memory quality can change with the surrounding agent framework and tool loop, so a fair comparison must document more than the memory store.
+Real comparisons require fixed adapters, fixed datasets, fixed agent/tool loops, explicit provider terms review, and reviewed handling of secrets and raw benchmark data. Memory quality can change with the surrounding agent framework and tool loop, so a fair comparison must document more than the memory store. Until those inputs exist, external competitor rows stay requirements-only and must not carry recall, abstention, token, latency, or ranking scores.
 
 The current report must not be used as evidence of provider-side deletion, model forgetting, compliance certification, token ROI, provider invoice savings, benchmark leadership, hosted-cloud readiness, or “best in world” superiority.
 

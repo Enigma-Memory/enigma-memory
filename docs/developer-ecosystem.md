@@ -25,7 +25,7 @@ The example app prints ids, counts, roots, and verification status only. It does
 
 ## CLI and CI loop
 
-The CI example installs Node 24, installs the published `enigma-memory@0.1.3` package, runs:
+The CI example installs Node 24, installs the published `enigma-memory@0.1.4` package, runs:
 
 ```sh
 npx enigma quickstart --overwrite

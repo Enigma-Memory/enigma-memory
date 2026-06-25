@@ -124,6 +124,11 @@ test('memory benchmark reports local baseline comparison rows', () => {
   assert.ok(byId.recency_last_n.exact_answer_recall < byId.full_context.exact_answer_recall);
   assert.equal(byId.keyword_filter.exact_answer_recall, 1);
   assert.equal(byId.enigma_context_pack.exact_answer_recall, 1);
+  assert.equal(byId.enigma_context_pack.abstention_correctness, 1);
+  assert.ok(byId.enigma_context_pack.estimated_prompt_tokens.total < byId.full_context.estimated_prompt_tokens.total);
+  assert.ok(byId.enigma_context_pack.estimated_prompt_tokens.total < 281);
+  assert.ok(byId.enigma_context_pack.estimated_prompt_tokens.mean_per_question < 56.2);
+  assert.ok(byId.enigma_context_pack.selected_memory_count.total < byId.full_context.selected_memory_count.total);
   assert.equal(byId.enigma_context_pack.duplicate_removal.applicable, true);
   assert.equal(byId.enigma_context_pack.duplicate_removal.max_duplicate_candidates_removed, 1);
   assert.equal(byId.full_context.duplicate_removal.applicable, false);
@@ -146,6 +151,8 @@ test('memory benchmark lists external adapter requirements without fake scores',
     assert.equal(row.can_run_in_this_harness, false);
     assert.equal(row.scores_included, false);
     assert.match(row.official_doc, /^https:\/\//u);
+    assert.equal(typeof row.official_positioning, 'string');
+    assert.match(row.official_positioning, /harness|runtime|memory|stack|public-API/iu);
     assert.ok(Array.isArray(row.required_artifacts));
     assert.ok(row.required_artifacts.length >= 3);
     assert.match(row.boundary_reason, /no .*score|no .*claim|not .*available|does not/iu);

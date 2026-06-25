@@ -36,6 +36,125 @@ const PUBLIC_PLAINTEXT_KEYS = new Set(['body', 'content', 'context', 'contexttex
 const SOURCE_REF_ROOT_RE = /^sha256:[a-f0-9]{64}$/;
 const PUBLIC_KEY_REQUIRED_FOR_CONTEXT_PACK_VERIFICATION = 'PUBLIC_KEY_REQUIRED_FOR_CONTEXT_PACK_VERIFICATION';
 
+const QUERY_RELEVANCE_STOPWORDS = new Set([
+  'about',
+  'after',
+  'again',
+  'against',
+  'also',
+  'and',
+  'any',
+  'are',
+  'assistant',
+  'because',
+  'been',
+  'before',
+  'being',
+  'between',
+  'can',
+  'could',
+  'current',
+  'does',
+  'from',
+  'has',
+  'have',
+  'how',
+  'into',
+  'its',
+  'latest',
+  'more',
+  'most',
+  'number',
+  'own',
+  'owns',
+  'please',
+  'should',
+  'that',
+  'the',
+  'their',
+  'then',
+  'there',
+  'these',
+  'they',
+  'this',
+  'use',
+  'using',
+  'was',
+  'what',
+  'when',
+  'where',
+  'which',
+  'who',
+  'whose',
+  'why',
+  'with',
+  'would',
+]);
+
+function addMeaningfulToken(tokens, token) {
+  if (token.length < 3) return;
+  if (!/[a-z]/u.test(token)) return;
+  if (QUERY_RELEVANCE_STOPWORDS.has(token)) return;
+  tokens.add(token);
+}
+
+function meaningfulTokensFrom(value) {
+  const tokens = new Set();
+  if (value === undefined || value === null) return tokens;
+  for (const match of String(value).toLowerCase().matchAll(/[a-z0-9]+(?:[-_][a-z0-9]+)*/gu)) {
+    const token = match[0];
+    addMeaningfulToken(tokens, token);
+    if (token.includes('-') || token.includes('_')) {
+      for (const part of token.split(/[-_]+/u)) addMeaningfulToken(tokens, part);
+    }
+  }
+  return tokens;
+}
+
+function addTokensFromValue(tokens, value) {
+  for (const token of meaningfulTokensFrom(value)) tokens.add(token);
+}
+
+function candidateRelevanceTokens(candidate) {
+  const tokens = new Set();
+  addTokensFromValue(tokens, candidate.content);
+  addTokensFromValue(tokens, candidate.metadata?.kind);
+  for (const tag of candidate.metadata?.purpose_tags ?? []) addTokensFromValue(tokens, tag);
+  return tokens;
+}
+
+function hasTokenOverlap(left, right) {
+  for (const token of left) {
+    if (right.has(token)) return true;
+  }
+  return false;
+}
+
+function strictQueryRelevance(args) {
+  return args.strict_relevance === true
+    || args.strictRelevance === true
+    || args.require_relevance === true
+    || args.requireRelevance === true
+    || args.query_relevance === 'strict'
+    || args.queryRelevance === 'strict';
+}
+
+function relevanceCandidateSet(args, candidates) {
+  if (args.queryAwareRelevance !== true) return candidates;
+  const query = typeof args.query === 'string' ? args.query.trim() : String(args.query ?? '').trim();
+  if (query.length === 0) return candidates;
+  const queryTokens = meaningfulTokensFrom(query);
+  if (queryTokens.size === 0) return candidates;
+
+  const relevant = [];
+  for (const candidate of candidates) {
+    if (hasTokenOverlap(queryTokens, candidateRelevanceTokens(candidate))) relevant.push(candidate);
+  }
+  if (relevant.length > 0) return relevant;
+  return strictQueryRelevance(args) ? [] : candidates;
+}
+
+
 function normalizedPublicKey(key) {
   return String(key).toLowerCase().replace(/[^a-z0-9]/g, '');
 }
@@ -215,8 +334,9 @@ function optimizedSelectionFrom(args, candidateAddresses, limit) {
     const candidate = optimizationCandidateFrom(args.vault, memoryAddr);
     if (candidate) candidates.push(candidate);
   }
+  const planCandidates = relevanceCandidateSet(args, candidates);
   const plan = createMemoryOptimizationPlan({
-    candidates,
+    candidates: planCandidates,
     prompt: args.query ?? '',
     pricing: contextPackPricing(args),
     now: args.now,
@@ -237,7 +357,7 @@ function optimizedSelectionFrom(args, candidateAddresses, limit) {
   }
   const selectedSet = new Set(selected);
   const selectedPlan = createMemoryOptimizationPlan({
-    candidates: candidates.filter((candidate) => selectedSet.has(candidate.address)),
+    candidates: planCandidates.filter((candidate) => selectedSet.has(candidate.address)),
     prompt: args.query ?? '',
     pricing: contextPackPricing(args),
     now: args.now,
@@ -503,11 +623,12 @@ export function compileContextPack(args = {}) {
   const tombstones = tombstoneAddressesFrom(vault);
   const limit = Number(args.limit ?? args.max_memories ?? args.maxMemories ?? 12);
   if (!Number.isInteger(limit) || limit < 0) throw new Error('compileContextPack limit must be a non-negative integer');
-  const candidateAddresses = requested ? [...requested] : [...active];
+  const hasExplicitMemoryAddresses = Boolean(requested);
+  const candidateAddresses = hasExplicitMemoryAddresses ? [...requested] : [...active];
   let selected = candidateAddresses.slice(0, limit);
   let optimizationPlan = null;
   if (optimizerEnabled(args)) {
-    const optimized = optimizedSelectionFrom({ ...args, vault }, candidateAddresses, limit);
+    const optimized = optimizedSelectionFrom({ ...args, vault, queryAwareRelevance: !hasExplicitMemoryAddresses }, candidateAddresses, limit);
     selected = optimized.selected;
     optimizationPlan = optimized.plan;
   }

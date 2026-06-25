@@ -26,13 +26,17 @@ The harness measures local Enigma operations only:
 
 - vault remember/update operations;
 - vault export and import;
-- context-pack retrieval through the passport package;
-- optimizer plan token estimates and duplicate removal;
+- context-pack retrieval through the passport package, including deterministic local relevance filtering before optimizer tiering;
+- optimizer plan token estimates, tiering, and duplicate removal;
 - bundle and context-pack verification;
 - local baseline comparisons over the same deterministic fixture questions;
 - p50/p95 latency with `performance.now`.
 
 Reported metrics include exact-answer recall, abstention correctness, estimated prompt tokens, duplicate candidates removed where applicable, operation latency summaries, verification status, and same-boundary cross-provider profile rows.
+
+Enigma context-pack token improvements are achieved by local selection, not external-provider behavior: the passport compiler narrows active local memories to the deterministic query/purpose/address-relevant set before optimizer tiering and deduplication. This lowers estimated prompt tokens by excluding locally irrelevant fixture memories while preserving the same recall and abstention scoring boundary.
+
+Numeric token and latency values in generated reports are local fixture measurements. They can change with hardware, Node/runtime version, script version, and fixture contents, so copy should cite the command and report artifact rather than treating one run as a universal score.
 
 ## Local baseline comparison
 
@@ -43,13 +47,13 @@ Reported metrics include exact-answer recall, abstention correctness, estimated 
 | `full_context` | Supplies every active fixture memory without optimization or deduplication. | Recall, abstention correctness, estimated prompt tokens, selected memory count, p50/p95 local latency. |
 | `recency_last_n` | Supplies the three most recently updated active fixture memories. | Same fields; duplicate removal is marked not applicable. |
 | `keyword_filter` | Supplies active fixture memories whose content or tags match deterministic query terms. | Same fields; duplicate removal is marked not applicable. |
-| `enigma_context_pack` | Uses the Enigma passport context-pack compiler and optimizer boundary. | Same fields plus duplicate-removal counts from the Enigma optimizer plan. |
+| `enigma_context_pack` | Uses the Enigma passport context-pack compiler with deterministic local relevance filtering before optimizer tiering and deduplication. | Same fields plus duplicate-removal counts from the Enigma optimizer plan. |
 
 These rows are local package evidence only. They do not compare hosted providers, do not use provider APIs, and do not support invoice savings, ROI, compliance, model-forgetting, or benchmark-leadership claims.
 
 ## External competitor adapter requirements
 
-`external_competitor_adapters` is a requirements matrix, not a score table. Each row has `status: "not_run_requires_credentials_or_runtime"`, `can_run_in_this_harness: false`, `required_artifacts`, `official_doc`, an exact `boundary_reason`, and `scores_included: false`.
+`external_competitor_adapters` is a requirements matrix, not a score table. Each row has `status: "not_run_requires_credentials_or_runtime"`, `can_run_in_this_harness: false`, `required_artifacts`, `official_doc`, `official_positioning`, an exact `boundary_reason`, and `scores_included: false`.
 
 | Adapter | Official source | Required artifacts before scoring | Boundary reason |
 | --- | --- | --- | --- |
@@ -60,11 +64,13 @@ These rows are local package evidence only. They do not compare hosted providers
 | OpenAI ChatGPT native memory | https://help.openai.com/en/articles/8590148-memory-faq | ChatGPT account/runtime with native memory enabled; account-safe evaluation protocol; dataset prompts; evidence capture that excludes personal data and credentials. | ChatGPT native memory is a consumer-app feature rather than a public API surface available to this local package harness. |
 | Claude memory tool | https://support.anthropic.com/en/articles/11145838-using-claude-memory | Claude/provider runtime with the memory tool available; client-side tool configuration; fixed model/tool-use policy/prompts/dataset mapping; safe evidence capture. | The memory tool is provider/client-side and requires a Claude runtime plus tool environment that this benchmark does not control. |
 
-No external adapter row contains recall, abstention, token, latency, or ranking scores. Third-party claims stay blocked until the required credentials, runtimes, and datasets are supplied and reviewed.
+No external adapter row contains recall, abstention, token, latency, or ranking scores. Third-party rows remain requirements-only until the required credentials, runtimes, fixed agent/tool loops, and reviewed datasets are supplied and reviewed.
+
+The `official_positioning` field records only source-attributed context needed to build a future adapter: Letta/MemGPT runtime and SDK/API-key requirements; LangGraph short-term checkpointer and long-term namespaced store memory; Zep temporal Context Graph/Context Lake positioning and retrieval-latency claim; Mem0 platform/open-source memory stack; OpenAI native consumer-app memory; and Claude provider/client-side memory tooling. None of those facts are scored or verified by this local run.
 
 ## Claim limits
 
-The benchmark report is evidence for this local deterministic fixture only. It is not provider deletion proof, model forgetting proof, compliance certification, ROI evidence, provider invoice savings evidence, benchmark leadership proof, hosted cloud readiness, or a substitute for external LoCoMo/LongMemEval evaluation.
+The benchmark report is evidence for this local deterministic fixture only. Reported score improvements mean Enigma selected fewer locally irrelevant context-pack candidates under the same fixture questions; they are not provider deletion proof, model forgetting proof, compliance certification, ROI evidence, provider invoice savings evidence, benchmark leadership proof, hosted cloud readiness, or a substitute for external LoCoMo/LongMemEval evaluation.
 
 Cross-provider rows are profile labels using the same Enigma context-pack boundary. External competitor rows are adapter requirements only; they do not call, score, or rank live provider models.
 
