@@ -1,0 +1,35 @@
+{
+  "schema": "enigma.proof_network.benchmark_attestation.v1",
+  "attestation_id": "pna_example_0001",
+  "generated_at": "2026-01-01T00:00:00.000Z",
+  "package_version": "0.0.0-example",
+  "dataset_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "runner_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "report_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "metrics_digest": {
+    "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "metric_count": 2,
+    "canonicalization": "json-c14n-sha256"
+  },
+  "leakage_scan": {
+    "scanned": true,
+    "passed": true,
+    "policy": "public_hashes_roots_refs_counts_only",
+    "public_payload_only": true,
+    "private_payload_detected": false,
+    "forbidden_field_names": []
+  },
+  "claim_boundaries": [
+    {
+      "claim_id": "example-boundary",
+      "claim": "This example records public proof digests only.",
+      "allowed_scope": "Schema-shaped demo artifact using fake hashes and public metadata.",
+      "not_proven": [
+        "Runtime availability",
+        "External audit outcome"
+      ]
+    }
+  ],
+  "transaction_submitted": false,
+  "public_payload_only": true
+}

@@ -1,0 +1,210 @@
+#!/usr/bin/env node
+// Enigma Memory — generate local-simulation secrets and TLS material.
+// CLAIM BOUNDARY: local-simulation only. The files created by this script are
+// bind-mounted by deploy/docker-compose.local-production-simulation.yml. They
+// are not production secrets, HSM custody, or real operator evidence.
+
+import { spawnSync } from 'node:child_process'
+import { generateKeyPairSync, randomUUID } from 'node:crypto'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const DEFAULT_SECRETS_DIR = path.join(ROOT, 'deploy', 'secrets-simulation')
+
+const REQUIRED_SECRET_FILES = [
+  'relay-signing-key',
+  'gateway-signing-key',
+  'external-storage-dsn',
+  'kms-key-ref',
+  'backup-target-uri',
+  'siem-export-endpoint',
+  'operator-acceptance-evidence-uri',
+  'gateway-admin-auth-bearer',
+  'gateway-data-plane-auth-bearer',
+  'tls.crt',
+  'tls.key',
+]
+
+function parseArgs(argv) {
+  const flags = { check: false, secretsDir: DEFAULT_SECRETS_DIR }
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i]
+    if (arg === '--check') {
+      flags.check = true
+    } else if (arg === '--secrets-dir') {
+      i += 1
+      if (i >= argv.length) throw new Error('--secrets-dir requires a path')
+      flags.secretsDir = path.resolve(argv[i])
+    } else if (arg === '--help' || arg === '-h') {
+      process.stdout.write(
+        'Usage: node scripts/simulate-production-env.mjs [--check] [--secrets-dir <dir>]\n' +
+          '\n' +
+          'Generates local-simulation secret files and a self-signed TLS certificate\n' +
+          `under ${DEFAULT_SECRETS_DIR} (customizable with --secrets-dir).\n` +
+          'Run with --check to verify required files exist and are non-empty.\n'
+      )
+      process.exit(0)
+    }
+  }
+  return flags
+}
+
+function generateKmsKeyRef() {
+  const pair = generateKeyPairSync('ed25519', {
+    privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    publicKeyEncoding: { type: 'spki', format: 'pem' },
+  })
+  return (
+    JSON.stringify(
+      {
+        schema: 'enigma.local_simulation_kms_key_ref.v1',
+        key_id: `local-simulation-kms-key-${randomUUID()}`,
+        alg: 'Ed25519',
+        public_key: pair.publicKey,
+        private_key: pair.privateKey,
+        claim_boundary: 'local-simulation only. This is not HSM-grade key custody.',
+      },
+      null,
+      2
+    ) + '\n'
+  )
+}
+
+const SECRET_GENERATORS = {
+  'relay-signing-key': () => 'local-simulation-relay-signing-key-ref\n',
+  'gateway-signing-key': () => 'local-simulation-gateway-signing-key-ref\n',
+  'external-storage-dsn': () => 'postgres://enigma:enigma@postgres:5432/enigma?sslmode=disable\n',
+  'kms-key-ref': generateKmsKeyRef,
+  'backup-target-uri': () => 'file:///tmp/enigma-backups\n',
+  'siem-export-endpoint': () => 'http://siem-mock:3000/events\n',
+  'operator-acceptance-evidence-uri': () => 'file:///run/secrets/operator-acceptance-evidence-uri\n',
+  'gateway-admin-auth-bearer': () => 'local-simulation-admin-token\n',
+  'gateway-data-plane-auth-bearer': () => 'local-simulation-data-plane-token\n',
+}
+
+function ensureDir(dir) {
+  fs.mkdirSync(dir, { recursive: true })
+}
+
+function isMissingOrEmpty(filePath) {
+  try {
+    const stat = fs.statSync(filePath)
+    return !stat.isFile() || stat.size === 0
+  } catch {
+    return true
+  }
+}
+
+function generateTlsCerts(secretsDir) {
+  const key = path.join(secretsDir, 'tls.key')
+  const cert = path.join(secretsDir, 'tls.crt')
+  const config = path.join(secretsDir, '.openssl-tmp.cnf')
+  const configText =
+    '[req]\n' +
+    'distinguished_name = req_distinguished_name\n' +
+    'x509_extensions = v3_req\n' +
+    'prompt = no\n' +
+    '\n' +
+    '[req_distinguished_name]\n' +
+    'CN = sim.enigmamemory.com\n' +
+    '\n' +
+    '[v3_req]\n' +
+    'subjectAltName = @alt_names\n' +
+    '\n' +
+    '[alt_names]\n' +
+    'DNS.1 = localhost\n' +
+    'DNS.2 = sim.enigmamemory.com\n' +
+    'DNS.3 = relay.sim.enigmamemory.com\n' +
+    'DNS.4 = gateway.sim.enigmamemory.com\n' +
+    'DNS.5 = *.sim.enigmamemory.com\n' +
+    'IP.1 = 127.0.0.1\n'
+  fs.writeFileSync(config, configText)
+  try {
+    const result = spawnSync(
+      'openssl',
+      [
+        'req', '-x509', '-nodes', '-newkey', 'rsa:2048',
+        '-keyout', key,
+        '-out', cert,
+        '-days', '365',
+        '-config', config,
+      ],
+      { stdio: 'pipe' }
+    )
+    if (result.status !== 0) {
+      throw new Error(
+        `Failed to generate self-signed TLS certificate: ${result.stderr?.toString() || 'openssl exited non-zero'}`
+      )
+    }
+  } finally {
+    try {
+      fs.unlinkSync(config)
+    } catch {
+      // ignore cleanup failure
+    }
+  }
+}
+
+function generateSecrets(secretsDir) {
+  ensureDir(secretsDir)
+  for (const name of REQUIRED_SECRET_FILES) {
+    if (name === 'tls.crt' || name === 'tls.key') continue
+    const filePath = path.join(secretsDir, name)
+    if (isMissingOrEmpty(filePath)) {
+      fs.writeFileSync(filePath, SECRET_GENERATORS[name](), { mode: 0o600 })
+    }
+  }
+  const keyPath = path.join(secretsDir, 'tls.key')
+  const certPath = path.join(secretsDir, 'tls.crt')
+  if (isMissingOrEmpty(keyPath) || isMissingOrEmpty(certPath)) {
+    generateTlsCerts(secretsDir)
+  }
+}
+
+function check(secretsDir) {
+  const missing = []
+  for (const name of REQUIRED_SECRET_FILES) {
+    if (isMissingOrEmpty(path.join(secretsDir, name))) missing.push(name)
+  }
+  if (missing.length > 0) {
+    process.stderr.write(`Missing or empty simulation secrets: ${missing.join(', ')}\n`)
+    process.exit(1)
+  }
+  process.stdout.write(
+    `All ${REQUIRED_SECRET_FILES.length} required simulation secret files exist and are non-empty in ${secretsDir}\n`
+  )
+}
+
+function printStartInstructions() {
+  process.stdout.write('\n')
+  process.stdout.write('To start the local production simulation, run:\n')
+  process.stdout.write('  docker compose -f deploy/docker-compose.local-production-simulation.yml up --build -d\n')
+  process.stdout.write('\n')
+  process.stdout.write('To make the public-looking domain resolve locally, add this line to /etc/hosts\n')
+  process.stdout.write('(or C:\\Windows\\System32\\drivers\\etc\\hosts on Windows):\n')
+  process.stdout.write('  127.0.0.1 sim.enigmamemory.com relay.sim.enigmamemory.com gateway.sim.enigmamemory.com\n')
+  process.stdout.write('\n')
+  process.stdout.write('To wait for the backend to be ready:\n')
+  process.stdout.write('  node scripts/wait-for-backend-ready.mjs\n')
+  process.stdout.write('\n')
+  process.stdout.write('To inspect public HTTPS readiness (self-signed cert, use -k with curl):\n')
+  process.stdout.write('  curl -k https://localhost:8443/readyz\n')
+  process.stdout.write('  curl -k https://localhost:9443/readyz\n')
+  process.stdout.write('  curl -k https://sim.enigmamemory.com:8443/readyz\n')
+  process.stdout.write('  curl -k https://sim.enigmamemory.com:9443/readyz\n')
+}
+
+function main() {
+  const flags = parseArgs(process.argv.slice(2))
+  if (flags.check) {
+    check(flags.secretsDir)
+    return
+  }
+  generateSecrets(flags.secretsDir)
+  check(flags.secretsDir)
+  printStartInstructions()
+}
+
+main()

@@ -30,6 +30,19 @@ import {
   createSettlementBatch,
   verifyServiceSettlementReceipt,
 } from '../../../packages/settlement/src/index.js';
+import {
+  assertNoPrivateProofPayload,
+  createBenchmarkAttestation,
+  createCapabilityGrant,
+  createCapabilityRevocation,
+  createProofNetworkAnchorBatch,
+  sha256Json as proofNetworkSha256Json,
+  validateBenchmarkAttestation,
+  validateCapabilityGrant,
+  validateCapabilityRevocation,
+  validateProofNetworkAnchorBatch,
+  validateProofNetworkPacket,
+} from '../../../packages/proof-network/src/index.js';
 
 const DEFAULT_BUNDLE = '.enigma/bundle.json';
 const DEFAULT_TEST_DRIVE_DIR = '.enigma/test-drive';
@@ -1723,7 +1736,7 @@ export async function testDriveCommand(flags, io) {
     out_dir: outDirInput,
     bundle: bundleInput,
     install_command: `npm install -g ${packageJson.name ?? 'enigma-memory'}`,
-    release_target: '0.1.11',
+    release_target: '0.1.12',
     artifacts_written: !dryRun,
     client_configs_written: false,
     client_config_write_required: false,
@@ -2088,6 +2101,229 @@ function integerFlag(flags, names, label = names[0], fallback = undefined) {
   return number;
 }
 
+function flagValues(flags, names) {
+  const values = [];
+  for (const name of names) {
+    const value = getFlag(flags, [name]);
+    const entries = Array.isArray(value) ? value : [value];
+    for (const entry of entries) {
+      if (entry === undefined || entry === true || entry === '') continue;
+      for (const item of String(entry).split(',')) {
+        const trimmed = item.trim();
+        if (trimmed) values.push(trimmed);
+      }
+    }
+  }
+  return values;
+}
+
+function chainWriteOrPrint(flags, io, artifact, summary) {
+  if (flags.has('out')) {
+    const outPath = resolve(String(requireFlag(flags, ['out'])));
+    return writeJson(outPath, artifact).then(() => {
+      print({
+        ok: true,
+        path: publicPathDisplay(String(requireFlag(flags, ['out'])), 'proof-network-artifact'),
+        transaction_submitted: false,
+        raw_memory_on_chain: false,
+        ...summary,
+      }, io);
+      return 0;
+    });
+  }
+  print(artifact, io);
+  return 0;
+}
+
+async function sha256PublicFile(path) {
+  const bytes = await readFile(path);
+  try {
+    assertNoPrivateProofPayload(JSON.parse(bytes.toString('utf8')));
+  } catch (error) {
+    if (error instanceof SyntaxError) return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+    throw new Error('Report file contains private proof payload markers.');
+  }
+  return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+}
+
+function scoreFlags(flags) {
+  const scores = {};
+  for (const value of flagValues(flags, ['score', 'scores', 'metric', 'metrics'])) {
+    const eq = value.indexOf('=');
+    if (eq <= 0) throw new Error('--score values must use name=value.');
+    const key = value.slice(0, eq).trim();
+    const raw = value.slice(eq + 1).trim();
+    if (!key || !raw) throw new Error('--score values must use name=value.');
+    const numeric = Number(raw);
+    scores[key] = Number.isFinite(numeric) && raw !== '' ? numeric : raw;
+  }
+  return scores;
+}
+
+
+function assertChainArtifact(validate, artifact) {
+  const result = chainValidationResult(validate, artifact);
+  if (!result.ok) throw new Error(result.errors?.join('; ') || 'Invalid proof-network artifact.');
+  return artifact;
+}
+function chainValidationResult(validate, artifact) {
+  assertNoPrivateProofPayload(artifact);
+  const result = validate(artifact);
+  if (result === false) return { ok: false };
+  if (result && typeof result === 'object') return { ok: result.ok !== false, ...result };
+  return { ok: true };
+}
+
+function chainArtifactValidator(artifact) {
+  const schema = String(artifact?.schema ?? artifact?.type ?? artifact?.artifact_type ?? '');
+  if (schema === 'enigma.proof_network.anchor_batch.v1') return [schema, validateProofNetworkAnchorBatch];
+  if (schema === 'enigma.proof_network.capability_grant.v1') return [schema, validateCapabilityGrant];
+  if (schema === 'enigma.proof_network.capability_revocation.v1') return [schema, validateCapabilityRevocation];
+  if (schema === 'enigma.proof_network.benchmark_attestation.v1') return [schema, validateBenchmarkAttestation];
+  if (schema === 'enigma.proof_network.packet.v1') return [schema, validateProofNetworkPacket];
+  throw new Error(`Unsupported proof-network artifact schema: ${schema || 'missing'}.`);
+}
+
+export async function chainAnchorCommand(flags, io) {
+  const roots = flagValues(flags, ['root', 'roots', 'memory-root', 'memoryRoot', 'receipt-root', 'receiptRoot', 'context-root', 'contextRoot', 'memory-commitment-root', 'memoryCommitmentRoot']);
+  if (roots.length === 0) throw new Error('Missing required --root.');
+  const refs = flagValues(flags, ['ref', 'refs', 'public-ref', 'publicRef']);
+  const publicChainRef = getFlag(flags, ['public-chain-ref', 'publicChainRef', 'chain-ref', 'chainRef'], 'solana:local-plan');
+  const batch = createProofNetworkAnchorBatch({
+    roots,
+    root_count: roots.length,
+    commitment_count: roots.length,
+    refs,
+    public_chain_ref: publicChainRef,
+    authority_ref: getFlag(flags, ['authority', 'authority-ref', 'authorityRef']),
+    batch_ref: getFlag(flags, ['batch-ref', 'batchRef']),
+    created_at: getFlag(flags, ['created-at', 'createdAt']),
+    transaction_submitted: false,
+    raw_memory_on_chain: false,
+  });
+  assertChainArtifact(validateProofNetworkAnchorBatch, batch);
+  return chainWriteOrPrint(flags, io, batch, {
+    artifact_type: batch.schema,
+    anchor_batch_id: batch.anchor_batch_id,
+    anchor_batch_hash: batch.anchor_batch_hash ?? proofNetworkSha256Json(batch),
+  });
+}
+
+export async function chainGrantCommand(flags, io) {
+  const resourceRefs = flagValues(flags, ['resource-root', 'resource-roots', 'resourceRoot', 'resourceRoots', 'resource-ref', 'resource-refs', 'resourceRef', 'resourceRefs', 'ref', 'refs']);
+  const capability = requireFlag(flags, ['capability', 'capability-id', 'capabilityId'], 'capability');
+  const scope = requireFlag(flags, ['scope', 'scope-ref', 'scopeRef', 'capability-scope', 'capabilityScope'], 'scope');
+  const policyHash = getFlag(flags, ['policy-hash', 'policyHash'], proofNetworkSha256Json({ capability, scope, resource_refs: resourceRefs }));
+  const grant = createCapabilityGrant({
+    issuer_ref: getFlag(flags, ['issuer', 'issuer-ref', 'issuerRef'], 'issuer:local-cli'),
+    subject_ref: requireFlag(flags, ['subject', 'subject-ref', 'subjectRef'], 'subject'),
+    capability,
+    scope,
+    scopes: scope,
+    capability_scope: scope,
+    resource_roots: resourceRefs.length ? resourceRefs : [policyHash],
+    policy_hash: policyHash,
+    expires_at: requireFlag(flags, ['expires-at', 'expiresAt'], 'expires-at'),
+    grant_ref: getFlag(flags, ['grant-ref', 'grantRef']),
+    issued_at: getFlag(flags, ['issued-at', 'issuedAt', 'created-at', 'createdAt']),
+    transaction_submitted: false,
+    raw_memory_on_chain: false,
+  });
+  assertChainArtifact(validateCapabilityGrant, grant);
+  return chainWriteOrPrint(flags, io, grant, {
+    artifact_type: grant.schema,
+    capability_grant_id: grant.capability_grant_id,
+    capability_grant_hash: grant.capability_grant_hash ?? proofNetworkSha256Json(grant),
+  });
+}
+
+export async function chainRevokeCommand(flags, io) {
+  const grantValue = getFlag(flags, ['grant']);
+  let grantHash = getFlag(flags, ['grant-hash', 'grantHash']);
+  let grantId = getFlag(flags, ['grant-id', 'grantId']);
+  if (grantValue !== undefined && grantValue !== true && grantValue !== '') {
+    const grantString = String(grantValue);
+    if (grantString.startsWith('sha256:')) {
+      grantHash = grantHash ?? grantString;
+    } else {
+      const grantArtifact = await readJson(resolve(grantString));
+      const grantValidation = validateCapabilityGrant(grantArtifact);
+      if (!grantValidation.ok) throw new Error(`Grant artifact is invalid: ${grantValidation.errors.join('; ')}`);
+      grantHash = grantHash ?? grantArtifact.capability_grant_hash;
+      grantId = grantId ?? grantArtifact.capability_grant_id;
+    }
+  }
+  const nullifierValue = getFlag(flags, ['nullifier-root', 'nullifierRoot', 'nullifier-ref', 'nullifierRef', 'nullifier']);
+  const revocation = createCapabilityRevocation({
+    grant_id: grantId,
+    grant_hash: grantHash ?? requireFlag(flags, ['grant-hash', 'grantHash'], 'grant-hash'),
+    reason_ref: requireFlag(flags, ['reason', 'revocation-reason', 'revocationReason'], 'reason'),
+    revocation_reason: getFlag(flags, ['reason', 'revocation-reason', 'revocationReason']),
+    revocation_ref: getFlag(flags, ['revocation-ref', 'revocationRef']),
+    nullifier_root: nullifierValue && String(nullifierValue).startsWith('sha256:') ? nullifierValue : undefined,
+    nullifier_ref: nullifierValue && !String(nullifierValue).startsWith('sha256:') ? nullifierValue : undefined,
+    revoked_at: getFlag(flags, ['revoked-at', 'revokedAt']),
+    transaction_submitted: false,
+    raw_memory_on_chain: false,
+  });
+  assertChainArtifact(validateCapabilityRevocation, revocation);
+  return chainWriteOrPrint(flags, io, revocation, {
+    artifact_type: revocation.schema,
+    capability_revocation_id: revocation.capability_revocation_id,
+    capability_revocation_hash: revocation.capability_revocation_hash ?? proofNetworkSha256Json(revocation),
+  });
+}
+
+export async function chainAttestCommand(flags, io) {
+  const reportHash = getFlag(flags, ['report-hash', 'reportHash']);
+  const reportFile = getFlag(flags, ['report-file', 'reportFile']);
+  const resolvedReportHash = reportHash || (reportFile ? await sha256PublicFile(resolve(String(reportFile))) : undefined);
+  if (!resolvedReportHash) throw new Error('Missing required --report-hash or --report-file.');
+  const scores = scoreFlags(flags);
+  const metricsHash = getFlag(flags, ['metrics-hash', 'metricsHash'], proofNetworkSha256Json({ scores }));
+  const attestation = createBenchmarkAttestation({
+    report_hash: resolvedReportHash,
+    report_file_hash: resolvedReportHash,
+    dataset_ref: requireFlag(flags, ['dataset-ref', 'datasetRef', 'dataset-manifest', 'datasetManifest'], 'dataset-ref'),
+    runner_ref: requireFlag(flags, ['runner-ref', 'runnerRef'], 'runner-ref'),
+    package_ref: requireFlag(flags, ['package-ref', 'packageRef'], 'package-ref'),
+    metrics: scores,
+    metrics_hash: metricsHash,
+    attestation_ref: getFlag(flags, ['attestation-ref', 'attestationRef']),
+    created_at: getFlag(flags, ['created-at', 'createdAt']),
+    transaction_submitted: false,
+    raw_memory_on_chain: false,
+  });
+  assertChainArtifact(validateBenchmarkAttestation, attestation);
+  return chainWriteOrPrint(flags, io, attestation, {
+    artifact_type: attestation.schema,
+    benchmark_attestation_id: attestation.benchmark_attestation_id,
+    benchmark_attestation_hash: attestation.benchmark_attestation_hash ?? proofNetworkSha256Json(attestation),
+  });
+}
+
+export async function chainVerifyCommand(flags, io, positionalFile = undefined) {
+  const inPath = resolve(String(requireFileArg(flags, ['file', 'in'], positionalFile, 'file')));
+  const artifact = await readJson(inPath);
+  const [schema, validate] = chainArtifactValidator(artifact);
+  let result;
+  try {
+    result = chainValidationResult(validate, artifact);
+  } catch (error) {
+    result = { ok: false, error: { code: 'PROOF_NETWORK_INVALID', message: error.message } };
+  }
+  print({
+    ok: result.ok === true,
+    artifact_type: schema,
+    artifact_hash: proofNetworkSha256Json(artifact),
+    transaction_submitted: false,
+    raw_memory_on_chain: false,
+    validation: result,
+  }, io);
+  return result.ok === true ? 0 : 1;
+}
+
+
 export async function meterEventCommand(flags, io) {
   const event = createUsageEvent({
     tenant_id: requireFlag(flags, ['tenant', 'tenant-id', 'tenantId'], 'tenant'),
@@ -2306,6 +2542,11 @@ function usage() {
       'settlement receipt',
       'settlement verify',
       'settlement batch',
+      'chain anchor',
+      'chain grant',
+      'chain revoke',
+      'chain attest',
+      'chain verify',
     ],
     connector_options: {
       '--bundle <path>': 'Absolute local Enigma vault bundle path rendered as ENIGMA_BUNDLE.',
@@ -2401,6 +2642,14 @@ function usage() {
       batch: 'enigma settlement batch --receipts <receipts.json> --batch-ref <ref> [--asset <asset>] [--out <file>]',
       boundary: 'Settlement artifacts contain commitment roots, capacity profiles, hashes, refs, prices, and claim boundaries only; no raw memory, prompts, provider responses, credentials, token ROI/profit, decentralization, or provider-invoice savings claim.',
     },
+    chain: {
+      anchor: 'enigma chain anchor --root <sha256:...> [--root <sha256:...>] [--ref <public-ref>] [--authority <public-authority-ref>] [--batch-ref <ref>] [--out <file>]',
+      grant: 'enigma chain grant --subject <public-subject-ref> --capability <capability-id> --scope <scope-id> [--resource-ref <sha256:...>] [--policy-hash <sha256:...>] --expires-at <iso> [--grant-ref <public-ref>] [--out <file>]',
+      revoke: 'enigma chain revoke --grant-hash <sha256:...> --reason <public-reason-code> [--revocation-ref <public-ref>] [--out <file>]',
+      attest: 'enigma chain attest (--report-hash <sha256:...> | --report-file <report.json>) --dataset-ref <sha256:...> --runner-ref <public-runner-ref> --package-ref <public-package-ref> [--score name=value] [--out <file>]',
+      verify: 'enigma chain verify --file <proof-artifact.json>',
+      boundary: 'Proof Network chain commands are local planning commands only. They write public-safe hashes, roots, refs, counts, signatures, and booleans; they do not submit Solana transactions or put raw memory on chain.',
+    },
     relay_gateway_options: {
       '--host <host>': 'Bind host. Defaults to 127.0.0.1.',
       '--port <port>': `Bind port. Defaults to ${DEFAULT_RELAY_PORT} for relay and ${DEFAULT_GATEWAY_PORT} for gateway.`,
@@ -2427,10 +2676,10 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     print(usage(), io);
     return 0;
   }
-  const twoPartCommands = ['boundary', 'mcp', 'mesh', 'enterprise', 'capsule', 'relay', 'gateway', 'connect', 'disconnect', 'import', 'native-host', 'meter', 'settlement', 'demo', 'passport'];
+  const twoPartCommands = ['boundary', 'mcp', 'mesh', 'enterprise', 'capsule', 'relay', 'gateway', 'connect', 'disconnect', 'import', 'native-host', 'meter', 'settlement', 'chain', 'demo', 'passport'];
   const flags = parseArgs(twoPartCommands.includes(command) ? argv.slice(2) : argv.slice(1));
   const positionalFile = optionalPositional(argv[2]);
-  if ((flags.has('help') || argv.includes('-h')) && (command === 'setup' || command === 'test-drive' || command === 'search' || command === 'status' || (command === 'passport' && subcommand === 'status') || ((command === 'relay' || command === 'gateway') && (subcommand === 'serve' || subcommand === 'demo')) || (command === 'native-host' && (subcommand === 'manifest' || subcommand === 'install-plan')) || (command === 'demo' && subcommand === 'cross-model'))) {
+  if ((command === 'chain' && (!subcommand || subcommand === '--help' || subcommand === '-h' || flags.has('help'))) || ((flags.has('help') || argv.includes('-h')) && (command === 'setup' || command === 'test-drive' || command === 'search' || command === 'status' || (command === 'passport' && subcommand === 'status') || ((command === 'relay' || command === 'gateway') && (subcommand === 'serve' || subcommand === 'demo')) || (command === 'native-host' && (subcommand === 'manifest' || subcommand === 'install-plan')) || (command === 'demo' && subcommand === 'cross-model')))) {
     print(usage(), io);
     return 0;
   }
@@ -2472,6 +2721,11 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     if (command === 'settlement' && subcommand === 'receipt') return await settlementReceiptCommand(flags, io);
     if (command === 'settlement' && subcommand === 'verify') return await settlementVerifyCommand(flags, io);
     if (command === 'settlement' && subcommand === 'batch') return await settlementBatchCommand(flags, io, positionalFile);
+    if (command === 'chain' && subcommand === 'anchor') return await chainAnchorCommand(flags, io);
+    if (command === 'chain' && subcommand === 'grant') return await chainGrantCommand(flags, io);
+    if (command === 'chain' && subcommand === 'revoke') return await chainRevokeCommand(flags, io);
+    if (command === 'chain' && subcommand === 'attest') return await chainAttestCommand(flags, io);
+    if (command === 'chain' && subcommand === 'verify') return await chainVerifyCommand(flags, io, positionalFile);
     if (command === 'native-host' && subcommand === 'install-plan') return await nativeHostInstallPlanCommand(flags, io);
     if (command === 'mesh' && subcommand === 'demo') return await meshDemoCommand(flags, io);
     if (command === 'enterprise' && subcommand === 'demo') return await enterpriseDemoCommand(flags, io);
