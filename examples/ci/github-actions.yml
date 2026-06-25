@@ -31,7 +31,7 @@ jobs:
         run: npm init -y
 
       - name: Install Enigma Memory
-        run: npm install enigma-memory@0.1.4
+        run: npm install enigma-memory
 
       - name: Expose local benchmark script
         run: |
@@ -44,8 +44,11 @@ jobs:
           await writeFile('package.json', `${JSON.stringify(pkg, null, 2)}\n`, 'utf8');
           JS
 
-      - name: Run Enigma quickstart
-        run: npx enigma quickstart --overwrite
+      - name: Run Enigma test drive
+        run: npx enigma test-drive --overwrite
+
+      - name: Run Enigma setup
+        run: npx enigma setup --overwrite
 
       - name: Run Enigma doctor
         run: npx enigma doctor

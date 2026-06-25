@@ -41,7 +41,7 @@ function expectedNextCommands(bundle, crossModelReport) {
     `enigma status --bundle ${quoted(bundle)}`,
     `enigma search --bundle ${quoted(bundle)} --query "local proof bundle"`,
     `enigma demo cross-model --bundle ${quoted(bundle)} --out ${quoted(crossModelReport)}`,
-    'node scripts/run-memory-benchmarks.mjs',
+    'enigma setup --overwrite',
   ];
 }
 
@@ -74,6 +74,7 @@ test('test-drive dry-run writes nothing and reports public tester commands', asy
   assert.equal(json.out_dir, outDir);
   assert.equal(json.install_command, 'npm install -g enigma-memory');
   assert.deepEqual(json.next_commands, expectedNextCommands(json.bundle, json.files.find((file) => file.role === 'cross_model_report').path));
+  assert.equal(json.next_commands.every((command) => command.startsWith('enigma ')), true);
   assert.equal(await pathExists(outDir), false);
   assertPublicSafe(stdout, ['private test-drive canary']);
 });

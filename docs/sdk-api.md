@@ -1,12 +1,14 @@
 # SDK and API guide
 
-This guide covers the public package imports for `enigma-memory@0.1.12`. The SDK runs locally by default: vaults, passports, context packs, receipts, relay/gateway demo state, storage contracts, metering artifacts, settlement artifacts, proof-network artifacts, and hosted-cloud contract packets are package-level developer surfaces. They are not evidence of hosted Enigma cloud, live customer API key issuance, provider-side deletion, provider model forgetting, token ROI, invoice savings, compliance certification, benchmark leadership, Solana transaction submission, or on-chain raw memory.
+This guide covers the public package imports for `enigma-memory`. The SDK runs locally by default: vaults, passports, context packs, receipts, relay/gateway demo state, storage contracts, metering artifacts, settlement artifacts, proof-network artifacts, and hosted-cloud contract packets are package-level developer surfaces. They are not evidence of hosted Enigma cloud, live customer API key issuance, provider-side deletion, provider model forgetting, token ROI, invoice savings, compliance certification, benchmark leadership, Solana transaction submission, or on-chain raw memory.
 
 ## Install and import style
 
 ```sh
 npm install enigma-memory
 ```
+
+Requires Node.js `>=24`, matching the package `engines` field.
 
 Use ESM imports and explicit subpaths when you know the surface you need:
 
@@ -239,7 +241,7 @@ const attestation = createBenchmarkAttestation({
   report_hash: 'sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
   dataset_ref: 'dataset-ref-public',
   runner_ref: 'runner-ref-public',
-  package_ref: 'npm:enigma-memory@0.1.12',
+  package_ref: 'npm:enigma-memory@0.1.13',
   metric_roots: ['sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'],
   sample_count: 120,
   run_count: 1,

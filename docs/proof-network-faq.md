@@ -36,7 +36,7 @@ That means a verifier can check that a later artifact matches the same committed
 
 ## What is live now?
 
-The 0.1.12 proof-network surface is local and public-safe:
+The 0.1.13 proof-network surface is local and public-safe:
 
 - pure proof artifact builders and validators for `enigma.proof_network.anchor_batch.v1`;
 - scoped capability grants with `enigma.proof_network.capability_grant.v1`;
