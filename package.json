@@ -1,6 +1,6 @@
 {
   "name": "enigma-memory",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "type": "module",
   "description": "Provider-agnostic AI memory passport and offline-verifiable proof layer.",
   "license": "Apache-2.0",
@@ -85,6 +85,7 @@
     "scripts/collect-hosted-backend-live-evidence.mjs",
     "scripts/build-hosted-probe-worker.mjs",
     "scripts/build-hosted-customer-lifecycle.mjs",
+    "scripts/build-hosted-api-key-lifecycle.mjs",
     "scripts/build-edge-backend-workers.mjs",
     "scripts/validate-cloudflare-worker-inspect.mjs",
     "scripts/validate-production-manifests.mjs",
@@ -177,6 +178,7 @@
     "production:edge-live": "node scripts/collect-edge-backend-bootstrap-evidence.mjs",
     "production:ref-draft": "node scripts/build-hosted-ref-draft.mjs",
     "production:hosted-customer": "node scripts/build-hosted-customer-lifecycle.mjs",
+    "production:hosted-api-key": "node scripts/build-hosted-api-key-lifecycle.mjs",
     "production:storage-bootstrap": "node scripts/cloudflare-storage-bootstrap.mjs",
     "production:worker-inspect": "node scripts/validate-cloudflare-worker-inspect.mjs",
     "production:cloudflare-credentials": "node scripts/validate-cloudflare-credentials.mjs",

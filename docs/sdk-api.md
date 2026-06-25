@@ -1,6 +1,6 @@
 # SDK and API guide
 
-This guide covers the public package imports for `enigma-memory@0.1.9`. The SDK runs locally by default: vaults, passports, context packs, receipts, relay/gateway demo state, storage contracts, metering artifacts, and settlement artifacts are package-level developer surfaces. They are not evidence of hosted Enigma cloud, provider-side deletion, provider model forgetting, token ROI, invoice savings, compliance certification, or benchmark leadership.
+This guide covers the public package imports for `enigma-memory@0.1.10`. The SDK runs locally by default: vaults, passports, context packs, receipts, relay/gateway demo state, storage contracts, metering artifacts, settlement artifacts, and hosted-cloud contract packets are package-level developer surfaces. They are not evidence of hosted Enigma cloud, live customer API key issuance, provider-side deletion, provider model forgetting, token ROI, invoice savings, compliance certification, or benchmark leadership.
 
 ## Install and import style
 
@@ -156,6 +156,27 @@ const job = createPermissionlessMemoryJob({
   payment_asset: 'CREDITS',
 });
 ```
+
+### `enigma-memory/hosted-cloud`
+
+The hosted-cloud module emits public-safe contract/readiness evidence only. Customer API key lifecycle packets model issue, rotate, revoke, and audit readiness with evidence refs, opaque subject refs, fingerprints, missing-evidence refs, readiness status, and operator approval refs. They never contain raw key material, provider payloads, plaintext prompts, raw memory, credentials, ROI claims, provider deletion claims, or model forgetting claims.
+
+```js
+import {
+  buildApiKeyLifecyclePacket,
+  validateApiKeyLifecyclePacket,
+} from 'enigma-memory/hosted-cloud';
+
+const packet = buildApiKeyLifecyclePacket({
+  tenant_id: 'tenant-alpha',
+  subject_ref: 'subject-ref-alpha',
+  environment: 'production',
+  operation: 'audit',
+});
+const valid = validateApiKeyLifecyclePacket(packet);
+```
+
+`customer_api_keys_live` stays `false` unless the issue/rotate/revoke/audit evidence refs are complete and an operator approval ref is supplied. Even then, the packet is readiness evidence validation only; it does not issue a key, create a secret, call KMS or auth providers, rotate or revoke a provider credential, or prove provider-side deletion.
 
 ## Verifying exported proof
 

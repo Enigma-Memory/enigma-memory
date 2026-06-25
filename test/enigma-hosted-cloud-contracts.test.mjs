@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   HOSTED_CLOUD_API_KEY_SCHEMA,
+  HOSTED_CLOUD_API_KEY_LIFECYCLE_PACKET_SCHEMA,
+  HOSTED_CLOUD_API_KEY_LIFECYCLE_OPERATIONS,
   HOSTED_CLOUD_BACKUP_DRILL_SCHEMA,
   HOSTED_CLOUD_CUSTOMER_LIFECYCLE_PACKET_SCHEMA,
   HOSTED_CLOUD_CUSTOMER_LIFECYCLE_PHASES,
@@ -13,6 +15,7 @@ import {
   HOSTED_CLOUD_USER_ACCOUNT_SCHEMA,
   HOSTED_CLOUD_VAULT_SCHEMA,
   buildApiKeyContract,
+  buildApiKeyLifecyclePacket,
   buildBackupDrillContract,
   buildCustomerLifecyclePacket,
   buildDashboardSummary,
@@ -22,6 +25,7 @@ import {
   buildUsageBillingRecord,
   buildUserAccountContract,
   validateApiKeyContract,
+  validateApiKeyLifecyclePacket,
   validateBackupDrillContract,
   validateCustomerLifecyclePacket,
   validateDashboardSummary,
@@ -35,6 +39,37 @@ import {
 const generatedAt = '2026-06-25T00:00:00.000Z';
 const issuedAt = '2026-06-25T00:00:00.000Z';
 const performedAt = '2026-06-25T01:00:00.000Z';
+
+const API_KEY_LIFECYCLE_PHASES_BY_OPERATION = Object.freeze({
+  issue: Object.freeze(['next_key_metadata', 'issue_policy', 'audit_log']),
+  rotate: Object.freeze(['current_key_metadata', 'next_key_metadata', 'rotation_policy', 'audit_log']),
+  revoke: Object.freeze(['current_key_metadata', 'revoked_key_metadata', 'revocation_policy', 'audit_log']),
+  audit: Object.freeze(['current_key_metadata', 'audit_log']),
+});
+
+function apiKeyLifecycleEvidenceRefs(operation, status = 'blocked_external_dependency') {
+  return Object.fromEntries(API_KEY_LIFECYCLE_PHASES_BY_OPERATION[operation].map((phase) => [
+    phase,
+    {
+      ref: status === 'provided' ? `evidence:api-key:${operation}:${phase}:2026-06-25` : `blocked:api-key:${operation}:${phase}:2026-06-25`,
+      status,
+      blocker: status === 'provided' ? undefined : `${operation} ${phase} evidence remains externally blocked`,
+    },
+  ]));
+}
+
+function completeApiKeyLifecyclePacket(operation = 'rotate', overrides = {}) {
+  return buildApiKeyLifecyclePacket({
+    tenant_id: 'tenant_alpha',
+    subject_ref: 'subject-ref-1',
+    environment: 'production',
+    operation,
+    generated_at: generatedAt,
+    required_evidence_refs: apiKeyLifecycleEvidenceRefs(operation, 'provided'),
+    operator_approval_ref: 'approval:hosted-api-key-lifecycle:2026-06-25',
+    ...overrides,
+  });
+}
 
 function evidenceRefs(status = 'blocked_external_dependency') {
   return Object.fromEntries(HOSTED_CLOUD_EXTERNAL_BLOCKERS.map((key) => [
@@ -482,8 +517,124 @@ test('hosted customer lifecycle packet rejects missing lifecycle surfaces', () =
     required_evidence_refs: lifecycleEvidenceRefs('provided'),
     operator_go_live_ref: 'approval:hosted-cloud-go-live:2026-06-25',
   });
-  const missingDashboard = structuredClone(packet);
-  delete missingDashboard.contracts.dashboard;
+  for (const surface of ['account', 'tenant', 'vault', 'api_key', 'billing', 'dashboard', 'backup', 'incident_sla']) {
+    const missingSurface = structuredClone(packet);
+    delete missingSurface.contracts[surface];
+    assert.throws(
+      () => validateCustomerLifecyclePacket(missingSurface),
+      new RegExp(`contracts\\.${surface}|missing_surface_refs`),
+      `expected missing ${surface} surface to fail validation`,
+    );
+  }
+});
 
-  assert.throws(() => validateCustomerLifecyclePacket(missingDashboard), /contracts\.dashboard|missing_surface_refs/);
+test('hosted API key lifecycle packet is blocked by default', () => {
+  const packet = buildApiKeyLifecyclePacket({
+    tenant_id: 'tenant_alpha',
+    subject_ref: 'subject-ref-1',
+    operation: 'audit',
+    generated_at: generatedAt,
+  });
+
+  assert.equal(packet.schema, HOSTED_CLOUD_API_KEY_LIFECYCLE_PACKET_SCHEMA);
+  assert.deepEqual(packet.lifecycle_events.map(({ operation }) => operation), ['audit', 'audit']);
+  assert.deepEqual(packet.lifecycle_events.map(({ phase }) => phase), API_KEY_LIFECYCLE_PHASES_BY_OPERATION.audit);
+  assert.equal(packet.customer_api_keys_live, false);
+  assert.equal(packet.readiness.customer_api_keys_live, false);
+  assert.match(packet.readiness.status, /blocked/);
+  assert.equal(packet.readiness.evidence_validation_only, true);
+  assert.equal(packet.readiness.no_external_provider_calls, true);
+  assert.equal(packet.readiness.no_provider_wiring, true);
+  assert.equal(packet.readiness.actual_key_issuance, false);
+  assert.equal(packet.guarantees.api_key_material_absent, true);
+  assert.equal(packet.public_safety_guarantees.provider_payloads_absent, true);
+  assert.deepEqual(packet.missing_evidence_refs.map(({ key }) => key), API_KEY_LIFECYCLE_PHASES_BY_OPERATION.audit);
+  assert.equal(validateApiKeyLifecyclePacket(packet), true);
+});
+
+test('hosted API key lifecycle packet becomes live-ready only with complete evidence and operator approval', () => {
+  assert.deepEqual(HOSTED_CLOUD_API_KEY_LIFECYCLE_OPERATIONS, ['issue', 'rotate', 'revoke', 'audit']);
+
+  for (const operation of HOSTED_CLOUD_API_KEY_LIFECYCLE_OPERATIONS) {
+    const packet = completeApiKeyLifecyclePacket(operation);
+    const expectedPhases = API_KEY_LIFECYCLE_PHASES_BY_OPERATION[operation];
+
+    assert.equal(packet.schema, HOSTED_CLOUD_API_KEY_LIFECYCLE_PACKET_SCHEMA);
+    assert.deepEqual(Object.keys(packet.required_evidence_refs), expectedPhases);
+    assert.deepEqual(packet.lifecycle_events.map(({ operation: eventOperation }) => eventOperation), expectedPhases.map(() => operation));
+    assert.deepEqual(packet.lifecycle_events.map(({ phase }) => phase), expectedPhases);
+    assert.deepEqual(packet.missing_evidence_refs, []);
+    assert.deepEqual(packet.external_blockers, []);
+    assert.equal(packet.operator_approval_ref, 'approval:hosted-api-key-lifecycle:2026-06-25');
+    assert.equal(packet.readiness.status, 'operator_approved_api_key_lifecycle_evidence');
+    assert.equal(packet.readiness.customer_api_keys_live, true);
+    assert.equal(packet.customer_api_keys_live, true);
+    assert.equal(packet.readiness.evidence_validation_only, true);
+    assert.equal(packet.readiness.actual_key_issuance, false);
+    assert.equal(validateApiKeyLifecyclePacket(packet), true);
+  }
+});
+
+test('hosted API key lifecycle packet stays blocked without complete evidence or approval', () => {
+  const missingApproval = completeApiKeyLifecyclePacket('rotate', { operator_approval_ref: undefined });
+  assert.deepEqual(missingApproval.missing_evidence_refs, []);
+  assert.equal(missingApproval.operator_approval_ref, null);
+  assert.equal(missingApproval.readiness.operator_approval_provided, false);
+  assert.equal(missingApproval.customer_api_keys_live, false);
+  assert.equal(validateApiKeyLifecyclePacket(missingApproval), true);
+
+  const incompleteEvidence = completeApiKeyLifecyclePacket('rotate', {
+    required_evidence_refs: {
+      ...apiKeyLifecycleEvidenceRefs('rotate', 'provided'),
+      rotation_policy: {
+        ref: 'blocked:api-key:rotate:rotation_policy:2026-06-25',
+        status: 'blocked_external_dependency',
+        blocker: 'rotation policy evidence remains externally blocked',
+      },
+    },
+  });
+  assert.deepEqual(incompleteEvidence.missing_evidence_refs.map(({ key }) => key), ['rotation_policy']);
+  assert.equal(incompleteEvidence.readiness.operator_approval_provided, true);
+  assert.equal(incompleteEvidence.customer_api_keys_live, false);
+  assert.equal(validateApiKeyLifecyclePacket(incompleteEvidence), true);
+});
+
+test('hosted API key lifecycle packet rejects raw memory, secrets, provider payloads, key material, and forbidden claims', () => {
+  const packet = completeApiKeyLifecyclePacket();
+
+  for (const [key, value, pattern] of [
+    ['raw_memory', 'customer plaintext memory', /not allowed/],
+    ['plaintext_prompt', 'private prompt: rotate this customer key', /not allowed/],
+    ['provider_response', { id: 'resp_1', body: 'provider response body' }, /not allowed/],
+    ['api_key_value', 'not-key-material', /not allowed|credential-looking/],
+    ['api_key_secret_material', 'api key secret material', /not allowed|credential-looking/],
+    ['credential_note', 'credential material', /not allowed|credential-looking/],
+    ['financial_claim', 'token ROI is guaranteed', /forbidden hosted-cloud claim/],
+    ['provider_deletion_claim', 'provider deletion is proven', /not allowed|forbidden hosted-cloud claim/],
+    ['model_forgetting_claim', 'model forgetting is proven', /not allowed|forbidden hosted-cloud claim/],
+  ]) {
+    assert.throws(() => validateApiKeyLifecyclePacket({ ...packet, [key]: value }), pattern);
+  }
+});
+
+test('hosted API key lifecycle packet rejects malformed operation surfaces', () => {
+  const packet = completeApiKeyLifecyclePacket();
+
+  assert.throws(() => buildApiKeyLifecyclePacket({
+    tenant_id: 'tenant_alpha',
+    subject_ref: 'subject-ref-1',
+    operation: 'mint',
+    generated_at: generatedAt,
+  }), /operation/);
+
+  const missingPhase = structuredClone(packet);
+  missingPhase.lifecycle_events = missingPhase.lifecycle_events.filter(({ phase }) => phase !== 'audit_log');
+  assert.throws(() => validateApiKeyLifecyclePacket(missingPhase), /lifecycle_events|missing/);
+
+  const malformedEvidence = structuredClone(packet);
+  malformedEvidence.required_evidence_refs.rotation_policy = {
+    ref: 'evidence:api-key:rotate:rotation_policy:2026-06-25',
+    status: 'ready',
+  };
+  assert.throws(() => validateApiKeyLifecyclePacket(malformedEvidence), /required_evidence_refs\.rotation_policy|status/);
 });
