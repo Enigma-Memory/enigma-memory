@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createHash } from 'node:crypto';
 import { createServer as createHttpServer } from 'node:http';
 import { realpathSync } from 'node:fs';
 import { access, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
@@ -30,6 +31,24 @@ const DEFAULT_BUNDLE = '.enigma/bundle.json';
 export const DEFAULT_RELAY_PORT = 8787;
 export const DEFAULT_GATEWAY_PORT = 8797;
 const DEFAULT_QUICKSTART_MEMORY = 'Enigma quickstart demo memory: local proof bundles can be created and verified without provider or cloud credentials.';
+const DEFAULT_CROSS_MODEL_DEMO_BUNDLE = '.enigma/cross-model-demo-bundle.json';
+const DEFAULT_CROSS_MODEL_MEMORY = 'Enigma cross-model demo memory: a local encrypted memory can be packaged for ChatGPT, Claude, Kimi, Cursor, and a local LLM without provider credentials.';
+const CROSS_MODEL_PROFILES = Object.freeze([
+  { id: 'chatgpt', provider: 'chatgpt', model: 'chatgpt-mcp-profile', label: 'ChatGPT' },
+  { id: 'claude', provider: 'claude', model: 'claude-mcp-profile', label: 'Claude' },
+  { id: 'kimi', provider: 'kimi', model: 'kimi-mcp-profile', label: 'Kimi' },
+  { id: 'cursor', provider: 'cursor', model: 'cursor-mcp-profile', label: 'Cursor' },
+  { id: 'local-llm', provider: 'local', model: 'local-llm-profile', label: 'Local LLM' },
+]);
+const CROSS_MODEL_CLAIM_BOUNDARIES = Object.freeze({
+  local_only: true,
+  provider_credentials_required: false,
+  provider_native_memory_canonical: false,
+  provider_deletion_proof: false,
+  model_forgetting_proof: false,
+  roi_or_savings_guarantee: false,
+  compliance_certification: false,
+});
 const PACKAGE_JSON_URL = new URL('../../../package.json', import.meta.url);
 const SPECS_URL = new URL('../../../specs/', import.meta.url);
 const IMPORTERS = Object.freeze({
@@ -189,6 +208,73 @@ async function quickstartMemoryTextFromFlags(flags) {
     return readFile(resolve(String(textFile)), 'utf8');
   }
   return DEFAULT_QUICKSTART_MEMORY;
+}
+
+async function crossModelMemoryTextFromFlags(flags) {
+  const textFile = getFlag(flags, ['memory-file', 'memoryFile', 'text-file', 'textFile']);
+  if (textFile === undefined) return DEFAULT_CROSS_MODEL_MEMORY;
+  if (textFile === true || textFile === '') throw new Error('Missing required --memory-file.');
+  return readFile(resolve(String(textFile)), 'utf8');
+}
+
+function activeMemoryCount(vault) {
+  return vault.activeAddresses instanceof Set ? vault.activeAddresses.size : 0;
+}
+
+function sha256Json(value) {
+  return `sha256:${createHash('sha256').update(JSON.stringify(value)).digest('hex')}`;
+}
+
+function contextPackPublicDigest(pack) {
+  return sha256Json({
+    schema: pack.schema,
+    context_pack_id: pack.context_pack_id,
+    provider: pack.provider,
+    model: pack.model,
+    purpose: pack.purpose,
+    memory_addresses: pack.memory_addresses,
+    receipt_hashes: pack.receipt_hashes,
+    active_set_root: pack.active_set_root,
+    receipt_log_root: pack.receipt_log_root,
+  });
+}
+
+function publicReceiptRefs(receipts) {
+  return (Array.isArray(receipts) ? receipts : []).map((receipt) => ({
+    receipt_id: receipt.receipt_id,
+    operation: receipt.operation,
+    memory_addr: receipt.memory_addr,
+    provider: receipt.provider,
+    model: receipt.model,
+    event_hash: receipt.event_hash,
+    receipt_log_root: receipt.receipt_log_root,
+    timestamp: receipt.timestamp,
+  }));
+}
+
+function publicContextPackSummary(pack) {
+  const receipts = publicReceiptRefs(pack.receipts);
+  return {
+    schema: pack.schema,
+    context_pack_ref: `enigma://context-pack/${pack.context_pack_id}`,
+    context_pack_id: pack.context_pack_id,
+    context_pack_digest: contextPackPublicDigest(pack),
+    provider: pack.provider,
+    model: pack.model,
+    purpose: pack.purpose,
+    memory_addresses: Array.isArray(pack.memory_addresses) ? [...pack.memory_addresses] : [],
+    memory_count: Array.isArray(pack.memory_addresses) ? pack.memory_addresses.length : 0,
+    receipt_count: receipts.length,
+    receipt_hashes: Array.isArray(pack.receipt_hashes) ? [...pack.receipt_hashes] : [],
+    receipts,
+    active_set_root: pack.active_set_root,
+    receipt_log_root: pack.receipt_log_root,
+    content_redacted: true,
+  };
+}
+
+function demoBundleRef(bundleWasSupplied) {
+  return bundleWasSupplied ? 'supplied_bundle' : DEFAULT_CROSS_MODEL_DEMO_BUNDLE;
 }
 
 async function readPackageJson() {
@@ -486,6 +572,119 @@ export async function quickstartCommand(flags, io) {
     },
   }, io);
   return verifyReport.ok === true ? 0 : 1;
+}
+
+export async function crossModelDemoCommand(flags, io) {
+  const bundleFlag = getFlag(flags, ['bundle', 'file']);
+  if (bundleFlag === true || bundleFlag === '') throw new Error('Missing required --bundle.');
+  const bundleWasSupplied = bundleFlag !== undefined;
+  const bundleInput = bundleWasSupplied ? String(bundleFlag) : DEFAULT_CROSS_MODEL_DEMO_BUNDLE;
+  const bundlePath = resolve(bundleInput);
+  const out = getFlag(flags, ['out']);
+  if (out === true || out === '') throw new Error('Missing required --out.');
+  const outPath = out === undefined ? undefined : resolve(String(out));
+  if (outPath !== undefined) ensureDistinctOutputPaths([bundlePath, outPath]);
+
+  const memoryFileWasSupplied = getFlag(flags, ['memory-file', 'memoryFile', 'text-file', 'textFile']) !== undefined;
+  let bundleCreated = false;
+  let vault;
+  let passport;
+  let demoMemoryAddr;
+
+  if (!bundleWasSupplied) {
+    vault = createVault({
+      subjectId: 'cross-model-demo-user',
+      displayName: 'Cross-model demo user',
+      passphrase: 'local-cross-model-demo-passphrase',
+    });
+    passport = createPassport({ vault, subjectId: vault.subject_id, displayName: 'Cross-model demo user' });
+    const remembered = remember({
+      vault,
+      passport,
+      text: await crossModelMemoryTextFromFlags(flags),
+      purpose: 'cross_model_demo_memory',
+      purpose_tags: ['cross-model-demo'],
+      metadata: { source: memoryFileWasSupplied ? 'local file supplied to demo' : 'generic cross-model demo memory' },
+    });
+    demoMemoryAddr = remembered.memory_addr;
+    bundleCreated = true;
+  } else {
+    const existed = await fileExists(bundlePath);
+    if (!existed) {
+      await ensureBundle(bundlePath, flags);
+      bundleCreated = true;
+    }
+    ({ vault, passport } = await loadState(bundlePath));
+    const remembered = remember({
+      vault,
+      passport,
+      text: await crossModelMemoryTextFromFlags(flags),
+      purpose: 'cross_model_demo_memory',
+      purpose_tags: ['cross-model-demo'],
+      metadata: { source: memoryFileWasSupplied ? 'local file supplied to demo' : 'generic cross-model demo memory' },
+    });
+    demoMemoryAddr = remembered.memory_addr;
+  }
+  const memorySource = memoryFileWasSupplied ? 'memory_file' : 'generic_demo';
+
+  const limit = integerFlag(flags, ['limit'], 'limit', 1);
+  if (limit < 1) throw new Error('--limit must be at least 1.');
+  const receiptCountBeforeProfiles = Array.isArray(vault.receipts) ? vault.receipts.length : 0;
+  const profiles = [];
+  for (const profile of CROSS_MODEL_PROFILES) {
+    const pack = compileContextPack({
+      vault,
+      passport,
+      provider: profile.provider,
+      model: profile.model,
+      query: 'memory follows me across models',
+      purpose: `cross_model_demo:${profile.id}`,
+      memory_addresses: [demoMemoryAddr],
+      limit,
+    });
+    const contextPack = publicContextPackSummary(pack);
+    profiles.push({
+      profile: profile.id,
+      label: profile.label,
+      provider: profile.provider,
+      model: profile.model,
+      context_pack_ref: contextPack.context_pack_ref,
+      context_pack_id: contextPack.context_pack_id,
+      context_pack_digest: contextPack.context_pack_digest,
+      context_pack: contextPack,
+      receipt_count: contextPack.receipt_count,
+      memory_count: contextPack.memory_count,
+      provider_native_memory_canonical: false,
+      receipts: contextPack.receipts,
+      claim_boundaries: { ...CROSS_MODEL_CLAIM_BOUNDARIES },
+    });
+  }
+
+  const bundle = await persistState(bundlePath, vault);
+  const report = {
+    ok: true,
+    schema: 'enigma.cross_model_demo.v1',
+    command: 'enigma demo cross-model',
+    story: 'One local Enigma memory is packaged as public-safe context pack references and receipts for ChatGPT, Claude, Kimi, Cursor, and a local LLM. No provider is called.',
+    bundle_ref: demoBundleRef(bundleWasSupplied),
+    bundle_supplied: bundleWasSupplied,
+    bundle_created: bundleCreated,
+    demo_only_vault: !bundleWasSupplied,
+    memory_source: memorySource,
+    demo_memory_addr: demoMemoryAddr,
+    profile_count: profiles.length,
+    profiles,
+    memory_count: activeMemoryCount(vault),
+    receipt_count: Array.isArray(bundle.receipts) ? bundle.receipts.length : 0,
+    generated_receipt_count: (Array.isArray(bundle.receipts) ? bundle.receipts.length : 0) - receiptCountBeforeProfiles,
+    provider_credentials_required: false,
+    provider_native_memory_canonical: false,
+    out_written: outPath !== undefined,
+    claim_boundaries: { ...CROSS_MODEL_CLAIM_BOUNDARIES },
+  };
+  if (outPath !== undefined) await writeJson(outPath, report);
+  print(report, io);
+  return 0;
 }
 
 async function rememberCommand(flags, io) {
@@ -1074,6 +1273,7 @@ function usage() {
     commands: [
       'init',
       'quickstart',
+      'demo cross-model',
       'doctor',
       'install',
       'connect <client>',
@@ -1126,6 +1326,12 @@ function usage() {
       '--memory-file <path>': 'Read local memory text from a file. Alias: --text-file.',
       '--memory-text <text>': 'Inline demo memory text for non-private demos only.',
       '--overwrite': 'Replace existing quickstart output files.',
+    },
+    cross_model_demo_options: {
+      '--bundle <path>': `Reuse a local Enigma bundle. If omitted, ${DEFAULT_CROSS_MODEL_DEMO_BUNDLE} is recreated as a demo-only local vault.`,
+      '--memory-file <path>': 'Seed the demo from a local file without echoing plaintext. Alias: --text-file.',
+      '--out <path>': 'Write the same public-safe JSON report to a local file.',
+      '--limit <n>': 'Maximum active memories per generated profile context pack. Defaults to 1 for the same-memory demo story.',
     },
     native_host: {
       bin: 'enigma-native-host',
@@ -1192,16 +1398,17 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     print(usage(), io);
     return 0;
   }
-  const twoPartCommands = ['boundary', 'mcp', 'mesh', 'enterprise', 'capsule', 'relay', 'gateway', 'connect', 'disconnect', 'import', 'native-host', 'meter', 'settlement'];
+  const twoPartCommands = ['boundary', 'mcp', 'mesh', 'enterprise', 'capsule', 'relay', 'gateway', 'connect', 'disconnect', 'import', 'native-host', 'meter', 'settlement', 'demo'];
   const flags = parseArgs(twoPartCommands.includes(command) ? argv.slice(2) : argv.slice(1));
   const positionalFile = optionalPositional(argv[2]);
-  if ((flags.has('help') || argv.includes('-h')) && (((command === 'relay' || command === 'gateway') && (subcommand === 'serve' || subcommand === 'demo')) || (command === 'native-host' && (subcommand === 'manifest' || subcommand === 'install-plan')))) {
+  if ((flags.has('help') || argv.includes('-h')) && (((command === 'relay' || command === 'gateway') && (subcommand === 'serve' || subcommand === 'demo')) || (command === 'native-host' && (subcommand === 'manifest' || subcommand === 'install-plan')) || (command === 'demo' && subcommand === 'cross-model'))) {
     print(usage(), io);
     return 0;
   }
   try {
     if (command === 'init') return await initCommand(flags, io);
     if (command === 'quickstart') return await quickstartCommand(flags, io);
+    if (command === 'demo' && subcommand === 'cross-model') return await crossModelDemoCommand(flags, io);
     if (command === 'doctor') return await doctorCommand(flags, io);
     if (command === 'install') return await installCommand(flags, io);
     if (command === 'connect') return await connectCommand(subcommand, flags, io);

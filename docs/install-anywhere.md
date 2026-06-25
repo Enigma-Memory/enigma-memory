@@ -17,6 +17,7 @@ Current status: Enigma has a local production foundation and a published package
 ```sh
 npm install -g enigma-memory
 enigma quickstart --bundle ./.enigma/bundle.json --overwrite
+enigma demo cross-model
 enigma doctor
 enigma-relay demo
 enigma-gateway demo
@@ -24,10 +25,13 @@ enigma-gateway demo
 
 `enigma quickstart` writes local review artifacts under the selected bundle/workspace path: a local vault bundle, a context pack, an export proof bundle, and a verify report. The proof boundary is local and Enigma-controlled: it verifies Enigma receipts, checkpoints, committed roots, and exported bundle shape only. It does not prove provider deletion, model forgetting, provider-native memory removal, hosted/BYOC availability, legal approval, or compliance certification.
 
+Run `enigma demo cross-model` to see the product loop after install: the same generic local Enigma memory is packaged as public-safe context-pack references and receipt summaries for `chatgpt`, `claude`, `kimi`, `cursor`, and `local-llm` unless you explicitly supply `--memory-file <path>`. It calls no providers, needs no provider key, reports `provider_native_memory_canonical:false`, and does not claim provider deletion, model forgetting, hosted availability, ROI/savings, or compliance certification. Add `--out ./.enigma/cross-model-demo-report.json` to save the report without echoing plaintext.
+
 One-off execution without a global install:
 
 ```sh
 npx --yes --package enigma-memory enigma quickstart --bundle ./.enigma/bundle.json --overwrite
+npx --yes --package enigma-memory enigma demo cross-model
 ```
 
 ## Source checkout versus package install
@@ -53,6 +57,7 @@ To perform the local global install from the checkout and initialize a local vau
 npm run install:local -- --execute --init-vault --bundle ./.enigma/bundle.json
 enigma doctor
 enigma --help
+enigma demo cross-model
 enigma-verify --help
 enigma-relay demo
 enigma-gateway demo
@@ -65,6 +70,7 @@ npm install -g .
 enigma init --bundle ./.enigma/bundle.json --subject local-user --display-name "Local user"
 enigma doctor
 enigma --help
+enigma demo cross-model
 enigma-verify --help
 enigma-relay demo
 enigma-gateway demo
@@ -75,6 +81,7 @@ If you do not want a global install from the checkout, run the bins directly:
 ```sh
 node apps/cli/bin/enigma.mjs --help
 node apps/verifier/bin/enigma-verify.mjs --help
+node apps/cli/bin/enigma.mjs demo cross-model
 node apps/relay/bin/enigma-relay.mjs demo
 node apps/gateway/bin/enigma-gateway.mjs demo
 ```
@@ -164,7 +171,18 @@ MCP resource and prompt:
 
 Use `docs/client-connectors.md` from a source checkout for Claude Desktop, Cursor, Kimi Code, VS Code/Cline, Roo Code, OpenCode, and generic MCP JSON. Connector entries default to command `enigma-mcp` and env key `ENIGMA_BUNDLE`.
 
-If a GUI-launched client cannot find shell-installed binaries, render an absolute MCP command:
+Npm-first connector flow:
+
+```sh
+npm install -g enigma-memory
+enigma quickstart --bundle "$HOME/.enigma/bundle.json" --overwrite
+enigma doctor --client claude-desktop
+enigma connect claude-desktop --bundle "$HOME/.enigma/bundle.json"
+```
+
+Replace `claude-desktop` with `cursor`, `kimi-code`, `vscode-cline`, `roo`, `opencode`, or `generic-mcp`. `enigma doctor --client ...` is read-only: it reports whether the config path exists, whether the Enigma MCP entry exists, whether command/env match, and the safe next action (`missing_client_config`, `connect`, `repair`, or `already_configured`). `enigma connect ...` merges only the Enigma `mcpServers.enigma` entry and preserves unrelated settings.
+
+If Kimi Code or another GUI-launched client cannot find shell-installed binaries, reconnect with an absolute MCP command because GUI apps may not inherit your terminal `PATH`:
 
 ```sh
 enigma connect kimi-code --bundle "$HOME/.enigma/bundle.json" --mcp-command "/absolute/path/to/enigma-mcp"
