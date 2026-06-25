@@ -1,37 +1,46 @@
 # Install Enigma anywhere
 
-This guide covers paths that work from a local checkout today and the paths to use after the public package is published as `enigma-memory`.
+This guide starts with the published npm package path for `enigma-memory`. Use a source checkout only when you need source-only docs, Docker assets, browser-extension scaffolding, package development, or release scripts.
 
-Current status: Enigma has a local production foundation and installable package scaffolding. Hosted cloud and BYOC operation require real deployment credentials, domains, TLS, durable storage, KMS/secrets, monitoring, backups, and operator/customer infrastructure; they are not activated by installing the package.
+Current status: Enigma has a local production foundation and a published package. Hosted cloud and BYOC operation require real deployment credentials, domains, TLS, durable storage, KMS/secrets, monitoring, backups, and operator/customer infrastructure; they are not activated by installing the package.
 
 ## Requirements
 
 - Node.js `>=24`
-- Git for the source-checkout path
 - A local filesystem path for the Enigma vault bundle
-- No network for the local CLI/MCP/verifier path after the package or checkout is present
-- Optional: Docker for containerized relay/gateway operation
+- No database, provider credential, cloud credential, npm publishing token, or package registry account for the local package quickstart
+- Git only for the advanced source-checkout path
+- Optional: Docker for source-checkout containerized relay/gateway operation
 
-## Fastest path from GitHub today
+## Default path: install from npm
 
 ```sh
-git clone https://github.com/Enigma-Memory/enigma-memory.git
-cd enigma-memory
-npm run install:local -- --execute --init-vault --bundle ./.enigma/bundle.json
+npm install -g enigma-memory
+enigma quickstart --bundle ./.enigma/bundle.json --overwrite
+enigma demo cross-model
 enigma doctor
 enigma-relay demo
 enigma-gateway demo
 ```
 
-This path installs from the checked-out source tree. It does not require Cloudflare, hosted relay/gateway access, provider API keys, a database, an npm publishing token, or a package registry account.
+`enigma quickstart` writes local review artifacts under the selected bundle/workspace path: a local vault bundle, a context pack, an export proof bundle, and a verify report. The proof boundary is local and Enigma-controlled: it verifies Enigma receipts, checkpoints, committed roots, and exported bundle shape only. It does not prove provider deletion, model forgetting, provider-native memory removal, hosted/BYOC availability, legal approval, or compliance certification.
+
+Run `enigma demo cross-model` to see the product loop after install: the same generic local Enigma memory is packaged as public-safe context-pack references and receipt summaries for `chatgpt`, `claude`, `kimi`, `cursor`, and `local-llm` unless you explicitly supply `--memory-file <path>`. It calls no providers, needs no provider key, reports `provider_native_memory_canonical:false`, and does not claim provider deletion, model forgetting, hosted availability, ROI/savings, or compliance certification. Add `--out ./.enigma/cross-model-demo-report.json` to save the report without echoing plaintext.
+
+One-off execution without a global install:
+
+```sh
+npx --yes --package enigma-memory enigma quickstart --bundle ./.enigma/bundle.json --overwrite
+npx --yes --package enigma-memory enigma demo cross-model
+```
 
 ## Source checkout versus package install
 
-The source checkout contains this guide, the deployment runbook, the release checklist, `Dockerfile`, `docker-compose.yml`, browser-extension source/docs, and other source-only collateral. The npm package includes the package README, CLI help, bins, app/package source listed in `package.json`, and module exports; it does not include source-only docs, Docker assets, or browser-extension files unless `package.json` is changed to include them. If you install only the package, use `enigma --help`, `enigma-verify --help`, `enigma-relay --help`, `enigma-gateway --help`, direct-bin demos, and the package README for local usage; use a source checkout or hosted docs for the full runbooks, Docker demo assets, and browser-extension scaffold.
+The npm package includes the package README, CLI help, bins, app/package source listed in `package.json`, and module exports. The source checkout contains this guide, the deployment runbook, the release checklist, `Dockerfile`, `docker-compose.yml`, browser-extension source/docs, and other source-only collateral. If you install only the package, use `enigma --help`, `enigma-verify --help`, `enigma-relay --help`, `enigma-gateway --help`, direct-bin demos, and the package README for local usage; use a source checkout or hosted docs for full runbooks, Docker demo assets, and browser-extension scaffolding.
 
 For a complete surface map, see [`public-api-reference.md`](public-api-reference.md). It distinguishes stable local/package interfaces from source-only demos and hosted/BYOC deployment interfaces.
 
-## Install from this repository
+## Advanced path: install from this repository
 
 From the repository root, use the local installer in preview mode first:
 
@@ -48,59 +57,38 @@ To perform the local global install from the checkout and initialize a local vau
 npm run install:local -- --execute --init-vault --bundle ./.enigma/bundle.json
 enigma doctor
 enigma --help
+enigma demo cross-model
 enigma-verify --help
 enigma-relay demo
 enigma-gateway demo
 ```
 
-Equivalent explicit steps:
+Equivalent explicit source-checkout steps:
 
 ```sh
 npm install -g .
 enigma init --bundle ./.enigma/bundle.json --subject local-user --display-name "Local user"
 enigma doctor
 enigma --help
+enigma demo cross-model
 enigma-verify --help
 enigma-relay demo
 enigma-gateway demo
 ```
 
-If you do not want a global install, run the bins directly:
+If you do not want a global install from the checkout, run the bins directly:
 
 ```sh
 node apps/cli/bin/enigma.mjs --help
 node apps/verifier/bin/enigma-verify.mjs --help
+node apps/cli/bin/enigma.mjs demo cross-model
 node apps/relay/bin/enigma-relay.mjs demo
 node apps/gateway/bin/enigma-gateway.mjs demo
 ```
 
-## Install from npm
+## Manual local no-network path
 
-The public package is published as `enigma-memory`:
-
-Publication boundary: the source-checkout installer does not publish the package and does not install from the registry. The public npm package is `enigma-memory`; use the npm commands below for the simplest package install, or use the source checkout flow above when you need source-only docs, Docker assets, or runbooks.
-
-```sh
-npm install -g enigma-memory
-enigma --help
-enigma-verify --help
-enigma-relay demo
-enigma-gateway demo
-```
-
-One-off execution without a global install:
-
-```sh
-npx --yes --package enigma-memory enigma --help
-npx --yes --package enigma-memory enigma doctor
-npx --yes --package enigma-memory enigma-verify --help
-npx --yes --package enigma-memory enigma-relay demo
-npx --yes --package enigma-memory enigma-gateway demo
-```
-
-## Local no-network path
-
-Create and use a vault without any hosted service:
+Use this when you want to inspect each step that `enigma quickstart` automates:
 
 ```sh
 mkdir -p .enigma
@@ -183,7 +171,18 @@ MCP resource and prompt:
 
 Use `docs/client-connectors.md` from a source checkout for Claude Desktop, Cursor, Kimi Code, VS Code/Cline, Roo Code, OpenCode, and generic MCP JSON. Connector entries default to command `enigma-mcp` and env key `ENIGMA_BUNDLE`.
 
-If a GUI-launched client cannot find shell-installed binaries, render an absolute MCP command:
+Npm-first connector flow:
+
+```sh
+npm install -g enigma-memory
+enigma quickstart --bundle "$HOME/.enigma/bundle.json" --overwrite
+enigma doctor --client claude-desktop
+enigma connect claude-desktop --bundle "$HOME/.enigma/bundle.json"
+```
+
+Replace `claude-desktop` with `cursor`, `kimi-code`, `vscode-cline`, `roo`, `opencode`, or `generic-mcp`. `enigma doctor --client ...` is read-only: it reports whether the config path exists, whether the Enigma MCP entry exists, whether command/env match, and the safe next action (`missing_client_config`, `connect`, `repair`, or `already_configured`). `enigma connect ...` merges only the Enigma `mcpServers.enigma` entry and preserves unrelated settings.
+
+If Kimi Code or another GUI-launched client cannot find shell-installed binaries, reconnect with an absolute MCP command because GUI apps may not inherit your terminal `PATH`:
 
 ```sh
 enigma connect kimi-code --bundle "$HOME/.enigma/bundle.json" --mcp-command "/absolute/path/to/enigma-mcp"

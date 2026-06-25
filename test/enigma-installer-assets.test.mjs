@@ -1,0 +1,175 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import {
+  INSTALLER_ASSET_SCHEMA,
+  buildInstallerAssets,
+  nativeInstallerBlockers,
+  parseInstallerAssetArgs,
+  runBuildInstallerAssets,
+} from '../scripts/build-installer-assets.mjs';
+import {
+  TRAY_ACTION_TYPES,
+  connectClients,
+  createTrayMenu,
+  createTrayState,
+  openDocs,
+  quitTray,
+  reduceTrayState,
+  runDiagnostics,
+  runQuickstart,
+  trayActionIntent,
+  trayStatus,
+} from '../apps/desktop/src/tray.js';
+
+const LOCAL_OR_SECRET_RE = /(?:C:\\Users\\|C:\\tmp\\|\/Users\/|\/home\/|\/tmp\/|Bearer\s+|ghp_[A-Za-z0-9_]{16,}|npm_[A-Za-z0-9_-]{24,}|api[_-]?key|password\s*[=:]|token\s*[=:]|raw memory plaintext)/i;
+
+function publicJson(value) {
+  const copy = { ...value };
+  delete copy.assets;
+  return JSON.stringify(copy);
+}
+
+function assetByPath(result, path) {
+  return result.assets.find((asset) => asset.path === path);
+}
+
+function codePointSorted(paths) {
+  return [...paths].sort();
+}
+
+test('installer asset generator returns deterministic public manifest in dry-run mode', () => {
+  const first = buildInstallerAssets({ outDir: 'tmp/private-output' });
+  const second = buildInstallerAssets({ outDir: 'another-output' });
+
+  assert.equal(first.schema, INSTALLER_ASSET_SCHEMA);
+  assert.equal(first.mode, 'dry-run');
+  assert.equal(first.dry_run, true);
+  assert.equal(first.public_safe, true);
+  assert.equal(first.output_dir, '<requested-output-dir>');
+  assert.equal(first.generated_native_installers, false);
+  const expectedFilePaths = codePointSorted([
+    'homebrew/enigma-memory.rb',
+    'install-linux.sh',
+    'install-windows.ps1',
+    'macos-pkgbuild/README.md',
+    'macos-pkgbuild/manifest.json',
+  ]);
+  assert.deepEqual(first.files, second.files);
+  assert.deepEqual(first.files.map((file) => file.path), expectedFilePaths);
+  assert.deepEqual(first.assets.map((asset) => asset.path), codePointSorted([...expectedFilePaths, 'installer-assets-manifest.json']));
+  assert.deepEqual(first.assets.map((asset) => [asset.path, asset.sha256]), second.assets.map((asset) => [asset.path, asset.sha256]));
+  assert.equal(assetByPath(first, 'installer-assets-manifest.json').content.includes('"sha256"'), true);
+  assert.doesNotMatch(publicJson(first), LOCAL_OR_SECRET_RE);
+});
+
+test('installer scripts are source installers with safe dry-run defaults', () => {
+  const result = buildInstallerAssets();
+  const windows = assetByPath(result, 'install-windows.ps1').content;
+  const linux = assetByPath(result, 'install-linux.sh').content;
+  const formula = assetByPath(result, 'homebrew/enigma-memory.rb').content;
+  const macosManifest = JSON.parse(assetByPath(result, 'macos-pkgbuild/manifest.json').content);
+
+  assert.match(windows, /Dry-run is the default/);
+  assert.match(windows, /param\(/);
+  assert.match(windows, /npm install -g enigma-memory/);
+  assert.doesNotMatch(windows, /Invoke-WebRequest|curl|Start-BitsTransfer|signtool/i);
+
+  assert.match(linux, /Dry-run is the default/);
+  assert.match(linux, /npm install -g enigma-memory/);
+  assert.doesNotMatch(linux, /curl|wget|sudo|\.deb|\.rpm/i);
+
+  assert.match(formula, /Draft only/);
+  assert.match(formula, /REPLACE_WITH_RELEASE_TARBALL_SHA256/);
+  assert.equal(macosManifest.generated_native_pkg, false);
+  assert.equal(macosManifest.source_only, true);
+
+  for (const asset of result.assets) assert.doesNotMatch(asset.content, LOCAL_OR_SECRET_RE, asset.path);
+});
+
+test('installer assets expose native .exe and .pkg blockers when tooling is absent', () => {
+  const blockers = nativeInstallerBlockers({});
+  assert.equal(blockers.windows_exe.generated, false);
+  assert.equal(blockers.windows_exe.available, false);
+  assert.equal(blockers.macos_pkg.generated, false);
+  assert.equal(blockers.macos_pkg.available, false);
+  assert.deepEqual(blockers.windows_exe.blockers.map((item) => item.code), [
+    'WINDOWS_EXE_BUILDER_REQUIRED',
+    'WINDOWS_CODE_SIGNING_REQUIRED',
+  ]);
+  assert.deepEqual(blockers.macos_pkg.blockers.map((item) => item.code), [
+    'MACOS_PKGBUILD_TOOLING_REQUIRED',
+    'MACOS_SIGNING_REQUIRED',
+  ]);
+
+  const result = buildInstallerAssets();
+  assert.equal(result.native_installers.windows_exe.available, false);
+  assert.equal(result.native_installers.macos_pkg.available, false);
+  assert.match(JSON.stringify(result.native_installers), /code-signing|Developer ID Installer|pkgbuild\/productbuild/);
+});
+
+test('installer CLI writes requested source assets only with explicit write mode', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-installer-assets-'));
+  let stdout = '';
+  let stderr = '';
+  const dryRunCode = await runBuildInstallerAssets(['--out-dir', dir], {
+    stdout: { write: (chunk) => { stdout += chunk; } },
+    stderr: { write: (chunk) => { stderr += chunk; } },
+  });
+  assert.equal(dryRunCode, 0, stderr);
+  assert.equal(JSON.parse(stdout).dry_run, true);
+
+  stdout = '';
+  stderr = '';
+  const writeCode = await runBuildInstallerAssets(['--out-dir', dir, '--write'], {
+    stdout: { write: (chunk) => { stdout += chunk; } },
+    stderr: { write: (chunk) => { stderr += chunk; } },
+  });
+  assert.equal(writeCode, 0, stderr);
+  const summary = JSON.parse(stdout);
+  assert.equal(summary.mode, 'write');
+
+  const manifest = JSON.parse(await readFile(join(dir, 'installer-assets-manifest.json'), 'utf8'));
+  assert.equal(manifest.schema, INSTALLER_ASSET_SCHEMA);
+  assert.equal(manifest.output_dir, '<requested-output-dir>');
+  assert.deepEqual(manifest.files, summary.files);
+  assert.equal((await readFile(join(dir, 'install-linux.sh'), 'utf8')).includes('npm install -g enigma-memory'), true);
+
+  assert.throws(() => parseInstallerAssetArgs(['--out-dir', '../leak']), /parent-directory traversal/);
+  assert.throws(() => parseInstallerAssetArgs(['--dry-run', '--write']), /either --dry-run or --write/);
+});
+
+test('desktop tray module is a pure model of status and menu actions', () => {
+  const state = createTrayState({ status: 'ready', connectedClients: ['cursor'], diagnosticsStatus: 'passed' });
+  const menu = createTrayMenu(state);
+
+  assert.equal(state.model_only, true);
+  assert.equal(state.native_tray_started, false);
+  assert.equal(menu.model_only, true);
+  assert.equal(menu.native_tray_started, false);
+  assert.deepEqual(menu.items.map((item) => item.action), [
+    TRAY_ACTION_TYPES.STATUS,
+    TRAY_ACTION_TYPES.QUICKSTART,
+    TRAY_ACTION_TYPES.CONNECT_CLIENTS,
+    TRAY_ACTION_TYPES.OPEN_DOCS,
+    TRAY_ACTION_TYPES.RUN_DIAGNOSTICS,
+    '',
+    TRAY_ACTION_TYPES.QUIT,
+  ]);
+  assert.equal(menu.items.find((item) => item.id === 'status').enabled, false);
+  assert.equal(menu.items.find((item) => item.id === 'connect-clients').label, 'Connect clients (1)');
+
+  assert.deepEqual(trayStatus('offline'), { type: 'tray/status', status: 'offline' });
+  assert.deepEqual(runQuickstart({ bundle: './.enigma/bundle.json' }), { type: 'tray/quickstart', bundle: './.enigma/bundle.json', overwrite: true });
+  assert.deepEqual(connectClients(['cursor', 'unknown']), { type: 'tray/connect-clients', clients: ['cursor'] });
+  assert.deepEqual(openDocs(''), { type: 'tray/open-docs', url: 'https://docs.enigmaprotocol.net/docs/install' });
+  assert.deepEqual(runDiagnostics(), { type: 'tray/run-diagnostics', scope: 'local' });
+  assert.deepEqual(quitTray(), { type: 'tray/quit', quit_requested: true });
+
+  const next = reduceTrayState(state, connectClients(['claude-desktop', 'browser-bridge']));
+  assert.equal(next.connected_client_count, 2);
+  assert.equal(reduceTrayState(next, quitTray()).quit_requested, true);
+  assert.deepEqual(trayActionIntent(runDiagnostics()), { kind: 'run_diagnostics', command: 'enigma', args: ['doctor'], side_effect: 'caller-owned' });
+});

@@ -2,7 +2,7 @@
 
 This checklist is for publishing and operating Enigma as an installable package and production-facing local/hosted system.
 
-Current release posture: local production foundation, installable package scaffolding, and the static public website on `https://enigmamemory.com/` are present. Hosted cloud relay/gateway requires deployment credentials and operator infrastructure before it can be sold or described as live.
+Current release posture: local production foundation, published npm package `enigma-memory`, and the static public website on `https://enigmamemory.com/` are present. Hosted cloud relay/gateway requires deployment credentials and operator infrastructure before it can be sold or described as live.
 
 Use the [overnight build master plan](overnight-build-master-plan.md) as the execution plan for overnight phase order, GPT-5.5/Kimi ownership, acceptance gates, and blocker handling before changing any release posture.
 
@@ -11,6 +11,7 @@ Use the [overnight build master plan](overnight-build-master-plan.md) as the exe
 | Surface | Status | Evidence / blocker |
 | --- | --- | --- |
 | Local CLI, MCP, vault, verifier, importer/capsule, and package surfaces | local/package passed | Local/package evidence covers Enigma-controlled state, offline receipt verification, package metadata, bin/import behavior, and local no-network operation only. |
+| Local memory benchmark harness | local/package benchmark fixture | `node scripts/run-memory-benchmarks.mjs` emits `enigma.memory_benchmark_suite.v1` evidence for deterministic local vault/context/optimizer/export/verify operations, latency, deduplication, abstention, and same-boundary provider profile labels. It is not LoCoMo/LongMemEval execution, live provider comparison, ROI/savings evidence, provider deletion proof, model forgetting proof, hosted readiness, or compliance certification. |
 | Local provenance/SBOM checksum evidence | local checksum evidence | `npm run provenance:local -- --out ./.enigma/release-provenance.json` records package-surface file inventory and SHA-256 values only; it is not signed provenance, registry attestation, source-control evidence, SLSA, compliance, Docker image, or cloud deployment evidence. |
 | Reviewer packet | local hand-review bundle | `npm run review:packet -- --out ./.enigma-review-packet --public-site <path-to-_public_site>` gathers local/package/provenance evidence and optionally copies a generated public-site artifact; it is not npm publication, live Cloudflare deployment, Docker runtime proof, hosted/BYOC readiness, legal approval, signed provenance, or compliance evidence. |
 | Repository collateral and deployment assets | source-only | `docs/`, `Dockerfile`, `docker-compose.yml`, and launch collateral are source-checkout artifacts unless the publish manifest explicitly includes them. |
@@ -20,7 +21,7 @@ Use the [overnight build master plan](overnight-build-master-plan.md) as the exe
 | Cloudflare Pages/token/handoff packets | live static-site evidence plus local handoff evidence | `cloudflare:pages:packet`, `cloudflare:token-policy`, `cloudflare:token-request`, `production:handoff`, and `production:goal-audit` emit public-safe JSON for another operator or AI. Token policy/request now include optional Workers Scripts Read/Edit for the hosted probe Worker. They do not print tokens and do not prove hosted backend readiness. |
 | Live endpoint monitoring and privacy ops runbooks | source-only / operator-run | `production:live-monitor:dry-run` validates the monitor configuration without probes; `docs/live-endpoint-monitoring.md`, `docs/privacy-preserving-analytics.md`, and `docs/cloudflare-token-rotation.md` define secret-free operations. These docs do not mutate Cloudflare, enable analytics, prove hosted readiness, or certify compliance. |
 | Docker relay/gateway demos and deploy manifests | Docker daemon blocked / runtime evidence plus static manifest validation | Docker runtime smoke has been recorded in release evidence where daemon access existed. `npm run production:manifests` validates the Compose/Kubernetes backend references for fail-closed flags, loopback-only Compose ports, exact public health ingress, private admin ingress, non-root/read-only settings, required secret refs, default-deny NetworkPolicy, fail-closed backup placeholder, and hosted-readiness refs. Hosted production still requires real backend credentials, storage, KMS, SIEM, backup, monitoring, network policy, tenant policy, legal/SLA, and operator acceptance. |
-| Hosted cloud and customer BYOC deployments | backend cloud/BYOC blocked | Hosted/BYOC release requires backend deployment credentials, backend DNS/TLS, durable storage, KMS/secrets, monitoring/alerting, backups, incident ownership, SIEM/log routing, network policy, tenant policy approval, usage metering, settlement evidence, threat model, legal/compliance approval, support/SLA approval, and completed operator acceptance. |
+| Hosted cloud and customer BYOC deployments | contract surface ready / backend cloud/BYOC blocked | `packages/hosted-cloud/src/index.js`, `test/enigma-hosted-cloud-contracts.test.mjs`, and `docs/hosted-cloud-product.md` define account, tenant, hosted vault, API key, billing, dashboard, backup-drill, and incident/SLA contracts plus validators. This is contract readiness only: hosted/BYOC release still requires backend deployment credentials, backend DNS/TLS, durable storage, KMS/secrets, monitoring/alerting, backups, incident ownership, SIEM/log routing, network policy, tenant policy approval, usage metering, settlement evidence, threat model, legal/compliance approval, support/SLA approval, external auth provider wiring, external billing provider wiring, and completed operator acceptance. |
 | Token, legal, compliance, and investment-sensitive claims | legal/token blocked | Token utility, compliance, and regulated claims require legal/board approval and must not imply ROI, equity, revenue share, guaranteed savings, hosted-live readiness, provider deletion, model forgetting, or compliance certification. |
 
 
@@ -28,13 +29,16 @@ Before reviewer handoff, confirm [`public-api-reference.md`](public-api-referenc
 
 Before public source release or npm publication, use [`public-github-repo-setup.md`](public-github-repo-setup.md) for repository setup boundaries and [`npm-publishing.md`](npm-publishing.md) for package publication boundaries.
 
-Before enabling live monitoring, analytics, or token rotation, use [`live-endpoint-monitoring.md`](live-endpoint-monitoring.md), [`privacy-preserving-analytics.md`](privacy-preserving-analytics.md), and [`cloudflare-token-rotation.md`](cloudflare-token-rotation.md) for public-safe operator boundaries. Before publishing a separate static docs hub, use [`hosted-docs-hub.md`](hosted-docs-hub.md) for included source docs, legal-review-gated topics, and deployment boundaries that do not change the existing public website/homepage.
+Before enabling live monitoring, analytics, or token rotation, use [`live-endpoint-monitoring.md`](live-endpoint-monitoring.md), [`privacy-preserving-analytics.md`](privacy-preserving-analytics.md), and [`cloudflare-token-rotation.md`](cloudflare-token-rotation.md) for public-safe operator boundaries. Before publishing a separate static docs hub, use [`hosted-docs-hub.md`](hosted-docs-hub.md) for included source docs, legal-review-gated topics, and deployment boundaries that do not change the existing public website/homepage. Before describing hosted cloud product readiness, use [`hosted-cloud-product.md`](hosted-cloud-product.md) to separate contract-ready validators from externally blocked auth, billing, legal, data-processing, support, and security-review work.
 
 ## Package and installability
 
 - [ ] Package name is `enigma-memory`.
-- [ ] Public install command is `npm install -g enigma-memory`; one-off CLI examples use `npx --yes --package enigma-memory <bin> ...`.
-- [ ] Published npm package is visible as `enigma-memory@0.1.0` before public npm-install claims are made.
+- [ ] Public install command is `npm install -g enigma-memory`; one-off quickstart command is `npx --yes --package enigma-memory enigma quickstart --bundle ./.enigma/bundle.json --overwrite`.
+- [ ] Published npm package is visible as `enigma-memory` before public npm-install claims are made.
+- [ ] Registry verification script is present and run as `npm run registry:verify -- --execute` before public npm-install claims; keep its evidence bounded to registry installability only.
+- [ ] Published-package quickstart smoke uses `npm install -g enigma-memory`, `enigma quickstart --bundle ./.enigma/bundle.json --overwrite`, `enigma doctor`, `enigma-relay demo`, and `enigma-gateway demo` in that order.
+- [ ] Quickstart output is described as a local vault bundle, context pack, export proof bundle, and verify report; that evidence is local Enigma-controlled proof only, not provider deletion, model forgetting, hosted/BYOC readiness, legal approval, or compliance certification.
 - [ ] `docs/npm-publishing.md` is followed before any future npm publication attempt, including package preflight, `npm pack --dry-run`, manual approval, `NPM_TOKEN` secret handling, provenance/SBOM boundaries, and rollback/deprecation notes.
 - [ ] `private` is not set for the publish artifact.
 - [ ] Node engine is `>=24`.
@@ -67,6 +71,7 @@ Before enabling live monitoring, analytics, or token rotation, use [`live-endpoi
   - desktop
   - settlement
   - storage
+  - hosted-cloud
 - [ ] `docs/public-api-reference.md` documents every public package/bin/service/schema surface and states which surfaces are stable local/package, demo/source-only, handoff/validator, or hosted/BYOC deployment interfaces.
 - [ ] Local provenance/SBOM evidence is generated with `npm run provenance:local -- --out ./.enigma/release-provenance.json` when a reviewer needs package-surface file inventory and SHA-256 values.
 - [ ] Release notes describe that provenance/SBOM output as local unsigned checksum evidence only, not signed attestation, registry provenance, git/source-control evidence, SLSA, compliance, Docker image digest, or cloud deployment evidence.
@@ -79,7 +84,11 @@ Before enabling live monitoring, analytics, or token rotation, use [`live-endpoi
 - [ ] Production handoff packet is generated with `npm run production:handoff -- --site <path-to-_public_site> --project-name enigma-memory --domain enigmamemory.com --live-url https://enigmamemory.com/ --expect-title Enigma` before handing work to another operator or AI.
 - [ ] Goal completion audit is generated with `npm run production:goal-audit -- --site <path-to-_public_site> --project-name enigma-memory --domain enigmamemory.com --live-url https://enigmamemory.com/ --expect-title Enigma --account-id <account-id>`; `complete:false` is correct until live/provider/operator evidence exists.
 - [ ] Backend readiness smoke is generated with `npm run production:backend-smoke`; it proves loopback HTTP `/livez`/`/readyz` runtime behavior and production fail-closed defaults only, not hosted cloud/BYOC infrastructure.
+- [ ] Local memory benchmark is generated with `node scripts/run-memory-benchmarks.mjs --out ./.enigma/memory-benchmark.json` before making performance, retention, recall, abstention, deduplication, cross-provider, or token-reduction claims; interpret it with `docs/memory-benchmarks.md` and keep claims bounded to the deterministic local fixture unless separate reviewed external benchmark evidence exists.
 - [ ] Hosted backend live evidence is validated with `npm run production:hosted-live -- --evidence <hosted-backend-live.json>` after real public HTTPS relay/gateway `/livez` and `/readyz` probes, all hosted production refs, and operator acceptance `go` exist.
+- [ ] Hosted-cloud contract builders and validators are present for user account, tenant, hosted vault, API key, usage billing record, dashboard summary, backup drill, and incident/SLA refs; validators reject raw memory, prompts, provider responses, credentials, financial outcome claims, provider-side deletion/model-forgetting claims, and missing operator evidence refs.
+- [ ] Hosted-cloud contracts remain contract/validator-only and do not call auth providers, billing providers, hosted deployments, KMS, support systems, status pages, SIEMs, backup targets, or model providers.
+- [ ] Hosted cloud is not sold or described as sellable until external auth provider wiring, billing provider wiring, approved legal docs, approved data processing terms, assigned support ownership, external security review, and operator go-live acceptance all have evidence refs.
 - [ ] Live endpoint monitor configuration is dry-run checked with `npm run production:live-monitor:dry-run`; real `npm run production:live-monitor` probes are run only by an approved operator from an operations environment and produce secret-free JSON without response bodies by default.
 - [ ] Optional Cloudflare Worker edge probe artifact is generated with `npm run production:hosted-probe -- --out-dir <dir>` if an operator wants a `/livez` + fail-closed `/readyz` DNS/TLS smoke before deploying the real relay/gateway. It is edge-probe evidence only.
 - [ ] Operator acceptance packet validation requires accepted static production manifests: `npm run production:acceptance:packet -- --validate` embeds `enigma.production_manifest_result.v1`; `npm run production:acceptance -- --packet <completed-packet.json>` must see `production_manifests.ok:true`, `status:"accepted"`, and zero manifest blockers.
@@ -112,9 +121,10 @@ cd enigma
 node --input-type=module -e "const { execFileSync } = await import('node:child_process'); const pack = JSON.parse(execFileSync('npm', ['pack', '--dry-run', '--json'], { encoding: 'utf8' }))[0]; const files = new Set(pack.files.map((file) => file.path)); for (const required of ['package.json', 'README.md']) { if (!files.has(required)) throw new Error(`missing packed file ${required}`); } if (![...files].some((file) => /^LICENSE(\\.|$)/.test(file))) throw new Error('missing packed LICENSE artifact'); console.log('packed README/package/LICENSE coverage checked')"
 node --input-type=module -e "const { readFile } = await import('node:fs/promises'); const pkg = JSON.parse(await readFile('package.json', 'utf8')); const bins = Object.entries(pkg.bin); for (const [name, file] of bins) { const text = await readFile(file, 'utf8'); if (!text.startsWith('#!/usr/bin/env node')) throw new Error(`${name} missing node shebang`); } if (pkg.license !== 'Apache-2.0') throw new Error('license metadata mismatch'); console.log('bin shebangs and license metadata checked')"
 node --input-type=module -e "await import('./packages/core/src/index.js'); await import('./packages/connectors/src/index.js'); await import('./packages/importers/src/index.js'); await import('./apps/relay/src/server.mjs'); await import('./apps/gateway/src/server.mjs'); const { readFile } = await import('node:fs/promises'); await readFile('./apps/desktop/src/index.html', 'utf8'); console.log('source imports checked')"
-npm install -g .
-enigma --help
-enigma-verify --help
+npm run registry:verify -- --execute
+npm install -g enigma-memory
+enigma quickstart --bundle ./.enigma/bundle.json --overwrite
+enigma doctor
 enigma-relay demo
 enigma-gateway demo
 printf '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"manual\",\"version\":\"0\"}}}\\n' | ENIGMA_BUNDLE=\"$PWD/.enigma/bundle.json\" enigma-mcp
@@ -158,6 +168,7 @@ Use [`reviewer-packet.md`](reviewer-packet.md) for the full packet workflow and 
 - [ ] Local memory lifecycle emits receipts.
 - [ ] Exported bundle verifies offline.
 - [ ] Boundary harness reports a declared classification instead of claiming unobserved provider behavior.
+- [ ] Local memory benchmark reports `enigma.memory_benchmark_suite.v1`, exact-answer recall, abstention correctness, context-token reduction, p50/p95 operation latency, duplicate removal, cross-provider profile rows, citations, and explicit no-ROI/no-provider-deletion/no-model-forgetting boundaries before performance or retention language is released.
 
 Commands:
 
@@ -354,6 +365,13 @@ curl http://127.0.0.1:8797/health
 
 The Docker assets are local relay/gateway demos. Hosted/BYOC container releases still require real infrastructure, runtime secrets, durable storage, TLS, monitoring, backup/restore, and incident response.
 
+## Hosted cloud product contracts
+
+- [ ] `packages/hosted-cloud/src/index.js` exports pure builders and validators for user account, tenant, hosted vault, API key, usage billing record, dashboard summary, backup drill, and incident/SLA reference contracts.
+- [ ] `test/enigma-hosted-cloud-contracts.test.mjs` covers contract creation, external blocker surfacing, provided evidence refs, and rejection of raw memory, prompts, provider responses, credentials, financial outcome claims, provider-side deletion/model-forgetting claims, and missing operator evidence refs.
+- [ ] `docs/hosted-cloud-product.md` states what is production contract-ready and what remains externally blocked: auth provider, billing provider, legal docs, data processing terms, support ownership, and external security review.
+- [ ] Release notes and sales collateral state hosted cloud is contract-ready only until external provider wiring and operator go-live evidence are complete.
+
 ## Hosted and BYOC enterprise acceptance
 
 Hosted mode cannot be marked released until:
@@ -377,7 +395,7 @@ BYOC mode cannot be marked released until:
 - [ ] Data residency, retention, deletion, legal hold, and incident contacts are documented.
 - [ ] Acceptance states that Enigma supplies package/service artifacts and the customer supplies infrastructure and credentials.
 
-Both modes must state that provider-native memory is cache only and that Enigma proofs cover Enigma-controlled state only. Without domain/cloud/customer credentials, acceptance remains limited to local package and Docker demos.
+Both modes must state that provider-native memory is cache only and that Enigma proofs cover Enigma-controlled state only. Without domain/cloud/customer credentials, auth provider wiring, billing provider wiring, legal docs, data processing terms, support ownership, external security review, and operator acceptance, acceptance remains limited to local package, contract validation, and Docker demos.
 
 ## Honesty and claim boundaries
 
@@ -400,7 +418,7 @@ Forbidden claims:
 - Compliance: do not claim SOC 2, HIPAA, GDPR, or other compliance status unless separately audited and approved.
 - Token economics: do not claim token ROI, profit, equity, revenue share, investment return, or price expectations.
 - Hardware: do not claim tamper-proof hardware or raw compute superiority.
-- Benchmarks: do not claim benchmark leadership unless the repository contains the measured test command, result, and review approval.
+- Benchmarks: do not claim benchmark leadership, performance superiority, retention quality, cross-provider superiority, or token-reduction/savings outcomes unless the repository contains the measured test command, result, citations, and review approval; run `node scripts/run-memory-benchmarks.mjs` before making any local fixture performance or retention claim.
 - Hosted/BYOC availability: do not claim hosted cloud or customer BYOC deployment is live without deployment credentials, domain/TLS, durable storage, KMS/secrets, monitoring, backups, incident ownership, and SIEM/log routing.
 
 ## Release notes language
