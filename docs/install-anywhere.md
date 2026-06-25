@@ -19,6 +19,29 @@ Use the published package as the primary path:
 ```sh
 npm install -g enigma-memory
 enigma setup --overwrite
+```
+
+`enigma setup --overwrite` is the safe default. It writes local Enigma artifacts under the workspace `.enigma` path and emits deterministic, public-safe JSON without printing raw memory plaintext. It does not write Claude, Cursor, Kimi, or other third-party app configs.
+
+To let setup auto-detect installed or already-configured clients and show the connector plan without mutating client configs:
+
+```sh
+enigma setup --client auto --overwrite
+```
+
+`--client auto` selects clients found by connector detection and falls back to the default setup client list when none are present. The setup output lists which clients were selected, which were skipped, and why.
+
+To explicitly write connector entries for installed/config-present clients only:
+
+```sh
+enigma setup --connect-installed --overwrite
+```
+
+`--connect-installed` implies auto client selection and is the setup-time write flag for client configs. It skips missing client configs instead of creating every default client config. Only explicit write flags mutate client configs. Existing `enigma connect <client>` behavior and existing `enigma setup --write-connectors` behavior for explicit/default clients are unchanged.
+
+After setup, use the same local vault from the CLI or connected clients:
+
+```sh
 enigma remember --text-file ./memory.txt
 enigma search --query "..."
 enigma context --query "..." --optimize
@@ -26,9 +49,7 @@ enigma verify --export ./.enigma/export.json
 enigma connect claude-desktop --dry-run
 ```
 
-`enigma setup --overwrite` writes local Enigma artifacts under the workspace `.enigma` path and emits deterministic, public-safe JSON. It does not write Claude, Cursor, Kimi, or other third-party app configs. Client config writes happen only when you explicitly run `enigma connect <client>` without `--dry-run`.
-
-The local Enigma vault is the canonical memory passport. Use provider-native memory as cache only. Enigma proof covers Enigma-controlled vault state, receipts, checkpoints, committed roots, and exported bundle shape; it does not prove provider deletion, model forgetting, provider-native memory removal, hosted/BYOC availability, legal approval, ROI/savings, or compliance certification.
+The local Enigma vault is the canonical memory passport. Provider-native memory is non-canonical cache only. Enigma proof covers Enigma-controlled vault state, receipts, checkpoints, committed roots, and exported bundle shape; it does not prove provider deletion, model forgetting, provider-native memory removal, hosted/BYOC availability, legal approval, ROI/savings, or compliance certification.
 
 One-off execution without a global install:
 
@@ -178,10 +199,11 @@ Npm-first connector flow:
 ```sh
 npm install -g enigma-memory
 enigma setup --overwrite
-enigma connect claude-desktop --dry-run
+enigma setup --client auto --overwrite
+enigma setup --connect-installed --overwrite
 ```
 
-Replace `claude-desktop` with `cursor`, `kimi-code`, `vscode-cline`, `roo`, `opencode`, or `generic-mcp`. `--dry-run` is read-only: it reports the target config path, the planned Enigma MCP entry, and whether a write would be needed. Remove `--dry-run` only when you explicitly want Enigma to merge the `mcpServers.enigma` entry while preserving unrelated settings.
+Run the first setup command for the safe local workspace. Use `--client auto` when you want setup to report installed/config-present connector targets without writing client configs. Use `--connect-installed` only when you explicitly want setup to merge Enigma into installed/config-present client configs; missing configs are skipped with reasons instead of created. Existing `enigma setup --write-connectors` behavior for explicit/default clients is unchanged. For a single client, replace `claude-desktop` with `cursor`, `kimi-code`, `vscode-cline`, `roo`, `opencode`, or `generic-mcp` and run `enigma connect <client> --dry-run`. `--dry-run` is read-only: it reports the target config path, the planned Enigma MCP entry, and whether a write would be needed. Remove `--dry-run` only when you explicitly want Enigma to merge the `mcpServers.enigma` entry while preserving unrelated settings.
 
 Copy-paste MCP entry for Claude Desktop, Cursor, Kimi Code, or a generic MCP client:
 

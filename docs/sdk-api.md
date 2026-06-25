@@ -1,6 +1,6 @@
 # SDK and API guide
 
-This guide covers the public package imports for `enigma-memory@0.1.6`. The SDK runs locally by default: vaults, passports, context packs, receipts, relay/gateway demo state, storage contracts, metering artifacts, and settlement artifacts are package-level developer surfaces. They are not evidence of hosted Enigma cloud, provider-side deletion, provider model forgetting, token ROI, invoice savings, compliance certification, or benchmark leadership.
+This guide covers the public package imports for `enigma-memory@0.1.8`. The SDK runs locally by default: vaults, passports, context packs, receipts, relay/gateway demo state, storage contracts, metering artifacts, and settlement artifacts are package-level developer surfaces. They are not evidence of hosted Enigma cloud, provider-side deletion, provider model forgetting, token ROI, invoice savings, compliance certification, or benchmark leadership.
 
 ## Install and import style
 

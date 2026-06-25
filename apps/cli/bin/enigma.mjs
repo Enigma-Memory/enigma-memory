@@ -759,17 +759,80 @@ async function initCommand(flags, io) {
 
 function setupClientIds(flags) {
   const raw = getFlag(flags, ['client']);
-  if (raw === undefined) return [...DEFAULT_SETUP_CLIENTS];
+  if (raw === undefined) return { mode: 'default', auto: false, clients: [...DEFAULT_SETUP_CLIENTS], explicit_clients: [] };
   const values = Array.isArray(raw) ? raw : [raw];
   const clients = [];
+  let auto = false;
   for (const value of values) {
     if (value === true || value === '') throw new Error('Missing required --client.');
     for (const client of String(value).split(',').map((item) => item.trim()).filter(Boolean)) {
+      if (client === 'auto') {
+        auto = true;
+        continue;
+      }
       getClientProfile(client);
       if (!clients.includes(client)) clients.push(client);
     }
   }
-  return clients.length > 0 ? clients : [...DEFAULT_SETUP_CLIENTS];
+  if (auto) return { mode: 'auto', auto: true, clients, explicit_clients: clients };
+  return { mode: clients.length > 0 ? 'explicit' : 'default', auto: false, clients: clients.length > 0 ? clients : [...DEFAULT_SETUP_CLIENTS], explicit_clients: clients };
+}
+
+function setupDetectedClientReason(client) {
+  if (client.installed === true && client.recommended_action === 'already_configured') return 'already_configured';
+  if (client.installed === true) return 'installed_needs_repair';
+  return 'client_config_present';
+}
+
+function setupSkippedClientReason(client) {
+  if (client.parse_error === true) return 'config_json_invalid';
+  if (client.config_path_exists === false || client.exists === false) return 'client_config_missing';
+  if (client.ok === false) return 'config_unreadable';
+  return 'not_selected';
+}
+
+function publicSetupClientSelectionEntry(client, reason) {
+  return {
+    client_id: client.client_id,
+    display_name: client.display_name,
+    reason,
+    action: client.recommended_action ?? client.action ?? null,
+    installed: client.installed === true,
+    config_path_exists: client.config_path_exists === true || client.exists === true,
+  };
+}
+
+async function setupAutoClientSelection(flags, artifacts, fallbackClients, mode) {
+  const doctor = await doctorConnectors({
+    ...connectorOptions(flags),
+    bundlePath: artifacts.bundlePath,
+    redactPaths: true,
+  });
+  const detected = doctor.clients.filter((client) => (client.config_path_exists === true || client.exists === true) && client.parse_error !== true);
+  const fallbackUsed = detected.length === 0;
+  const selectedClients = fallbackUsed ? [...fallbackClients] : detected.map((client) => client.client_id);
+  const selectedSet = new Set(selectedClients);
+  const detectedSet = new Set(detected.map((client) => client.client_id));
+  const selected = fallbackUsed
+    ? selectedClients.map((clientId) => {
+      const client = doctor.clients.find((entry) => entry.client_id === clientId) ?? { client_id: clientId, display_name: getClientProfile(clientId).display_name };
+      return publicSetupClientSelectionEntry(client, 'default_fallback_no_client_configs_detected');
+    })
+    : detected.map((client) => publicSetupClientSelectionEntry(client, setupDetectedClientReason(client)));
+  const skipped = doctor.clients
+    .filter((client) => !selectedSet.has(client.client_id))
+    .map((client) => publicSetupClientSelectionEntry(client, fallbackUsed && !detectedSet.has(client.client_id) ? 'not_in_default_fallback' : setupSkippedClientReason(client)));
+  const connectableClientIds = new Set(detected.map((client) => client.client_id));
+  return {
+    mode,
+    auto: true,
+    fallback_used: fallbackUsed,
+    clients: selectedClients,
+    selected,
+    skipped,
+    connectable_client_ids: connectableClientIds,
+    detection: doctor,
+  };
 }
 
 function setupMemorySource(flags) {
@@ -915,7 +978,7 @@ function publicConnectPlan(plan, wizard, profile, snippet) {
   };
 }
 
-async function setupConnectorPlans(flags, artifacts, clients, writeConnectors, displays) {
+async function setupConnectorPlans(flags, artifacts, clients, writeConnectors, displays, writeClientIds = null) {
   const publicOptions = {
     ...connectorOptions(flags),
     bundlePath: displays.bundle,
@@ -929,9 +992,10 @@ async function setupConnectorPlans(flags, artifacts, clients, writeConnectors, d
     const profile = getClientProfile(client, publicOptions);
     const snippet = renderMcpConfig(client, publicOptions);
     const wizard = planConnectWizard(client, { platform: profile.platform }).clients[0];
-    const rawPlan = writeConnectors
+    const writeAllowed = writeClientIds === null || writeClientIds.has(client);
+    const rawPlan = writeConnectors && writeAllowed
       ? await connectClient(client, { ...writeOptions, dryRun: false })
-      : { ok: true, changed: true, dryRun: true };
+      : { ok: true, changed: !(writeConnectors && !writeAllowed), dryRun: true };
     const plan = publicConnectPlan(rawPlan, wizard, profile, snippet);
     connectors.push({
       client_id: client,
@@ -940,19 +1004,33 @@ async function setupConnectorPlans(flags, artifacts, clients, writeConnectors, d
       mcp_config_snippet: snippet,
       connect_command: `enigma connect ${client} --bundle ${commandPath(displays.bundle)}`,
       connect_plan: plan,
+      write_selected: writeAllowed,
+      write_skipped_reason: writeConnectors && !writeAllowed ? 'client_config_missing' : null,
       wizard,
     });
   }
   return connectors;
 }
 
+function publicSetupClientSelection(selection) {
+  return {
+    mode: selection.mode,
+    auto: selection.auto === true,
+    fallback_used: selection.fallback_used === true,
+    selected: selection.selected,
+    skipped: selection.skipped,
+  };
+}
+
 export async function setupCommand(flags, io) {
   const bundleInput = pathFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE);
   const outDirInput = pathFlag(flags, ['out-dir', 'outDir'], dirname(bundleInput));
-  const clients = setupClientIds(flags);
+  const requestedSelection = setupClientIds(flags);
   const overwrite = booleanFlag(flags, ['overwrite'], false);
   const dryRun = booleanFlag(flags, ['dry-run', 'dryRun'], false);
-  const writeConnectors = booleanFlag(flags, ['write-connectors', 'writeConnectors'], false) && !dryRun;
+  const writeConnectorsFlag = booleanFlag(flags, ['write-connectors', 'writeConnectors'], false);
+  const connectInstalled = booleanFlag(flags, ['connect-installed', 'connectInstalled'], false);
+  const connectorWritesRequested = (writeConnectorsFlag || connectInstalled) && !dryRun;
   const displays = setupPublicDisplays(bundleInput, outDirInput);
   const rawDisplays = setupRawDisplays(bundleInput, outDirInput);
   let artifacts;
@@ -961,9 +1039,24 @@ export async function setupCommand(flags, io) {
   } catch (error) {
     throw publicSetupError(error, rawDisplays, displays);
   }
-  const connectors = await setupConnectorPlans(flags, artifacts, clients, writeConnectors, displays);
+  const selection = connectInstalled || requestedSelection.auto
+    ? await setupAutoClientSelection(flags, artifacts, DEFAULT_SETUP_CLIENTS, connectInstalled ? 'connect_installed' : 'auto')
+    : {
+      ...requestedSelection,
+      fallback_used: false,
+      selected: requestedSelection.clients.map((clientId) => {
+        const profile = getClientProfile(clientId);
+        return publicSetupClientSelectionEntry({ client_id: clientId, display_name: profile.display_name }, requestedSelection.mode === 'default' ? 'default_setup_client' : 'explicit_client');
+      }),
+      skipped: [],
+      connectable_client_ids: null,
+    };
+  const clients = selection.clients;
+  const writeClientIds = connectInstalled ? selection.connectable_client_ids : null;
+  const connectors = await setupConnectorPlans(flags, artifacts, clients, connectorWritesRequested, displays, writeClientIds);
   const doctor = await setupDoctorChecks(flags, artifacts, clients, displays);
   const ok = artifacts.verifyReport.ok === true;
+  const anyConnectorWritePerformed = connectors.some((connector) => connector.connect_plan.writes_performed === true);
 
   print({
     ok,
@@ -971,7 +1064,10 @@ export async function setupCommand(flags, io) {
     command: 'enigma setup',
     dry_run: dryRun,
     artifacts_written: !dryRun,
-    client_configs_written: writeConnectors,
+    client_configs_written: writeConnectorsFlag && !dryRun ? true : anyConnectorWritePerformed,
+    client_config_write_requested: connectorWritesRequested,
+    connector_write_mode: connectInstalled ? 'installed_only' : (writeConnectorsFlag ? 'selected_clients' : 'plan_only'),
+    connect_installed: connectInstalled,
     bundle: displays.bundle,
     context_pack: displays.context_pack,
     export: displays.export,
@@ -985,10 +1081,19 @@ export async function setupCommand(flags, io) {
     provider_credentials_required: false,
     provider_native_memory_canonical: false,
     selected_clients: clients,
+    skipped_clients: selection.skipped,
+    client_selection: publicSetupClientSelection(selection),
+    connector_write_skips: connectors
+      .filter((connector) => connector.write_skipped_reason)
+      .map((connector) => ({
+        client_id: connector.client_id,
+        display_name: connector.display_name,
+        reason: connector.write_skipped_reason,
+      })),
     connectors,
     mcp_config_snippets: Object.fromEntries(connectors.map((connector) => [connector.client_id, connector.mcp_config_snippet])),
     connect_plans: Object.fromEntries(connectors.map((connector) => [connector.client_id, connector.connect_plan])),
-    next_commands: setupNextCommands(displays.bundle, displays.export, clients, writeConnectors),
+    next_commands: setupNextCommands(displays.bundle, displays.export, clients, connectorWritesRequested && (!connectInstalled || anyConnectorWritePerformed)),
     checks: doctor.checks,
     claim_boundaries: { ...SETUP_CLAIM_BOUNDARIES },
   }, io);
@@ -1902,7 +2007,8 @@ function usage() {
     setup_options: {
       '--bundle <path>': 'Bundle JSON to create. Defaults to .enigma/bundle.json.',
       '--out-dir <path>': 'Directory for context-pack.json, export.json, and verify-report.json. Defaults to the bundle directory.',
-      '--client <id>': `Client to plan; repeat or comma-separate. Defaults to ${DEFAULT_SETUP_CLIENTS.join(', ')}.`,
+      '--client <id|auto>': `Client to plan; repeat or comma-separate. Use auto to plan installed/config-present clients, falling back to ${DEFAULT_SETUP_CLIENTS.join(', ')}.`,
+      '--connect-installed': 'Auto-select installed/config-present clients and write only those existing client configs; missing client configs are reported and skipped.',
       '--memory-file <path>': 'Read local memory text from a file without echoing plaintext. Alias: --text-file.',
       '--memory-text <text>': 'Inline demo-only memory text. Avoid for private content because argv can be logged.',
       '--overwrite': 'Replace existing local setup artifacts.',
