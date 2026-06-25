@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto';
 import { createServer as createHttpServer } from 'node:http';
-import { realpathSync } from 'node:fs';
-import { access, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { constants as fsConstants, realpathSync } from 'node:fs';
+import { access, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createVault, remember, recall, updateMemory, deleteMemory, exportBundle } from '../../../packages/vault/src/index.js';
@@ -574,6 +574,86 @@ function minimumNodeMajor(range) {
   return match ? Number(match[1]) : 0;
 }
 
+function npmUserAgentCheck(userAgent = process.env.npm_config_user_agent) {
+  const raw = typeof userAgent === 'string' ? userAgent.trim() : '';
+  const npmToken = raw.split(/\s+/).find((token) => token.startsWith('npm/'));
+  const version = npmToken ? npmToken.slice(4) : null;
+  return {
+    ok: true,
+    detected: version !== null,
+    name: version === null ? null : 'npm',
+    version,
+    source: version === null ? null : 'npm_config_user_agent',
+  };
+}
+
+async function statIfExists(path) {
+  try {
+    return await stat(path);
+  } catch (error) {
+    if (error?.code === 'ENOENT' || error?.code === 'ENOTDIR') return null;
+    throw error;
+  }
+}
+
+async function nearestExistingAncestor(path) {
+  let current = resolve(path);
+  for (;;) {
+    const stats = await statIfExists(current);
+    if (stats !== null) return { path: current, stats };
+    const parent = dirname(current);
+    if (parent === current) return null;
+    current = parent;
+  }
+}
+
+function publicParentDisplay(path, label) {
+  const value = String(path);
+  if (/^<[^>]+>$/.test(value)) return `<${label}>`;
+  const parent = dirname(value);
+  return parent === '' ? '.' : publicPathDisplay(parent, label);
+}
+
+async function writableVaultPathCheck(bundleInput, displayInput = bundleInput) {
+  const bundlePath = resolve(String(bundleInput));
+  const parentPath = dirname(bundlePath);
+  const targetStats = await statIfExists(bundlePath);
+  const nearest = await nearestExistingAncestor(parentPath);
+  let ok = false;
+  let reason = null;
+  let parentExists = false;
+  let nearestExistingParent = null;
+  if (targetStats?.isDirectory()) {
+    reason = 'target_is_directory';
+  } else if (nearest === null) {
+    reason = 'no_existing_parent';
+  } else if (!nearest.stats.isDirectory()) {
+    reason = 'nearest_parent_not_directory';
+    nearestExistingParent = '<existing-parent-path>';
+  } else {
+    parentExists = nearest.path === parentPath;
+    nearestExistingParent = parentExists ? publicParentDisplay(displayInput, 'bundle-dir') : '<existing-parent-dir>';
+    try {
+      await access(nearest.path, fsConstants.W_OK);
+      ok = true;
+    } catch {
+      reason = 'parent_not_writable';
+    }
+  }
+  return {
+    ok,
+    path: publicPathDisplay(displayInput, 'bundle-path'),
+    parent: publicParentDisplay(displayInput, 'bundle-dir'),
+    parent_exists: parentExists,
+    nearest_existing_parent: nearestExistingParent,
+    target_exists: targetStats !== null,
+    target_is_directory: targetStats?.isDirectory() === true,
+    writable: ok,
+    reason,
+    hint: ok ? null : 'Choose a writable --bundle path or create a writable parent directory.',
+  };
+}
+
 async function schemaFiles() {
   return (await readdir(SPECS_URL)).filter((name) => name.endsWith('.schema.json')).sort();
 }
@@ -908,8 +988,17 @@ function setupNextCommands(bundleInput, exportDisplay, clients, writeConnectors)
     `enigma context --bundle ${commandPath(bundleInput)} --query "project context"`,
     `enigma verify --export ${commandPath(exportDisplay)}`,
   ];
-  if (!writeConnectors) commands.push(`enigma connect ${primaryClient} --bundle ${commandPath(bundleInput)}`);
+  if (!writeConnectors) commands.push(`enigma connect ${primaryClient} --bundle ${commandPath(bundleInput)} --dry-run`);
   return commands;
+}
+
+function doctorNextCommands(bundleDisplay, client) {
+  const clientId = client ?? DEFAULT_SETUP_CLIENTS[0];
+  return [
+    `enigma setup --bundle ${commandPath(bundleDisplay)}`,
+    `enigma doctor --bundle ${commandPath(bundleDisplay)} --client ${clientId}`,
+    `enigma connect ${clientId} --bundle ${commandPath(bundleDisplay)}`,
+  ];
 }
 
 async function setupDoctorChecks(flags, artifacts, clients, displays) {
@@ -938,12 +1027,15 @@ async function setupDoctorChecks(flags, artifacts, clients, displays) {
     const doctor = await doctorConnectors({ ...connectorBaseOptions, clientId: client });
     connectorClients.push(...doctor.clients);
   }
+  const vaultPath = await writableVaultPathCheck(artifacts.bundlePath, displays.bundle);
   const checks = {
     node: {
       ok: requiredNodeMajor === 0 || currentNodeMajor >= requiredNodeMajor,
       current: process.versions.node,
       required: packageJson.engines?.node ?? null,
     },
+    npm: npmUserAgentCheck(),
+    vault_path: vaultPath,
     package_bins: {
       ok: binEntries.every((entry) => entry.declared && entry.exists),
       required: REQUIRED_PACKAGE_BINS,
@@ -1531,7 +1623,7 @@ function testDriveNextCommands(bundleDisplay, crossModelReportDisplay) {
     `enigma status --bundle ${quotedBundle}`,
     `enigma search --bundle ${quotedBundle} --query "local proof bundle"`,
     `enigma demo cross-model --bundle ${quotedBundle} --out ${quotedReport}`,
-    'node scripts/run-memory-benchmarks.mjs',
+    'enigma setup --overwrite',
   ];
 }
 
@@ -1736,7 +1828,7 @@ export async function testDriveCommand(flags, io) {
     out_dir: outDirInput,
     bundle: bundleInput,
     install_command: `npm install -g ${packageJson.name ?? 'enigma-memory'}`,
-    release_target: '0.1.12',
+    release_target: '0.1.13',
     artifacts_written: !dryRun,
     client_configs_written: false,
     client_config_write_required: false,
@@ -1842,10 +1934,11 @@ export async function doctorCommand(flags, io) {
     };
   }));
   const schemas = await schemaFiles();
+  const bundleInput = pathFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE);
   const selectedClient = getFlag(flags, ['client']);
   const doctorOptions = selectedClient && selectedClient !== true
-    ? { ...connectorOptions(flags), clientId: String(selectedClient) }
-    : { ...connectorOptions(flags), clientId: undefined };
+    ? { ...connectorOptions(flags), clientId: String(selectedClient), redactPaths: true }
+    : { ...connectorOptions(flags), clientId: undefined, redactPaths: true };
   const connectorDoctor = await doctorConnectors(doctorOptions);
   const profile = getClientProfile(String(selectedClient && selectedClient !== true ? selectedClient : 'generic-mcp'), connectorOptions(flags));
   const checks = {
@@ -1854,6 +1947,7 @@ export async function doctorCommand(flags, io) {
       current: process.versions.node,
       required: packageJson.engines?.node ?? null,
     },
+    npm: npmUserAgentCheck(),
     package_bins: {
       ok: binEntries.every((entry) => entry.declared && entry.exists),
       required: REQUIRED_PACKAGE_BINS,
@@ -1864,8 +1958,9 @@ export async function doctorCommand(flags, io) {
     bundle_default_path: {
       ok: DEFAULT_BUNDLE === '.enigma/bundle.json',
       path: DEFAULT_BUNDLE,
-      resolved: resolve(String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE))),
+      resolved: publicPathDisplay(resolve(bundleInput), 'bundle-path'),
     },
+    vault_path: await writableVaultPathCheck(resolve(bundleInput), publicPathDisplay(bundleInput, 'bundle-path')),
     schemas: {
       ok: schemas.length > 0,
       count: schemas.length,
@@ -1883,11 +1978,14 @@ export async function doctorCommand(flags, io) {
     ok,
     node: checks.node,
     package_bins: checks.package_bins,
+    npm: checks.npm,
+    vault_path: checks.vault_path,
     bundle_default_path: checks.bundle_default_path,
     schema_count: checks.schemas.count,
     schemas: checks.schemas,
     mcp_command_name: checks.mcp_command_name.command,
     connectors: checks.connectors,
+    next_commands: doctorNextCommands(checks.vault_path.path, String(selectedClient && selectedClient !== true ? selectedClient : 'generic-mcp')),
     checks,
   }, io);
   return ok ? 0 : 1;

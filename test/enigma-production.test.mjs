@@ -50,10 +50,12 @@ const PRODUCTION_REVIEW_DOCS = Object.freeze([
   'docs/public-api-reference.md',
   'docs/operator-acceptance-packet.md',
 ]);
-const SOURCE_ONLY_README_REFERENCES = Object.freeze([
-  'apps/browser-extension/README.md',
+const INSTALL_ONBOARDING_PACKAGE_DOCS = Object.freeze([
   'docs/install-anywhere.md',
   'docs/client-connectors.md',
+]);
+const SOURCE_ONLY_README_REFERENCES = Object.freeze([
+  'apps/browser-extension/README.md',
   'docs/production-release-checklist.md',
   ...PRODUCTION_REVIEW_DOCS,
 ]);
@@ -333,7 +335,7 @@ function reviewPacketCommandRunner() {
       return { stdout: `${JSON.stringify({ schema: 'enigma.release_audit.v1', ok: true, required_failed: [], gates: [{ name: 'review-packet-embedded-boundary', ok: true, status: 0 }] })}\n`, stderr: '' };
     }
     if (args.includes('pack') || joinedArgs.includes('npm pack --dry-run --json --ignore-scripts')) {
-      return { stdout: `${JSON.stringify([{ filename: 'enigma-memory-0.1.12.tgz', files: [{ path: 'README.md' }] }])}\n`, stderr: '' };
+      return { stdout: `${JSON.stringify([{ filename: 'enigma-memory-0.1.13.tgz', files: [{ path: 'README.md' }] }])}\n`, stderr: '' };
     }
     throw new Error(`Unexpected review packet command: ${joinedArgs}`);
   };
@@ -1958,6 +1960,10 @@ test('package README references are included or intentionally source-only', asyn
   const readme = await readFile(new URL('../README.md', import.meta.url), 'utf8');
 
   assert.equal(packageFilesCover(pkg, 'README.md'), false, 'root README is npm auto-included without a files entry');
+  for (const rel of INSTALL_ONBOARDING_PACKAGE_DOCS) {
+    assert.equal(readme.includes(rel), true, `${rel} must remain an explicit README reference`);
+    assert.equal(packageFilesCover(pkg, rel), true, `${rel} must ship with the npm package for install/onboarding readers`);
+  }
   for (const rel of SOURCE_ONLY_README_REFERENCES) {
     assert.equal(readme.includes(rel), true, `${rel} must remain an explicit README reference`);
     assert.equal(packageFilesCover(pkg, rel), false, `${rel} is a source-tree reference, not packaged runtime code`);

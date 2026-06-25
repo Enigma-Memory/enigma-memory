@@ -90,8 +90,12 @@ test('setup default creates local Memory Passport artifacts without connector wr
     assert.ok(summary.next_commands.some((command) => command.startsWith('enigma search ')));
     assert.ok(summary.next_commands.some((command) => command.startsWith('enigma context ')));
     assert.ok(summary.next_commands.some((command) => command.startsWith('enigma verify ')));
+    assert.ok(summary.next_commands.some((command) => command.startsWith('enigma connect generic-mcp ') && command.endsWith(' --dry-run')));
     assert.equal(summary.connectors.length, 4);
     assert.equal(summary.connectors.every((connector) => connector.connect_plan.dry_run === true), true);
+    assert.equal(summary.checks.npm.ok, true);
+    assert.equal(summary.checks.vault_path.ok, true);
+    assert.equal(summary.checks.vault_path.path, '.enigma/bundle.json');
     assert.equal(JSON.stringify(summary).includes(dir), false);
 
     assert.equal((await readJson(join(dir, '.enigma', 'bundle.json'))).schema, 'enigma.vault_bundle.v1');
@@ -275,4 +279,36 @@ test('setup memory file input does not echo plaintext to stdout', async () => {
   assert.equal(JSON.stringify(summary).includes(dir), false);
   assert.equal(summary.memory_source, 'memory_file');
   assert.equal(JSON.stringify(summary).includes(privateMemory), false);
+});
+
+test('doctor reports first-run diagnostics without echoing local paths', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-doctor-diagnostics-'));
+  const bundlePath = join(dir, 'bundle.json');
+  const configPath = join(dir, 'missing-client-config.json');
+  const previousUserAgent = process.env.npm_config_user_agent;
+  process.env.npm_config_user_agent = 'npm/10.9.0 node/v24.0.0 win32 x64 workspaces/false';
+  try {
+    const io = makeIo();
+    assert.equal(await main(['doctor', '--bundle', bundlePath, '--client', 'generic-mcp', '--config', configPath], io.io), 0, io.stderr());
+    const stdout = io.stdout();
+    const summary = io.json();
+
+    assert.equal(stdout.includes(dir), false);
+    assert.equal(summary.npm.detected, true);
+    assert.equal(summary.npm.version, '10.9.0');
+    assert.equal(summary.vault_path.ok, true);
+    assert.equal(summary.vault_path.path, '<bundle-path>');
+    assert.equal(summary.vault_path.parent, '<bundle-dir>');
+    assert.equal(summary.vault_path.writable, true);
+    assert.equal(summary.bundle_default_path.resolved, '<bundle-path>');
+    assert.deepEqual(summary.connectors.clients.map((client) => client.config_path), ['[redacted:config_path]']);
+    assert.ok(summary.next_commands.some((command) => command.startsWith('enigma setup ')));
+    assert.ok(summary.next_commands.some((command) => command.startsWith('enigma connect generic-mcp ')));
+  } finally {
+    if (previousUserAgent === undefined) {
+      delete process.env.npm_config_user_agent;
+    } else {
+      process.env.npm_config_user_agent = previousUserAgent;
+    }
+  }
 });

@@ -24,6 +24,7 @@ export const DEFAULT_REGISTRY_VERSION = PACKAGE_JSON.version;
 export const REGISTRY_INSTALL_CHECKS = Object.freeze([
   Object.freeze({ step: 'check_enigma_help', bin: 'enigma', args: Object.freeze(['--help']) }),
   Object.freeze({ step: 'check_enigma_doctor', bin: 'enigma', args: Object.freeze(['doctor']) }),
+  Object.freeze({ step: 'check_enigma_test_drive_dry_run', bin: 'enigma', args: Object.freeze(['test-drive', '--dry-run']) }),
   Object.freeze({ step: 'check_enigma_relay_demo', bin: 'enigma-relay', args: Object.freeze(['demo']) }),
   Object.freeze({ step: 'check_enigma_gateway_demo', bin: 'enigma-gateway', args: Object.freeze(['demo']) }),
 ]);
