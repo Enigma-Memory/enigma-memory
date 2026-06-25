@@ -9,14 +9,33 @@ For most developers, start with the installed CLI before reading the SDK interna
 ```sh
 npm install -g enigma-memory
 enigma setup --overwrite
+```
+
+`enigma setup --overwrite` is the safe default. It writes local Enigma artifacts under the workspace `.enigma` path and emits deterministic, public-safe JSON without printing raw memory plaintext. It does not write third-party app configs.
+
+To let setup auto-detect installed or already-configured clients and report the connector plan without mutating client configs:
+
+```sh
+enigma setup --client auto --overwrite
+```
+
+To explicitly write connector entries for installed/config-present clients only:
+
+```sh
+enigma setup --connect-installed --overwrite
+```
+
+`--client auto` selects clients found by connector detection and falls back to the default setup client list when none are present. The setup output lists selected clients, skipped clients, and skip reasons. `--connect-installed` implies auto selection, writes only for installed/config-present clients, and skips missing configs instead of creating every default client config. Only explicit write flags mutate client configs; `enigma connect <client>` without `--dry-run` remains the single-client write path, and existing `enigma setup --write-connectors` behavior for explicit/default clients is unchanged. Treat provider-native memory as non-canonical cache only; the local Enigma vault is canonical.
+
+After setup, use the same local vault from the CLI or connected clients:
+
+```sh
 enigma remember --text-file ./memory.txt
 enigma search --query "..."
 enigma context --query "..." --optimize
 enigma verify --export ./.enigma/export.json
 enigma connect claude-desktop --dry-run
 ```
-
-`enigma setup --overwrite` writes local Enigma artifacts under the workspace `.enigma` path and emits deterministic, public-safe JSON. It does not write third-party app configs unless you explicitly run `enigma connect <client>` without `--dry-run`. Treat provider-native memory as cache only; the local Enigma vault is canonical.
 
 ## Copyable starting points
 
@@ -41,7 +60,7 @@ The example app prints ids, counts, roots, and verification status only. It does
 
 ## CLI and CI loop
 
-The CI example installs Node 24, installs the published `enigma-memory@0.1.6` package, runs:
+The CI example installs Node 24, installs the published `enigma-memory@0.1.8` package, runs:
 
 ```sh
 npx --yes --package enigma-memory enigma setup --overwrite
@@ -65,7 +84,7 @@ Use the workflow as a template in a consumer repository. It is intentionally lim
 
 ## MCP client loop
 
-The same installed package can be used by Claude Desktop, Cursor, Kimi Code, or any generic MCP client. Copy one snippet, replace the bundle path with the local path from your setup output, and restart the client.
+The same installed package can be used by Claude Desktop, Cursor, Kimi Code, or any generic MCP client. The smooth setup path is `enigma setup --client auto --overwrite` to plan detected clients, then `enigma setup --connect-installed --overwrite` only when you explicitly want setup to write installed/config-present client configs. Manual snippets remain useful when a client needs a copied entry; replace the bundle path with the local path from your setup output, and restart the client.
 
 Claude Desktop:
 

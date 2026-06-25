@@ -1,9 +1,49 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { access, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { main } from '../apps/cli/bin/enigma.mjs';
+import { platformDefaultConfigPath } from '../packages/connectors/src/index.js';
+
+const DEFAULT_SETUP_CLIENTS = Object.freeze(['generic-mcp', 'claude-desktop', 'cursor', 'kimi-code']);
+const CONNECTOR_ENV_KEYS = Object.freeze(['HOME', 'USERPROFILE', 'APPDATA']);
+
+function connectorFixtureEnv(dir) {
+  const home = join(dir, 'home');
+  return {
+    HOME: home,
+    USERPROFILE: home,
+    APPDATA: join(dir, 'appdata'),
+  };
+}
+
+async function pathExists(path) {
+  try {
+    await access(path);
+    return true;
+  } catch (error) {
+    if (error?.code === 'ENOENT') return false;
+    throw error;
+  }
+}
+
+async function withConnectorFixtureEnv(dir, callback) {
+  const nextEnv = connectorFixtureEnv(dir);
+  const previousEnv = Object.fromEntries(CONNECTOR_ENV_KEYS.map((key) => [key, process.env[key]]));
+  for (const [key, value] of Object.entries(nextEnv)) process.env[key] = value;
+  try {
+    return await callback(nextEnv);
+  } finally {
+    for (const key of CONNECTOR_ENV_KEYS) {
+      if (previousEnv[key] === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = previousEnv[key];
+      }
+    }
+  }
+}
 
 function makeIo() {
   let stdout = '';
@@ -113,6 +153,113 @@ test('setup selected clients accepts comma-separated and repeated client options
     assert.match(connector.connect_command, new RegExp(`^enigma connect ${connector.client_id} --bundle `));
     assert.equal(JSON.stringify(summary).includes(dir), false);
   }
+});
+
+test('setup --client auto falls back to default setup clients when no client config exists', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-setup-auto-empty-'));
+
+  await withConnectorFixtureEnv(dir, async () => {
+    const defaultConfigPaths = DEFAULT_SETUP_CLIENTS.map((clientId) => platformDefaultConfigPath(clientId));
+    const io = makeIo();
+    assert.equal(await main(['setup', '--bundle', join(dir, 'bundle.json'), '--out-dir', dir, '--client', 'auto', '--overwrite'], io.io), 0, io.stderr());
+    const summary = io.json();
+
+    assert.equal(summary.ok, true);
+    assert.equal(summary.client_configs_written, false);
+    assert.equal(summary.client_selection.auto, true);
+    assert.equal(summary.client_selection.fallback_used, true);
+    assert.deepEqual(summary.selected_clients, DEFAULT_SETUP_CLIENTS);
+    assert.deepEqual(summary.client_selection.selected.map((client) => client.client_id), DEFAULT_SETUP_CLIENTS);
+    assert.equal(summary.client_selection.selected.every((client) => client.reason === 'default_fallback_no_client_configs_detected'), true);
+    assert.deepEqual(summary.connectors.map((connector) => connector.client_id), DEFAULT_SETUP_CLIENTS);
+    assert.equal(summary.connectors.every((connector) => connector.connect_plan.dry_run === true), true);
+    assert.ok(Array.isArray(summary.skipped_clients));
+    for (const skipped of summary.skipped_clients) {
+      assert.equal(typeof skipped.client_id, 'string');
+      assert.equal(typeof skipped.reason, 'string');
+    }
+    for (const configPath of defaultConfigPaths) {
+      assert.equal(await pathExists(configPath), false, `${configPath} must not be created`);
+    }
+    assert.equal(JSON.stringify(summary).includes(dir), false);
+  });
+});
+
+test('setup --connect-installed skips missing default client configs without creating them', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-setup-connect-installed-empty-'));
+
+  await withConnectorFixtureEnv(dir, async () => {
+    const defaultConfigPaths = DEFAULT_SETUP_CLIENTS.map((clientId) => platformDefaultConfigPath(clientId));
+    const io = makeIo();
+    assert.equal(await main(['setup', '--bundle', join(dir, 'bundle.json'), '--out-dir', dir, '--connect-installed', '--overwrite'], io.io), 0, io.stderr());
+    const summary = io.json();
+
+    assert.equal(summary.ok, true);
+    assert.equal(summary.connect_installed, true);
+    assert.equal(summary.connector_write_mode, 'installed_only');
+    assert.equal(summary.client_config_write_requested, true);
+    assert.equal(summary.client_configs_written, false);
+    assert.deepEqual(summary.selected_clients, DEFAULT_SETUP_CLIENTS);
+    assert.deepEqual(summary.connectors.map((connector) => connector.client_id), DEFAULT_SETUP_CLIENTS);
+    for (const connector of summary.connectors) {
+      assert.equal(connector.write_selected, false);
+      assert.equal(connector.write_skipped_reason, 'client_config_missing');
+      assert.equal(connector.connect_plan.dry_run, true);
+      assert.equal(connector.connect_plan.writes_performed, false);
+    }
+    for (const configPath of defaultConfigPaths) {
+      assert.equal(await pathExists(configPath), false, `${configPath} must not be created`);
+    }
+    assert.equal(JSON.stringify(summary).includes(dir), false);
+  });
+});
+
+test('setup --connect-installed writes only the installed selected client config', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-setup-connect-installed-cursor-'));
+
+  await withConnectorFixtureEnv(dir, async () => {
+    const cursorConfigPath = platformDefaultConfigPath('cursor');
+    await mkdir(dirname(cursorConfigPath), { recursive: true });
+    await writeFile(cursorConfigPath, `${JSON.stringify({ mcpServers: { sibling: { command: 'sibling-mcp' } } }, null, 2)}\n`, 'utf8');
+    const missingDefaultConfigPaths = DEFAULT_SETUP_CLIENTS
+      .filter((clientId) => clientId !== 'cursor')
+      .map((clientId) => platformDefaultConfigPath(clientId));
+
+    const bundlePath = join(dir, 'bundle.json');
+    const io = makeIo();
+    assert.equal(await main(['setup', '--bundle', bundlePath, '--out-dir', dir, '--connect-installed', '--overwrite'], io.io), 0, io.stderr());
+    const summary = io.json();
+
+    assert.equal(summary.ok, true);
+    assert.equal(summary.client_configs_written, true);
+    assert.deepEqual(summary.selected_clients, ['cursor']);
+    assert.equal(summary.connect_installed, true);
+    assert.equal(summary.connector_write_mode, 'installed_only');
+    assert.equal(summary.client_config_write_requested, true);
+    assert.equal(summary.client_selection.fallback_used, false);
+    assert.deepEqual(summary.client_selection.selected.map((client) => client.client_id), ['cursor']);
+    assert.equal(summary.connectors[0].write_selected, true);
+    assert.equal(summary.connectors[0].write_skipped_reason, null);
+    assert.deepEqual(summary.connectors.map((connector) => connector.client_id), ['cursor']);
+    assert.equal(summary.connectors[0].connect_plan.dry_run, false);
+    assert.equal(summary.connectors[0].connect_plan.writes_performed, true);
+    assert.deepEqual(summary.connectors[0].connect_plan.planned_writes.map((write) => write.type), ['write']);
+
+    const writtenConfig = JSON.parse(await readFile(cursorConfigPath, 'utf8'));
+    assert.equal(writtenConfig.mcpServers.sibling.command, 'sibling-mcp');
+    assert.equal(writtenConfig.mcpServers.enigma.command, 'enigma-mcp');
+    assert.equal(writtenConfig.mcpServers.enigma.env.ENIGMA_BUNDLE, bundlePath);
+    for (const configPath of missingDefaultConfigPaths) {
+      assert.equal(await pathExists(configPath), false, `${configPath} must not be created`);
+    }
+    const skippedByClient = new Map(summary.skipped_clients.map((client) => [client.client_id, client]));
+    for (const clientId of DEFAULT_SETUP_CLIENTS.filter((id) => id !== 'cursor')) {
+      const skipped = skippedByClient.get(clientId);
+      assert.ok(skipped, `${clientId} should explain why connector write was skipped`);
+      assert.match(skipped.reason, /missing|not found|client_config_missing/i);
+    }
+    assert.equal(JSON.stringify(summary).includes(dir), false);
+  });
 });
 
 test('setup memory file input does not echo plaintext to stdout', async () => {

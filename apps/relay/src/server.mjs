@@ -1296,13 +1296,34 @@ export async function loadRelayStateFromFile(path, options = {}) {
   }
 }
 
+function retryableRelayRenameError(error) {
+  return error?.code === 'EBUSY' || error?.code === 'EPERM' || error?.code === 'EACCES';
+}
+
+async function delayRelayRenameRetry(ms) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function renameRelayStateAtomically(tempPath, filePath) {
+  const delays = [10, 25, 50, 100, 200];
+  for (let attempt = 0; attempt <= delays.length; attempt += 1) {
+    try {
+      await rename(tempPath, filePath);
+      return;
+    } catch (error) {
+      if (attempt === delays.length || !retryableRelayRenameError(error)) throw error;
+      await delayRelayRenameRetry(delays[attempt]);
+    }
+  }
+}
+
 export async function saveRelayStateToFile(state, path) {
   const filePath = assertString(path, 'relay state file path');
   const snapshot = serializeRelayState(state);
   const tempPath = join(dirname(filePath), `.${basename(filePath)}.${randomBytes(6).toString('hex')}.tmp`);
   try {
     await writeFile(tempPath, `${JSON.stringify(snapshot, null, 2)}\n`, 'utf8');
-    await rename(tempPath, filePath);
+    await renameRelayStateAtomically(tempPath, filePath);
   } catch (error) {
     await unlink(tempPath).catch(() => undefined);
     throw error;
