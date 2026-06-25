@@ -22,13 +22,41 @@ jobs:
         run: npm init -y
 
       - name: Install Enigma Memory
-        run: npm install enigma-memory@0.1.1
+        run: npm install enigma-memory@0.1.3
+
+      - name: Expose local benchmark script
+        run: |
+          node --input-type=module <<'JS'
+          import { readFile, writeFile } from 'node:fs/promises';
+
+          const pkg = JSON.parse(await readFile('package.json', 'utf8'));
+          pkg.scripts ??= {};
+          pkg.scripts['benchmark:memory-suite'] = 'node ./node_modules/enigma-memory/scripts/run-memory-benchmarks.mjs';
+          await writeFile('package.json', `${JSON.stringify(pkg, null, 2)}\n`, 'utf8');
+          JS
 
       - name: Run Enigma quickstart
         run: npx enigma quickstart --overwrite
 
       - name: Run Enigma doctor
         run: npx enigma doctor
+
+      - name: Run local memory benchmark
+        run: |
+          npm run benchmark:memory-suite -- --out benchmark-report.json
+          mkdir -p artifacts
+          cp benchmark-report.json artifacts/benchmark-report.json
+          echo "Saved public-safe benchmark report placeholder at artifacts/benchmark-report.json"
+
+      # Optional artifact upload placeholder:
+      # If your repository already permits actions/upload-artifact, uncomment a
+      # reviewed upload step like this. The example keeps the report saved in the
+      # workspace without requiring that action.
+      # - name: Upload benchmark report
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: enigma-memory-benchmark-report
+      #     path: artifacts/benchmark-report.json
 
       - name: Smoke test package imports
         run: |

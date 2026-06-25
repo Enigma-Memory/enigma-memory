@@ -16,7 +16,7 @@ import {
   compileContextPack,
   verifyContextPack,
 } from '../packages/passport/src/index.js';
-import { createMemoryOptimizationPlan } from '../packages/optimizer/src/index.js';
+import { createMemoryOptimizationPlan, estimateTextTokens } from '../packages/optimizer/src/index.js';
 import { verifyBundle } from '../apps/verifier/bin/enigma-verify.mjs';
 
 export const MEMORY_BENCHMARK_SUITE_SCHEMA = 'enigma.memory_benchmark_suite.v1';
@@ -33,6 +33,131 @@ const CONTEXT_BOUNDARY = Object.freeze({
 });
 
 const PROVIDER_PROFILES = Object.freeze(['chatgpt', 'claude', 'kimi', 'cursor', 'local-llm']);
+
+const LOCAL_BASELINES = Object.freeze([
+  {
+    id: 'full_context',
+    label: 'Full active context',
+    boundary: 'All active fixture memories are supplied without optimization or deduplication.',
+  },
+  {
+    id: 'recency_last_n',
+    label: 'Recency last N',
+    boundary: 'The three most recently updated active fixture memories are supplied.',
+  },
+  {
+    id: 'keyword_filter',
+    label: 'Keyword filter',
+    boundary: 'Active fixture memories are supplied when deterministic query terms match content or tags.',
+  },
+  {
+    id: 'enigma_context_pack',
+    label: 'Enigma context pack',
+    boundary: 'The Enigma passport context-pack compiler and optimizer boundary are used locally.',
+  },
+]);
+
+const EXTERNAL_COMPETITOR_ADAPTERS = Object.freeze([
+  {
+    id: 'letta_memgpt',
+    name: 'Letta / MemGPT',
+    status: 'not_run_requires_credentials_or_runtime',
+    required_artifacts: [
+      'Letta API key or self-hosted Letta runtime',
+      'Pinned Letta SDK package and version such as @letta-ai/letta-client or letta-client',
+      'Agent, tools, model, and memory configuration',
+      'Operator-supplied benchmark dataset or fixture mapping',
+    ],
+    official_doc: 'https://docs.letta.com/concepts/memgpt/',
+    can_run_in_this_harness: false,
+    boundary_reason: 'This local harness has no Letta credentials, SDK installation, hosted/self-hosted Letta runtime, fixed agent loop, or approved external dataset, so no Letta score is produced.',
+    scores_included: false,
+  },
+  {
+    id: 'langgraph_memory',
+    name: 'LangGraph memory',
+    status: 'not_run_requires_credentials_or_runtime',
+    required_artifacts: [
+      'Pinned LangGraph runtime and package versions',
+      'Checkpointer configuration for short-term memory',
+      'Namespaced long-term store configuration',
+      'Fixed graph, model, tools, and dataset mapping',
+    ],
+    official_doc: 'https://docs.langchain.com/oss/python/langgraph/memory',
+    can_run_in_this_harness: false,
+    boundary_reason: 'This Node local package harness does not install or execute a LangGraph runtime, checkpointer, namespaced store, graph, model, or dataset adapter, so no LangGraph score is produced.',
+    scores_included: false,
+  },
+  {
+    id: 'zep',
+    name: 'Zep',
+    status: 'not_run_requires_credentials_or_runtime',
+    required_artifacts: [
+      'Zep credentials or local/runtime endpoint',
+      'Pinned Zep client and version',
+      'Temporal Context Graph or Context Lake configuration',
+      'Dataset ingestion and retrieval mapping',
+    ],
+    official_doc: 'https://help.getzep.com/',
+    can_run_in_this_harness: false,
+    boundary_reason: 'This local harness has no Zep credentials, client package, Context Graph or Context Lake runtime, ingestion job, or provider-approved retrieval dataset, so no Zep score or latency claim is produced.',
+    scores_included: false,
+  },
+  {
+    id: 'mem0',
+    name: 'Mem0',
+    status: 'not_run_requires_credentials_or_runtime',
+    required_artifacts: [
+      'Mem0 platform credentials or open-source stack runtime',
+      'Pinned Mem0 SDK/package versions',
+      'Memory extraction, update, retrieval, model, and tool configuration',
+      'Dataset ingestion and scoring mapping',
+    ],
+    official_doc: 'https://docs.mem0.ai/',
+    can_run_in_this_harness: false,
+    boundary_reason: 'This local harness has no Mem0 credentials, SDK/runtime, configured extraction/retrieval loop, model/tool environment, or external dataset adapter, so no Mem0 score is produced.',
+    scores_included: false,
+  },
+  {
+    id: 'openai_native_memory',
+    name: 'OpenAI ChatGPT native memory',
+    status: 'not_run_requires_credentials_or_runtime',
+    required_artifacts: [
+      'Consumer ChatGPT account/runtime with native memory enabled',
+      'Account-safe evaluation protocol and export/review process',
+      'Dataset prompts and operator approval for non-public app interaction',
+      'Evidence capture that excludes personal data and credentials',
+    ],
+    official_doc: 'https://help.openai.com/en/articles/8590148-memory-faq',
+    can_run_in_this_harness: false,
+    boundary_reason: 'ChatGPT native memory is a consumer-app feature rather than a public API surface available to this local package harness, so no OpenAI native-memory score is produced.',
+    scores_included: false,
+  },
+  {
+    id: 'claude_memory_tool',
+    name: 'Claude memory tool',
+    status: 'not_run_requires_credentials_or_runtime',
+    required_artifacts: [
+      'Claude/provider runtime with the memory tool available',
+      'Client-side tool configuration and storage boundary',
+      'Fixed model, tool-use policy, prompts, and dataset mapping',
+      'Evidence capture that excludes personal data and credentials',
+    ],
+    official_doc: 'https://support.anthropic.com/en/articles/11145838-using-claude-memory',
+    can_run_in_this_harness: false,
+    boundary_reason: 'The Claude memory tool is provider/client-side and requires a Claude runtime plus tool environment that this local package benchmark does not control, so no Claude memory-tool score is produced.',
+    scores_included: false,
+  },
+]);
+
+const PUBLIC_CLAIMS_ALLOWED = Object.freeze([
+  'Runs a deterministic local Enigma memory fixture without external provider calls.',
+  'Reports local exact-answer recall and abstention correctness for the fixture questions.',
+  'Compares Enigma context packs with full-context, recency, and keyword local baselines on the same fixture.',
+  'Reports local estimated prompt tokens, duplicate-removal counts where applicable, and p50/p95 local latency.',
+  'Verifies Enigma-controlled bundles and context packs without exposing raw fixture memory, questions, or answers.',
+  'Lists external competitor adapter requirements and withholds third-party scores until credentials, runtimes, and datasets are supplied.',
+]);
 
 const BENCHMARK_CITATIONS = Object.freeze([
   {
@@ -402,6 +527,190 @@ function activeOptimizationPlan(vault, query) {
   });
 }
 
+function activeBenchmarkMemories(vault) {
+  const memories = [];
+  for (const memoryAddr of vault.activeAddresses ?? []) {
+    const record = vault.__getRecord(memoryAddr);
+    if (!record || record.state !== 'active') continue;
+    memories.push({
+      memory_addr: memoryAddr,
+      content: vault.__getPlaintext(memoryAddr),
+      updated_at: record.updated_at ?? record.created_at,
+      created_at: record.created_at,
+      purpose_tags: Array.isArray(record.purpose_tags) ? [...record.purpose_tags] : [],
+    });
+  }
+  return memories;
+}
+
+function estimatePromptTokens(query, memories) {
+  let tokens = estimateTextTokens(query);
+  for (const memory of memories) tokens += estimateTextTokens(memory.content);
+  return tokens;
+}
+
+function localLatencySummary(values) {
+  return {
+    samples: values.length,
+    p50_ms: Number(percentile(values, 0.5).toFixed(6)),
+    p95_ms: Number(percentile(values, 0.95).toFixed(6)),
+  };
+}
+
+function compareUpdatedDesc(left, right) {
+  const leftTime = Date.parse(left.updated_at ?? left.created_at ?? '');
+  const rightTime = Date.parse(right.updated_at ?? right.created_at ?? '');
+  if (leftTime !== rightTime) return rightTime - leftTime;
+  return String(left.memory_addr).localeCompare(String(right.memory_addr));
+}
+
+function queryTerms(query) {
+  const stopwords = new Set([
+    'after',
+    'should',
+    'the',
+    'use',
+    'what',
+    'which',
+    'who',
+  ]);
+  const terms = [];
+  for (const match of String(query).toLowerCase().matchAll(/[a-z0-9_-]{3,}/gu)) {
+    const term = match[0];
+    if (!stopwords.has(term)) terms.push(term);
+  }
+  return terms;
+}
+
+function keywordFilteredMemories(memories, query) {
+  const terms = queryTerms(query);
+  if (terms.length === 0) return [];
+  return memories.filter((memory) => {
+    const haystack = `${memory.content} ${(memory.purpose_tags ?? []).join(' ')}`.toLowerCase();
+    return terms.some((term) => haystack.includes(term));
+  });
+}
+
+function selectLocalBaselineMemories(baselineId, vault, passport, question) {
+  const memories = activeBenchmarkMemories(vault);
+  if (baselineId === 'full_context') {
+    return {
+      memories,
+      estimatedPromptTokens: estimatePromptTokens(question.query, memories),
+      duplicateCandidatesRemoved: 0,
+      duplicateRemovalApplicable: false,
+    };
+  }
+  if (baselineId === 'recency_last_n') {
+    const selected = [...memories].sort(compareUpdatedDesc).slice(0, 3);
+    return {
+      memories: selected,
+      estimatedPromptTokens: estimatePromptTokens(question.query, selected),
+      duplicateCandidatesRemoved: 0,
+      duplicateRemovalApplicable: false,
+    };
+  }
+  if (baselineId === 'keyword_filter') {
+    const selected = keywordFilteredMemories(memories, question.query);
+    return {
+      memories: selected,
+      estimatedPromptTokens: estimatePromptTokens(question.query, selected),
+      duplicateCandidatesRemoved: 0,
+      duplicateRemovalApplicable: false,
+    };
+  }
+  if (baselineId === 'enigma_context_pack') {
+    const fullPlan = activeOptimizationPlan(vault, question.query);
+    const pack = compileContextPack({
+      vault,
+      passport,
+      query: question.query,
+      context_pack_id: `ctx_benchmark_local_baseline_${question.id}`,
+      ...packOptions('local-llm'),
+    });
+    return {
+      memories: pack.memories,
+      estimatedPromptTokens: pack.optimization_plan?.optimized_prompt_tokens ?? estimatePromptTokens(question.query, pack.memories),
+      duplicateCandidatesRemoved: fullPlan.totals.duplicates_removed,
+      duplicateRemovalApplicable: true,
+    };
+  }
+  throw new Error(`unknown local baseline ${baselineId}`);
+}
+
+function compareLocalBaselines(vault, passport) {
+  const rows = [];
+  for (const baseline of LOCAL_BASELINES) {
+    let exactTotal = 0;
+    let exactCorrect = 0;
+    let abstainTotal = 0;
+    let abstainCorrect = 0;
+    let totalEstimatedPromptTokens = 0;
+    let selectedMemoryTotal = 0;
+    let maxDuplicateCandidatesRemoved = 0;
+    let totalDuplicateCandidatesRemoved = 0;
+    let duplicateRemovalApplicable = false;
+    const latencies = [];
+
+    for (const question of PRIVATE_FIXTURE.questions) {
+      const start = performance.now();
+      const selected = selectLocalBaselineMemories(baseline.id, vault, passport, question);
+      const result = chooseAnswer(question, { memories: selected.memories });
+      latencies.push(Math.max(0, performance.now() - start));
+
+      totalEstimatedPromptTokens += selected.estimatedPromptTokens;
+      selectedMemoryTotal += selected.memories.length;
+      maxDuplicateCandidatesRemoved = Math.max(maxDuplicateCandidatesRemoved, selected.duplicateCandidatesRemoved);
+      totalDuplicateCandidatesRemoved += selected.duplicateCandidatesRemoved;
+      duplicateRemovalApplicable = duplicateRemovalApplicable || selected.duplicateRemovalApplicable;
+
+      if (question.category === 'abstention') {
+        abstainTotal += 1;
+        if (result.abstained && result.correct) abstainCorrect += 1;
+      } else {
+        exactTotal += 1;
+        if (!result.abstained && result.correct) exactCorrect += 1;
+      }
+    }
+
+    rows.push({
+      id: baseline.id,
+      baseline: baseline.id,
+      label: baseline.label,
+      boundary: baseline.boundary,
+      local_fixture_only: true,
+      external_provider_called: false,
+      deterministic_fixture: true,
+      question_count: PRIVATE_FIXTURE.questions.length,
+      exact_answer_questions: exactTotal,
+      exact_answer_correct: exactCorrect,
+      exact_answer_recall: exactTotal === 0 ? 0 : Number((exactCorrect / exactTotal).toFixed(6)),
+      recall: exactTotal === 0 ? 0 : Number((exactCorrect / exactTotal).toFixed(6)),
+      abstention_questions: abstainTotal,
+      abstention_correct: abstainCorrect,
+      abstention_correctness: abstainTotal === 0 ? 0 : Number((abstainCorrect / abstainTotal).toFixed(6)),
+      estimated_prompt_tokens: {
+        total: totalEstimatedPromptTokens,
+        mean_per_question: Number((totalEstimatedPromptTokens / PRIVATE_FIXTURE.questions.length).toFixed(6)),
+        estimator: 'estimateTextTokens deterministic local estimator',
+      },
+      selected_memory_count: {
+        total: selectedMemoryTotal,
+        mean_per_question: Number((selectedMemoryTotal / PRIVATE_FIXTURE.questions.length).toFixed(6)),
+      },
+      duplicate_removal: {
+        applicable: duplicateRemovalApplicable,
+        max_duplicate_candidates_removed: maxDuplicateCandidatesRemoved,
+        total_duplicate_candidates_removed: totalDuplicateCandidatesRemoved,
+      },
+      latency: localLatencySummary(latencies),
+      public_question_text_included: false,
+      public_answer_text_included: false,
+    });
+  }
+  return rows;
+}
+
 function summarizeContextReduction(plan) {
   const baseline = plan?.baseline_prompt_tokens ?? 0;
   const optimized = plan?.optimized_prompt_tokens ?? 0;
@@ -433,6 +742,8 @@ function compareProviders(vault, passport, samples) {
       provider_runtime_observed: false,
       external_provider_called: false,
       same_enigma_context_pack_boundary: true,
+      scores_included: false,
+      not_external_competitor_score: true,
       boundary: {
         optimize: CONTEXT_BOUNDARY.optimize,
         max_estimated_tokens: CONTEXT_BOUNDARY.max_estimated_tokens,
@@ -489,6 +800,7 @@ export function runMemoryBenchmarkSuite(options = {}) {
   const passport = createPassport({ vault: importedVault, now: generatedAt });
 
   const scored = scoreQuestions(importedVault, passport, samples);
+  const localBaselineRows = compareLocalBaselines(importedVault, passport);
   const fullOptimizationPlan = activeOptimizationPlan(importedVault, 'Use the benchmark memory boundary for recall and abstention evaluation.');
   const providerRows = compareProviders(importedVault, passport, samples);
   const verificationBundleResults = [];
@@ -522,7 +834,7 @@ export function runMemoryBenchmarkSuite(options = {}) {
       benchmark_leadership_claim: false,
       claim_boundary: [
         'This suite measures deterministic local Enigma fixture operations only.',
-        'Cross-provider rows use profile labels and the same Enigma context-pack boundary; they do not call or compare live provider models.',
+        'Cross-provider profile rows remain same-boundary Enigma labels; external competitor adapter rows are requirements only and contain no third-party scores.',
         'Token reduction is a local estimator result against this fixture, not a provider invoice, ROI, guaranteed savings, or benchmark-leadership claim.',
         'Verification proves Enigma-controlled receipts/bundles/context packs only; it is not provider deletion, provider forgetting, model forgetting, or compliance certification evidence.',
       ],
@@ -536,6 +848,7 @@ export function runMemoryBenchmarkSuite(options = {}) {
       optimizer_plan_token_estimates: true,
       bundle_verification: true,
       context_pack_verification: true,
+      local_baseline_comparison: true,
       latency_clock: 'performance.now',
     },
     metrics: {
@@ -546,6 +859,7 @@ export function runMemoryBenchmarkSuite(options = {}) {
         deduped_candidates: fullOptimizationPlan.totals.deduped_candidates,
         duplicate_candidates_removed: fullOptimizationPlan.totals.duplicates_removed,
       },
+      local_baseline_comparisons: localBaselineRows,
       latency: latencySummary(samples),
       verification: {
         bundle_verify_runs: verificationBundleResults.length,
@@ -553,7 +867,10 @@ export function runMemoryBenchmarkSuite(options = {}) {
         context_pack_verify_valid: contextVerification.valid === true,
       },
     },
+    local_baseline_comparisons: localBaselineRows,
     cross_provider_profiles: providerRows,
+    external_competitor_adapters: EXTERNAL_COMPETITOR_ADAPTERS,
+    public_claims_allowed: PUBLIC_CLAIMS_ALLOWED,
   };
 
   return assertNoRawFixtureLeak(report);

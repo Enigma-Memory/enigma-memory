@@ -1,6 +1,6 @@
 {
   "name": "enigma-memory",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "type": "module",
   "description": "Provider-agnostic AI memory passport and offline-verifiable proof layer.",
   "license": "Apache-2.0",
@@ -112,6 +112,7 @@
     "docs/sdk-api.md",
     "docs/developer-ecosystem.md",
     "docs/memory-benchmarks.md",
+    "docs/benchmark-reproducibility.md",
     "docs/installers-and-desktop.md",
     "docs/browser-extension-install.md",
     "docs/hosted-cloud-product.md",
