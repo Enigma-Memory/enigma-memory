@@ -73,7 +73,7 @@ test('local installer rejects invalid Node versions and unsafe commands', () => 
   assert.throws(() => validateNodeVersion('not-a-version'), /Invalid Node version/);
   assert.throws(() => parseInstallerArgs(['--dry-run', '--execute']), /either --dry-run or --execute/);
   assert.throws(() => validateCommandSpec({ command: 'curl', args: ['https://example.invalid/install.sh'] }), /allowlisted/);
-  assert.throws(() => validateCommandSpec({ command: 'npm', args: ['install', '-g', '@enigma-ai/enigma'] }), /exactly npm install -g \./);
+  assert.throws(() => validateCommandSpec({ command: 'npm', args: ['install', '-g', 'enigma-memory'] }), /exactly npm install -g \./);
   assert.throws(() => validateCommandSpec({ command: 'enigma', args: ['init', '--bundle', 'bad\npath'] }), /control character/);
 });
 

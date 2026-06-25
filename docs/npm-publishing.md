@@ -1,13 +1,13 @@
 # npm publishing runbook
 
-Use this runbook to publish `@enigma-ai/enigma` to npm from the public source repository. It does not publish by itself, create npm accounts, mutate GitHub settings, or prove hosted/cloud readiness.
+Use this runbook to publish the public `enigma-memory` package to npm from the public source repository. It does not publish by itself, create npm accounts, mutate GitHub settings, or prove hosted/cloud readiness.
 
 ## Preconditions
 
 - The public repository setup runbook has been completed for the source repository.
 - `package.json` has the intended `name`, `version`, `license`, `files`, `bin`, `exports`, `engines`, and `publishConfig.access` values.
 - The release owner has approved the package version and release notes.
-- The npm account or organization already has permission to publish `@enigma-ai/enigma`.
+- The authorized npm account already has permission to publish the public `enigma-memory` package.
 - No Cloudflare, website, provider, KMS, SIEM, personal, or hosted deployment credential is needed for npm publication.
 
 ## Package preflight
@@ -41,7 +41,7 @@ The manual publish workflow uses only the `NPM_TOKEN` GitHub secret for registry
 
 Configure GitHub before first use:
 
-1. Create an npm automation token or equivalent token approved by the npm organization owner.
+1. Create an npm automation token or equivalent token approved for the authorized npm account.
 2. Add it as repository or environment secret `NPM_TOKEN`.
 3. Create a GitHub environment named `npm-publish`.
 4. Add required reviewers to the `npm-publish` environment so the workflow pauses for manual approval before the publish job can proceed.
@@ -86,7 +86,7 @@ npm versions are immutable once published. If a bad version is published:
 3. If the package should not be used, deprecate the affected version with a factual message:
 
    ```sh
-   npm deprecate @enigma-ai/enigma@<version> "Deprecated: use <fixed-version>; see release notes."
+   npm deprecate enigma-memory@<version> "Deprecated: use <fixed-version>; see release notes."
    ```
 
 4. Publish a fixed patch version after the full preflight and manual workflow approval path passes.
