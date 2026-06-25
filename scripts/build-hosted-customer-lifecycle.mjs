@@ -25,10 +25,10 @@ import {
   buildUserAccountContract,
   buildCustomerLifecyclePacket,
   validateCustomerLifecyclePacket,
-} from '../packages/hosted-cloud/src/index.js';
+} from 'enigma-memory/hosted-cloud';
 
 export const HOSTED_CUSTOMER_LIFECYCLE_PACKET_SCHEMA = HOSTED_CLOUD_CUSTOMER_LIFECYCLE_PACKET_SCHEMA;
-export const HOSTED_CUSTOMER_LIFECYCLE_RELEASE_TARGET = '0.1.9';
+export const HOSTED_CUSTOMER_LIFECYCLE_RELEASE_TARGET = '0.1.10';
 
 const PROVIDED = 'provided';
 const BLOCKED_MISSING = 'blocked_missing_evidence';
@@ -181,8 +181,11 @@ export function parseEvidenceRef(value) {
 function normalizeEvidenceRefs(records = []) {
   const refs = Object.fromEntries(HOSTED_CUSTOMER_LIFECYCLE_EVIDENCE_KEYS.map((key) => [key, defaultEvidenceRef(key)]));
   for (const rawRecord of records) {
-    const record = typeof rawRecord === 'string' ? parseEvidenceRef(rawRecord) : rawRecord;
-    refs[record.key] = normalizeEvidenceRecord(record.key, record);
+    const parsedRecord = typeof rawRecord === 'string' ? parseEvidenceRef(rawRecord) : rawRecord;
+    const key = EVIDENCE_KEY_ALIASES[parsedRecord.key] ?? parsedRecord.key;
+    if (!HOSTED_CUSTOMER_LIFECYCLE_EVIDENCE_KEYS.includes(key)) throw new Error(`evidence key must be one of: ${HOSTED_CUSTOMER_LIFECYCLE_EVIDENCE_KEYS.join(', ')}`);
+    const record = { ...parsedRecord, key };
+    refs[key] = normalizeEvidenceRecord(key, record);
   }
   return refs;
 }
@@ -193,46 +196,6 @@ function operatorEvidenceRefsFrom(evidenceRefs) {
     if (evidence.status === PROVIDED) return [key, { status: PROVIDED, ref: evidence.ref }];
     return [key, { status: BLOCKED_EXTERNAL, ref: evidence.ref, blocker: evidence.blocker }];
   }));
-}
-
-function phaseFor(definition, evidence, contract) {
-  return {
-    phase: definition.key,
-    label: definition.label,
-    contract_schema: definition.schema,
-    evidence_ref: evidence.ref,
-    status: evidence.status === PROVIDED ? 'evidence_ref_provided' : evidence.status,
-    contract_id: contract?.[definition.idField] ?? null,
-  };
-}
-
-function lifecycleReadiness(evidenceRefs, operatorGoLiveRef) {
-  const missingEvidenceRefs = Object.values(evidenceRefs)
-    .filter((evidence) => evidence.status !== PROVIDED)
-    .map(({ key, status, ref, blocker }) => ({ key, status, ref, blocker }));
-  const allEvidenceProvided = missingEvidenceRefs.length === 0;
-  const operatorGoLiveProvided = typeof operatorGoLiveRef === 'string' && operatorGoLiveRef.length > 0;
-  const hostedCloudSellable = allEvidenceProvided && operatorGoLiveProvided;
-  const status = hostedCloudSellable
-    ? 'operator_approved_evidence_packet'
-    : allEvidenceProvided
-      ? 'blocked_operator_go_live_approval'
-      : 'blocked_missing_evidence';
-  return {
-    status,
-    hosted_cloud_sellable: hostedCloudSellable,
-    evidence_validation_only: true,
-    provider_wiring_performed: false,
-    no_external_provider_calls: true,
-    all_evidence_refs_provided: allEvidenceProvided,
-    operator_go_live_approval_ref: operatorGoLiveRef ?? 'blocked:operator_go_live_approval',
-    operator_go_live_approval_provided: operatorGoLiveProvided,
-    missing_evidence_refs: missingEvidenceRefs,
-    external_blockers: HOSTED_CLOUD_EXTERNAL_BLOCKERS
-      .map((key) => evidenceRefs[key])
-      .filter((evidence) => evidence.status !== PROVIDED)
-      .map(({ key, ref, blocker }) => ({ key, ref, blocker })),
-  };
 }
 
 function refFor(evidenceRefs, key) {
