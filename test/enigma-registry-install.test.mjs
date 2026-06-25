@@ -34,7 +34,7 @@ test('registry verifier defaults to public-safe dry-run command planning', async
   assert.equal(result.dry_run, true);
   assert.equal(result.execute, false);
   assert.equal(result.skip_network, false);
-  assert.deepEqual(result.commands.map((command) => command.status), ['preview', 'preview', 'preview', 'preview', 'preview']);
+  assert.deepEqual(result.commands.map((command) => command.status), ['preview', 'preview', 'preview', 'preview', 'preview', 'preview']);
   assert.deepEqual(result.commands[0], {
     step: 'install_package',
     command: 'npm',
@@ -45,6 +45,7 @@ test('registry verifier defaults to public-safe dry-run command planning', async
   assert.deepEqual(result.commands.slice(1).map((command) => [command.command, command.args]), [
     ['enigma', ['--help']],
     ['enigma', ['doctor']],
+    ['enigma', ['test-drive', '--dry-run']],
     ['enigma-relay', ['demo']],
     ['enigma-gateway', ['demo']],
   ]);
@@ -70,7 +71,7 @@ test('registry verifier skip-network validates the plan without running commands
   assert.equal(result.mode, 'skip-network');
   assert.equal(result.execute, true);
   assert.equal(result.skip_network, true);
-  assert.deepEqual(result.commands.map((command) => command.status), ['validated', 'validated', 'validated', 'validated', 'validated']);
+  assert.deepEqual(result.commands.map((command) => command.status), ['validated', 'validated', 'validated', 'validated', 'validated', 'validated']);
   assert.equal(result.safety.skip_network_runs_no_commands, true);
   assert.doesNotMatch(JSON.stringify(result), /operator|private|node\/bin|tmp/u);
 });
@@ -107,7 +108,7 @@ test('registry verifier execute mode is injectable and never copies command outp
 
   assert.equal(result.ok, true);
   assert.equal(result.mode, 'execute');
-  assert.equal(calls.length, 5);
+  assert.equal(calls.length, 6);
   assert.equal(calls[0].command, 'npm');
   assert.deepEqual(calls[0].args.slice(0, 2), ['install', '--prefix']);
   assert.equal(calls[0].args[3], `enigma-memory@${DEFAULT_REGISTRY_VERSION}`);
@@ -117,14 +118,16 @@ test('registry verifier execute mode is injectable and never copies command outp
     '/operator/private/node/bin/node',
     '/operator/private/node/bin/node',
     '/operator/private/node/bin/node',
+    '/operator/private/node/bin/node',
   ]);
   assert.ok(calls[1].args[0].includes('node_modules'));
   assert.ok(calls[1].args[0].includes('apps'));
   assert.deepEqual(calls[1].args.slice(1), ['--help']);
   assert.deepEqual(calls[2].args.slice(1), ['doctor']);
-  assert.deepEqual(calls[3].args.slice(1), ['demo']);
+  assert.deepEqual(calls[3].args.slice(1), ['test-drive', '--dry-run']);
   assert.deepEqual(calls[4].args.slice(1), ['demo']);
-  assert.deepEqual(result.commands.map((command) => command.status), ['passed', 'passed', 'passed', 'passed', 'passed']);
+  assert.deepEqual(calls[5].args.slice(1), ['demo']);
+  assert.deepEqual(result.commands.map((command) => command.status), ['passed', 'passed', 'passed', 'passed', 'passed', 'passed']);
 
   const serialized = JSON.stringify(result);
   assert.doesNotMatch(serialized, /raw memory|Bearer|token_value|operator|private|node\/bin/u);
@@ -142,7 +145,7 @@ test('registry verifier summary reports skipped checks after a failed command wi
   ], { ok: true, required: '>=24', current_major: 24 });
 
   assert.equal(result.ok, false);
-  assert.deepEqual(result.commands.map((command) => command.status), ['passed', 'failed', 'skipped', 'skipped', 'skipped']);
+  assert.deepEqual(result.commands.map((command) => command.status), ['passed', 'failed', 'skipped', 'skipped', 'skipped', 'skipped']);
   const serialized = JSON.stringify(result);
   assert.doesNotMatch(serialized, /operator|private|ignored body|raw memory/u);
 });
