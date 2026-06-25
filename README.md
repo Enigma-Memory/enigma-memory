@@ -31,6 +31,14 @@ enigma setup --connect-installed --overwrite
 
 `--connect-installed` is the explicit client-config write path. It skips missing client configs instead of creating every default client config.
 
+## Enigma Proof Network
+
+Enigma Proof Network is the public proof layer for AI memory: local tools can package privacy-preserving roots, refs, counts, signatures, scoped capability grants, revocations, and benchmark attestations without exposing raw memory, prompts, transcripts, completions, embeddings, tenant names, private keys, provider responses, or provider credentials.
+
+The `enigma chain anchor|grant|revoke|attest|verify` commands are local planning and verification commands. They emit public-safe JSON with `transaction_submitted:false` and `raw_memory_on_chain:false`; they do not submit Solana transactions, deploy hosted SaaS, create accounts, or call external providers.
+
+Start with the category narrative in [`docs/market-category-narrative.md`](docs/market-category-narrative.md), then read the technical overview in [`docs/proof-network.md`](docs/proof-network.md), use its [Solana role](docs/proof-network.md#solana-role) section for the Solana-ready anchoring boundary, and read [`docs/proof-network-faq.md`](docs/proof-network-faq.md) for claim boundaries.
+
 ## Install once, use everywhere
 
 Prerequisites:

@@ -22,6 +22,7 @@
     "schema": { "const": "enigma.goal_completion_audit.v1" },
     "generated_at": { "type": "string", "format": "date-time" },
     "objective": { "type": "string", "minLength": 1 },
+    "environment": { "type": "string", "minLength": 1 },
     "complete": { "type": "boolean" },
     "release_posture": { "type": "string", "minLength": 1 },
     "go_live_ready": { "type": "boolean" },

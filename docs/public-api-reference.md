@@ -18,6 +18,7 @@ import { verifyReceiptChain } from 'enigma-memory/core';
 import { createMemoryOptimizationPlan } from 'enigma-memory/optimizer';
 import { createUsageEvent, aggregateUsageEvents } from 'enigma-memory/metering';
 import { createPermissionlessMemoryJob, createConsumerGpuCapacityProfile, createServiceSettlementReceipt } from 'enigma-memory/settlement';
+import { createProofNetworkAnchorBatch, createCapabilityGrant, createProofNetworkPacket } from 'enigma-memory/proof-network';
 ```
 
 The verifier's `verifyBundle(bundle)` helper is implemented in the `enigma-verify` bin source; package consumers should prefer the `enigma-verify` bin, `enigma verify`, or the MCP `enigma_verify_receipts` tool unless working from a source checkout.
@@ -39,6 +40,7 @@ Use package subpath exports for public module imports:
 | `enigma-memory/optimizer` | `./optimizer` | `packages/optimizer/src/index.js` | stable local/package | `MEMORY_OPTIMIZATION_PRODUCT_THESIS`, `MEMORY_OPTIMIZATION_PLAN_SCHEMA`, `MEMORY_ACCESS_RECEIPT_SCHEMA`, `estimateTextTokens`, `estimateTokenCost`, `createMemoryOptimizationPlan`, `createMemoryAccessReceipt`, `assertNoRawMemoryOutput`. |
 | `enigma-memory/metering` | `./metering` | `packages/metering/src/index.js` | stable local/package | `USAGE_EVENT_SCHEMA`, `USAGE_AGGREGATE_SCHEMA`, `USAGE_METERING_PRODUCT_THESIS`, `createUsageEvent`, `aggregateUsageEvents`. |
 | `enigma-memory/settlement` | `./settlement` | `packages/settlement/src/index.js` | stable local/package | `PERMISSIONLESS_MEMORY_JOB_SCHEMA`, `CONSUMER_GPU_CAPACITY_PROFILE_SCHEMA`, `OPERATOR_SERVICE_QUOTE_SCHEMA`, `SERVICE_SETTLEMENT_RECEIPT_SCHEMA`, `SETTLEMENT_BATCH_SCHEMA`, `SETTLEMENT_PRODUCT_THESIS`, `CONSUMER_GPU_MEMORY_MARKET_THESIS`, `createPermissionlessMemoryJob`, `createConsumerGpuCapacityProfile`, `createOperatorServiceQuote`, `createServiceSettlementReceipt`, `verifyServiceSettlementReceipt`, `createSettlementBatch`. |
+| `enigma-memory/proof-network` | `./proof-network` | `packages/proof-network/src/index.js` | stable local/package proof module | `PROOF_NETWORK_ANCHOR_BATCH_SCHEMA`, `PROOF_NETWORK_CAPABILITY_GRANT_SCHEMA`, `PROOF_NETWORK_CAPABILITY_REVOCATION_SCHEMA`, `PROOF_NETWORK_BENCHMARK_ATTESTATION_SCHEMA`, `PROOF_NETWORK_PACKET_SCHEMA`, `PROOF_NETWORK_SCHEMAS`, `assertNoPrivateProofPayload`, `sha256Json`, `createProofNetworkAnchorBatch`, `validateProofNetworkAnchorBatch`, `createCapabilityGrant`, `validateCapabilityGrant`, `createCapabilityRevocation`, `validateCapabilityRevocation`, `createBenchmarkAttestation`, `validateBenchmarkAttestation`, `createProofNetworkPacket`, `validateProofNetworkPacket`. |
 | `enigma-memory/storage` | `./storage` | `packages/storage/src/index.js` | stable local/package contract module | `PRODUCTION_STORAGE_SCHEMA`, `POSTGRES_MIGRATION_SCHEMA`, `PRODUCTION_STORAGE_OPERATION_SCHEMA`, `PRODUCTION_STORAGE_TABLES`, `postgresProductionSchemaSql`, `buildPostgresMigration`, `assertProductionStorageSqlSafe`, `productionStorageContract`, parameterized operation builders for relay records, witness checkpoints, pairings, gateway policy versions, decisions, SIEM events, and readiness evidence refs. |
 | `enigma-memory/hosted-cloud` | `./hosted-cloud` | `packages/hosted-cloud/src/index.js` | stable local/package contract module | Hosted-cloud contract schemas, blockers, lifecycle phases, builders, and validators: `HOSTED_CLOUD_USER_ACCOUNT_SCHEMA`, `HOSTED_CLOUD_TENANT_SCHEMA`, `HOSTED_CLOUD_VAULT_SCHEMA`, `HOSTED_CLOUD_API_KEY_SCHEMA`, `HOSTED_CLOUD_API_KEY_LIFECYCLE_PACKET_SCHEMA`, `HOSTED_CLOUD_USAGE_BILLING_SCHEMA`, `HOSTED_CLOUD_DASHBOARD_SCHEMA`, `HOSTED_CLOUD_BACKUP_DRILL_SCHEMA`, `HOSTED_CLOUD_INCIDENT_SLA_SCHEMA`, `HOSTED_CLOUD_CUSTOMER_LIFECYCLE_PACKET_SCHEMA`, `HOSTED_CLOUD_EXTERNAL_BLOCKERS`, `HOSTED_CLOUD_CUSTOMER_LIFECYCLE_PHASES`, `HOSTED_CLOUD_API_KEY_LIFECYCLE_OPERATIONS`, `HOSTED_CLOUD_API_KEY_LIFECYCLE_PHASES`, `buildUserAccountContract`, `buildTenantContract`, `buildHostedVaultContract`, `buildApiKeyContract`, `buildApiKeyLifecyclePacket`, `buildCustomerLifecyclePacket`, and matching validators. These are readiness evidence validators only; they do not create hosted SaaS accounts, issue customer API keys, call providers, store raw memory/key material, or make hosted cloud sellable/live without complete evidence plus operator approval. |
 | `enigma-memory/relay` | `./relay` | `apps/relay/src/server.mjs` | stable local/package service module | `createRelayState`, `createRelayServer`, `handleRelayRequest`, `serializeRelayState`, `hydrateRelayState`, `loadRelayStateFromFile`, `saveRelayStateToFile`, `runRelayDemo`. |
@@ -51,6 +53,8 @@ Use package subpath exports for public module imports:
 Hosted-cloud package exports and `production:hosted-customer` / `production:hosted-api-key` command output are readiness evidence validation only, not live hosted SaaS or live API key issuance. They do not wire auth, billing, storage, support, monitoring, KMS, secret issuance, key rotation, provider revocation, or provider systems.
 
 The hosted-cloud lifecycle entry points are `buildCustomerLifecyclePacket(input)` / `validateCustomerLifecyclePacket(packet)` for `enigma.hosted_cloud.customer_lifecycle_packet.v1` and `buildApiKeyLifecyclePacket(input)` / `validateApiKeyLifecyclePacket(packet)` for `enigma.hosted_cloud.api_key_lifecycle_packet.v1`. API key lifecycle packets cover issue, rotate, revoke, and audit readiness using evidence refs, fingerprints, opaque subject refs, missing-evidence refs, readiness status, and operator approval refs only.
+
+The proof-network entry points build and validate public-safe `enigma.proof_network.*.v1` artifacts for root anchoring, capability grants/revocations, benchmark attestations, and packet envelopes. They are pure local helpers: no network, filesystem, provider, or Solana calls occur in the module API, and artifacts must carry hashes, roots, refs, counts, signatures, and claim boundaries instead of raw memory, prompts, transcripts, completions, embeddings, tenant names, provider responses, private keys, API keys, or seed phrases.
 
 ## Module API quick reference
 
@@ -78,6 +82,26 @@ The optimizer may accept private plaintext candidate content as local input, but
 | `createMemoryOptimizationPlan(input)` | Builds a deterministic local/offline dedupe and tiering plan. | May inspect private local candidates; exported plan must be plaintext-minimized. |
 | `createMemoryAccessReceipt(input)` | Emits a receipt for optimizer access/settlement/proof anchoring. | Anchor commitments and metadata only; do not include raw memory content. |
 | `assertNoRawMemoryOutput(artifact)` | Fails closed if optimizer output exposes raw memory-like fields. | Use before public docs examples, receipts, SIEM exports, or chain/witness artifacts. |
+
+### Proof network (`enigma-memory/proof-network`)
+
+`enigma-memory/proof-network` is the privacy-preserving proof layer for AI memory. It emits Solana-ready opaque anchor batches and related proof artifacts, but the package API does not submit transactions, contact RPC endpoints, read files, or write files. Public artifacts should be safe to publish: roots/refs/hashes/counts/signatures only, with `transaction_submitted:false` and `raw_memory_on_chain:false` where chain-shaped output is produced.
+
+| Export | Use | Notes |
+| --- | --- | --- |
+| `PROOF_NETWORK_ANCHOR_BATCH_SCHEMA` | Stable schema name for `enigma.proof_network.anchor_batch.v1`. | Anchor batches collect public roots/refs for later settlement or chain anchoring. |
+| `PROOF_NETWORK_CAPABILITY_GRANT_SCHEMA` | Stable schema name for `enigma.proof_network.capability_grant.v1`. | Grants are scoped capability artifacts, not secret ACL bodies. |
+| `PROOF_NETWORK_CAPABILITY_REVOCATION_SCHEMA` | Stable schema name for `enigma.proof_network.capability_revocation.v1`. | Revocations/nullifiers refer to prior grants by public-safe ids/hashes. |
+| `PROOF_NETWORK_BENCHMARK_ATTESTATION_SCHEMA` | Stable schema name for `enigma.proof_network.benchmark_attestation.v1`. | Benchmark attestations bind report hashes plus dataset/runner/package refs without raw datasets or provider responses. |
+| `PROOF_NETWORK_PACKET_SCHEMA` | Stable schema name for `enigma.proof_network.packet.v1`. | Packets bundle supported proof-network artifacts under one verifier envelope. |
+| `PROOF_NETWORK_SCHEMAS` | Frozen map of supported proof-network schema constants. | Keys are `anchor_batch`, `capability_grant`, `capability_revocation`, `benchmark_attestation`, and `packet`. |
+| `assertNoPrivateProofPayload(value)` | Fails closed on private/secret proof payload keys or values. | Use before publishing proof-network artifacts, docs examples, test fixtures, or chain payloads. |
+| `sha256Json(value)` | Returns a deterministic SHA-256 digest for JSON-like input. | Hashes canonical public-safe values; do not hash-and-publish private raw content as a substitute for minimization. |
+| `createProofNetworkAnchorBatch(input)` / `validateProofNetworkAnchorBatch(batch)` | Builds or validates an anchor batch. | Inputs are roots/refs and public metadata only; output is Solana-ready but unsubmitted. |
+| `createCapabilityGrant(input)` / `validateCapabilityGrant(grant)` | Builds or validates a scoped capability grant. | Use opaque subject/resource refs and scopes; do not include tenant names, secret policy bodies, or raw ACL text. |
+| `createCapabilityRevocation(input)` / `validateCapabilityRevocation(revocation)` | Builds or validates a revocation/nullifier artifact. | Revocation artifacts prove intent/scope linkage without exposing private authorization state. |
+| `createBenchmarkAttestation(input)` / `validateBenchmarkAttestation(attestation)` | Builds or validates benchmark evidence. | Carries report hashes and dataset/runner/package refs; it is not a benchmark-leadership claim by itself. |
+| `createProofNetworkPacket(input)` / `validateProofNetworkPacket(packet)` | Builds or validates a packet containing supported proof-network artifacts. | Packets are local verification envelopes, not deployment, provider, or Solana transaction evidence. |
 
 ### Core (`enigma-memory/core`)
 
@@ -205,6 +229,13 @@ npx --yes --package enigma-memory enigma demo cross-model
 - `enigma gateway serve`
 - `enigma mesh demo`
 - `enigma enterprise demo`
+- `enigma chain anchor`
+- `enigma chain grant`
+- `enigma chain revoke`
+- `enigma chain attest`
+- `enigma chain verify`
+
+`enigma chain ...` commands are local artifact builders/verifiers. They produce or validate public-safe JSON for later operator review, and every generated chain-shaped artifact must make the boundary explicit with `transaction_submitted:false` and `raw_memory_on_chain:false`. They do not submit Solana transactions, contact Solana RPC, create accounts, deploy infrastructure, call providers, or put raw memory on-chain.
 
 Common local options and outputs:
 
@@ -264,6 +295,7 @@ Common local options and outputs:
 | `npm run production:threat-model` | required `-- --review <threat-model.json>`, optional `-- --out <file>` | Validates `enigma.security_threat_model_review.v1` coverage for assets, trust boundaries, adversaries/abuse cases, controls, tests, residual risk statuses, required non-claims, source refs, and review cadence. |
 | `npm run production:legal` | required `-- --approval <approval.json>`, optional `-- --out <file>` | Validates `enigma.legal_compliance_approval.v1` legal/privacy/marketing review evidence, required no-claim categories, publication controls, and blocks unsupported claims for provider deletion, model forgetting, compliance status, token ROI, guaranteed savings, raw compute superiority, hosted-live readiness, and unsupported superlatives. |
 | `npm run memory:benchmark` | optional `-- --out <file>`, `-- --price-per-million-tokens <number>`, `-- --currency <code>` | Emits `enigma.memory_optimization_benchmark.v1` fixture evidence with private candidate text omitted, `content_hash` redacted, and claim boundaries stating the result is a repository fixture estimate rather than provider invoice savings. |
+| `npm run proof:packet` | required `-- --active-root <sha256> --receipt-root <sha256> --benchmark-report <file> --dataset-hash <sha256> --runner-hash <sha256> --operator-ref <ref>`, optional `--out <file>` | Secondary helper that emits an `enigma.proof_network.packet.v1` combining an anchor batch and benchmark attestation. It hashes the benchmark report file but never copies the report body/path into the packet, sets `transaction_submitted:false` and `raw_memory_on_chain:false`, and does not call a network, deploy contracts, create accounts, sign transactions, or write raw memory/prompts/transcripts/completions/embeddings/provider responses. |
 | `enigma export --bundle <path> --out <file>` | none beyond paths | Writes an exported bundle with encrypted/committed vault state and receipt metadata. |
 | `enigma verify --bundle <exported-bundle.json>` | `--file` or `--export` aliases | Prints `enigma.verification_report.v1`. |
 | `enigma doctor` | `--client`, connector options | Checks Node version, bins, schemas, MCP command name, and connector state. |
@@ -276,6 +308,11 @@ Common local options and outputs:
 | `enigma settlement receipt` | `--job <job.json>`, `--quote <quote.json>`, `--settled-amount <n>`, `--settlement-ref <ref>`, `--service-receipt-ref <ref>`, optional `--out <file>` | Emits `enigma.service_settlement_receipt.v1` linking job hash, quote hash, usage hash, memory root, policy hash, service receipt, and settlement ref. |
 | `enigma settlement verify` | `--job <job.json>`, `--quote <quote.json>`, `--receipt <receipt.json>` | Verifies the settlement receipt references and fail-closed claim boundaries. |
 | `enigma settlement batch` | `--receipts <receipts.json>`, `--batch-ref <ref>`, optional `--asset <asset>`, `--out <file>` | Emits `enigma.settlement_batch.v1` over service settlement receipts without investment, provider-invoice, or token-ROI claims. |
+| `enigma chain anchor` | `--root <sha256:...>` one or more times or comma-separated, optional `--ref <public-ref>`, `--authority <public-authority-ref>`, `--batch-ref <ref>`, `--out <file>` | Emits `enigma.proof_network.anchor_batch.v1`: a Solana-ready opaque anchor batch with public roots/refs only, `transaction_submitted:false`, and `raw_memory_on_chain:false`. It does not submit a transaction, call Solana RPC, create accounts, or write raw memory on-chain. |
+| `enigma chain grant` | `--subject <public-subject-ref>`, `--capability <capability-id>`, `--scope <scope-id>`, optional `--resource-ref <sha256:...>`, `--policy-hash <sha256:...>`, required `--expires-at <iso>`, optional `--grant-ref <public-ref>`, `--out <file>` | Emits `enigma.proof_network.capability_grant.v1` for local authorization planning. Grants must not include tenant names, secret ACL bodies, bearer values, private keys, seed phrases, raw memory, prompts, transcripts, completions, embeddings, or provider responses. |
+| `enigma chain revoke` | `--grant-hash <sha256:...>`, `--reason <public-reason-code>`, optional `--revocation-ref <public-ref>`, `--out <file>` | Emits `enigma.proof_network.capability_revocation.v1`, a public-safe revocation/nullifier artifact. It records revocation intent/linkage only and does not mutate a chain or provider system. |
+| `enigma chain attest` | `--report-hash <sha256:...>` or `--report-file <report.json>`, required `--dataset-ref <sha256:...>`, `--runner-ref <public-runner-ref>`, `--package-ref <public-package-ref>`, optional repeatable `--score <name=value>`, `--out <file>` | Emits `enigma.proof_network.benchmark_attestation.v1` with report/dataset/runner/package hashes or refs. It omits raw datasets, raw reports, prompts, completions, provider responses, and unsupported benchmark-leadership claims. |
+| `enigma chain verify --file <proof-artifact.json>` | proof-network artifact or packet JSON file | Validates supported proof-network artifacts locally and prints verifier JSON for `anchor_batch`, `capability_grant`, `capability_revocation`, `benchmark_attestation`, or `packet` schemas. It does not submit transactions, call Solana RPC, call providers, deploy infrastructure, or certify hosted/BYOC readiness. |
 | `enigma native-host manifest` | `--browser` one of `chrome`, `edge`, or `firefox`; `--host-path <absolute path>`; `--extension-id <id>`; optional `--out <file>` | Generates native-host manifest JSON for `com.enigma.native_host` to stdout. With `--out`, it writes the file and reports `{ ok, path }`. It does not copy files into browser profile paths and does not write Windows registry keys. |
 | `enigma native-host install-plan` | `--browser` one of `chrome`, `edge`, or `firefox`; `--manifest <absolute path>`; optional `--os <windows|macos|linux>`; optional `--home <absolute path>` | Prints a no-write native-host install plan with `target_manifest_paths`, `manual_steps`, `registry_command_preview`, `firefox_manifest_directory`, and `writes_performed: false`. It validates the target shape but does not create directories, copy profile files, or write registry keys; an operator must execute the shown copy/registration steps. |
 | `enigma connect <client>` / `enigma disconnect <client>` | `--bundle`, `--config`, `--server-name`, `--mcp-command`/`--command`, `--dry-run` | Merges or removes the Enigma MCP server entry without making provider-native memory canonical. |
@@ -353,7 +390,7 @@ The native-host bridge stays local and explicit-approval only. Provider-native m
 
 ## MCP server surface
 
-Transport: stdio JSON-RPC through `enigma-mcp` or `enigma mcp serve`. Protocol version advertised by the server is `2024-11-05`; server info is `enigma-mcp-server` version `0.1.11`.
+Transport: stdio JSON-RPC through `enigma-mcp` or `enigma mcp serve`. Protocol version advertised by the server is `2024-11-05`; server info is `enigma-mcp-server` version `0.1.12`.
 
 Supported JSON-RPC methods are `initialize`, `notifications/initialized`, `ping`, `tools/list`, `tools/call`, `resources/list`, `resources/templates/list`, `resources/read`, `prompts/list`, and `prompts/get`. Unknown methods return JSON-RPC method-not-found errors; request ids must be strings/numbers/null matching the server's id validation.
 
@@ -529,6 +566,11 @@ Schemas are package-included under `specs/` and are reviewable from a source che
 | `specs/gateway-request-v1.schema.json` | `https://schemas.enigma.ai/gateway-request-v1.schema.json` | `enigma.gateway_request.v1`; plaintext-free gateway request. |
 | `specs/mesh-node-v1.schema.json` | `https://schemas.enigma.ai/mesh-node-v1.schema.json` | `enigma.mesh_node.v1`, `enigma.capsule_manifest.v1`, `enigma.witness_checkpoint.v1`, `enigma.relay_record.v1`, `enigma.federation_grant.v1`; mesh artifacts. |
 | `specs/enterprise-policy-v1.schema.json` | `https://schemas.enigma.ai/enterprise-policy-v1.schema.json` | `enigma.enterprise_policy.v1`; default-deny hosted/BYOC/on-prem policy with `provider_native_memory: "cache_only"`. |
+| `specs/proof-network-anchor-batch-v1.schema.json` | `https://schemas.enigma.ai/proof-network-anchor-batch-v1.schema.json` | `enigma.proof_network.anchor_batch.v1`; public-safe Solana-ready roots/refs anchor batch with no transaction submission. |
+| `specs/proof-network-capability-grant-v1.schema.json` | `https://schemas.enigma.ai/proof-network-capability-grant-v1.schema.json` | `enigma.proof_network.capability_grant.v1`; scoped capability grant with opaque refs only. |
+| `specs/proof-network-capability-revocation-v1.schema.json` | `https://schemas.enigma.ai/proof-network-capability-revocation-v1.schema.json` | `enigma.proof_network.capability_revocation.v1`; grant revocation/nullifier artifact. |
+| `specs/proof-network-benchmark-attestation-v1.schema.json` | `https://schemas.enigma.ai/proof-network-benchmark-attestation-v1.schema.json` | `enigma.proof_network.benchmark_attestation.v1`; report/dataset/runner/package hash/ref attestation. |
+| `specs/proof-network-packet-v1.schema.json` | `https://schemas.enigma.ai/proof-network-packet-v1.schema.json` | `enigma.proof_network.packet.v1`; local proof-network packet/verifier envelope. |
 
 Infrastructure readiness output schemas:
 

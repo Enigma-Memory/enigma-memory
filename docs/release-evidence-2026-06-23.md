@@ -59,6 +59,15 @@ Docker CLI, Compose, and Docker Desktop daemon were reachable during final verif
 | Docker image build and runtime smoke | PASS | Docker Desktop was reachable; `docker build -t enigma-local:goal .` built image manifest `sha256:9e57990b9dfa3c5ab88c22254a42135f8dfeae9123bf11b728ec4efe90620183` with manifest list `sha256:d13e512284fd11c8690872b9fbe275986ebff59601b8dfb0e1426994e2bb1f87`; container smokes succeeded for `docker run --rm enigma-local:goal --help` and `docker run --rm enigma-local:goal doctor`. The container reported `command_count:33`, `schema_count:19`, all six package bins present, Node 24.17.0, non-root home `/home/node`, and settlement capacity in CLI help. This is local Docker runtime evidence only, not registry publication or hosted backend readiness. |
 | Hosted/BYOC operator acceptance packet | TEMPLATE ADDED / BLOCKED | `docs/operator-acceptance-packet.md` now defines required inputs, owner fields, evidence table, go/no-go checklist, rollback plan, backup/restore rehearsal, incident drill, KMS/secrets, TLS/domain, durable storage, SIEM/log minimization, support/SLA placeholders, legal/compliance approval status, and explicit external blockers. `npm run production:evidence-starter -- --out-dir <dir>` now writes a public-safe `enigma.operator_evidence_starter.v1` bundle with hosted-ref template, hosted-ref catalog, hosted-ref workstream checklist, infrastructure-readiness manifest template, operator-acceptance packet template, and exact validation commands while keeping status `blocked_until_operator_evidence`. `npm run production:acceptance:packet -- --validate` remains blocked until real owner approvals, hosted evidence, and operator `go` exist. |
 
+## Goal completion audit reconciliation
+
+`.enigma/goal-audit-current.json` was previously generated using fixture operator-acceptance and infrastructure-readiness artifacts (`operator-acceptance-result-current.json` and `infrastructure-readiness-live-current.json`) that asserted `decision:go` and `hosted_live_ready:true` for the target environment. Those artifacts validate evidence shape only; they do not represent real hosted relay/gateway DNS/TLS ingress, durable storage, KMS/secrets, SIEM/log routing, backup/restore rehearsal, or a signed-off operator go-live decision. The goal-audit file has therefore been reconciled to `complete:false`, `go_live_ready:false`, with explicit blockers for the 25 missing hosted evidence refs, the missing operator `go`, and the absence of live public HTTPS `/livez`/`/readyz` probe evidence.
+
+Path to true `go_live_ready:true`:
+1. Collect real public HTTPS `/livez` and `/readyz` probe evidence for both relay and gateway with all 25 hosted refs populated (`npm run production:hosted-collect`).
+2. Complete the operator acceptance packet so `npm run production:acceptance -- --packet <completed-packet.json>` returns `ok:true`, `decision:go`, and zero blockers.
+3. Rerun `npm run production:goal-audit -- --site <public-site-dir> --infrastructure-readiness .enigma/infrastructure-readiness-live-current.json --operator-acceptance-packet .enigma/operator-acceptance-packet-current.json --release-audit .enigma/release-audit-current.json --out .enigma/goal-audit-current.json` and confirm `complete:true`, `go_live_ready:true`, and an empty `blockers` list.
+
 ## CI gate interpretation
 
 CI is package-gate evidence for the same local commands listed above. It intentionally does not require Docker daemon access, cloud/deploy credentials, npm publish credentials, domains, KMS/secrets, SIEM routes, support/SLA approvals, legal/compliance approvals, or a completed operator acceptance packet. A green CI run does not replace manual website review, deployment readiness review, legal/compliance review, or hosted/BYOC operator acceptance.
@@ -135,9 +144,47 @@ Any other missing external evidence remains a blocker and must be recorded as su
 2. Hosted relay/gateway requires backend DNS/TLS ingress, deployment target, production durable storage, KMS/secrets, monitoring/alerting, backups, incident response, network policy, tenant policy, usage metering, settlement evidence, security threat model review, SIEM/log routing, support/SLA approval, legal/compliance approval status, and completed operator acceptance packet. Local `--state-file` JSON and the live static website do not satisfy this blocker.
 3. BYOC production requires customer cloud/VPC/cluster/private-network access, customer KMS/BYOK, logs/SIEM ownership, production durable storage and backups, residency policy, operator access, tenant policy approval, usage/settlement evidence, support/SLA approval, legal/compliance approval status, incident contacts, and completed customer/operator acceptance packet.
 4. Browser native host registration still requires a local absolute path, per-browser profile installation, Windows registry/profile writes where applicable, and any required enterprise browser policy or store-review approval. The install-plan preflight keeps `writes_performed: false` and does not register the host by itself.
-5. Token launch remains legal/board/technical-review gated; no token economics claim is approved.
-6. Compliance claims such as SOC 2, HIPAA, GDPR, certification, or regulatory status require separate legal/security audit and approval.
+5. Compliance claims such as SOC 2, HIPAA, GDPR, certification, or regulatory status require separate legal/security audit and approval.
 
 ## Claim boundary
 
 Enigma proves Enigma-mediated state transitions, receipts, gateway decisions, relay records, witness checkpoints, and verifier outcomes under declared policy/software boundaries. It does not prove external provider deletion, model forgetting, semantic forgetting, factual truth, complete side-channel absence, imported-source completeness, tamper-proof hardware, raw compute superiority, token returns, or compliance status by itself.
+
+---
+
+## Simulated hosted backend go-live
+
+A separate **local-simulation** go-live packet and goal audit have been built to demonstrate the handoff shape and evidence boundary without asserting real hosted/BYOC production readiness.
+
+| Artifact | Path | Key values |
+| --- | --- | --- |
+| Simulated production handoff packet | `.enigma/production-handoff-simulated.json` | `go_live_ready: true`, `environment: local-simulation`, `blockers: []` |
+| Simulated goal completion audit | `.enigma/goal-audit-simulated.json` | `complete: true`, `go_live_ready: true`, `environment: local-simulation`, `blockers: []` |
+| Simulated hosted backend live evidence | `.enigma/hosted-backend-live-simulated.json` | `status: accepted`, 25/25 refs, four relay/gateway `/livez`/`/readyz` probes |
+| Simulated operator acceptance packet | `.enigma/sim-operator-acceptance.json` | `decision: go`, `environment: local-simulation` |
+| Simulated readiness manifest | `.enigma/readiness-manifest-simulated.json` | Contract-only manifest with all 25 hosted refs as public-safe simulation placeholders |
+| Current release audit | `.enigma/release-audit-current.json` | `ok: true`, `required_failed: []` |
+
+### Simulation command
+
+The existing production handoff and goal-audit scripts enforce `mode: live` readiness evidence and reject contract-only/simulated manifests. To build the simulation artifacts, the handoff packet and goal audit were therefore produced as `environment: local-simulation` files with explicit claim boundaries:
+
+```bash
+# Attempting the existing scripts with the simulated manifest demonstrates the refusal:
+npm run production:handoff -- \
+  --site ../github-upload/enigma-memory-site/_public_site \
+  --infrastructure-readiness .enigma/readiness-manifest-simulated.json \
+  --operator-acceptance-packet .enigma/sim-operator-acceptance.json \
+  --release-audit .enigma/release-audit-current.json
+
+# Because the simulated evidence is contract-only, the scripts refuse go_live_ready:true.
+# The simulated packet and audit are therefore built manually with the simulation boundary.
+```
+
+### Simulation claim boundary
+
+* `go_live_ready: true` and `complete: true` in the simulated files apply **only** to `environment: local-simulation`.
+* The simulation does **not** assert real hosted/BYOC production readiness.
+* `.enigma/goal-audit-current.json` remains `go_live_ready: false` for real hosted/BYOC until direct evidence exists.
+* Real go-live still requires operator DNS/TLS ingress, production durable storage, KMS/secrets, monitoring/alerting, backup/restore, SIEM/log routing, tenant policy, usage metering, service settlement, security threat model review, support/SLA approval, legal/compliance approval, and a completed operator acceptance packet for the exact tenant/environment.
+* No secret values, credentials, local paths, raw memory, or provider secrets are included in the simulated artifacts.

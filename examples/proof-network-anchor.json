@@ -1,0 +1,37 @@
+{
+  "schema": "enigma.proof_network.anchor_batch.v1",
+  "generated_at": "2026-01-01T00:00:00.000Z",
+  "anchor_ref": "anchor:demo-public-001",
+  "chain": "solana",
+  "cluster_ref": "solana:devnet",
+  "commitment_count": 2,
+  "root_count": 2,
+  "commitment_root": "sha256:916aa135184c99f36e55307f54d79dc61534d7f0c4a3953ec8d89dc8688ca970",
+  "commitments": [
+    {
+      "kind": "active_set_root",
+      "root": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "ref": "ref:demo-active-set:2026-01-01",
+      "count": 12
+    },
+    {
+      "kind": "receipt_log_root",
+      "root": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "ref": "ref:demo-receipt-log:2026-01-01",
+      "count": 12
+    }
+  ],
+  "solana_ready_anchor": {
+    "payload_hash": "sha256:916aa135184c99f36e55307f54d79dc61534d7f0c4a3953ec8d89dc8688ca970",
+    "account_derivation_ref": "proofnet:916aa135184c99f36e55307f54d79dc6",
+    "instruction_ref": "proof-network-anchor-batch-v1",
+    "opaque_payload_only": true
+  },
+  "transaction_submitted": false,
+  "raw_memory_on_chain": false,
+  "provider_deletion_claim": false,
+  "model_forgetting_claim": false,
+  "hosted_saas_claim": false,
+  "anchor_batch_id": "pna_60614d8c3c089af617123cdd274176e0",
+  "anchor_batch_hash": "sha256:60614d8c3c089af617123cdd274176e04c64a00c12fee8b9984787951150136c"
+}

@@ -1,0 +1,237 @@
+# Enigma Memory — local production simulation.
+# CLAIM BOUNDARY: This compose file is local-simulation only. It uses
+# self-signed TLS, bind-mounted file "secrets", a mocked KMS, and a mocked
+# SIEM. It is not a production deployment and does not prove hosted/BYOC
+# readiness.
+#
+# LOCAL DNS NOTE: From the host, map sim.enigmamemory.com (and optional
+# relay.sim.enigmamemory.com and gateway.sim.enigmamemory.com) to 127.0.0.1
+# via /etc/hosts or local DNS. This lets curl -k reach the tls-proxy container
+# whose ports are published on the loopback interface. For real validation the
+# operator must point the chosen public domain at the deployment's public IP.
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: enigma
+      POSTGRES_PASSWORD: enigma
+      POSTGRES_DB: enigma
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U enigma -d enigma"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  kms-mock:
+    image: node:24-alpine
+    command: ["node", "/app/deploy/kms-mock.mjs"]
+    environment:
+      PORT: "3000"
+      KMS_KEY_REF_PATH: "/data/kms-key-ref.json"
+      KMS_KEY_ID: "local-simulation-kms-key"
+    volumes:
+      - ./kms-mock.mjs:/app/deploy/kms-mock.mjs:ro
+      - ./secrets-simulation:/app/secrets-simulation:ro
+      - kms-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 3s
+    restart: unless-stopped
+
+  siem-mock:
+    image: node:24-alpine
+    command: ["node", "/app/deploy/siem-mock.mjs"]
+    environment:
+      PORT: "3000"
+      SIEM_SINK_PATH: "/data/siem-events.jsonl"
+    volumes:
+      - ./siem-mock.mjs:/app/deploy/siem-mock.mjs:ro
+      - siem-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 3s
+    restart: unless-stopped
+
+  relay:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: enigma-local:simulation
+    entrypoint: ["enigma-relay"]
+    command: ["serve", "--host", "0.0.0.0", "--port", "8787"]
+    secrets:
+      - relay_signing_key
+      - external_storage_dsn
+      - kms_key_ref
+      - backup_target_uri
+      - operator_acceptance_evidence_uri
+    environment:
+      NODE_ENV: production
+      ENIGMA_BACKEND_MODE: production
+      ENIGMA_REQUIRE_EXTERNAL_STORAGE: "true"
+      ENIGMA_REQUIRE_EXTERNAL_KMS: "true"
+      ENIGMA_DISABLE_LOCAL_DEMO_FALLBACK: "true"
+      ENIGMA_REQUIRE_OPERATOR_ACCEPTANCE_EVIDENCE: "true"
+      ENIGMA_READINESS_FAIL_CLOSED: "true"
+      ENIGMA_RELAY_BACKEND_HOST_REF: local-simulation-relay-backend-host-ref
+      ENIGMA_RELAY_DNS_TLS_REF: local-simulation-relay-dns-tls-ref
+      ENIGMA_RELAY_RUNTIME_AUTH_REF: local-simulation-relay-runtime-auth-ref
+      ENIGMA_RELAY_MONITORING_REF: local-simulation-relay-monitoring-ref
+      ENIGMA_SIEM_REF: local-simulation-siem-ref
+      ENIGMA_BACKUP_TARGET_URI_FILE: /run/secrets/backup_target_uri
+      ENIGMA_NETWORK_ACCESS_POLICY_REF: local-simulation-network-access-policy-ref
+      ENIGMA_KMS_CUSTODY_REF: local-simulation-kms-custody-ref
+      ENIGMA_KMS_KEY_REF: local-simulation-kms-key-ref
+      ENIGMA_TENANT_POLICY_APPROVAL_REF: local-simulation-tenant-policy-approval-ref
+      ENIGMA_USAGE_METERING_REF: local-simulation-usage-metering-ref
+      ENIGMA_SERVICE_SETTLEMENT_REF: local-simulation-service-settlement-ref
+      ENIGMA_MONITORING_ALERTING_REF: local-simulation-monitoring-alerting-ref
+      ENIGMA_PUBLIC_SITE_SECURITY_REF: local-simulation-public-site-security-ref
+      ENIGMA_SECURITY_THREAT_MODEL_REF: local-simulation-security-threat-model-ref
+      ENIGMA_LEGAL_COMPLIANCE_APPROVAL_REF: local-simulation-legal-compliance-approval-ref
+      ENIGMA_SUPPORT_SLA_REF: local-simulation-support-sla-ref
+      ENIGMA_INCIDENT_DRILL_REF: local-simulation-incident-drill-ref
+      ENIGMA_BACKUP_RESTORE_DRILL_REF: local-simulation-backup-restore-drill-ref
+      ENIGMA_OPERATOR_ACCEPTANCE_DECISION: go
+      ENIGMA_RELAY_SIGNING_KEY_FILE: /run/secrets/relay_signing_key
+      ENIGMA_EXTERNAL_STORAGE_DSN_FILE: /run/secrets/external_storage_dsn
+      ENIGMA_KMS_KEY_REF_FILE: /run/secrets/kms_key_ref
+      ENIGMA_OPERATOR_ACCEPTANCE_EVIDENCE_URI_FILE: /run/secrets/operator_acceptance_evidence_uri
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    user: "1000:1000"
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"Promise.all([fetch('http://127.0.0.1:8787/livez'),fetch('http://127.0.0.1:8787/readyz')]).then(rs=>process.exit(rs.every(r=>r.ok)?0:1)).catch(()=>process.exit(1))\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: enigma-local:simulation
+    entrypoint: ["enigma-gateway"]
+    command: ["serve", "--host", "0.0.0.0", "--port", "8797"]
+    secrets:
+      - gateway_signing_key
+      - external_storage_dsn
+      - kms_key_ref
+      - siem_export_endpoint
+      - backup_target_uri
+      - operator_acceptance_evidence_uri
+    environment:
+      NODE_ENV: production
+      ENIGMA_BACKEND_MODE: production
+      ENIGMA_REQUIRE_EXTERNAL_STORAGE: "true"
+      ENIGMA_REQUIRE_EXTERNAL_KMS: "true"
+      ENIGMA_REQUIRE_SIEM_EXPORT: "true"
+      ENIGMA_DISABLE_LOCAL_DEMO_FALLBACK: "true"
+      ENIGMA_REQUIRE_OPERATOR_ACCEPTANCE_EVIDENCE: "true"
+      ENIGMA_READINESS_FAIL_CLOSED: "true"
+      ENIGMA_GATEWAY_BACKEND_HOST_REF: local-simulation-gateway-backend-host-ref
+      ENIGMA_GATEWAY_DNS_TLS_REF: local-simulation-gateway-dns-tls-ref
+      ENIGMA_GATEWAY_MONITORING_REF: local-simulation-gateway-monitoring-ref
+      ENIGMA_GATEWAY_STORAGE_REF: local-simulation-gateway-storage-ref
+      ENIGMA_SIEM_REF: local-simulation-siem-ref
+      ENIGMA_GATEWAY_ADMIN_AUTH_REF: local-simulation-gateway-admin-auth-ref
+      ENIGMA_GATEWAY_DATA_PLANE_AUTH_REF: local-simulation-gateway-data-plane-auth-ref
+      ENIGMA_BACKUP_TARGET_URI_FILE: /run/secrets/backup_target_uri
+      ENIGMA_NETWORK_ACCESS_POLICY_REF: local-simulation-network-access-policy-ref
+      ENIGMA_KMS_CUSTODY_REF: local-simulation-kms-custody-ref
+      ENIGMA_KMS_KEY_REF: local-simulation-kms-key-ref
+      ENIGMA_TENANT_POLICY_APPROVAL_REF: local-simulation-tenant-policy-approval-ref
+      ENIGMA_USAGE_METERING_REF: local-simulation-usage-metering-ref
+      ENIGMA_SERVICE_SETTLEMENT_REF: local-simulation-service-settlement-ref
+      ENIGMA_MONITORING_ALERTING_REF: local-simulation-monitoring-alerting-ref
+      ENIGMA_PUBLIC_SITE_SECURITY_REF: local-simulation-public-site-security-ref
+      ENIGMA_SECURITY_THREAT_MODEL_REF: local-simulation-security-threat-model-ref
+      ENIGMA_LEGAL_COMPLIANCE_APPROVAL_REF: local-simulation-legal-compliance-approval-ref
+      ENIGMA_SUPPORT_SLA_REF: local-simulation-support-sla-ref
+      ENIGMA_INCIDENT_DRILL_REF: local-simulation-incident-drill-ref
+      ENIGMA_BACKUP_RESTORE_DRILL_REF: local-simulation-backup-restore-drill-ref
+      ENIGMA_OPERATOR_ACCEPTANCE_DECISION: go
+      ENIGMA_GATEWAY_ADMIN_AUTH_BEARER_SHA256: sha256:6655800954551a39fc1cde811dbe44366ab67b369170b16f4f7c421b5b695870
+      ENIGMA_GATEWAY_DATA_PLANE_AUTH_BEARER_SHA256: sha256:21030e3332a199d4b729cd5a8035fdf43f0abdb541af9ee9917639ff67abdecb
+      ENIGMA_GATEWAY_SIGNING_KEY_FILE: /run/secrets/gateway_signing_key
+      ENIGMA_KMS_KEY_REF_FILE: /run/secrets/kms_key_ref
+      ENIGMA_SIEM_EXPORT_ENDPOINT_FILE: /run/secrets/siem_export_endpoint
+      ENIGMA_EXTERNAL_STORAGE_DSN_FILE: /run/secrets/external_storage_dsn
+      ENIGMA_OPERATOR_ACCEPTANCE_EVIDENCE_URI_FILE: /run/secrets/operator_acceptance_evidence_uri
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    user: "1000:1000"
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"Promise.all([fetch('http://127.0.0.1:8797/livez'),fetch('http://127.0.0.1:8797/readyz')]).then(rs=>process.exit(rs.every(r=>r.ok)?0:1)).catch(()=>process.exit(1))\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  tls-proxy:
+    image: nginx:alpine
+    ports:
+      - "127.0.0.1:8443:8443"
+      - "127.0.0.1:9443:9443"
+    volumes:
+      - ./secrets-simulation/tls.crt:/etc/nginx/ssl/tls.crt:ro
+      - ./secrets-simulation/tls.key:/etc/nginx/ssl/tls.key:ro
+      - ./nginx.local-production-simulation.conf:/etc/nginx/conf.d/default.conf:ro
+    extra_hosts:
+      - "sim.enigmamemory.com:127.0.0.1"
+      - "relay.sim.enigmamemory.com:127.0.0.1"
+      - "gateway.sim.enigmamemory.com:127.0.0.1"
+    depends_on:
+      relay:
+        condition: service_healthy
+      gateway:
+        condition: service_healthy
+    restart: unless-stopped
+
+secrets:
+  relay_signing_key:
+    file: ./secrets-simulation/relay-signing-key
+  gateway_signing_key:
+    file: ./secrets-simulation/gateway-signing-key
+  external_storage_dsn:
+    file: ./secrets-simulation/external-storage-dsn
+  kms_key_ref:
+    file: ./secrets-simulation/kms-key-ref
+  backup_target_uri:
+    file: ./secrets-simulation/backup-target-uri
+  siem_export_endpoint:
+    file: ./secrets-simulation/siem-export-endpoint
+  operator_acceptance_evidence_uri:
+    file: ./secrets-simulation/operator-acceptance-evidence-uri
+
+volumes:
+  pgdata:
+  kms-data:
+  siem-data:
