@@ -11,13 +11,17 @@ import { runBoundarySimulation } from '../../../packages/boundary/src/index.js';
 import { startStdioServer } from '../../../packages/mcp-server/src/index.js';
 import { runMeshDemo } from '../../../packages/mesh/src/index.js';
 import { runEnterpriseDemo } from '../../../packages/enterprise/src/index.js';
-import { connectClient, disconnectClient, doctorConnectors, getClientProfile, renderMcpConfig, supportedClients } from '../../../packages/connectors/src/index.js';
+import { connectClient, disconnectClient, doctorConnectors, getClientProfile, planConnectWizard, renderMcpConfig, supportedClients } from '../../../packages/connectors/src/index.js';
 import { exportEnigmaCapsule, importChatGptExport, importClaudeMemory, importEnigmaCapsule, importLangGraphStore, importLettaAgentFile, importMem0Export, importZepGraphitiExport } from '../../../packages/importers/src/index.js';
 import * as relayServer from '../../relay/src/server.mjs';
 import * as gatewayServer from '../../gateway/src/server.mjs';
 import { verifyBundle } from '../../verifier/bin/enigma-verify.mjs';
 import { createNativeHostInstallPlan, createNativeHostManifest } from '../../native-host/bin/enigma-native-host.mjs';
 import { aggregateUsageEvents, createUsageEvent } from '../../../packages/metering/src/index.js';
+import {
+  createMemoryAccessReceipt,
+  createMemoryOptimizationPlan,
+} from '../../../packages/optimizer/src/index.js';
 import {
   createConsumerGpuCapacityProfile,
   createOperatorServiceQuote,
@@ -33,6 +37,21 @@ export const DEFAULT_GATEWAY_PORT = 8797;
 const DEFAULT_QUICKSTART_MEMORY = 'Enigma quickstart demo memory: local proof bundles can be created and verified without provider or cloud credentials.';
 const DEFAULT_CROSS_MODEL_DEMO_BUNDLE = '.enigma/cross-model-demo-bundle.json';
 const DEFAULT_CROSS_MODEL_MEMORY = 'Enigma cross-model demo memory: a local encrypted memory can be packaged for ChatGPT, Claude, Kimi, Cursor, and a local LLM without provider credentials.';
+const DEFAULT_SETUP_CLIENTS = Object.freeze(['generic-mcp', 'claude-desktop', 'cursor', 'kimi-code']);
+const SETUP_CLAIM_BOUNDARIES = Object.freeze({
+  local_only: true,
+  provider_credentials_required: false,
+  provider_native_memory_canonical: false,
+  provider_deletion_proof: false,
+  model_forgetting_proof: false,
+  roi_or_savings_guarantee: false,
+  compliance_certification: false,
+});
+const QUICKSTART_ARTIFACT_NAMES = Object.freeze({
+  contextPack: 'context-pack.json',
+  export: 'export.json',
+  verifyReport: 'verify-report.json',
+});
 const CROSS_MODEL_PROFILES = Object.freeze([
   { id: 'chatgpt', provider: 'chatgpt', model: 'chatgpt-mcp-profile', label: 'ChatGPT' },
   { id: 'claude', provider: 'claude', model: 'claude-mcp-profile', label: 'Claude' },
@@ -77,6 +96,19 @@ const IMPORTERS = Object.freeze({
 
 export const REQUIRED_PACKAGE_BINS = Object.freeze(['enigma', 'enigma-verify', 'enigma-mcp', 'enigma-relay', 'enigma-gateway', 'enigma-native-host']);
 
+function setFlagValue(flags, name, value) {
+  if (!flags.has(name)) {
+    flags.set(name, value);
+    return;
+  }
+  const current = flags.get(name);
+  if (Array.isArray(current)) {
+    current.push(value);
+  } else {
+    flags.set(name, [current, value]);
+  }
+}
+
 function parseArgs(argv) {
   const flags = new Map();
   for (let i = 0; i < argv.length; i += 1) {
@@ -84,11 +116,11 @@ function parseArgs(argv) {
     if (!arg.startsWith('--')) continue;
     const eq = arg.indexOf('=');
     if (eq !== -1) {
-      flags.set(arg.slice(2, eq), arg.slice(eq + 1));
+      setFlagValue(flags, arg.slice(2, eq), arg.slice(eq + 1));
     } else if (!argv[i + 1] || argv[i + 1].startsWith('--')) {
-      flags.set(arg.slice(2), true);
+      setFlagValue(flags, arg.slice(2), true);
     } else {
-      flags.set(arg.slice(2), argv[i + 1]);
+      setFlagValue(flags, arg.slice(2), argv[i + 1]);
       i += 1;
     }
   }
@@ -98,6 +130,19 @@ function parseArgs(argv) {
 function getFlag(flags, names, fallback = undefined) {
   for (const name of names) if (flags.has(name)) return flags.get(name);
   return fallback;
+}
+
+function lastFlagValue(value) {
+  return Array.isArray(value) ? value[value.length - 1] : value;
+}
+
+function booleanFlag(flags, names, fallback = false) {
+  const value = lastFlagValue(getFlag(flags, names, fallback));
+  if (value === true || value === false) return value;
+  if (value === undefined || value === '') return fallback;
+  if (String(value) === 'true') return true;
+  if (String(value) === 'false') return false;
+  throw new Error(`--${names[0]} must be true or false.`);
 }
 
 function requireFlag(flags, names, label = names[0]) {
@@ -166,7 +211,7 @@ async function fileExists(path) {
 }
 
 function pathFlag(flags, names, fallback) {
-  const value = getFlag(flags, names, fallback);
+  const value = lastFlagValue(getFlag(flags, names, fallback));
   if (value === true || value === '') throw new Error(`Missing required --${names[0]}.`);
   return String(value);
 }
@@ -208,6 +253,74 @@ async function quickstartMemoryTextFromFlags(flags) {
     return readFile(resolve(String(textFile)), 'utf8');
   }
   return DEFAULT_QUICKSTART_MEMORY;
+}
+
+function quickstartOutputs(bundleInput, outDirInput) {
+  const bundlePath = resolve(bundleInput);
+  const outDirPath = resolve(outDirInput);
+  const contextPackPath = resolve(outDirPath, QUICKSTART_ARTIFACT_NAMES.contextPack);
+  const exportPath = resolve(outDirPath, QUICKSTART_ARTIFACT_NAMES.export);
+  const verifyReportPath = resolve(outDirPath, QUICKSTART_ARTIFACT_NAMES.verifyReport);
+  return {
+    bundlePath,
+    outDirPath,
+    contextPackPath,
+    exportPath,
+    verifyReportPath,
+    contextPackDisplay: quickstartPathDisplay(outDirInput, QUICKSTART_ARTIFACT_NAMES.contextPack),
+    exportDisplay: quickstartPathDisplay(outDirInput, QUICKSTART_ARTIFACT_NAMES.export),
+    verifyReportDisplay: quickstartPathDisplay(outDirInput, QUICKSTART_ARTIFACT_NAMES.verifyReport),
+    outputs: [
+      { path: bundlePath, display: bundleInput },
+      { path: contextPackPath, display: quickstartPathDisplay(outDirInput, QUICKSTART_ARTIFACT_NAMES.contextPack) },
+      { path: exportPath, display: quickstartPathDisplay(outDirInput, QUICKSTART_ARTIFACT_NAMES.export) },
+      { path: verifyReportPath, display: quickstartPathDisplay(outDirInput, QUICKSTART_ARTIFACT_NAMES.verifyReport) },
+    ],
+  };
+}
+
+async function buildQuickstartArtifacts(flags, { bundleInput = DEFAULT_BUNDLE, outDirInput = dirname(bundleInput), overwrite = false, write = true } = {}) {
+  const paths = quickstartOutputs(bundleInput, outDirInput);
+  ensureDistinctOutputPaths(paths.outputs.map((output) => output.path));
+  await assertCanWriteQuickstartOutputs(paths.outputs, overwrite);
+
+  const vault = createVault({
+    subjectId: String(getFlag(flags, ['subject', 'subject-id'], 'local-user')),
+    displayName: String(getFlag(flags, ['display-name', 'name'], 'Local user')),
+    passphrase: String(getFlag(flags, ['passphrase'], 'local-development-passphrase')),
+  });
+  const passport = createPassport({
+    vault,
+    subjectId: vault.subject_id,
+    displayName: String(getFlag(flags, ['display-name', 'name'], 'Local user')),
+  });
+  remember({
+    vault,
+    passport,
+    text: await quickstartMemoryTextFromFlags(flags),
+    purpose: 'quickstart_local_proof',
+    purpose_tags: ['quickstart'],
+    metadata: { source: 'enigma quickstart' },
+  });
+  const contextPack = compileContextPack({
+    vault,
+    passport,
+    query: '',
+    purpose: 'quickstart_local_context',
+    limit: 8,
+  });
+  const exported = exportBundle({ vault, includePlaintext: false });
+  const bundle = exported.bundle ?? exported;
+  const verifyReport = verifyBundle(bundle);
+
+  if (write) {
+    await writeJson(paths.bundlePath, bundle);
+    await writeJson(paths.contextPackPath, contextPack);
+    await writeJson(paths.exportPath, bundle);
+    await writeJson(paths.verifyReportPath, verifyReport);
+  }
+
+  return { ...paths, vault, passport, contextPack, bundle, verifyReport };
 }
 
 async function crossModelMemoryTextFromFlags(flags) {
@@ -270,6 +383,157 @@ function publicContextPackSummary(pack) {
     active_set_root: pack.active_set_root,
     receipt_log_root: pack.receipt_log_root,
     content_redacted: true,
+  };
+}
+
+const SEARCH_RELEVANCE_STOPWORDS = new Set([
+  'about',
+  'after',
+  'again',
+  'against',
+  'also',
+  'and',
+  'any',
+  'are',
+  'assistant',
+  'because',
+  'been',
+  'before',
+  'being',
+  'between',
+  'can',
+  'could',
+  'current',
+  'does',
+  'from',
+  'has',
+  'have',
+  'how',
+  'into',
+  'its',
+  'latest',
+  'more',
+  'most',
+  'number',
+  'own',
+  'owns',
+  'please',
+  'should',
+  'that',
+  'the',
+  'their',
+  'then',
+  'there',
+  'these',
+  'they',
+  'this',
+  'use',
+  'using',
+  'was',
+  'what',
+  'when',
+  'where',
+  'which',
+  'who',
+  'whose',
+  'why',
+  'with',
+  'would',
+]);
+
+function addSearchToken(tokens, token) {
+  if (token.length < 3) return;
+  if (!/[a-z]/u.test(token)) return;
+  if (SEARCH_RELEVANCE_STOPWORDS.has(token)) return;
+  tokens.add(token);
+}
+
+function searchTokensFrom(value) {
+  const tokens = new Set();
+  if (value === undefined || value === null) return tokens;
+  for (const match of String(value).toLowerCase().matchAll(/[a-z0-9]+(?:[-_][a-z0-9]+)*/gu)) {
+    const token = match[0];
+    addSearchToken(tokens, token);
+    if (token.includes('-') || token.includes('_')) {
+      for (const part of token.split(/[-_]+/u)) addSearchToken(tokens, part);
+    }
+  }
+  return tokens;
+}
+
+function addSearchTokensFromValue(tokens, value) {
+  for (const token of searchTokensFrom(value)) tokens.add(token);
+}
+
+function recordSearchTokens(record, content) {
+  const tokens = new Set();
+  addSearchTokensFromValue(tokens, content);
+  addSearchTokensFromValue(tokens, record?.kind);
+  for (const tag of record?.purpose_tags ?? []) addSearchTokensFromValue(tokens, tag);
+  return tokens;
+}
+
+function searchScore(queryTokens, memoryTokens) {
+  if (queryTokens.size === 0) return 0;
+  let overlap = 0;
+  for (const token of queryTokens) {
+    if (memoryTokens.has(token)) overlap += 1;
+  }
+  return Math.round((overlap / queryTokens.size) * 1_000_000) / 1_000_000;
+}
+
+function searchResultReceiptIds(vault, memoryAddr) {
+  return vault.receipts
+    .filter((receipt) => receipt?.memory_addr === memoryAddr || receipt?.source_addr === memoryAddr)
+    .map((receipt) => receipt.receipt_id)
+    .filter((receiptId) => typeof receiptId === 'string' && receiptId.length > 0);
+}
+
+function publicAccessReceiptRef(receipt) {
+  return {
+    access_receipt_ref: `enigma://memory-access/${receipt.receipt_id}`,
+    receipt_id: receipt.receipt_id,
+    operation: receipt.operation,
+    memory_addr: receipt.address,
+    plan_hash: receipt.plan_hash,
+    estimated_prompt_tokens: receipt.estimated_prompt_tokens,
+    access_boundary: receipt.access_boundary,
+  };
+}
+
+function searchCandidates(vault, queryTokens) {
+  const candidates = [];
+  const byAddress = new Map();
+  for (const memoryAddr of [...vault.activeAddresses].sort()) {
+    const record = vault.__getRecord(memoryAddr);
+    if (!record || record.state !== 'active') continue;
+    const content = vault.__getPlaintext(memoryAddr);
+    const score = searchScore(queryTokens, recordSearchTokens(record, content));
+    if (queryTokens.size > 0 && score === 0) continue;
+    const candidate = {
+      address: memoryAddr,
+      content,
+      importance: typeof record.importance === 'number' ? record.importance : typeof record.confidence === 'number' ? record.confidence : undefined,
+      last_accessed_at: record.updated_at ?? record.created_at,
+      metadata: {
+        kind: record.kind,
+        sensitivity: record.sensitivity,
+        purpose_tags: record.purpose_tags ?? [],
+      },
+    };
+    candidates.push(candidate);
+    byAddress.set(memoryAddr, { record, content, score });
+  }
+  return { candidates, byAddress };
+}
+
+function connectorReadinessSummary(bundlePath) {
+  return {
+    ready: true,
+    bundle: bundlePath,
+    bundle_env: 'ENIGMA_BUNDLE',
+    mcp_command: 'enigma-mcp',
+    supported_clients: supportedClients,
   };
 }
 
@@ -493,85 +757,275 @@ async function initCommand(flags, io) {
   return 0;
 }
 
+function setupClientIds(flags) {
+  const raw = getFlag(flags, ['client']);
+  if (raw === undefined) return [...DEFAULT_SETUP_CLIENTS];
+  const values = Array.isArray(raw) ? raw : [raw];
+  const clients = [];
+  for (const value of values) {
+    if (value === true || value === '') throw new Error('Missing required --client.');
+    for (const client of String(value).split(',').map((item) => item.trim()).filter(Boolean)) {
+      getClientProfile(client);
+      if (!clients.includes(client)) clients.push(client);
+    }
+  }
+  return clients.length > 0 ? clients : [...DEFAULT_SETUP_CLIENTS];
+}
+
+function setupMemorySource(flags) {
+  if (getFlag(flags, ['memory-file', 'memoryFile', 'text-file', 'textFile']) !== undefined) return 'memory_file';
+  if (getFlag(flags, ['memory-text', 'memoryText']) !== undefined) return 'demo_text';
+  return 'default_demo';
+}
+
+function commandPath(path) {
+  return `"${String(path).replace(/"/g, '\\"')}"`;
+}
+
+function publicPathDisplay(path, label) {
+  const value = String(path);
+  if (/^[A-Za-z]:[\\/]/.test(value) || value.startsWith('/') || value.startsWith('\\\\')) return `<${label}>`;
+  return value;
+}
+
+function setupPublicDisplays(bundleInput, outDirInput) {
+  const outDir = publicPathDisplay(outDirInput, 'out-dir');
+  return {
+    bundle: publicPathDisplay(bundleInput, 'bundle-path'),
+    context_pack: quickstartPathDisplay(outDir, QUICKSTART_ARTIFACT_NAMES.contextPack),
+    export: quickstartPathDisplay(outDir, QUICKSTART_ARTIFACT_NAMES.export),
+    verify_report: quickstartPathDisplay(outDir, QUICKSTART_ARTIFACT_NAMES.verifyReport),
+  };
+}
+
+function setupRawDisplays(bundleInput, outDirInput) {
+  const plan = quickstartOutputs(bundleInput, outDirInput);
+  return {
+    bundle: plan.outputs[0].display,
+    context_pack: plan.contextPackDisplay,
+    export: plan.exportDisplay,
+    verify_report: plan.verifyReportDisplay,
+  };
+}
+
+function publicSetupError(error, rawDisplays, publicDisplays) {
+  let message = error.message;
+  for (const [raw, safe] of Object.entries({
+    [rawDisplays.bundle]: publicDisplays.bundle,
+    [rawDisplays.context_pack]: publicDisplays.context_pack,
+    [rawDisplays.export]: publicDisplays.export,
+    [rawDisplays.verify_report]: publicDisplays.verify_report,
+  })) {
+    message = message.split(raw).join(safe);
+  }
+  return new Error(message);
+}
+
+function setupNextCommands(bundleInput, exportDisplay, clients, writeConnectors) {
+  const primaryClient = clients[0] ?? DEFAULT_SETUP_CLIENTS[0];
+  const commands = [
+    `enigma remember --bundle ${commandPath(bundleInput)} --text-file ./memory.txt`,
+    `enigma search --bundle ${commandPath(bundleInput)} --query "project context"`,
+    `enigma context --bundle ${commandPath(bundleInput)} --query "project context"`,
+    `enigma verify --export ${commandPath(exportDisplay)}`,
+  ];
+  if (!writeConnectors) commands.push(`enigma connect ${primaryClient} --bundle ${commandPath(bundleInput)}`);
+  return commands;
+}
+
+async function setupDoctorChecks(flags, artifacts, clients, displays) {
+  const packageJson = await readPackageJson();
+  const requiredNodeMajor = minimumNodeMajor(packageJson.engines?.node);
+  const currentNodeMajor = nodeMajor(process.versions.node);
+  const binMap = packageJson.bin && typeof packageJson.bin === 'object' && !Array.isArray(packageJson.bin) ? packageJson.bin : {};
+  const binEntries = await Promise.all(REQUIRED_PACKAGE_BINS.map(async (name) => {
+    const target = binMap[name];
+    const declared = typeof target === 'string' && target.length > 0;
+    return {
+      name,
+      target: declared ? target : null,
+      declared,
+      exists: declared ? await fileExists(packageFileUrl(target)) : false,
+    };
+  }));
+  const schemas = await schemaFiles();
+  const connectorBaseOptions = {
+    ...connectorOptions(flags),
+    bundlePath: artifacts.bundlePath,
+    redactPaths: true,
+  };
+  const connectorClients = [];
+  for (const client of clients) {
+    const doctor = await doctorConnectors({ ...connectorBaseOptions, clientId: client });
+    connectorClients.push(...doctor.clients);
+  }
+  const checks = {
+    node: {
+      ok: requiredNodeMajor === 0 || currentNodeMajor >= requiredNodeMajor,
+      current: process.versions.node,
+      required: packageJson.engines?.node ?? null,
+    },
+    package_bins: {
+      ok: binEntries.every((entry) => entry.declared && entry.exists),
+      required: REQUIRED_PACKAGE_BINS,
+      entries: binEntries,
+      missing: binEntries.filter((entry) => !entry.declared).map((entry) => entry.name),
+      missing_targets: binEntries.filter((entry) => entry.declared && !entry.exists).map((entry) => entry.name),
+    },
+    artifacts: {
+      ok: artifacts.verifyReport.ok === true,
+      bundle: displays.bundle,
+      context_pack: displays.context_pack,
+      export: displays.export,
+      verify_report: displays.verify_report,
+    },
+    schemas: {
+      ok: schemas.length > 0,
+      count: schemas.length,
+      files: schemas,
+    },
+    connectors: {
+      ok: connectorClients.every((client) => client.ok !== false),
+      clients: connectorClients,
+    },
+  };
+  return { ok: Object.values(checks).every((check) => check.ok !== false), checks };
+}
+
+function publicConnectPlan(plan, wizard, profile, snippet) {
+  const changed = plan?.changed !== false;
+  const dryRun = plan?.dryRun === true || plan?.dry_run === true;
+  const plannedWrites = changed ? [{ type: 'write', path: wizard.default_config_path }] : [];
+  return {
+    ok: plan?.ok !== false,
+    action: 'connect',
+    client_id: profile.client_id,
+    configPath: wizard.default_config_path,
+    config_path: wizard.default_config_path,
+    serverName: profile.server_name,
+    server_name: profile.server_name,
+    changed,
+    dryRun,
+    dry_run: dryRun,
+    writes_performed: changed && !dryRun,
+    backup_planned: Boolean(plan?.backupPath),
+    plannedWrites,
+    planned_writes: plannedWrites,
+    config: snippet,
+  };
+}
+
+async function setupConnectorPlans(flags, artifacts, clients, writeConnectors, displays) {
+  const publicOptions = {
+    ...connectorOptions(flags),
+    bundlePath: displays.bundle,
+  };
+  const writeOptions = {
+    ...connectorOptions(flags),
+    bundlePath: artifacts.bundlePath,
+  };
+  const connectors = [];
+  for (const client of clients) {
+    const profile = getClientProfile(client, publicOptions);
+    const snippet = renderMcpConfig(client, publicOptions);
+    const wizard = planConnectWizard(client, { platform: profile.platform }).clients[0];
+    const rawPlan = writeConnectors
+      ? await connectClient(client, { ...writeOptions, dryRun: false })
+      : { ok: true, changed: true, dryRun: true };
+    const plan = publicConnectPlan(rawPlan, wizard, profile, snippet);
+    connectors.push({
+      client_id: client,
+      display_name: profile.display_name,
+      default_config_path: wizard.default_config_path,
+      mcp_config_snippet: snippet,
+      connect_command: `enigma connect ${client} --bundle ${commandPath(displays.bundle)}`,
+      connect_plan: plan,
+      wizard,
+    });
+  }
+  return connectors;
+}
+
+export async function setupCommand(flags, io) {
+  const bundleInput = pathFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE);
+  const outDirInput = pathFlag(flags, ['out-dir', 'outDir'], dirname(bundleInput));
+  const clients = setupClientIds(flags);
+  const overwrite = booleanFlag(flags, ['overwrite'], false);
+  const dryRun = booleanFlag(flags, ['dry-run', 'dryRun'], false);
+  const writeConnectors = booleanFlag(flags, ['write-connectors', 'writeConnectors'], false) && !dryRun;
+  const displays = setupPublicDisplays(bundleInput, outDirInput);
+  const rawDisplays = setupRawDisplays(bundleInput, outDirInput);
+  let artifacts;
+  try {
+    artifacts = await buildQuickstartArtifacts(flags, { bundleInput, outDirInput, overwrite, write: !dryRun });
+  } catch (error) {
+    throw publicSetupError(error, rawDisplays, displays);
+  }
+  const connectors = await setupConnectorPlans(flags, artifacts, clients, writeConnectors, displays);
+  const doctor = await setupDoctorChecks(flags, artifacts, clients, displays);
+  const ok = artifacts.verifyReport.ok === true;
+
+  print({
+    ok,
+    schema: 'enigma.setup.v1',
+    command: 'enigma setup',
+    dry_run: dryRun,
+    artifacts_written: !dryRun,
+    client_configs_written: writeConnectors,
+    bundle: displays.bundle,
+    context_pack: displays.context_pack,
+    export: displays.export,
+    verify_report: displays.verify_report,
+    memory_source: setupMemorySource(flags),
+    memory_plaintext_echoed: false,
+    memory_count: Array.isArray(artifacts.bundle.memory_objects) ? artifacts.bundle.memory_objects.length : 0,
+    receipt_count: Array.isArray(artifacts.bundle.receipts) ? artifacts.bundle.receipts.length : 0,
+    context_item_count: Array.isArray(artifacts.contextPack.memories) ? artifacts.contextPack.memories.length : 0,
+    verify_ok: artifacts.verifyReport.ok === true,
+    provider_credentials_required: false,
+    provider_native_memory_canonical: false,
+    selected_clients: clients,
+    connectors,
+    mcp_config_snippets: Object.fromEntries(connectors.map((connector) => [connector.client_id, connector.mcp_config_snippet])),
+    connect_plans: Object.fromEntries(connectors.map((connector) => [connector.client_id, connector.connect_plan])),
+    next_commands: setupNextCommands(displays.bundle, displays.export, clients, writeConnectors),
+    checks: doctor.checks,
+    claim_boundaries: { ...SETUP_CLAIM_BOUNDARIES },
+  }, io);
+  return ok ? 0 : 1;
+}
+
 export async function quickstartCommand(flags, io) {
   const bundleInput = pathFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE);
   const outDirInput = pathFlag(flags, ['out-dir', 'outDir'], dirname(bundleInput));
-  const bundlePath = resolve(bundleInput);
-  const outDirPath = resolve(outDirInput);
-  const contextPackPath = resolve(outDirPath, 'context-pack.json');
-  const exportPath = resolve(outDirPath, 'export.json');
-  const verifyReportPath = resolve(outDirPath, 'verify-report.json');
-  const contextPackDisplay = quickstartPathDisplay(outDirInput, 'context-pack.json');
-  const exportDisplay = quickstartPathDisplay(outDirInput, 'export.json');
-  const verifyReportDisplay = quickstartPathDisplay(outDirInput, 'verify-report.json');
-  const outputs = [
-    { path: bundlePath, display: bundleInput },
-    { path: contextPackPath, display: contextPackDisplay },
-    { path: exportPath, display: exportDisplay },
-    { path: verifyReportPath, display: verifyReportDisplay },
-  ];
-  ensureDistinctOutputPaths(outputs.map((output) => output.path));
-  const overwrite = getFlag(flags, ['overwrite'], false) === true || getFlag(flags, ['overwrite'], false) === 'true';
-  await assertCanWriteQuickstartOutputs(outputs, overwrite);
-
-  const vault = createVault({
-    subjectId: String(getFlag(flags, ['subject', 'subject-id'], 'local-user')),
-    displayName: String(getFlag(flags, ['display-name', 'name'], 'Local user')),
-    passphrase: String(getFlag(flags, ['passphrase'], 'local-development-passphrase')),
-  });
-  const passport = createPassport({
-    vault,
-    subjectId: vault.subject_id,
-    displayName: String(getFlag(flags, ['display-name', 'name'], 'Local user')),
-  });
-  remember({
-    vault,
-    passport,
-    text: await quickstartMemoryTextFromFlags(flags),
-    purpose: 'quickstart_local_proof',
-    purpose_tags: ['quickstart'],
-    metadata: { source: 'enigma quickstart' },
-  });
-  const contextPack = compileContextPack({
-    vault,
-    passport,
-    query: '',
-    purpose: 'quickstart_local_context',
-    limit: 8,
-  });
-  const exported = exportBundle({ vault, includePlaintext: false });
-  const bundle = exported.bundle ?? exported;
-  const verifyReport = verifyBundle(bundle);
-
-  await writeJson(bundlePath, bundle);
-  await writeJson(contextPackPath, contextPack);
-  await writeJson(exportPath, bundle);
-  await writeJson(verifyReportPath, verifyReport);
+  const overwrite = booleanFlag(flags, ['overwrite'], false);
+  const artifacts = await buildQuickstartArtifacts(flags, { bundleInput, outDirInput, overwrite, write: true });
 
   print({
-    ok: verifyReport.ok === true,
+    ok: artifacts.verifyReport.ok === true,
     bundle: bundleInput,
-    context_pack: contextPackDisplay,
-    export: exportDisplay,
-    verify_report: verifyReportDisplay,
-    memory_count: Array.isArray(bundle.memory_objects) ? bundle.memory_objects.length : 0,
-    receipt_count: Array.isArray(bundle.receipts) ? bundle.receipts.length : 0,
-    context_item_count: Array.isArray(contextPack.memories) ? contextPack.memories.length : 0,
-    verify_ok: verifyReport.ok === true,
+    context_pack: artifacts.contextPackDisplay,
+    export: artifacts.exportDisplay,
+    verify_report: artifacts.verifyReportDisplay,
+    memory_count: Array.isArray(artifacts.bundle.memory_objects) ? artifacts.bundle.memory_objects.length : 0,
+    receipt_count: Array.isArray(artifacts.bundle.receipts) ? artifacts.bundle.receipts.length : 0,
+    context_item_count: Array.isArray(artifacts.contextPack.memories) ? artifacts.contextPack.memories.length : 0,
+    verify_ok: artifacts.verifyReport.ok === true,
     next_commands: [
-      `enigma verify --export ${exportDisplay}`,
+      `enigma verify --export ${artifacts.exportDisplay}`,
       `enigma connect generic-mcp --bundle ${bundleInput} --dry-run`,
     ],
     claim_boundaries: {
       local_only: true,
       provider_credentials_required: false,
+      provider_native_memory_canonical: false,
       provider_deletion_proof: false,
       model_forgetting_proof: false,
       roi_or_savings_guarantee: false,
       compliance_certification: false,
     },
   }, io);
-  return verifyReport.ok === true ? 0 : 1;
+  return artifacts.verifyReport.ok === true ? 0 : 1;
 }
 
 export async function crossModelDemoCommand(flags, io) {
@@ -764,6 +1218,118 @@ async function contextCommand(flags, io) {
   const out = getFlag(flags, ['out']);
   if (out && out !== true) await writeJson(resolve(String(out)), pack);
   print(pack, io);
+  return 0;
+}
+
+
+async function searchCommand(flags, io) {
+  const bundlePath = resolve(String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE)));
+  const query = String(requireFlag(flags, ['query', 'q'], 'query'));
+  const limit = integerFlag(flags, ['limit'], 'limit', 8);
+  if (limit < 0) throw new Error('--limit must be non-negative.');
+  const includeContent = getFlag(flags, ['include-content', 'includeContent']) === true || getFlag(flags, ['include-content', 'includeContent']) === 'true';
+  const { vault } = await loadState(bundlePath);
+  const roots = vault.__computeRoots();
+  const queryTokens = searchTokensFrom(query);
+  const { candidates, byAddress } = searchCandidates(vault, queryTokens);
+  const plan = createMemoryOptimizationPlan({
+    candidates,
+    prompt: query,
+    now: getFlag(flags, ['now'], '2026-01-01T00:00:00.000Z'),
+  });
+  const planIndex = new Map(plan.items.map((item, index) => [item.address, index]));
+  const selectedItems = plan.items
+    .filter((item) => byAddress.has(item.address))
+    .sort((left, right) => {
+      const scoreDiff = byAddress.get(right.address).score - byAddress.get(left.address).score;
+      if (scoreDiff !== 0) return scoreDiff;
+      return planIndex.get(left.address) - planIndex.get(right.address);
+    })
+    .slice(0, limit);
+  const accessReceipts = selectedItems.map((item, index) => createMemoryAccessReceipt({
+    item,
+    plan,
+    sequence: index,
+    timestamp: null,
+    pricing: plan.pricing,
+  }));
+  const accessReceiptByAddress = new Map(accessReceipts.map((receipt) => [receipt.address, publicAccessReceiptRef(receipt)]));
+  const results = selectedItems.map((item) => {
+    const hit = byAddress.get(item.address);
+    const record = hit.record;
+    const accessReceipt = accessReceiptByAddress.get(item.address);
+    return {
+      memory_ref: `enigma://memory/${item.address}`,
+      memory_addr: item.address,
+      address: item.address,
+      kind: record.kind,
+      sensitivity: record.sensitivity,
+      tags: Array.isArray(record.purpose_tags) ? [...record.purpose_tags] : [],
+      purpose_tags: Array.isArray(record.purpose_tags) ? [...record.purpose_tags] : [],
+      score: hit.score,
+      tier: item.tier,
+      receipt_ids: searchResultReceiptIds(vault, item.address),
+      access_receipt_ref: accessReceipt?.access_receipt_ref,
+      access_receipt_id: accessReceipt?.receipt_id,
+      access_receipt_refs: accessReceipt?.access_receipt_ref ? [accessReceipt.access_receipt_ref] : [],
+      content_redacted: !includeContent,
+      ...(includeContent ? { content: hit.content } : {}),
+    };
+  });
+  print({
+    ok: true,
+    schema: 'enigma.memory_search.v1',
+    bundle: bundlePath,
+    query_redacted: true,
+    limit,
+    result_count: results.length,
+    results,
+    access_receipts: accessReceipts.map(publicAccessReceiptRef),
+    active_set_root: roots.active_set_root,
+    receipt_log_root: roots.receipt_log_root,
+    claim_boundary: includeContent
+      ? 'Search ran against the selected local bundle and includes plaintext only because --include-content was explicit; this does not prove provider deletion, provider-native memory state, or model forgetting.'
+      : 'Search ran against the selected local bundle and redacts plaintext by default; refs, scores, tags, roots, and receipt refs are not provider deletion proof or model forgetting proof.',
+  }, io);
+  return 0;
+}
+
+async function statusCommand(flags, io) {
+  const bundlePath = resolve(String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE)));
+  const { stored, vault, passport } = await loadState(bundlePath);
+  const roots = vault.__computeRoots();
+  const activeCount = activeMemoryCount(vault);
+  const tombstoneCount = vault.tombstones instanceof Map ? vault.tombstones.size : 0;
+  const receiptCount = Array.isArray(vault.receipts) ? vault.receipts.length : 0;
+  print({
+    ok: true,
+    schema: 'enigma.passport_status.v1',
+    bundle: bundlePath,
+    passport_ref: `enigma://passport/${passport.passport_id}`,
+    owner: {
+      subject_id: stored.owner?.subject_id ?? stored.passport?.owner?.subject_id ?? stored.vault?.subject_id ?? passport.owner?.subject_id ?? vault.subject_id,
+      display_name: stored.owner?.display_name ?? stored.passport?.owner?.display_name ?? stored.vault?.display_name ?? passport.owner?.display_name ?? 'Local user',
+    },
+    counts: {
+      active_memories: activeCount,
+      tombstoned_memories: tombstoneCount,
+      receipts: receiptCount,
+    },
+    active_memory_count: activeCount,
+    tombstoned_memory_count: tombstoneCount,
+    receipt_count: receiptCount,
+    active_set_root: roots.active_set_root,
+    receipt_log_root: roots.receipt_log_root,
+    connector_readiness: connectorReadinessSummary(bundlePath),
+    next_recommended_commands: [
+      `enigma remember --bundle "${bundlePath}" --text-file <path>`,
+      `enigma search --bundle "${bundlePath}" --query <text>`,
+      `enigma context --bundle "${bundlePath}" --query <text>`,
+      `enigma verify --bundle "${bundlePath}"`,
+      `enigma connect <client> --bundle "${bundlePath}"`,
+    ],
+    claim_boundary: 'Status reports local bundle counters, owner display fields, connector readiness hints, and commitment roots only; it does not expose raw memory, certify compliance, prove provider deletion, or prove model forgetting.',
+  }, io);
   return 0;
 }
 
@@ -1272,6 +1838,7 @@ function usage() {
     usage: 'enigma <command> [options]',
     commands: [
       'init',
+      'setup',
       'quickstart',
       'demo cross-model',
       'doctor',
@@ -1283,6 +1850,9 @@ function usage() {
       'update',
       'delete',
       'context',
+      'search',
+      'status',
+      'passport status',
       'export',
       'import <source>',
       'capsule export',
@@ -1317,6 +1887,27 @@ function usage() {
     remember_options: {
       '--text <text>': 'Inline local memory text. Avoid for private content because argv can be logged by process tooling.',
       '--text-file <path>': 'Read local memory text from a file so private smoke input is not exposed in shell argv. Aliases: --memory-file, --textFile, --memoryFile.',
+    },
+    search_options: {
+      '--query <text>': 'Required local query. Output redacts the query and memory plaintext by default. Alias: --q.',
+      '--bundle <path>': 'Bundle JSON to search. Defaults to .enigma/bundle.json.',
+      '--limit <n>': 'Maximum ranked active memories to return. Defaults to 8.',
+      '--json': 'Reserved for explicit JSON output; CLI output is JSON by default.',
+      '--include-content': 'Opt in to returning plaintext local memory content in the JSON result.',
+    },
+    status_options: {
+      'enigma status --bundle <path>': 'Show local Memory Passport counts, roots, owner display fields, connector readiness, and next commands.',
+      'enigma passport status --bundle <path>': 'Alias for enigma status.',
+    },
+    setup_options: {
+      '--bundle <path>': 'Bundle JSON to create. Defaults to .enigma/bundle.json.',
+      '--out-dir <path>': 'Directory for context-pack.json, export.json, and verify-report.json. Defaults to the bundle directory.',
+      '--client <id>': `Client to plan; repeat or comma-separate. Defaults to ${DEFAULT_SETUP_CLIENTS.join(', ')}.`,
+      '--memory-file <path>': 'Read local memory text from a file without echoing plaintext. Alias: --text-file.',
+      '--memory-text <text>': 'Inline demo-only memory text. Avoid for private content because argv can be logged.',
+      '--overwrite': 'Replace existing local setup artifacts.',
+      '--dry-run': 'Plan setup without writing local artifacts or client configs.',
+      '--write-connectors': 'Also write selected client MCP config files. Defaults to false.',
     },
     quickstart_options: {
       '--bundle <path>': 'Bundle JSON to create. Defaults to .enigma/bundle.json.',
@@ -1398,15 +1989,16 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     print(usage(), io);
     return 0;
   }
-  const twoPartCommands = ['boundary', 'mcp', 'mesh', 'enterprise', 'capsule', 'relay', 'gateway', 'connect', 'disconnect', 'import', 'native-host', 'meter', 'settlement', 'demo'];
+  const twoPartCommands = ['boundary', 'mcp', 'mesh', 'enterprise', 'capsule', 'relay', 'gateway', 'connect', 'disconnect', 'import', 'native-host', 'meter', 'settlement', 'demo', 'passport'];
   const flags = parseArgs(twoPartCommands.includes(command) ? argv.slice(2) : argv.slice(1));
   const positionalFile = optionalPositional(argv[2]);
-  if ((flags.has('help') || argv.includes('-h')) && (((command === 'relay' || command === 'gateway') && (subcommand === 'serve' || subcommand === 'demo')) || (command === 'native-host' && (subcommand === 'manifest' || subcommand === 'install-plan')) || (command === 'demo' && subcommand === 'cross-model'))) {
+  if ((flags.has('help') || argv.includes('-h')) && (command === 'setup' || command === 'search' || command === 'status' || (command === 'passport' && subcommand === 'status') || ((command === 'relay' || command === 'gateway') && (subcommand === 'serve' || subcommand === 'demo')) || (command === 'native-host' && (subcommand === 'manifest' || subcommand === 'install-plan')) || (command === 'demo' && subcommand === 'cross-model'))) {
     print(usage(), io);
     return 0;
   }
   try {
     if (command === 'init') return await initCommand(flags, io);
+    if (command === 'setup') return await setupCommand(flags, io);
     if (command === 'quickstart') return await quickstartCommand(flags, io);
     if (command === 'demo' && subcommand === 'cross-model') return await crossModelDemoCommand(flags, io);
     if (command === 'doctor') return await doctorCommand(flags, io);
@@ -1418,6 +2010,9 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     if (command === 'update') return await updateCommand(flags, io);
     if (command === 'delete') return await deleteCommand(flags, io);
     if (command === 'context') return await contextCommand(flags, io);
+    if (command === 'search') return await searchCommand(flags, io);
+    if (command === 'status') return await statusCommand(flags, io);
+    if (command === 'passport' && subcommand === 'status') return await statusCommand(flags, io);
     if (command === 'export') return await exportCommand(flags, io);
     if (command === 'import') return await importCommand(subcommand, flags, io, positionalFile);
     if (command === 'capsule' && subcommand === 'export') return await capsuleExportCommand(flags, io, positionalFile);

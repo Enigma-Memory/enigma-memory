@@ -1,37 +1,39 @@
 # Install Enigma anywhere
 
-This guide starts with the published npm package path for `enigma-memory`. Use a source checkout only when you need source-only docs, Docker assets, browser-extension scaffolding, package development, or release scripts.
+Start with the published npm package path for `enigma-memory`: install once, run `enigma setup --overwrite` once, then use memory/search/context/verify/connect from the same local AI Memory Passport. Use a source checkout only when you need source-only docs, Docker assets, browser-extension scaffolding, package development, or release scripts.
 
-Current status: Enigma has a local production foundation and a published package. Hosted cloud and BYOC operation require real deployment credentials, domains, TLS, durable storage, KMS/secrets, monitoring, backups, and operator/customer infrastructure; they are not activated by installing the package.
+Hosted cloud and BYOC operation require real deployment credentials, domains, TLS, durable storage, KMS/secrets, monitoring, backups, and operator/customer infrastructure; they are not activated by installing the package.
 
 ## Requirements
 
 - Node.js `>=24`
 - A local filesystem path for the Enigma vault bundle
-- No database, provider credential, cloud credential, npm publishing token, or package registry account for the local package quickstart
+- No database, provider credential, cloud credential, npm publishing token, or package registry account for the local setup path
 - Git only for the advanced source-checkout path
 - Optional: Docker for source-checkout containerized relay/gateway operation
 
-## Default path: install from npm
+## Default path: install once, use everywhere
+
+Use the published package as the primary path:
 
 ```sh
 npm install -g enigma-memory
-enigma quickstart --bundle ./.enigma/bundle.json --overwrite
-enigma demo cross-model
-enigma doctor
-enigma-relay demo
-enigma-gateway demo
+enigma setup --overwrite
+enigma remember --text-file ./memory.txt
+enigma search --query "..."
+enigma context --query "..." --optimize
+enigma verify --export ./.enigma/export.json
+enigma connect claude-desktop --dry-run
 ```
 
-`enigma quickstart` writes local review artifacts under the selected bundle/workspace path: a local vault bundle, a context pack, an export proof bundle, and a verify report. The proof boundary is local and Enigma-controlled: it verifies Enigma receipts, checkpoints, committed roots, and exported bundle shape only. It does not prove provider deletion, model forgetting, provider-native memory removal, hosted/BYOC availability, legal approval, or compliance certification.
+`enigma setup --overwrite` writes local Enigma artifacts under the workspace `.enigma` path and emits deterministic, public-safe JSON. It does not write Claude, Cursor, Kimi, or other third-party app configs. Client config writes happen only when you explicitly run `enigma connect <client>` without `--dry-run`.
 
-Run `enigma demo cross-model` to see the product loop after install: the same generic local Enigma memory is packaged as public-safe context-pack references and receipt summaries for `chatgpt`, `claude`, `kimi`, `cursor`, and `local-llm` unless you explicitly supply `--memory-file <path>`. It calls no providers, needs no provider key, reports `provider_native_memory_canonical:false`, and does not claim provider deletion, model forgetting, hosted availability, ROI/savings, or compliance certification. Add `--out ./.enigma/cross-model-demo-report.json` to save the report without echoing plaintext.
+The local Enigma vault is the canonical memory passport. Use provider-native memory as cache only. Enigma proof covers Enigma-controlled vault state, receipts, checkpoints, committed roots, and exported bundle shape; it does not prove provider deletion, model forgetting, provider-native memory removal, hosted/BYOC availability, legal approval, ROI/savings, or compliance certification.
 
 One-off execution without a global install:
 
 ```sh
-npx --yes --package enigma-memory enigma quickstart --bundle ./.enigma/bundle.json --overwrite
-npx --yes --package enigma-memory enigma demo cross-model
+npx --yes --package enigma-memory enigma setup --overwrite
 ```
 
 ## Source checkout versus package install
@@ -88,7 +90,7 @@ node apps/gateway/bin/enigma-gateway.mjs demo
 
 ## Manual local no-network path
 
-Use this when you want to inspect each step that `enigma quickstart` automates:
+Use this when you want to inspect each step behind the setup-first path:
 
 ```sh
 mkdir -p .enigma
@@ -98,7 +100,7 @@ enigma init --bundle ./.enigma/bundle.json --subject local-user --display-name "
 enigma remember --bundle ./.enigma/bundle.json --text-file "$ENIGMA_DEMO_MEMORY_FILE" --purpose user_memory --tags local
 enigma context --bundle ./.enigma/bundle.json --query "local context" --purpose local_context --out ./.enigma/context-pack.json
 enigma export --bundle ./.enigma/bundle.json --out ./.enigma/export.json
-enigma verify --bundle ./.enigma/export.json
+enigma verify --export ./.enigma/export.json
 ```
 
 Windows PowerShell equivalent:
@@ -111,7 +113,7 @@ enigma init --bundle .\.enigma\bundle.json --subject local-user --display-name "
 enigma remember --bundle .\.enigma\bundle.json --text-file $env:ENIGMA_DEMO_MEMORY_FILE --purpose user_memory --tags local
 enigma context --bundle .\.enigma\bundle.json --query "local context" --purpose local_context --out .\.enigma\context-pack.json
 enigma export --bundle .\.enigma\bundle.json --out .\.enigma\export.json
-enigma verify --bundle .\.enigma\export.json
+enigma verify --export .\.enigma\export.json
 ```
 
 The local bundle is the canonical state for this path. Provider-native memory is cache only. Exported proof and network artifacts should contain commitments, roots, addresses, receipt ids, and encrypted payloads, not raw memory plaintext.
@@ -175,18 +177,33 @@ Npm-first connector flow:
 
 ```sh
 npm install -g enigma-memory
-enigma quickstart --bundle "$HOME/.enigma/bundle.json" --overwrite
-enigma doctor --client claude-desktop
-enigma connect claude-desktop --bundle "$HOME/.enigma/bundle.json"
+enigma setup --overwrite
+enigma connect claude-desktop --dry-run
 ```
 
-Replace `claude-desktop` with `cursor`, `kimi-code`, `vscode-cline`, `roo`, `opencode`, or `generic-mcp`. `enigma doctor --client ...` is read-only: it reports whether the config path exists, whether the Enigma MCP entry exists, whether command/env match, and the safe next action (`missing_client_config`, `connect`, `repair`, or `already_configured`). `enigma connect ...` merges only the Enigma `mcpServers.enigma` entry and preserves unrelated settings.
+Replace `claude-desktop` with `cursor`, `kimi-code`, `vscode-cline`, `roo`, `opencode`, or `generic-mcp`. `--dry-run` is read-only: it reports the target config path, the planned Enigma MCP entry, and whether a write would be needed. Remove `--dry-run` only when you explicitly want Enigma to merge the `mcpServers.enigma` entry while preserving unrelated settings.
+
+Copy-paste MCP entry for Claude Desktop, Cursor, Kimi Code, or a generic MCP client:
+
+```json
+{
+  "mcpServers": {
+    "enigma": {
+      "command": "enigma-mcp",
+      "args": [],
+      "env": {
+        "ENIGMA_BUNDLE": "/absolute/path/to/.enigma/bundle.json"
+      }
+    }
+  }
+}
+```
 
 If Kimi Code or another GUI-launched client cannot find shell-installed binaries, reconnect with an absolute MCP command because GUI apps may not inherit your terminal `PATH`:
 
 ```sh
-enigma connect kimi-code --bundle "$HOME/.enigma/bundle.json" --mcp-command "/absolute/path/to/enigma-mcp"
-enigma connect kimi-code --bundle "$HOME/.enigma/bundle.json" --command "C:\\Users\\REPLACE_WITH_USER\\AppData\\Roaming\\npm\\enigma-mcp.cmd"
+enigma connect kimi-code --dry-run --mcp-command "/absolute/path/to/enigma-mcp"
+enigma connect kimi-code --mcp-command "/absolute/path/to/enigma-mcp"
 ```
 
 ## Browser extension and native host path
@@ -434,7 +451,7 @@ test -f "$ENIGMA_DEMO_MEMORY_FILE"
 enigma init --bundle ./.enigma/bundle.json
 enigma remember --bundle ./.enigma/bundle.json --text-file "$ENIGMA_DEMO_MEMORY_FILE" --purpose verification
 enigma export --bundle ./.enigma/bundle.json --out ./.enigma/export.json
-enigma verify --bundle ./.enigma/export.json
+enigma verify --export ./.enigma/export.json
 ```
 
 MCP handshake:

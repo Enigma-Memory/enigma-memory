@@ -1,6 +1,6 @@
 # Client connectors
 
-Enigma connects to assistant clients through MCP. The client starts `enigma-mcp` over stdio, and Enigma reads/writes the local vault bundle named by `ENIGMA_BUNDLE`.
+Enigma connects to assistant clients through MCP. The client starts `enigma-mcp` over stdio, and Enigma reads/writes the local vault bundle named by `ENIGMA_BUNDLE`. Install once, run setup once, then connect the same AI Memory Passport everywhere.
 
 Supported connector IDs:
 
@@ -12,21 +12,26 @@ Supported connector IDs:
 - `opencode`
 - `generic-mcp`
 
-## Install the package
-
-Install the published package first:
+## One clear path
 
 ```sh
 npm install -g enigma-memory
-enigma quickstart --bundle "$HOME/.enigma/bundle.json" --overwrite
-enigma doctor
+enigma setup --overwrite
+enigma remember --text-file ./memory.txt
+enigma search --query "..."
+enigma context --query "..." --optimize
+enigma verify --export ./.enigma/export.json
+enigma connect claude-desktop --dry-run
 ```
+
+`enigma setup --overwrite` writes local Enigma artifacts under the workspace `.enigma` path and emits deterministic, public-safe JSON. It does not write Claude, Cursor, Kimi, VS Code, Roo, OpenCode, or generic MCP client configs. Client config writes happen only when you explicitly run `enigma connect <client>` without `--dry-run`.
+
+Provider-native memory is cache only in this architecture. The Enigma vault remains canonical, and Enigma receipts prove Enigma-controlled lifecycle events; they do not prove that a hosted provider deleted hidden copies or that a model forgot anything.
 
 One-off execution without a global install:
 
 ```sh
-npx --yes --package enigma-memory enigma quickstart --bundle "$HOME/.enigma/bundle.json" --overwrite
-npx --yes --package enigma-memory enigma doctor
+npx --yes --package enigma-memory enigma setup --overwrite
 ```
 
 From a source checkout, use this only for package development or source-only docs:
@@ -36,63 +41,36 @@ cd enigma
 npm install -g .
 ```
 
-## Create the local vault first
+## Preview, then connect
 
-```sh
-enigma init --bundle "$HOME/.enigma/bundle.json" --subject local-user --display-name "Local user"
-enigma verify --bundle "$HOME/.enigma/bundle.json"
-```
-
-Windows PowerShell:
-
-```powershell
-enigma init --bundle "$HOME\.enigma\bundle.json" --subject local-user --display-name "Local user"
-enigma verify --bundle "$HOME\.enigma\bundle.json"
-```
-
-## Detect and connect client configs with the CLI
-
-Doctor all supported connector profiles:
+Preview all supported connector profiles:
 
 ```sh
 enigma doctor
 ```
 
-Doctor one client before changing it:
+Preview one client without changing it:
 
 ```sh
-enigma doctor --client claude-desktop
-enigma doctor --client cursor
-enigma doctor --client kimi-code
-enigma doctor --client vscode-cline
-enigma doctor --client roo
-enigma doctor --client opencode
-enigma doctor --client generic-mcp
+enigma connect claude-desktop --dry-run
+enigma connect cursor --dry-run
+enigma connect kimi-code --dry-run
+enigma connect vscode-cline --dry-run
+enigma connect roo --dry-run
+enigma connect opencode --dry-run
+enigma connect generic-mcp --dry-run
 ```
 
-Connector detection is read-only. It resolves the client config path for the current OS, checks whether that config exists, checks whether the `mcpServers.enigma` entry exists, and checks whether `command`, `args`, and `env.ENIGMA_BUNDLE` match the requested Enigma server entry. The safe `recommended_action` is one of:
-
-- `already_configured`: the Enigma MCP entry is present and matches the requested command/env.
-- `missing_client_config`: the client config file was not found; open/install the client first or pass an explicit `--config` path.
-- `connect`: the config exists but has no Enigma server entry; `enigma connect ...` can merge one without touching sibling settings.
-- `repair`: the existing Enigma entry or JSON needs correction; review the reported reason before reconnecting.
-
-Install the local Enigma package-level integration files:
+When the dry run looks right, remove `--dry-run` for the client you want:
 
 ```sh
-enigma install --bundle "$HOME/.enigma/bundle.json"
-```
-
-Connect one client:
-
-```sh
-enigma connect claude-desktop --bundle "$HOME/.enigma/bundle.json"
-enigma connect cursor --bundle "$HOME/.enigma/bundle.json"
-enigma connect kimi-code --bundle "$HOME/.enigma/bundle.json"
-enigma connect vscode-cline --bundle "$HOME/.enigma/bundle.json"
-enigma connect roo --bundle "$HOME/.enigma/bundle.json"
-enigma connect opencode --bundle "$HOME/.enigma/bundle.json"
-enigma connect generic-mcp --bundle "$HOME/.enigma/bundle.json"
+enigma connect claude-desktop
+enigma connect cursor
+enigma connect kimi-code
+enigma connect vscode-cline
+enigma connect roo
+enigma connect opencode
+enigma connect generic-mcp
 ```
 
 Disconnect one client without touching unrelated client settings:
@@ -107,23 +85,13 @@ enigma disconnect opencode
 enigma disconnect generic-mcp
 ```
 
-Connector writes are semantic and idempotent. Enigma preserves unrelated client settings and sibling MCP servers under `mcpServers`, writes changed JSON through a temporary file followed by `rename`, and creates a `.bak.<timestamp>` backup only when an existing config actually changes. Running the same `enigma connect ...` command against an equivalent config, even with JSON keys in a different order, reports `changed: false` and does not create or report a backup. The planner/detection APIs are read-only; JSON files are only written when the connect/disconnect API or CLI command is explicitly run.
+Connector writes are semantic and idempotent. Enigma preserves unrelated client settings and sibling MCP servers under `mcpServers`, writes changed JSON through a temporary file followed by `rename`, and creates a `.bak.<timestamp>` backup only when an existing config actually changes. Running the same `enigma connect ...` command against an equivalent config, even with JSON keys in a different order, reports `changed: false` and does not create or report a backup. Detection and dry runs are read-only.
 
-If you need to review the JSON before writing a client config, use the connector API from a checkout:
+## Copy-paste MCP snippets
 
-```sh
-node --input-type=module -e "import { renderMcpConfig } from './packages/connectors/src/index.js'; console.log(JSON.stringify(renderMcpConfig('generic-mcp', { bundlePath: process.env.HOME + '/.enigma/bundle.json' }), null, 2));"
-```
+Use an absolute bundle path. The MCP process inherits client environment in some apps and not in others; setting `ENIGMA_BUNDLE` directly in the entry is the portable path. The command defaults to `enigma-mcp`; if a GUI app cannot find shell-installed binaries, render an absolute command with `--mcp-command` (alias: `--command`).
 
-To show a public-safe ordered setup plan without reading or writing client files:
-
-```sh
-node --input-type=module -e "import { planConnectWizard } from './packages/connectors/src/index.js'; console.log(JSON.stringify(planConnectWizard({ platform: process.platform }), null, 2));"
-```
-
-## Universal MCP server entry
-
-Every supported client ultimately needs this shape:
+Claude Desktop:
 
 ```json
 {
@@ -139,10 +107,52 @@ Every supported client ultimately needs this shape:
 }
 ```
 
-Use an absolute bundle path. The MCP process inherits client environment in some apps and not in others; setting `ENIGMA_BUNDLE` directly in the entry is the portable path. The command defaults to `enigma-mcp`; if a GUI app cannot find shell-installed binaries, render an absolute command with `--mcp-command` (alias: `--command`).
+Cursor:
 
-```sh
-enigma connect kimi-code --bundle "$HOME/.enigma/bundle.json" --mcp-command "/absolute/path/to/enigma-mcp"
+```json
+{
+  "mcpServers": {
+    "enigma": {
+      "command": "enigma-mcp",
+      "args": [],
+      "env": {
+        "ENIGMA_BUNDLE": "/absolute/path/to/.enigma/bundle.json"
+      }
+    }
+  }
+}
+```
+
+Kimi Code:
+
+```json
+{
+  "mcpServers": {
+    "enigma": {
+      "command": "enigma-mcp",
+      "args": [],
+      "env": {
+        "ENIGMA_BUNDLE": "/absolute/path/to/.enigma/bundle.json"
+      }
+    }
+  }
+}
+```
+
+Generic MCP:
+
+```json
+{
+  "mcpServers": {
+    "enigma": {
+      "command": "enigma-mcp",
+      "args": [],
+      "env": {
+        "ENIGMA_BUNDLE": "/absolute/path/to/.enigma/bundle.json"
+      }
+    }
+  }
+}
 ```
 
 ## Claude Desktop
@@ -164,7 +174,7 @@ Manual entry:
       "command": "enigma-mcp",
       "args": [],
       "env": {
-        "ENIGMA_BUNDLE": "/Users/alice/.enigma/bundle.json"
+        "ENIGMA_BUNDLE": "/absolute/path/to/.enigma/bundle.json"
       }
     }
   }
@@ -174,7 +184,8 @@ Manual entry:
 CLI:
 
 ```sh
-enigma connect claude-desktop --bundle "$HOME/.enigma/bundle.json"
+enigma connect claude-desktop --dry-run
+enigma connect claude-desktop
 ```
 
 Restart Claude Desktop after changing the config.
@@ -198,7 +209,7 @@ Manual entry:
       "command": "enigma-mcp",
       "args": [],
       "env": {
-        "ENIGMA_BUNDLE": "/Users/alice/.enigma/bundle.json"
+        "ENIGMA_BUNDLE": "/absolute/path/to/.enigma/bundle.json"
       }
     }
   }
@@ -208,7 +219,8 @@ Manual entry:
 CLI:
 
 ```sh
-enigma connect cursor --bundle "$HOME/.enigma/bundle.json"
+enigma connect cursor --dry-run
+enigma connect cursor
 ```
 
 Restart Cursor or reload the window after changing the config.
@@ -232,7 +244,7 @@ Manual entry:
       "command": "enigma-mcp",
       "args": [],
       "env": {
-        "ENIGMA_BUNDLE": "/Users/alice/.enigma/bundle.json"
+        "ENIGMA_BUNDLE": "/absolute/path/to/.enigma/bundle.json"
       }
     }
   }
@@ -242,14 +254,15 @@ Manual entry:
 CLI:
 
 ```sh
-enigma connect kimi-code --bundle "$HOME/.enigma/bundle.json"
+enigma connect kimi-code --dry-run
+enigma connect kimi-code
 ```
 
 Kimi Code is usually launched from the operating-system GUI, so it may not inherit the same `PATH` as your terminal. If Kimi Code does not find `enigma-mcp`, pass an absolute executable path:
 
 ```sh
-enigma connect kimi-code --bundle "$HOME/.enigma/bundle.json" --mcp-command "/opt/homebrew/bin/enigma-mcp"
-enigma connect kimi-code --bundle "$HOME/.enigma/bundle.json" --command "C:\\Users\\alice\\AppData\\Roaming\\npm\\enigma-mcp.cmd"
+enigma connect kimi-code --dry-run --mcp-command "/absolute/path/to/enigma-mcp"
+enigma connect kimi-code --mcp-command "/absolute/path/to/enigma-mcp"
 ```
 
 The rendered Kimi Code config still uses the same local bundle contract:
@@ -261,7 +274,7 @@ The rendered Kimi Code config still uses the same local bundle contract:
       "command": "/absolute/path/to/enigma-mcp",
       "args": [],
       "env": {
-        "ENIGMA_BUNDLE": "/Users/alice/.enigma/bundle.json"
+        "ENIGMA_BUNDLE": "/absolute/path/to/.enigma/bundle.json"
       }
     }
   }
@@ -289,7 +302,7 @@ Manual entry:
       "command": "enigma-mcp",
       "args": [],
       "env": {
-        "ENIGMA_BUNDLE": "/Users/alice/.enigma/bundle.json"
+        "ENIGMA_BUNDLE": "/absolute/path/to/.enigma/bundle.json"
       }
     }
   }
@@ -299,7 +312,8 @@ Manual entry:
 CLI:
 
 ```sh
-enigma connect vscode-cline --bundle "$HOME/.enigma/bundle.json"
+enigma connect vscode-cline --dry-run
+enigma connect vscode-cline
 ```
 
 Reload VS Code after changing the config.
@@ -323,7 +337,7 @@ Manual entry:
       "command": "enigma-mcp",
       "args": [],
       "env": {
-        "ENIGMA_BUNDLE": "/Users/alice/.enigma/bundle.json"
+        "ENIGMA_BUNDLE": "/absolute/path/to/.enigma/bundle.json"
       }
     }
   }
@@ -333,7 +347,8 @@ Manual entry:
 CLI:
 
 ```sh
-enigma connect roo --bundle "$HOME/.enigma/bundle.json"
+enigma connect roo --dry-run
+enigma connect roo
 ```
 
 Reload VS Code after changing the config.
@@ -357,7 +372,7 @@ Manual entry:
       "command": "enigma-mcp",
       "args": [],
       "env": {
-        "ENIGMA_BUNDLE": "/Users/alice/.enigma/bundle.json"
+        "ENIGMA_BUNDLE": "/absolute/path/to/.enigma/bundle.json"
       }
     }
   }
@@ -367,7 +382,8 @@ Manual entry:
 CLI:
 
 ```sh
-enigma connect opencode --bundle "$HOME/.enigma/bundle.json"
+enigma connect opencode --dry-run
+enigma connect opencode
 ```
 
 Restart OpenCode after changing the config.
@@ -401,7 +417,8 @@ Manual entry:
 CLI:
 
 ```sh
-enigma connect generic-mcp --bundle "$HOME/.enigma/bundle.json"
+enigma connect generic-mcp --dry-run
+enigma connect generic-mcp
 ```
 
 ## Verify MCP by hand

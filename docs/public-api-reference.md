@@ -346,7 +346,7 @@ The native-host bridge stays local and explicit-approval only. Provider-native m
 
 ## MCP server surface
 
-Transport: stdio JSON-RPC through `enigma-mcp` or `enigma mcp serve`. Protocol version advertised by the server is `2024-11-05`; server info is `enigma-mcp-server` version `0.1.5`.
+Transport: stdio JSON-RPC through `enigma-mcp` or `enigma mcp serve`. Protocol version advertised by the server is `2024-11-05`; server info is `enigma-mcp-server` version `0.1.6`.
 
 Supported JSON-RPC methods are `initialize`, `notifications/initialized`, `ping`, `tools/list`, `tools/call`, `resources/list`, `resources/templates/list`, `resources/read`, `prompts/list`, and `prompts/get`. Unknown methods return JSON-RPC method-not-found errors; request ids must be strings/numbers/null matching the server's id validation.
 
