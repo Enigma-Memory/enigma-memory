@@ -74,11 +74,11 @@ node apps/relay/bin/enigma-relay.mjs demo
 node apps/gateway/bin/enigma-gateway.mjs demo
 ```
 
-## Install from npm after publication
+## Install from npm
 
-After the public `enigma-memory` package is published:
+The public package is published as `enigma-memory`:
 
-Publication boundary: the source-checkout installer does not publish the package and does not install from the registry. Use the npm commands below only after an operator has published `enigma-memory` from the authorized npm account; until then, use the source checkout flow above or direct local bins.
+Publication boundary: the source-checkout installer does not publish the package and does not install from the registry. The public npm package is `enigma-memory`; use the npm commands below for the simplest package install, or use the source checkout flow above when you need source-only docs, Docker assets, or runbooks.
 
 ```sh
 npm install -g enigma-memory

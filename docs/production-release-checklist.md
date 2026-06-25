@@ -34,8 +34,8 @@ Before enabling live monitoring, analytics, or token rotation, use [`live-endpoi
 
 - [ ] Package name is `enigma-memory`.
 - [ ] Public install command is `npm install -g enigma-memory`; one-off CLI examples use `npx --yes --package enigma-memory <bin> ...`.
-- [ ] Package is publishable when release credentials are present.
-- [ ] `docs/npm-publishing.md` is followed before any npm publication attempt, including package preflight, `npm pack --dry-run`, manual approval, `NPM_TOKEN` secret handling, provenance/SBOM boundaries, and rollback/deprecation notes.
+- [ ] Published npm package is visible as `enigma-memory@0.1.0` before public npm-install claims are made.
+- [ ] `docs/npm-publishing.md` is followed before any future npm publication attempt, including package preflight, `npm pack --dry-run`, manual approval, `NPM_TOKEN` secret handling, provenance/SBOM boundaries, and rollback/deprecation notes.
 - [ ] `private` is not set for the publish artifact.
 - [ ] Node engine is `>=24`.
 - [ ] Package import has no side effects: importing modules must not start servers, read user files, mutate configs, or open network connections.
