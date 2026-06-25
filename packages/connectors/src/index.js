@@ -235,14 +235,19 @@ export function getClientProfile(clientIdOrOptions = 'generic-mcp', maybeOptions
   });
 }
 
+function serverEnvFromOptions(options = {}) {
+  return options.serverEnv ?? options.server_env ?? options.mcpEnv ?? options.mcp_env;
+}
+
 function serverEntryFromOptions(options = {}) {
   const env = {};
-  if (isPlainObject(options.env)) {
-    for (const [key, value] of Object.entries(options.env)) {
+  const serverEnv = serverEnvFromOptions(options);
+  if (isPlainObject(serverEnv)) {
+    for (const [key, value] of Object.entries(serverEnv)) {
       if (value !== undefined && value !== null) env[key] = String(value);
     }
   }
-  const bundlePath = String(options.bundlePath ?? options.bundle_path ?? env.ENIGMA_BUNDLE ?? defaultBundlePath(options));
+  const bundlePath = String(options.bundlePath ?? options.bundle_path ?? env.ENIGMA_BUNDLE ?? options.env?.ENIGMA_BUNDLE ?? defaultBundlePath(options));
   env.ENIGMA_BUNDLE = bundlePath;
   return {
     command: mcpCommandFromOptions(options),
@@ -309,10 +314,18 @@ async function unusedBackupPath(configPath, now) {
   throw new Error(`Cannot allocate backup path for ${configPath}.`);
 }
 
-async function readJsonConfig(configPath) {
+function optionFileReader(options = {}) {
+  const reader = options.readFile ?? options.read_file ?? options.fs?.readFile ?? options.fileSystem?.readFile;
+  if (reader === undefined) return { reader: readFile, thisArg: undefined };
+  if (typeof reader !== 'function') throw new Error('Connector readFile option must be a function.');
+  return { reader, thisArg: options.fs ?? options.fileSystem };
+}
+
+async function readJsonConfig(configPath, options = {}) {
   let text;
   try {
-    text = await readFile(configPath, 'utf8');
+    const { reader, thisArg } = optionFileReader(options);
+    text = await reader.call(thisArg, configPath, 'utf8');
   } catch (error) {
     if (error?.code === 'ENOENT') return { exists: false, config: {} };
     throw error;
@@ -322,9 +335,15 @@ async function readJsonConfig(configPath) {
   try {
     config = JSON.parse(text);
   } catch (error) {
-    throw new Error(`Cannot parse JSON connector config at ${configPath}: ${error.message}`);
+    const parseError = new Error(`Cannot parse JSON connector config at ${configPath}: ${error.message}`);
+    parseError.code = 'EJSONPARSE';
+    throw parseError;
   }
-  if (!isPlainObject(config)) throw new Error(`Connector config at ${configPath} must be a JSON object.`);
+  if (!isPlainObject(config)) {
+    const typeError = new Error(`Connector config at ${configPath} must be a JSON object.`);
+    typeError.code = 'EJSONTYPE';
+    throw typeError;
+  }
   return { exists: true, config };
 }
 
@@ -412,7 +431,7 @@ export async function connectClient(clientIdOrOptions = 'generic-mcp', maybeOpti
   const options = normalizeOptions(clientIdOrOptions, maybeOptions);
   const clientId = normalizeClientId(options.clientId ?? options.client_id);
   const configPath = String(options.configPath ?? options.config_path ?? platformDefaultConfigPath(clientId, options));
-  const { exists, config } = await readJsonConfig(configPath);
+  const { exists, config } = await readJsonConfig(configPath, options);
   const plan = connectPlan({ clientId, options: { ...options, configPath }, exists, existingConfig: config, backupPath: null });
   if (exists && plan.changed) {
     plan.backupPath = await unusedBackupPath(configPath, options.now);
@@ -425,7 +444,7 @@ export async function disconnectClient(clientIdOrOptions = 'generic-mcp', maybeO
   const options = normalizeOptions(clientIdOrOptions, maybeOptions);
   const clientId = normalizeClientId(options.clientId ?? options.client_id);
   const configPath = String(options.configPath ?? options.config_path ?? platformDefaultConfigPath(clientId, options));
-  const { exists, config } = await readJsonConfig(configPath);
+  const { exists, config } = await readJsonConfig(configPath, options);
   const plan = disconnectPlan({ clientId, options: { ...options, configPath }, exists, existingConfig: config, backupPath: null });
   if (exists && plan.changed) {
     plan.backupPath = await unusedBackupPath(configPath, options.now);
@@ -434,51 +453,264 @@ export async function disconnectClient(clientIdOrOptions = 'generic-mcp', maybeO
   return writePlan(plan, exists);
 }
 
-function installedState(config, profile, serverName, options = {}) {
-  const container = ensureContainer(config, profile.server_container_path, false);
-  if (!container || !isPlainObject(container[serverName])) return { installed: false, commandOk: false, bundleEnvOk: false };
-  const entry = container[serverName];
+function emptyInstalledState() {
   return {
-    installed: true,
-    commandOk: entry.command === mcpCommandFromOptions(options),
-    bundleEnvOk: typeof entry.env?.ENIGMA_BUNDLE === 'string' && entry.env.ENIGMA_BUNDLE.length > 0,
+    installed: false,
+    serverEntryExists: false,
+    server_entry_exists: false,
+    commandOk: false,
+    command_ok: false,
+    argsOk: false,
+    args_ok: false,
+    bundleEnvPresent: false,
+    bundle_env_present: false,
+    bundleEnvOk: false,
+    bundle_env_ok: false,
+    envOk: false,
+    env_ok: false,
   };
 }
 
-export async function doctorConnectors(clientIdOrOptions = {}, maybeOptions = {}) {
+function installedState(config, profile, serverName, options = {}) {
+  const container = ensureContainer(config, profile.server_container_path, false);
+  if (!container || !isPlainObject(container[serverName])) return emptyInstalledState();
+  const entry = container[serverName];
+  const expectedEntry = serverEntryFromOptions(options);
+  const actualArgs = Array.isArray(entry.args) ? [...entry.args].map(String) : [];
+  const actualEnv = {};
+  if (isPlainObject(entry.env)) {
+    for (const [key, value] of Object.entries(entry.env)) {
+      if (value !== undefined && value !== null) actualEnv[key] = String(value);
+    }
+  }
+  const actualBundlePath = typeof actualEnv.ENIGMA_BUNDLE === 'string' ? actualEnv.ENIGMA_BUNDLE : '';
+  const commandOk = entry.command === expectedEntry.command;
+  const argsOk = jsonEqual(actualArgs, expectedEntry.args);
+  const bundleEnvOk = actualBundlePath === expectedEntry.env.ENIGMA_BUNDLE;
+  const envOk = jsonEqual(actualEnv, expectedEntry.env);
+  return {
+    installed: true,
+    serverEntryExists: true,
+    server_entry_exists: true,
+    commandOk,
+    command_ok: commandOk,
+    argsOk,
+    args_ok: argsOk,
+    bundleEnvPresent: actualBundlePath.length > 0,
+    bundle_env_present: actualBundlePath.length > 0,
+    bundleEnvOk,
+    bundle_env_ok: bundleEnvOk,
+    envOk,
+    env_ok: envOk,
+  };
+}
+
+function recommendedConnectorAction(exists, state, error) {
+  if (error) return 'repair';
+  if (!exists) return 'missing_client_config';
+  if (!state.installed) return 'connect';
+  return state.commandOk && state.argsOk && state.envOk ? 'already_configured' : 'repair';
+}
+
+function connectorRepairReasons(exists, state, error) {
+  if (error?.code === 'EJSONPARSE') return ['config_json_invalid'];
+  if (error?.code === 'EJSONTYPE') return ['config_json_not_object'];
+  if (error) return ['config_unreadable'];
+  if (!exists) return ['client_config_missing'];
+  if (!state.installed) return ['enigma_server_missing'];
+  const reasons = [];
+  if (!state.commandOk) reasons.push('command_mismatch');
+  if (!state.argsOk) reasons.push('args_mismatch');
+  if (!state.bundleEnvPresent) reasons.push('bundle_env_missing');
+  else if (!state.bundleEnvOk) reasons.push('bundle_env_mismatch');
+  else if (!state.envOk) reasons.push('env_mismatch');
+  return reasons;
+}
+
+function shouldRedactPaths(options = {}) {
+  return options.redactPaths === true || options.redact_paths === true || options.redact === true;
+}
+
+function redactedPath(path, label, options = {}) {
+  return shouldRedactPaths(options) ? `[redacted:${label}]` : path;
+}
+
+function redactErrorMessage(message, configPath, options = {}) {
+  if (!shouldRedactPaths(options)) return message;
+  const candidates = [
+    configPath,
+    options.homeDir,
+    options.home_dir,
+    options.bundlePath,
+    options.bundle_path,
+    options.env?.HOME,
+    options.env?.USERPROFILE,
+    options.env?.APPDATA,
+  ].filter((value) => typeof value === 'string' && value.length > 0);
+  let redacted = String(message);
+  for (const candidate of candidates) {
+    redacted = redacted.split(candidate).join('[redacted:path]');
+  }
+  return redacted.split('[redacted:path]').join(redactedPath(configPath, 'config_path', options));
+}
+
+function publicBundlePlaceholder(platform) {
+  return platform === 'win32' ? '%USERPROFILE%\\.enigma\\bundle.json' : '$HOME/.enigma/bundle.json';
+}
+
+function publicDefaultConfigPath(clientId, platform) {
+  return CLIENT_DEFINITIONS[clientId].default_config_paths[platform];
+}
+
+function connectCommandFor(clientId, platform) {
+  return `enigma connect ${clientId} --bundle "${publicBundlePlaceholder(platform)}"`;
+}
+
+function wizardStepsForClient(clientId, platform) {
+  const steps = [
+    {
+      order: 1,
+      id: 'install_package',
+      title: 'Install the published package first.',
+      command: 'npm install -g enigma-memory',
+      writes: 'global_npm_package',
+    },
+    {
+      order: 2,
+      id: 'create_local_bundle',
+      title: 'Create and verify the local Enigma bundle.',
+      commands: [
+        `enigma quickstart --bundle "${publicBundlePlaceholder(platform)}" --overwrite`,
+        `enigma verify --bundle "${publicBundlePlaceholder(platform)}"`,
+      ],
+      writes: 'local_enigma_bundle',
+    },
+    {
+      order: 3,
+      id: 'doctor_client',
+      title: 'Inspect the client config before changing it.',
+      command: `enigma doctor --client ${clientId}`,
+      writes: false,
+    },
+    {
+      order: 4,
+      id: 'connect_client',
+      title: 'Merge only the Enigma MCP server entry into the client config.',
+      command: connectCommandFor(clientId, platform),
+      writes: 'client_config_when_user_runs_command',
+    },
+    {
+      order: 5,
+      id: 'restart_client',
+      title: 'Restart or reload the client so it re-reads MCP settings.',
+      writes: false,
+    },
+  ];
+  if (clientId === 'kimi-code') {
+    steps.splice(4, 0, {
+      order: 5,
+      id: 'kimi_gui_path_caveat',
+      title: 'If Kimi Code was launched from the GUI and cannot find enigma-mcp, reconnect with an absolute command path.',
+      command: `${connectCommandFor(clientId, platform)} --mcp-command "/absolute/path/to/enigma-mcp"`,
+      writes: 'client_config_when_user_runs_command',
+    });
+    for (let index = 5; index < steps.length; index += 1) steps[index].order = index + 1;
+  }
+  return steps;
+}
+
+export function planConnectWizard(clientIdOrOptions = {}, maybeOptions = {}) {
+  const options = normalizeOptions(clientIdOrOptions, maybeOptions);
+  const selected = options.clientId ?? options.client_id;
+  const clientIds = selected ? [normalizeClientId(selected)] : supportedClients;
+  const platform = normalizePlatform(options.platform ?? process.platform);
+  return {
+    ok: true,
+    schema: 'enigma.connect_wizard_plan.v1',
+    platform,
+    writes_performed: false,
+    writesPerformed: false,
+    clients: clientIds.map((clientId) => ({
+      client_id: clientId,
+      display_name: CLIENT_DEFINITIONS[clientId].display_name,
+      default_config_path: publicDefaultConfigPath(clientId, platform),
+      steps: wizardStepsForClient(clientId, platform),
+    })),
+  };
+}
+
+export async function detectClientConnector(clientIdOrOptions = 'generic-mcp', maybeOptions = {}) {
+  const options = normalizeOptions(clientIdOrOptions, maybeOptions);
+  const clientId = normalizeClientId(options.clientId ?? options.client_id ?? 'generic-mcp');
+  const profile = getClientProfile(clientId, options);
+  const serverName = String(options.serverName ?? options.server_name ?? profile.server_name);
+  const configPath = String(options.configPath ?? options.config_path ?? profile.default_config_path);
+  const displayedConfigPath = redactedPath(configPath, 'config_path', options);
+  const base = {
+    client_id: clientId,
+    display_name: profile.display_name,
+    platform: profile.platform,
+    configPath: displayedConfigPath,
+    config_path: displayedConfigPath,
+    public_default_config_path: publicDefaultConfigPath(clientId, profile.platform),
+    serverName,
+    server_name: serverName,
+  };
+
+  try {
+    const { exists, config } = await readJsonConfig(configPath, options);
+    const state = exists ? installedState(config, profile, serverName, options) : emptyInstalledState();
+    const action = recommendedConnectorAction(exists, state);
+    return {
+      ...base,
+      ok: action === 'already_configured' || action === 'missing_client_config',
+      exists,
+      configPathExists: exists,
+      config_path_exists: exists,
+      ...state,
+      action,
+      recommendedAction: action,
+      recommended_action: action,
+      repairReasons: connectorRepairReasons(exists, state),
+      repair_reasons: connectorRepairReasons(exists, state),
+      wizard: planConnectWizard(clientId, { platform: profile.platform }).clients[0],
+    };
+  } catch (error) {
+    const state = emptyInstalledState();
+    const action = recommendedConnectorAction(true, state, error);
+    return {
+      ...base,
+      ok: false,
+      exists: true,
+      configPathExists: true,
+      config_path_exists: true,
+      ...state,
+      action,
+      recommendedAction: action,
+      recommended_action: action,
+      repairReasons: connectorRepairReasons(true, state, error),
+      repair_reasons: connectorRepairReasons(true, state, error),
+      parseError: error?.code === 'EJSONPARSE' || error?.code === 'EJSONTYPE',
+      parse_error: error?.code === 'EJSONPARSE' || error?.code === 'EJSONTYPE',
+      error: redactErrorMessage(error.message, configPath, options),
+      wizard: planConnectWizard(clientId, { platform: profile.platform }).clients[0],
+    };
+  }
+}
+
+export async function detectConnectors(clientIdOrOptions = {}, maybeOptions = {}) {
   const options = normalizeOptions(clientIdOrOptions, maybeOptions);
   const selected = options.clientId ?? options.client_id;
   const clientIds = selected ? [normalizeClientId(selected)] : supportedClients;
   const clients = [];
-
   for (const clientId of clientIds) {
-    const profile = getClientProfile(clientId, options);
-    const serverName = String(options.serverName ?? options.server_name ?? profile.server_name);
-    const configPath = String(options.configPath ?? options.config_path ?? profile.default_config_path);
-    try {
-      const { exists, config } = await readJsonConfig(configPath);
-      const state = exists ? installedState(config, profile, serverName, options) : { installed: false, commandOk: false, bundleEnvOk: false };
-      clients.push({
-        client_id: clientId,
-        ok: !exists || (state.installed && state.commandOk && state.bundleEnvOk),
-        exists,
-        configPath,
-        serverName,
-        ...state,
-      });
-    } catch (error) {
-      clients.push({
-        client_id: clientId,
-        ok: false,
-        exists: true,
-        configPath,
-        serverName,
-        error: error.message,
-      });
-    }
+    clients.push(await detectClientConnector(clientId, options));
   }
-
   return { ok: clients.every((client) => client.ok), clients };
+}
+
+export async function doctorConnectors(clientIdOrOptions = {}, maybeOptions = {}) {
+  return detectConnectors(clientIdOrOptions, maybeOptions);
 }
 
 export function runConnectorDemo(input = {}) {
@@ -515,6 +747,7 @@ export function runConnectorDemo(input = {}) {
     backupPath: backupPathFor(demoOptions.configPath, demoOptions.now),
   });
   const generatedJson = stringifyConfig(sampleConfig);
+  const wizardPlan = planConnectWizard(clientId, { platform: profile.platform }).clients[0];
 
   return {
     ok: true,
@@ -529,5 +762,7 @@ export function runConnectorDemo(input = {}) {
     disconnect: disconnectResult,
     generatedJson,
     generatedJSON: generatedJson,
+    wizardPlan,
+    wizard_plan: wizardPlan,
   };
 }

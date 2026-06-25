@@ -14,24 +14,26 @@ Supported connector IDs:
 
 ## Install the package
 
-From this repository:
+Install the published package first:
+
+```sh
+npm install -g enigma-memory
+enigma quickstart --bundle "$HOME/.enigma/bundle.json" --overwrite
+enigma doctor
+```
+
+One-off execution without a global install:
+
+```sh
+npx --yes --package enigma-memory enigma quickstart --bundle "$HOME/.enigma/bundle.json" --overwrite
+npx --yes --package enigma-memory enigma doctor
+```
+
+From a source checkout, use this only for package development or source-only docs:
 
 ```sh
 cd enigma
 npm install -g .
-```
-
-After the public `enigma-memory` package is published:
-
-```sh
-npm install -g enigma-memory
-```
-
-One-off `enigma-memory` package execution after publication:
-
-```sh
-npx --yes --package enigma-memory enigma --help
-npx --yes --package enigma-memory enigma doctor
 ```
 
 ## Create the local vault first
@@ -48,13 +50,32 @@ enigma init --bundle "$HOME\.enigma\bundle.json" --subject local-user --display-
 enigma verify --bundle "$HOME\.enigma\bundle.json"
 ```
 
-## Install/check connector configs with the CLI
+## Detect and connect client configs with the CLI
 
 Doctor all supported connector profiles:
 
 ```sh
 enigma doctor
 ```
+
+Doctor one client before changing it:
+
+```sh
+enigma doctor --client claude-desktop
+enigma doctor --client cursor
+enigma doctor --client kimi-code
+enigma doctor --client vscode-cline
+enigma doctor --client roo
+enigma doctor --client opencode
+enigma doctor --client generic-mcp
+```
+
+Connector detection is read-only. It resolves the client config path for the current OS, checks whether that config exists, checks whether the `mcpServers.enigma` entry exists, and checks whether `command`, `args`, and `env.ENIGMA_BUNDLE` match the requested Enigma server entry. The safe `recommended_action` is one of:
+
+- `already_configured`: the Enigma MCP entry is present and matches the requested command/env.
+- `missing_client_config`: the client config file was not found; open/install the client first or pass an explicit `--config` path.
+- `connect`: the config exists but has no Enigma server entry; `enigma connect ...` can merge one without touching sibling settings.
+- `repair`: the existing Enigma entry or JSON needs correction; review the reported reason before reconnecting.
 
 Install the local Enigma package-level integration files:
 
@@ -86,12 +107,18 @@ enigma disconnect opencode
 enigma disconnect generic-mcp
 ```
 
-Connector writes are semantic and idempotent. Enigma preserves unrelated client settings and sibling MCP servers under `mcpServers`, writes changed JSON through a temporary file followed by `rename`, and creates a `.bak.<timestamp>` backup only when an existing config actually changes. Running the same `enigma connect ...` command against an equivalent config, even with JSON keys in a different order, reports `changed: false` and does not create or report a backup.
+Connector writes are semantic and idempotent. Enigma preserves unrelated client settings and sibling MCP servers under `mcpServers`, writes changed JSON through a temporary file followed by `rename`, and creates a `.bak.<timestamp>` backup only when an existing config actually changes. Running the same `enigma connect ...` command against an equivalent config, even with JSON keys in a different order, reports `changed: false` and does not create or report a backup. The planner/detection APIs are read-only; JSON files are only written when the connect/disconnect API or CLI command is explicitly run.
 
 If you need to review the JSON before writing a client config, use the connector API from a checkout:
 
 ```sh
 node --input-type=module -e "import { renderMcpConfig } from './packages/connectors/src/index.js'; console.log(JSON.stringify(renderMcpConfig('generic-mcp', { bundlePath: process.env.HOME + '/.enigma/bundle.json' }), null, 2));"
+```
+
+To show a public-safe ordered setup plan without reading or writing client files:
+
+```sh
+node --input-type=module -e "import { planConnectWizard } from './packages/connectors/src/index.js'; console.log(JSON.stringify(planConnectWizard({ platform: process.platform }), null, 2));"
 ```
 
 ## Universal MCP server entry

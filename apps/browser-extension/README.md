@@ -118,7 +118,40 @@ All insertion is plain text. No HTML from Enigma context is inserted into provid
 
 ## Loading during development
 
-1. Register the local native messaging host as `com.enigma.native_host` in the browser profile.
-2. Open the browser extension management page.
-3. Enable developer mode and load `enigma/apps/browser-extension` as an unpacked extension.
-4. Visit a supported provider page and use the Enigma control in the lower-right corner.
+Package preflight from the package root:
+
+```sh
+node scripts/package-browser-extension.mjs
+```
+
+To also write a deterministic local ZIP for review:
+
+```sh
+node scripts/package-browser-extension.mjs --zip ./dist/enigma-browser-extension.zip
+```
+
+The packager validates the unpacked extension, denies source maps/private files/credential-shaped content/local user paths, and emits public-safe JSON with file checksums. It does not submit to any browser store.
+
+1. Install the npm package so the local native host is available:
+
+   ```sh
+   npm install -g enigma-memory
+   ```
+
+2. Create or select a local bundle and make it available to the browser-launched native host through `ENIGMA_BUNDLE` or a local wrapper.
+3. Load `enigma/apps/browser-extension` as an unpacked extension in Chrome or Edge, or load `manifest.json` as a temporary add-on in Firefox.
+4. Copy the local extension ID from the browser developer page.
+5. Generate the native host manifest:
+
+   ```sh
+   enigma native-host manifest \
+     --browser chrome \
+     --host-path <absolute-enigma-native-host-path> \
+     --extension-id <local-extension-id> \
+     --out ./com.enigma.native_host.json
+   ```
+
+   Use `--browser edge` or `--browser firefox` for those browsers. Preview install targets with `enigma native-host install-plan --browser <chrome|edge|firefox> --manifest <absolute-manifest-path>`, then manually copy/register the manifest as instructed.
+6. Restart the browser, visit a supported HTTPS provider page, click **Request context**, review the returned local context, then click **Approve and insert**.
+
+The extension never auto-injects, never submits the provider prompt for the user, and does not use browser sync storage. See `enigma/docs/browser-extension-install.md` for browser-specific local install steps.

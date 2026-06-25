@@ -1,0 +1,63 @@
+name: Enigma Memory smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  enigma-memory-smoke:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Create disposable npm project
+        run: npm init -y
+
+      - name: Install Enigma Memory
+        run: npm install enigma-memory@0.1.1
+
+      - name: Run Enigma quickstart
+        run: npx enigma quickstart --overwrite
+
+      - name: Run Enigma doctor
+        run: npx enigma doctor
+
+      - name: Smoke test package imports
+        run: |
+          node --input-type=module <<'JS'
+          import { createVault, remember, exportBundle } from 'enigma-memory/vault';
+          import { createPassport, compileContextPack } from 'enigma-memory/passport';
+          import { verifyReceiptChain } from 'enigma-memory';
+
+          const vault = createVault({ subject_id: 'ci-demo-subject' });
+          const passport = createPassport({ vault, display_name: 'CI Demo' });
+          const remembered = remember({
+            vault,
+            text: 'CI smoke uses a generic non-private Enigma Memory fact.',
+            purpose_tags: ['ci-smoke'],
+          });
+          const pack = compileContextPack({
+            vault,
+            passport,
+            memory_addresses: [remembered.memory_addr],
+            limit: 1,
+          });
+          const bundle = exportBundle({ vault, includePlaintext: false });
+          const report = verifyReceiptChain({
+            receipts: bundle.receipts,
+            publicKey: bundle.keyring.publicKey,
+            expectedReceiptLogRoot: bundle.vault.receipt_log_root,
+            expectedActiveSetRoot: bundle.vault.active_set_root,
+            verifyEmbeddedReceiptLogRoot: true,
+          });
+          if (!report.valid) throw new Error(`receipt verification failed: ${report.errors.join('; ')}`);
+          console.log(JSON.stringify({ ok: true, memory_count: pack.memory_addresses.length, receipt_count: bundle.receipts.length }));
+          JS

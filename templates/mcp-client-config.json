@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "enigma": {
+      "command": "enigma-mcp",
+      "env": {
+        "ENIGMA_BUNDLE": "<ENIGMA_BUNDLE>"
+      }
+    }
+  }
+}

@@ -5,7 +5,7 @@ Enigma is a provider-agnostic AI memory custody and proof layer. It gives a user
 Current status:
 
 - Local production foundation: CLI, verifier, vault, passport, boundary, MCP server, connector, importer, relay, gateway, enterprise, mesh, browser-extension, and desktop scaffold code exist in this repository.
-- Published npm package: package bins and module entry points are available as `enigma-memory@0.1.0`; use the npm install path below for the simplest onboarding flow.
+- Published npm package: package bins and module entry points are available as `enigma-memory`; use the npm install path below for the simplest onboarding flow.
 - Source-only artifacts: `docs/`, `Dockerfile`, and `docker-compose.yml` live in the source checkout. The package README and CLI help are the package-included install guides; the full runbooks require the repository or hosted docs.
 - Hosted cloud is not included by default. Hosted relay/gateway/cloud operation requires deployment credentials, a domain, TLS, production durable storage, KMS/secrets, monitoring, backups, operator policy, and a completed operator acceptance packet. Local relay/gateway `--state-file` demo state does not satisfy those hosted/BYOC requirements.
 - Cloudflare API/domain/hosting automation is documented but safe-by-default: [`docs/cloudflare-token-and-domain-runbook.md`](docs/cloudflare-token-and-domain-runbook.md) gives the token recipe, Registrar prerequisites, local token storage rule, search/check flow, explicit domain+price purchase gate, Pages deploy gate, custom-domain steps, and post-setup token rotation.
@@ -22,10 +22,32 @@ Enigma does not claim that a closed provider deleted internal data, that model w
 Prerequisites:
 
 - Node.js `>=24`
-- Git for the source-checkout path
-- No database, package registry account, provider credential, or cloud credential for the local no-network path
+- No database, package registry account, provider credential, or cloud credential for the local package quickstart
+- Git only when you choose the advanced source-checkout path
 
-Fastest path from GitHub:
+## Quickstart from npm
+
+Use the published package first:
+
+```sh
+npm install -g enigma-memory
+enigma quickstart --bundle ./.enigma/bundle.json --overwrite
+enigma doctor
+enigma-relay demo
+enigma-gateway demo
+```
+
+`enigma quickstart` creates a local Enigma workspace for proof review: a local vault bundle, a context pack, an export proof bundle, and a verify report. These artifacts prove Enigma-controlled local vault state, receipts, checkpoints, and verification results only; they do not prove provider deletion, provider model forgetting, provider-native memory removal, hosted availability, or compliance certification.
+
+One-off execution without a global install:
+
+```sh
+npx --yes --package enigma-memory enigma quickstart --bundle ./.enigma/bundle.json --overwrite
+```
+
+## Advanced/source-only path
+
+Use a source checkout only when you need source-only docs, Docker assets, browser-extension scaffolding, package development, or release scripts:
 
 ```sh
 git clone https://github.com/Enigma-Memory/enigma-memory.git
@@ -36,43 +58,9 @@ enigma-relay demo
 enigma-gateway demo
 ```
 
-`install:local` is dry-run unless `--execute` is present. The command above installs the checked-out package globally, creates a local vault bundle, and never needs Cloudflare, OpenAI, Anthropic, npm publish credentials, a database, or hosted infrastructure.
+`install:local` is dry-run unless `--execute` is present. The command above installs the checked-out package globally and creates a local vault bundle. It does not require Cloudflare, OpenAI, Anthropic, npm publish credentials, a database, or hosted infrastructure.
 
-If the repository is already checked out:
-
-```sh
-npm install -g .
-enigma --help
-enigma-verify --help
-enigma-relay demo
-enigma-gateway demo
-```
-
-Repeat the local package/demo release evidence from a source checkout:
-
-```sh
-npm run release:audit
-```
-
-The audit prints an `enigma.release_audit.v1` JSON summary and supports `-- --out <file>` for handoff/goal-audit ingestion. It fails nonzero if any required local gate fails. It runs `npm run check`, `npm test`, `npm pack --dry-run`, direct-bin help/demo smokes, and an MCP stdio `initialize`/`tools`/`resources`/`prompts` smoke. It does not require Docker, cloud credentials, npm publish credentials, or a live website.
-
-Generate local provenance/SBOM checksum evidence from the source checkout:
-
-```sh
-npm run provenance:local -- --out ./.enigma/release-provenance.json
-```
-
-The provenance/SBOM command writes package-surface file inventory and SHA-256 values for reviewer comparison, then prints `{ ok, path, file_count, root_hash }`; without `--out`, it prints the full `enigma.release_provenance.v1` JSON to stdout. It complements `npm pack --dry-run` by giving checksums for inventoried local package-surface files; it does not sign the release, publish to a registry, prove a git commit, claim SLSA/compliance status, prove a Docker image digest, or prove hosted/cloud deployment.
-
-When the public `enigma-memory` package is available:
-
-```sh
-npm install -g enigma-memory
-npx --yes --package enigma-memory enigma --help
-npx --yes --package enigma-memory enigma doctor
-```
-
-Create a no-network local vault, write one local memory from a file, compile a context pack, export a proof bundle, and verify it. Use a tenant-approved smoke file; do not expand private memory into shell argv.
+Manual alternative: create a no-network local vault, write one local memory from a file, compile a context pack, export a proof bundle, and verify it. Use a tenant-approved smoke file; do not expand private memory into shell argv.
 
 POSIX shell:
 

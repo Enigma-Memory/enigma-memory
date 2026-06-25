@@ -10,6 +10,6 @@ This package is part of Enigma, the provider-agnostic AI memory and proof layer.
 - `connectClient` reads JSON, merges only the Enigma MCP server entry, backs up an existing changed file with a timestamp suffix, writes pretty JSON, is idempotent, and supports `dryRun` planned writes.
 - `disconnectClient` removes only the Enigma server entry, leaves all other client configuration intact, backs up an existing changed file first, and supports `dryRun` planned writes.
 - Connector receipts, plans, and demo artifacts must not contain raw memory plaintext.
-- Public exports are `supportedClients`, `getClientProfile`, `renderMcpConfig`, `connectClient`, `disconnectClient`, `doctorConnectors`, `platformDefaultConfigPath`, and `runConnectorDemo`.
+- Public exports are `supportedClients`, `getClientProfile`, `renderMcpConfig`, `connectClient`, `disconnectClient`, `detectClientConnector`, `detectConnectors`, `doctorConnectors`, `planConnectWizard`, `platformDefaultConfigPath`, and `runConnectorDemo`.
 
 Package-specific implementation details are governed by `research/handoff-enigma/09_BUILD_BACKLOG.md` and `research/handoff-enigma/12_KIMI_BUILD_BRIEF.md`.
