@@ -4,7 +4,7 @@ Enigma Memory is a local-first AI Memory Passport. It gives you one canonical lo
 
 Start with the Memory Drive loop below — one install, one connect, then health and status verification. You do not need to understand relay, gateway, mesh, browser, desktop, hosted infrastructure, or the proof network before trying Enigma locally.
 
-The package path needs no database, provider credential, cloud credential, npm publishing token, or external account. Hosted cloud and BYOC operation are separate advanced modes that require real deployment credentials, domains, TLS, durable storage, KMS/secrets, monitoring, backups, and operator acceptance.
+Hosted cloud and BYOC operation are waitlist/operator-deploy only; they require real deployment credentials, domains, TLS, durable storage, KMS/secrets, monitoring, backups, and operator acceptance. The relay and gateway binaries included in the package are local bootstrap probes, not a live hosted service.
 
 Enigma does not claim that a closed provider deleted internal data, that model weights forgot, or that provider-native memory disappeared. It proves facts about Enigma-controlled vault state, receipts, checkpoints, and declared boundary operations.
 
@@ -20,21 +20,27 @@ Use Enigma as your private Memory Drive for AI: install once, connect the AI cli
 
 ```sh
 npm install -g enigma-memory
-enigma init
-enigma setup --client auto --connect-installed --overwrite
-enigma drive health
-enigma status
-enigma remember --text-file ./memory.txt
-enigma search --query "project context"
-enigma context --query "project context" --optimize
-enigma verify --export ./.enigma/export.json
+enigma setup --bundle "$HOME/.enigma/bundle.json" --client auto --connect-installed --overwrite
+echo "Keep all Q3 planning notes in the project-context tag." > memory.txt
+enigma remember --bundle "$HOME/.enigma/bundle.json" --text-file memory.txt
+enigma search --bundle "$HOME/.enigma/bundle.json" --query "Q3 planning"
+enigma context --bundle "$HOME/.enigma/bundle.json" --query "Q3 planning" --out "$HOME/.enigma/context-pack.json"
+enigma verify --export "$HOME/.enigma/export.json"
 ```
 
-`enigma init` is the credential-free first run: it creates the local `.enigma` workspace, bundle, and proof artifacts and emits public-safe JSON without provider or cloud credentials. `enigma setup --client auto --connect-installed --overwrite` then configures the drive and merges the `mcpServers.enigma` entry into every installed/config-present client it detects (Claude Desktop, Cursor, Kimi Code, VS Code/Cline, Roo, OpenCode, generic MCP). It skips clients that are not installed and never creates configs from scratch; preview with `--dry-run` first if you want to see which clients will be written. The same commands run on Windows PowerShell because the npm global install adds an `enigma.cmd` shim. Neither command prints raw memory plaintext.
+Windows CMD:
 
-`enigma drive health` reports a SMART-style memory-drive health packet — freshness, duplicate rate, tombstone backlog, stale derived artifacts, receipt coverage, and connector health — computed from local metadata only, with no network calls or private payloads. It is part of the Memory Drive surface in this release; in any build where it is unavailable, `enigma status` and `enigma doctor` cover the same local passport counts, roots, and connector readiness.
+```cmd
+npm install -g enigma-memory
+enigma setup --bundle "%USERPROFILE%\.enigma\bundle.json" --client auto --connect-installed --overwrite
+echo Keep all Q3 planning notes in the project-context tag.> memory.txt
+enigma remember --bundle "%USERPROFILE%\.enigma\bundle.json" --text-file memory.txt
+enigma search --bundle "%USERPROFILE%\.enigma\bundle.json" --query "Q3 planning"
+enigma context --bundle "%USERPROFILE%\.enigma\bundle.json" --query "Q3 planning" --out "%USERPROFILE%\.enigma\context-pack.json"
+enigma verify --export "%USERPROFILE%\.enigma\export.json"
+```
 
-`enigma status` shows passport counts, roots, owner display fields, and connector readiness. The local Enigma vault remains canonical. Provider-native memory is non-canonical and should be treated as a convenience cache only. Enigma receipts prove Enigma-controlled vault state, receipts, checkpoints, and declared boundary operations; they do not prove provider deletion, provider model forgetting, provider-native memory removal, hosted availability, ROI/savings, or compliance certification.
+`enigma setup` is the credential-free first run: it creates the local `.enigma` workspace, bundle, proof artifacts, and a demo memory, then connects every installed/config-present client it detects (Claude Desktop, Cursor, Kimi Code, VS Code/Cline, Roo, OpenCode, generic MCP). It skips clients that are not installed and never creates configs from scratch; preview with `--dry-run` first if you want to see which clients will be written. If no clients are installed, setup still succeeds and the local CLI path works; use the copy-paste MCP snippets below to connect a client later, or run `enigma connect generic-mcp --dry-run` to preview a standalone snippet. The same commands run on Windows PowerShell via the `enigma.cmd` shim the npm global install adds. Neither command prints raw memory plaintext.
 
 ## Enigma Proof Network
 

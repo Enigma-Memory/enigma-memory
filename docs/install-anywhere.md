@@ -1,8 +1,7 @@
 # Install Enigma anywhere
 
 Start with the published npm package path for `enigma-memory`: install once, connect your installed AI clients, then inspect Memory Drive health and passport status. Use a source checkout only when you need source-only docs, Docker assets, browser-extension scaffolding, package development, or release scripts.
-
-Hosted cloud and BYOC operation require real deployment credentials, domains, TLS, durable storage, KMS/secrets, monitoring, backups, and operator/customer infrastructure; they are not activated by installing the package, running setup, or running the test drive.
+Hosted cloud and BYOC operation are waitlist/operator-deploy only; they require real deployment credentials, domains, TLS, durable storage, KMS/secrets, monitoring, backups, and operator/customer infrastructure. The relay and gateway binaries included in the package are local bootstrap probes, not a live hosted service. They are not activated by installing the package, running setup, or running the test drive.
 
 ## Requirements
 
@@ -472,6 +471,8 @@ python scripts/preflight_public_site.py --site _public_site
 Run it from the public-site package/artifact root after building or obtaining `_public_site`. The command reads local files only and reports `checked_counts`, `warnings`, and `blockers`; it does not use Cloudflare credentials, upload assets, change DNS/TLS, mutate cache state, or prove live availability. Treat a clean result as local artifact readiness only. Cloudflare deployment and domain verification still require the operator's account, credentials, and live checks.
 
 ## Enterprise hosted and BYOC modes
+
+Both modes are waitlist/operator-deploy only. The relay and gateway binaries are local bootstrap probes; production hosted or BYOC operation requires real deployment credentials, domain/TLS, durable storage, KMS/secrets, monitoring, backups, incident response, and operator acceptance.
 
 Hosted mode:
 
