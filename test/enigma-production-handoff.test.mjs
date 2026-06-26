@@ -409,6 +409,7 @@ test('production handoff packet CLI writes public-safe handoff JSON', async () =
     '--site', site,
     '--project-name', 'enigma-memory',
     '--domain', 'enigmamemory.com',
+    '--live-url', 'data:text/html,%3Ctitle%3EEnigma%20%E2%80%94%20Verifiable%20AI%20memory%20plane%3C%2Ftitle%3E',
     '--out', outPath,
   ], {
     cwd: process.cwd(),
@@ -426,6 +427,8 @@ test('production handoff packet CLI writes public-safe handoff JSON', async () =
   assert.equal(stdoutPacket.go_live_ready, false);
   assert.equal(stdoutPacket.hosted_probe_worker.ok, true);
   assert.equal(stdoutPacket.hosted_probe_worker.required_env_ref_count, 17);
+  assert.equal(stdoutPacket.pages.live_observation.ok, false);
+  assert.match(stdoutPacket.blockers.join('\n'), /live URL must be HTTPS/);
   assert.match(stdoutPacket.blockers.join('\n'), /CLOUDFLARE_API_TOKEN is absent|missing refs\.backend_host/);
   assert.doesNotMatch(result.stdout, /Bearer|PRIVATE KEY|sk-/i);
   assert.doesNotMatch(result.stdout, /enigma-production-handoff-out-|enigma production handoff site-/i);
@@ -447,7 +450,31 @@ test('production handoff CLI redacts unreadable packet paths from errors', async
     windowsHide: true,
   }), (error) => {
     assert.match(error.stdout, /operator acceptance packet JSON could not be read/);
+    assert.equal(JSON.parse(error.stdout).error.code, 'USAGE_ERROR');
     assert.doesNotMatch(error.stdout, /enigma-production-missing-packet|operator-packet\.json|enigma production handoff site-/i);
+    return true;
+  });
+});
+
+test('production handoff loads supplied packet path before live fetch', async () => {
+  const site = await writeSite();
+  const missingPacketPath = join(tmpdir(), 'enigma-production-fetch-order-missing-packet', 'operator-packet.json');
+  await assert.rejects(() => buildProductionHandoffPacket({
+    site,
+    projectName: 'enigma-memory',
+    domain: 'enigmamemory.com',
+    liveUrl: 'https://enigmamemory.com/',
+    expectTitle: 'Enigma',
+    operatorAcceptancePacket: missingPacketPath,
+  }, {
+    env: {},
+    generated_at: '2026-06-24T00:00:00.000Z',
+    fetchImpl: async () => {
+      throw new Error('live fetch should not run before packet read');
+    },
+  }), (error) => {
+    assert.match(error.message, /operator acceptance packet JSON could not be read/);
+    assert.doesNotMatch(error.message, /enigma-production-fetch-order-missing-packet|operator-packet\.json|enigma production handoff site-/i);
     return true;
   });
 });
@@ -465,6 +492,7 @@ test('production handoff CLI accepts a completed operator packet path without le
     '--site', site,
     '--project-name', 'enigma-memory',
     '--domain', 'enigmamemory.com',
+    '--live-url', 'data:text/html,%3Ctitle%3EEnigma%20%E2%80%94%20Verifiable%20AI%20memory%20plane%3C%2Ftitle%3E',
     '--operator-acceptance-packet', operatorPacketPath,
   ], {
     cwd: process.cwd(),
@@ -480,6 +508,8 @@ test('production handoff CLI accepts a completed operator packet path without le
   assert.deepEqual(stdoutPacket.operator_acceptance.blocker_breakdown, {});
   assert.doesNotMatch(stdoutPacket.next_actions.map((item) => item.id).join('\n'), /generate-operator-evidence-starter|complete-operator-acceptance/);
   assert.equal(stdoutPacket.infrastructure.hosted_live_ready, false);
+  assert.equal(stdoutPacket.pages.live_observation.ok, false);
+  assert.match(stdoutPacket.blockers.join('\n'), /live URL must be HTTPS/);
   assert.doesNotMatch(result.stdout, /Bearer|PRIVATE KEY|sk-|Enigma operator fixture|ticket:\/\/security_owner\/approval/i);
   assert.doesNotMatch(result.stdout, /enigma-production-handoff-operator-packet-|enigma production handoff site-/i);
 });

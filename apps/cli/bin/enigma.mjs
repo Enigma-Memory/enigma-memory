@@ -842,15 +842,78 @@ async function persistState(bundlePath, vault) {
 }
 
 async function initCommand(flags, io) {
-  const bundlePath = resolve(String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE)));
-  const vault = createVault({
-    subjectId: String(getFlag(flags, ['subject', 'subject-id'], 'local-user')),
-    displayName: String(getFlag(flags, ['display-name', 'name'], 'Local user')),
-    passphrase: String(getFlag(flags, ['passphrase'], 'local-development-passphrase')),
-  });
-  const bundle = await persistState(bundlePath, vault);
-  print({ ok: true, bundle: bundlePath, schema: bundle.schema, subject_id: bundle.vault?.subject_id }, io);
-  return 0;
+  const bundleInput = pathFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE);
+  const outDirInput = pathFlag(flags, ['out-dir', 'outDir'], dirname(bundleInput));
+  const requestedSelection = setupClientIds(flags);
+  const overwrite = booleanFlag(flags, ['overwrite'], false);
+  const dryRun = booleanFlag(flags, ['dry-run', 'dryRun'], false);
+  const connectRequested = booleanFlag(flags, ['connect'], false);
+  const displays = setupPublicDisplays(bundleInput, outDirInput);
+  const rawDisplays = setupRawDisplays(bundleInput, outDirInput);
+  let artifacts;
+  try {
+    artifacts = await buildQuickstartArtifacts(flags, { bundleInput, outDirInput, overwrite, write: !dryRun });
+  } catch (error) {
+    throw publicSetupError(error, rawDisplays, displays);
+  }
+
+  const autoSelect = requestedSelection.auto || (connectRequested && requestedSelection.mode === 'default');
+  const selection = await setupClientSelection(
+    flags,
+    artifacts,
+    requestedSelection,
+    autoSelect,
+    connectRequested && requestedSelection.mode === 'default' ? 'connect_installed' : requestedSelection.mode,
+  );
+  const clients = selection.clients;
+  const connectorWritesRequested = connectRequested && !dryRun;
+  const writeClientIds = connectRequested && selection.connectable_client_ids ? selection.connectable_client_ids : null;
+  const connectors = await setupConnectorPlans(flags, artifacts, clients, connectorWritesRequested, displays, writeClientIds);
+  const doctor = await setupDoctorChecks(flags, artifacts, clients, displays);
+  const ok = artifacts.verifyReport.ok === true;
+  const anyConnectorWritePerformed = connectors.some((connector) => connector.connect_plan.writes_performed === true);
+
+  print({
+    ok,
+    schema: artifacts.bundle.schema,
+    command: 'enigma init',
+    onboarding_schema: 'enigma.init.v1',
+    dry_run: dryRun,
+    artifacts_written: !dryRun,
+    bundle: displays.bundle,
+    out_dir: publicPathDisplay(outDirInput, 'out-dir'),
+    context_pack: displays.context_pack,
+    export: displays.export,
+    verify_report: displays.verify_report,
+    subject_id: artifacts.bundle.vault?.subject_id,
+    client_configs_written: anyConnectorWritePerformed,
+    client_config_write_requested: connectorWritesRequested,
+    connector_write_mode: connectRequested ? (selection.connectable_client_ids ? 'installed_only' : 'selected_clients') : 'plan_only',
+    connect_requested: connectRequested,
+    selected_clients: clients,
+    skipped_clients: selection.skipped,
+    client_selection: publicSetupClientSelection(selection),
+    connector_write_skips: connectorWriteSkips(connectors),
+    connectors,
+    mcp_config_snippets: Object.fromEntries(connectors.map((connector) => [connector.client_id, connector.mcp_config_snippet])),
+    connect_plans: Object.fromEntries(connectors.map((connector) => [connector.client_id, connector.connect_plan])),
+    memory_source: setupMemorySource(flags),
+    memory_plaintext_echoed: false,
+    raw_memory_printed: false,
+    memory_count: Array.isArray(artifacts.bundle.memory_objects) ? artifacts.bundle.memory_objects.length : 0,
+    receipt_count: Array.isArray(artifacts.bundle.receipts) ? artifacts.bundle.receipts.length : 0,
+    context_item_count: Array.isArray(artifacts.contextPack.memories) ? artifacts.contextPack.memories.length : 0,
+    verify_ok: ok,
+    provider_credentials_required: false,
+    hosted_saas_live: false,
+    solana_required: false,
+    browser_extension_required: false,
+    provider_native_memory_canonical: false,
+    next_commands: initNextCommands({ dryRun, bundleDisplay: displays.bundle, outDirDisplay: publicPathDisplay(outDirInput, 'out-dir'), exportDisplay: displays.export, clients, requestedSelection, connectRequested, overwrite, connectorWritesPerformed: anyConnectorWritePerformed }),
+    checks: doctor.checks,
+    claim_boundaries: { ...SETUP_CLAIM_BOUNDARIES, hosted_saas_live: false, raw_memory_printed: false, solana_required: false, browser_extension_required: false },
+  }, io);
+  return ok ? 0 : 1;
 }
 
 function setupClientIds(flags) {
@@ -992,6 +1055,21 @@ function setupNextCommands(bundleInput, exportDisplay, clients, writeConnectors)
   return commands;
 }
 
+function initExecuteCommand(bundleDisplay, outDirDisplay, requestedSelection, connectRequested, overwrite) {
+  let command = `enigma init --bundle ${commandPath(bundleDisplay)} --out-dir ${commandPath(outDirDisplay)}`;
+  for (const client of requestedSelection.explicit_clients) command += ` --client ${client}`;
+  if (requestedSelection.auto) command += ' --client auto';
+  if (connectRequested) command += ' --connect';
+  if (overwrite) command += ' --overwrite';
+  return command;
+}
+
+function initNextCommands({ dryRun, bundleDisplay, outDirDisplay, exportDisplay, clients, requestedSelection, connectRequested, overwrite, connectorWritesPerformed }) {
+  const commands = dryRun ? [initExecuteCommand(bundleDisplay, outDirDisplay, requestedSelection, connectRequested, overwrite || dryRun)] : [];
+  commands.push(...setupNextCommands(bundleDisplay, exportDisplay, clients, connectRequested && connectorWritesPerformed));
+  return commands;
+}
+
 function doctorNextCommands(bundleDisplay, client) {
   const clientId = client ?? DEFAULT_SETUP_CLIENTS[0];
   return [
@@ -1130,6 +1208,33 @@ function publicSetupClientSelection(selection) {
   };
 }
 
+function setupStaticClientSelection(requestedSelection) {
+  return {
+    ...requestedSelection,
+    fallback_used: false,
+    selected: requestedSelection.clients.map((clientId) => {
+      const profile = getClientProfile(clientId);
+      return publicSetupClientSelectionEntry({ client_id: clientId, display_name: profile.display_name }, requestedSelection.mode === 'default' ? 'default_setup_client' : 'explicit_client');
+    }),
+    skipped: [],
+    connectable_client_ids: null,
+  };
+}
+
+async function setupClientSelection(flags, artifacts, requestedSelection, autoSelect, mode) {
+  return autoSelect ? setupAutoClientSelection(flags, artifacts, DEFAULT_SETUP_CLIENTS, mode) : setupStaticClientSelection(requestedSelection);
+}
+
+function connectorWriteSkips(connectors) {
+  return connectors
+    .filter((connector) => connector.write_skipped_reason)
+    .map((connector) => ({
+      client_id: connector.client_id,
+      display_name: connector.display_name,
+      reason: connector.write_skipped_reason,
+    }));
+}
+
 export async function setupCommand(flags, io) {
   const bundleInput = pathFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE);
   const outDirInput = pathFlag(flags, ['out-dir', 'outDir'], dirname(bundleInput));
@@ -1147,18 +1252,13 @@ export async function setupCommand(flags, io) {
   } catch (error) {
     throw publicSetupError(error, rawDisplays, displays);
   }
-  const selection = connectInstalled || requestedSelection.auto
-    ? await setupAutoClientSelection(flags, artifacts, DEFAULT_SETUP_CLIENTS, connectInstalled ? 'connect_installed' : 'auto')
-    : {
-      ...requestedSelection,
-      fallback_used: false,
-      selected: requestedSelection.clients.map((clientId) => {
-        const profile = getClientProfile(clientId);
-        return publicSetupClientSelectionEntry({ client_id: clientId, display_name: profile.display_name }, requestedSelection.mode === 'default' ? 'default_setup_client' : 'explicit_client');
-      }),
-      skipped: [],
-      connectable_client_ids: null,
-    };
+  const selection = await setupClientSelection(
+    flags,
+    artifacts,
+    requestedSelection,
+    connectInstalled || requestedSelection.auto,
+    connectInstalled ? 'connect_installed' : 'auto',
+  );
   const clients = selection.clients;
   const writeClientIds = connectInstalled ? selection.connectable_client_ids : null;
   const connectors = await setupConnectorPlans(flags, artifacts, clients, connectorWritesRequested, displays, writeClientIds);
@@ -1182,28 +1282,26 @@ export async function setupCommand(flags, io) {
     verify_report: displays.verify_report,
     memory_source: setupMemorySource(flags),
     memory_plaintext_echoed: false,
+    raw_memory_printed: false,
     memory_count: Array.isArray(artifacts.bundle.memory_objects) ? artifacts.bundle.memory_objects.length : 0,
     receipt_count: Array.isArray(artifacts.bundle.receipts) ? artifacts.bundle.receipts.length : 0,
     context_item_count: Array.isArray(artifacts.contextPack.memories) ? artifacts.contextPack.memories.length : 0,
     verify_ok: artifacts.verifyReport.ok === true,
     provider_credentials_required: false,
+    hosted_saas_live: false,
+    solana_required: false,
+    browser_extension_required: false,
     provider_native_memory_canonical: false,
     selected_clients: clients,
     skipped_clients: selection.skipped,
     client_selection: publicSetupClientSelection(selection),
-    connector_write_skips: connectors
-      .filter((connector) => connector.write_skipped_reason)
-      .map((connector) => ({
-        client_id: connector.client_id,
-        display_name: connector.display_name,
-        reason: connector.write_skipped_reason,
-      })),
+    connector_write_skips: connectorWriteSkips(connectors),
     connectors,
     mcp_config_snippets: Object.fromEntries(connectors.map((connector) => [connector.client_id, connector.mcp_config_snippet])),
     connect_plans: Object.fromEntries(connectors.map((connector) => [connector.client_id, connector.connect_plan])),
     next_commands: setupNextCommands(displays.bundle, displays.export, clients, connectorWritesRequested && (!connectInstalled || anyConnectorWritePerformed)),
     checks: doctor.checks,
-    claim_boundaries: { ...SETUP_CLAIM_BOUNDARIES },
+    claim_boundaries: { ...SETUP_CLAIM_BOUNDARIES, hosted_saas_live: false, raw_memory_printed: false, solana_required: false, browser_extension_required: false },
   }, io);
   return ok ? 0 : 1;
 }
@@ -1212,21 +1310,29 @@ export async function quickstartCommand(flags, io) {
   const bundleInput = pathFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE);
   const outDirInput = pathFlag(flags, ['out-dir', 'outDir'], dirname(bundleInput));
   const overwrite = booleanFlag(flags, ['overwrite'], false);
-  const artifacts = await buildQuickstartArtifacts(flags, { bundleInput, outDirInput, overwrite, write: true });
+  const displays = setupPublicDisplays(bundleInput, outDirInput);
+  const rawOutputs = quickstartOutputs(bundleInput, outDirInput);
+  await assertCanWriteQuickstartOutputs([
+    { path: rawOutputs.bundlePath, display: displays.bundle },
+    { path: rawOutputs.contextPackPath, display: displays.context_pack },
+    { path: rawOutputs.exportPath, display: displays.export },
+    { path: rawOutputs.verifyReportPath, display: displays.verify_report },
+  ], overwrite);
+  const artifacts = await buildQuickstartArtifacts(flags, { bundleInput, outDirInput, overwrite, write: true, checkExisting: false });
 
   print({
     ok: artifacts.verifyReport.ok === true,
-    bundle: bundleInput,
-    context_pack: artifacts.contextPackDisplay,
-    export: artifacts.exportDisplay,
-    verify_report: artifacts.verifyReportDisplay,
+    bundle: displays.bundle,
+    context_pack: displays.context_pack,
+    export: displays.export,
+    verify_report: displays.verify_report,
     memory_count: Array.isArray(artifacts.bundle.memory_objects) ? artifacts.bundle.memory_objects.length : 0,
     receipt_count: Array.isArray(artifacts.bundle.receipts) ? artifacts.bundle.receipts.length : 0,
     context_item_count: Array.isArray(artifacts.contextPack.memories) ? artifacts.contextPack.memories.length : 0,
     verify_ok: artifacts.verifyReport.ok === true,
     next_commands: [
-      `enigma verify --export ${artifacts.exportDisplay}`,
-      `enigma connect generic-mcp --bundle ${bundleInput} --dry-run`,
+      `enigma verify --export ${displays.export}`,
+      `enigma connect generic-mcp --bundle ${displays.bundle} --dry-run`,
     ],
     claim_boundaries: {
       local_only: true,
@@ -1421,13 +1527,17 @@ async function deleteCommand(flags, io) {
 async function contextCommand(flags, io) {
   const bundlePath = resolve(String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE)));
   const { vault, passport } = await loadState(bundlePath);
+  const query = getFlag(flags, ['query', 'q'], '');
+  const optimize = getFlag(flags, ['optimize']) === true
+    || getFlag(flags, ['optimize']) === 'true'
+    || String(query).trim().length > 0;
   const pack = compileContextPack({
     vault,
     passport,
-    query: getFlag(flags, ['query', 'q'], ''),
+    query,
     purpose: getFlag(flags, ['purpose'], 'local_context'),
     limit: Number(getFlag(flags, ['limit'], 8)),
-    optimize: getFlag(flags, ['optimize']) === true || getFlag(flags, ['optimize']) === 'true',
+    optimize,
     max_estimated_tokens: parseOptionalNumber(getFlag(flags, ['max-estimated-tokens', 'maxEstimatedTokens'])),
     price_per_million_tokens: parseOptionalNumber(getFlag(flags, ['price-per-million-tokens', 'pricePerMillionTokens'])),
     currency: getFlag(flags, ['currency']),
@@ -1828,7 +1938,7 @@ export async function testDriveCommand(flags, io) {
     out_dir: outDirInput,
     bundle: bundleInput,
     install_command: `npm install -g ${packageJson.name ?? 'enigma-memory'}`,
-    release_target: '0.1.13',
+    release_target: '0.1.15',
     artifacts_written: !dryRun,
     client_configs_written: false,
     client_config_write_required: false,
@@ -2279,7 +2389,162 @@ function chainArtifactValidator(artifact) {
   if (schema === 'enigma.proof_network.capability_revocation.v1') return [schema, validateCapabilityRevocation];
   if (schema === 'enigma.proof_network.benchmark_attestation.v1') return [schema, validateBenchmarkAttestation];
   if (schema === 'enigma.proof_network.packet.v1') return [schema, validateProofNetworkPacket];
-  throw new Error(`Unsupported proof-network artifact schema: ${schema || 'missing'}.`);
+  throw new Error(schema ? 'Unsupported proof-network artifact schema.' : 'Unsupported proof-network artifact schema: missing.');
+}
+
+const SOLANA_SUBMIT_CLUSTERS = new Set(['devnet', 'testnet', 'mainnet-beta', 'localnet']);
+const SOLANA_MEMO_PROGRAM_ID = 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr';
+
+function solanaSubmitCluster(flags) {
+  const cluster = String(requireFlag(flags, ['cluster'], 'cluster'));
+  if (!SOLANA_SUBMIT_CLUSTERS.has(cluster)) {
+    throw new Error('--cluster must be one of devnet, testnet, mainnet-beta, or localnet.');
+  }
+  return cluster;
+}
+
+function createSolanaProofMemoRef(schema, artifact, cluster) {
+  const artifactHash = proofNetworkSha256Json(artifact);
+  const proofCommitment = proofNetworkSha256Json({
+    rail: 'solana-memo-v1',
+    cluster,
+    artifact_type: schema,
+    artifact_hash: artifactHash,
+  });
+  return {
+    v: 1,
+    protocol: 'enigma-proof-network',
+    rail: 'solana-memo',
+    cluster,
+    artifact_type: schema,
+    artifact_hash: artifactHash,
+    proof_commitment: proofCommitment,
+  };
+}
+
+function solanaSubmitRpcLabel(flags, cluster) {
+  return getFlag(flags, ['rpc']) ? '<custom-rpc>' : `${cluster}:default`;
+}
+
+function solanaSubmitDryRunExplanation() {
+  return 'Dry run only. Execute mode would submit one Solana Memo instruction containing only memo_ref JSON: schema, artifact hash, cluster, and compact proof commitment. The raw artifact body, memory, prompts, transcripts, embeddings, provider responses, private keys, and local paths are not included.';
+}
+
+async function loadSolanaWeb3() {
+  try {
+    return await import('@solana/web3.js');
+  } catch {
+    throw new Error('Solana execute mode requires optional dependency @solana/web3.js. Install package dependencies before using --execute.');
+  }
+}
+
+async function readSolanaKeypair(path) {
+  let parsed;
+  try {
+    parsed = JSON.parse(await readFile(path, 'utf8'));
+  } catch {
+    throw new Error('Unable to read a valid Solana --keypair JSON array.');
+  }
+  if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('Solana --keypair must be a JSON array of secret-key bytes.');
+  const bytes = new Uint8Array(parsed.length);
+  for (let i = 0; i < parsed.length; i += 1) {
+    const value = parsed[i];
+    if (!Number.isInteger(value) || value < 0 || value > 255) throw new Error('Solana --keypair must be a JSON array of secret-key bytes.');
+    bytes[i] = value;
+  }
+  return bytes;
+}
+
+function solanaSubmitRpcUrl(flags, cluster, clusterApiUrl) {
+  const rpc = getFlag(flags, ['rpc']);
+  if (rpc !== undefined && rpc !== true && rpc !== '') return String(lastFlagValue(rpc));
+  if (cluster === 'localnet') return 'http://127.0.0.1:8899';
+  return clusterApiUrl(cluster);
+}
+
+async function submitSolanaMemoTransaction(flags, cluster, memoRef) {
+  const keypairPath = resolve(String(requireFlag(flags, ['keypair'], 'keypair')));
+  const secretKey = await readSolanaKeypair(keypairPath);
+  const { Connection, Keypair, PublicKey, Transaction, TransactionInstruction, clusterApiUrl, sendAndConfirmTransaction } = await loadSolanaWeb3();
+  let payer;
+  try {
+    payer = Keypair.fromSecretKey(secretKey);
+  } catch {
+    throw new Error('Solana --keypair could not be loaded as a signer.');
+  }
+  const connection = new Connection(solanaSubmitRpcUrl(flags, cluster, clusterApiUrl), 'confirmed');
+  const memoBytes = Buffer.from(JSON.stringify(memoRef), 'utf8');
+  const transaction = new Transaction().add(new TransactionInstruction({
+    keys: [],
+    programId: new PublicKey(SOLANA_MEMO_PROGRAM_ID),
+    data: memoBytes,
+  }));
+  try {
+    return await sendAndConfirmTransaction(connection, transaction, [payer], { commitment: 'confirmed' });
+  } catch {
+    throw new Error('Solana submission failed before a public-safe transaction signature was returned.');
+  }
+}
+
+export async function chainSubmitSolanaCommand(flags, io, positionalFile = undefined) {
+  const inPath = resolve(String(requireFileArg(flags, ['file', 'in'], positionalFile, 'file')));
+  const cluster = solanaSubmitCluster(flags);
+  let artifact;
+  try {
+    artifact = await readJson(inPath);
+  } catch {
+    throw new Error('Unable to read a valid proof artifact JSON file.');
+  }
+  assertNoPrivateProofPayload(artifact);
+  const [schema, validate] = chainArtifactValidator(artifact);
+  const result = chainValidationResult(validate, artifact);
+  if (result.ok !== true) throw new Error(result.errors?.join('; ') || 'Invalid proof-network artifact.');
+  const memoRef = createSolanaProofMemoRef(schema, artifact, cluster);
+  const execute = booleanFlag(flags, ['execute'], false);
+  if (!execute) {
+    print({
+      ok: true,
+      command: 'chain submit-solana',
+      mode: 'dry-run',
+      chain: 'solana',
+      cluster,
+      rpc_endpoint: solanaSubmitRpcLabel(flags, cluster),
+      transaction_submitted: false,
+      raw_memory_on_chain: false,
+      artifact_type: schema,
+      artifact_hash: memoRef.artifact_hash,
+      proof_commitment: memoRef.proof_commitment,
+      memo_program: SOLANA_MEMO_PROGRAM_ID,
+      memo_ref: memoRef,
+      would_submit: {
+        instruction_count: 1,
+        program: 'spl-memo',
+        payload: 'memo_ref',
+      },
+      validation: result,
+      explanation: solanaSubmitDryRunExplanation(),
+    }, io);
+    return 0;
+  }
+  const signature = await submitSolanaMemoTransaction(flags, cluster, memoRef);
+  print({
+    ok: true,
+    command: 'chain submit-solana',
+    mode: 'execute',
+    chain: 'solana',
+    cluster,
+    rpc_endpoint: solanaSubmitRpcLabel(flags, cluster),
+    transaction_submitted: true,
+    raw_memory_on_chain: false,
+    signature,
+    artifact_type: schema,
+    artifact_hash: memoRef.artifact_hash,
+    proof_commitment: memoRef.proof_commitment,
+    memo_program: SOLANA_MEMO_PROGRAM_ID,
+    memo_ref: memoRef,
+    validation: result,
+  }, io);
+  return 0;
 }
 
 export async function chainAnchorCommand(flags, io) {
@@ -2645,6 +2910,7 @@ function usage() {
       'chain revoke',
       'chain attest',
       'chain verify',
+      'chain submit-solana',
     ],
     connector_options: {
       '--bundle <path>': 'Absolute local Enigma vault bundle path rendered as ENIGMA_BUNDLE.',
@@ -2667,6 +2933,16 @@ function usage() {
     status_options: {
       'enigma status --bundle <path>': 'Show local Memory Passport counts, roots, owner display fields, connector readiness, and next commands.',
       'enigma passport status --bundle <path>': 'Alias for enigma status.',
+    },
+    init_options: {
+      '--dry-run': 'Print the first-run plan without writing local artifacts or client configs.',
+      '--bundle <path>': 'Bundle JSON to create. Defaults to .enigma/bundle.json.',
+      '--out-dir <path>': 'Directory for context-pack.json, export.json, and verify-report.json. Defaults to the bundle directory.',
+      '--client <id|auto>': `Client to plan; repeat or comma-separate. Use auto to plan installed/config-present clients, falling back to ${DEFAULT_SETUP_CLIENTS.join(', ')}.`,
+      '--connect': 'Explicitly write selected client MCP configs; with default client selection, writes only installed/config-present client configs and skips missing configs.',
+      '--memory-file <path>': 'Read local memory text from a file without echoing plaintext. Alias: --text-file.',
+      '--memory-text <text>': 'Inline demo-only memory text. Avoid for private content because argv can be logged.',
+      '--overwrite': 'Replace existing local first-run artifacts.',
     },
     setup_options: {
       '--bundle <path>': 'Bundle JSON to create. Defaults to .enigma/bundle.json.',
@@ -2746,7 +3022,8 @@ function usage() {
       revoke: 'enigma chain revoke --grant-hash <sha256:...> --reason <public-reason-code> [--revocation-ref <public-ref>] [--out <file>]',
       attest: 'enigma chain attest (--report-hash <sha256:...> | --report-file <report.json>) --dataset-ref <sha256:...> --runner-ref <public-runner-ref> --package-ref <public-package-ref> [--score name=value] [--out <file>]',
       verify: 'enigma chain verify --file <proof-artifact.json>',
-      boundary: 'Proof Network chain commands are local planning commands only. They write public-safe hashes, roots, refs, counts, signatures, and booleans; they do not submit Solana transactions or put raw memory on chain.',
+      submit_solana: 'enigma chain submit-solana --file <proof-artifact.json> --cluster <devnet|testnet|mainnet-beta|localnet> [--rpc <url>] [--execute --keypair <solana-keypair.json>]',
+      boundary: 'Proof Network chain commands default to local planning and dry-run validation. submit-solana only submits a Solana Memo transaction when --execute is passed; it carries compact public-safe commitment/ref JSON, never raw memory or artifact bodies.',
     },
     relay_gateway_options: {
       '--host <host>': 'Bind host. Defaults to 127.0.0.1.',
@@ -2777,7 +3054,7 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
   const twoPartCommands = ['boundary', 'mcp', 'mesh', 'enterprise', 'capsule', 'relay', 'gateway', 'connect', 'disconnect', 'import', 'native-host', 'meter', 'settlement', 'chain', 'demo', 'passport'];
   const flags = parseArgs(twoPartCommands.includes(command) ? argv.slice(2) : argv.slice(1));
   const positionalFile = optionalPositional(argv[2]);
-  if ((command === 'chain' && (!subcommand || subcommand === '--help' || subcommand === '-h' || flags.has('help'))) || ((flags.has('help') || argv.includes('-h')) && (command === 'setup' || command === 'test-drive' || command === 'search' || command === 'status' || (command === 'passport' && subcommand === 'status') || ((command === 'relay' || command === 'gateway') && (subcommand === 'serve' || subcommand === 'demo')) || (command === 'native-host' && (subcommand === 'manifest' || subcommand === 'install-plan')) || (command === 'demo' && subcommand === 'cross-model')))) {
+  if ((command === 'chain' && (!subcommand || subcommand === '--help' || subcommand === '-h' || flags.has('help'))) || ((flags.has('help') || argv.includes('-h')) && (command === 'init' || command === 'setup' || command === 'test-drive' || command === 'search' || command === 'status' || (command === 'passport' && subcommand === 'status') || ((command === 'relay' || command === 'gateway') && (subcommand === 'serve' || subcommand === 'demo')) || (command === 'native-host' && (subcommand === 'manifest' || subcommand === 'install-plan')) || (command === 'demo' && subcommand === 'cross-model')))) {
     print(usage(), io);
     return 0;
   }
@@ -2824,6 +3101,7 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     if (command === 'chain' && subcommand === 'revoke') return await chainRevokeCommand(flags, io);
     if (command === 'chain' && subcommand === 'attest') return await chainAttestCommand(flags, io);
     if (command === 'chain' && subcommand === 'verify') return await chainVerifyCommand(flags, io, positionalFile);
+    if (command === 'chain' && subcommand === 'submit-solana') return await chainSubmitSolanaCommand(flags, io, positionalFile);
     if (command === 'native-host' && subcommand === 'install-plan') return await nativeHostInstallPlanCommand(flags, io);
     if (command === 'mesh' && subcommand === 'demo') return await meshDemoCommand(flags, io);
     if (command === 'enterprise' && subcommand === 'demo') return await enterpriseDemoCommand(flags, io);

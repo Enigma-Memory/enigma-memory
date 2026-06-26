@@ -256,7 +256,7 @@ function reviewPacketCommandRunner() {
       return { stdout: `${JSON.stringify({ schema: 'enigma.release_audit.v1', ok: true, required_failed: [], gates: [{ name: 'review-packet-embedded-boundary', ok: true, status: 0 }] })}\n`, stderr: '' };
     }
     if (args.includes('pack') || joinedArgs.includes('npm pack --dry-run --json --ignore-scripts')) {
-      return { stdout: `${JSON.stringify([{ filename: 'enigma-memory-0.1.13.tgz', files: [{ path: 'README.md' }] }])}\n`, stderr: '' };
+      return { stdout: `${JSON.stringify([{ filename: 'enigma-memory-0.1.15.tgz', files: [{ path: 'README.md' }] }])}\n`, stderr: '' };
     }
     throw new Error(`Unexpected review packet command: ${joinedArgs}`);
   };
@@ -299,7 +299,7 @@ test('release smoke exercises local CLI path without leaking private memory into
     const context = await runCliJson([
       'context',
       '--bundle', bundlePath,
-      '--query', 'release smoke local context',
+      '--query', 'release-smoke local-only',
       '--purpose', 'release_smoke_context',
       '--limit', '1',
     ]);
@@ -397,6 +397,48 @@ test('local provenance command writes release evidence and audit gate validates 
       /root hash/i,
     );
   });
+});
+
+test('release audit npm-test failure diagnostics stay compact and public-safe', async () => {
+  const { summarizeNpmTestFailure } = await import('../scripts/release-audit.mjs');
+  const tokenSentinel = 'releasediagtokenmustnotappear1234567890';
+  const rawMemorySentinel = 'private launch-code phrase must not leave local memory';
+  const emailSentinel = 'release-person@example.com';
+  const privatePath = join(PROJECT_ROOT_PATH, 'test', 'enigma-hosted-go-live-simulation.test.mjs');
+  const noise = Array.from({ length: 30 }, (_value, index) => `# diagnostic noise line ${index + 1}`).join('\n');
+  const stdout = `TAP version 13
+# Subtest: hosted go-live simulation
+not ok 1 - hosted go-live simulation cleans stale Compose resources
+  ---
+  error: 'network with name deploy_default already exists'
+${noise}
+# location: file://${privatePath}:42:7
+# Authorization: Bearer ${tokenSentinel}
+# raw_memory: "${rawMemorySentinel}"
+# maintainer: ${emailSentinel}
+# cache path: D:/Users/alice/.enigma/log.txt
+# tests 1
+# pass 0
+# fail 1
+`;
+
+  const summary = summarizeNpmTestFailure(stdout, '');
+  assert.equal(summary.tap.tests, '1');
+  assert.equal(summary.tap.fail, '1');
+  assert.deepEqual(summary.failing_tests, ['hosted go-live simulation cleans stale Compose resources']);
+  assert.ok(Array.isArray(summary.stdout_tail));
+  assert.equal(summary.stdout_tail.length <= 18, true);
+  const auditSource = await readProjectText(RELEASE_AUDIT_SCRIPT);
+  assert.match(auditSource, /summarizeFailure:\s*summarizeNpmTestFailure/, 'npm-test gate must attach failure diagnostics');
+  assert.match(auditSource, /options\.summarizeFailure\s*\?\s*diagnosticMessage/, 'npm-test gate error message must stay public-safe');
+
+  const encoded = JSON.stringify(summary);
+  assert.equal(encoded.includes(tokenSentinel), false, 'diagnostics must redact secret-looking lines');
+  assert.equal(encoded.includes(rawMemorySentinel), false, 'diagnostics must redact raw-memory-looking lines');
+  assert.equal(encoded.includes(emailSentinel), false, 'diagnostics must redact personal email addresses');
+  assert.equal(encoded.includes('D:/Users/alice'), false, 'diagnostics must scrub generic local paths');
+  assert.equal(encoded.includes(PROJECT_ROOT_PATH.replace(/\\/g, '/').replace(/\/$/, '')), false, 'diagnostics must scrub project-local paths');
+  assert.match(encoded, /<project-root>/, 'diagnostics should keep a scrubbed path hint');
 });
 
 test('review packet builder writes local evidence with private collateral and raw memory excluded', async () => {

@@ -1,6 +1,6 @@
 # Proof Network build notes
 
-These notes are for future engineers extending Enigma's privacy-preserving Proof Network into a Solana program or hosted verifier. The 0.1.13 scope is local-only: create and verify public-safe proof artifacts, prepare opaque root batches for future chain anchoring, and never submit transactions or write private memory material into proof payloads.
+These notes are for future engineers extending Enigma's privacy-preserving Proof Network into a Solana program or hosted verifier. The 0.1.15 scope is local-only: create and verify public-safe proof artifacts, prepare opaque root batches for future chain anchoring, and never submit transactions or write private memory material into proof payloads.
 
 Paths below are relative to `enigma/`.
 
@@ -202,7 +202,7 @@ On-chain accounts should store compact hashes, counters, timestamps, and public 
 
 A hosted verifier can add convenience, not authority over private content. It may validate schema ids, JSON Schemas, package validators, canonical hashes, packet nesting, artifact counts, and public registry/chain observations. It must return bounded public-safe error codes and never echo private submitted values.
 
-Verifier non-goals: no raw memory ingestion, provider transcript ingestion, embedding upload endpoint, tenant-name lookup endpoint, Solana transaction submission, or hosted secret custody in the 0.1.13 proof-network layer.
+Verifier non-goals: no raw memory ingestion, provider transcript ingestion, embedding upload endpoint, tenant-name lookup endpoint, Solana transaction submission, or hosted secret custody in the 0.1.15 proof-network layer.
 
 ## Targeted test plan
 

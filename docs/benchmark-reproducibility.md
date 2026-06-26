@@ -4,7 +4,7 @@ This guide explains how to reproduce the current local Enigma memory benchmark, 
 
 ## What is reproducible today
 
-The current planned package is `enigma-memory@0.1.13`. Two benchmark paths are reproducible without provider credentials:
+The current planned package is `enigma-memory@0.1.15`. Two benchmark paths are reproducible without provider credentials:
 
 1. The local deterministic memory suite, available through the package script and the script file it wraps:
 
@@ -64,7 +64,7 @@ Do not commit downloaded files or raw benchmark conversations. The package `.git
 
 ## Reproduce and save local fixture JSON
 
-1. Use a clean checkout containing `enigma-memory@0.1.13`.
+1. Use a clean checkout containing `enigma-memory@0.1.15`.
 2. From a repository root that contains `enigma/package.json`, enter the package directory:
 
    ```sh
@@ -130,20 +130,21 @@ Public sharing should include the generated benchmark report JSON and generated 
 
 ## Proof-network benchmark attestations
 
-For the planned 0.1.13 proof-network layer, benchmark results should be represented as a public-safe local attestation rather than by publishing raw benchmark inputs. The attestation JSON uses `schema: "enigma.proof_network.benchmark_attestation.v1"` and may be bundled in `enigma.proof_network.packet.v1` for review. The benchmark attestation flow is local planning only: it does not submit transactions, and generated artifacts must keep `transaction_submitted: false` and `raw_memory_on_chain: false`.
+For the planned 0.1.15 proof-network layer, benchmark results should be represented as a public-safe local attestation rather than by publishing raw benchmark inputs. The attestation JSON uses `schema: "enigma.proof_network.benchmark_attestation.v1"` and may be bundled in `enigma.proof_network.packet.v1` for review. The benchmark proof-release flow is local planning only: it does not call APIs, submit transactions, or claim hosted SaaS behavior, and generated artifacts must keep `transaction_submitted: false` and `raw_memory_on_chain: false`.
 
-Hash the generated benchmark report and companion dataset manifest, then attest only the hashes, schema names, dataset refs, runner refs, package refs, aggregate metric names/values copied from the report, record counts, top-k/sample bounds, timestamps, and signatures or signer refs needed for review. The public artifact must not contain raw dataset rows, raw conversations, prompts, private questions, private answers, provider responses, embeddings, credentials, tenant names, account ids, local absolute paths, or unpublished benchmark scores.
+Hash the generated benchmark report and companion dataset manifest, then attest only the report hash, schema name, dataset refs, runner refs, package refs, score commitments, record counts, top-k/sample bounds, and timestamps needed for review. The public artifacts must not contain raw dataset rows, raw conversations, prompts, private questions, private answers, provider responses, embeddings, credentials, tenant names, account ids, local absolute paths, unpublished benchmark scores, or the raw benchmark report body.
 
-Use a `sha256:<hex>` commitment for the report and manifest. If the CLI derives the report commitment from `--report-file`, publish the resulting hash field only; if a reviewer precomputes a hash, hash the final public-safe JSON artifact that will be shared, not any raw source dataset or private run directory.
+Use a `sha256:<hex>` commitment for the report and manifest. The proof-release script derives the report commitment from `--report` and writes that hash to the attestation, proof packet, and release manifest; it does not copy the report JSON body or report path into proof artifacts. Hash the final public-safe benchmark report that will be shared, not any raw source dataset or private run directory.
 
-After running one of the benchmark commands above and confirming the report is public-safe, create a local planning attestation with placeholder hashes and metric values replaced from the generated report and manifest:
+After running one of the benchmark commands above and confirming the report is public-safe, create a local proof release:
 
 ```sh
-enigma chain attest --report-file .enigma/standard-memory-benchmark-sample.json --dataset-ref "sha256:<public-dataset-or-manifest-hash>" --runner-ref "run-standard-memory-benchmarks.mjs@<reviewed-revision>" --package-ref "enigma-memory@0.1.13" --score "retrieval_evidence_proxy=<value-copied-from-report>" --out .enigma/standard-memory-benchmark-attestation.json
-enigma chain verify --file .enigma/standard-memory-benchmark-attestation.json
+npm run benchmark:proof-release -- --report .enigma/standard-memory-benchmark-sample.json --dataset-ref "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" --runner-ref "runner:run-standard-memory-benchmarks.mjs@reviewed-revision" --package-ref "enigma-memory@0.1.15" --score "retrieval_evidence_proxy=<value-copied-from-report>" --out-dir .enigma/benchmark-proof-release
 ```
 
-When a report file is supplied, the attestation command should derive a SHA-256 report commitment from the JSON report and store that commitment rather than copying the report body into the proof artifact. If a precomputed report hash is used instead, record the hash algorithm, report schema, dataset manifest hash, and the exact runner/package refs that produced it. Treat the proof-network attestation as a reproducibility receipt for a specific local report hash and explicitly recorded aggregate metrics, not as evidence of provider answer accuracy, competitor performance, Solana settlement, or live model behavior.
+The command writes `benchmark-attestation.json`, `benchmark-proof-packet.json`, and `benchmark-proof-release.json` in the output directory. The release manifest uses `schema: "enigma.benchmark_proof_release.v1"` and records explicit boundaries: local benchmark attestation only, no API calls, no provider answer-accuracy claim, no competitor performance claim, no Solana submission claim, no hosted SaaS claim, and no ROI/profit/provider-savings claim.
+
+When a report file is supplied, the generated attestation is a reproducibility receipt for a specific local report hash and explicitly supplied aggregate score commitments. It is not evidence of provider answer accuracy, competitor performance, Solana settlement, ROI, hosted-cloud readiness, provider deletion, model forgetting, or live model behavior.
 
 ## Local baseline rows in the report
 

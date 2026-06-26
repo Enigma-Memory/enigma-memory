@@ -136,6 +136,10 @@ const KUBERNETES_BACKEND_MANIFEST = resolve(PROJECT_ROOT, 'deploy', 'kubernetes'
 const ENIGMA_INFRASTRUCTURE_READINESS_MANIFEST = 'ENIGMA_INFRASTRUCTURE_READINESS_MANIFEST';
 const ENIGMA_INFRASTRUCTURE_READINESS_LIVE = 'ENIGMA_INFRASTRUCTURE_READINESS_LIVE';
 const SECRET_LOOKING_OUTPUT = /(?:Authorization:\s*Bearer\s+[A-Za-z0-9._~+/=-]{8,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|["']?(?:api[_-]?key|access[_-]?token|refresh[_-]?token|secret|password|private[_-]?key)["']?\s*[:=]\s*["']?[A-Za-z0-9._~+/=-]{16,})/i;
+const TEST_FAILURE_SUMMARY_LIMIT = 8;
+const TEST_OUTPUT_TAIL_LINE_LIMIT = 18;
+const TEST_OUTPUT_TAIL_CHAR_LIMIT = 280;
+const REDACTED_DIAGNOSTIC_LINE = '<redacted secret-looking output>';
 
 function npmInvocation(args) {
   const label = commandLabel('npm', args);
@@ -233,6 +237,68 @@ function tapCounts(output) {
     if (match) counts[match[1]] = match[2];
   }
   return counts;
+}
+
+function sanitizeDiagnosticLine(value) {
+  const scrubbed = scrubLocalPathText(value)
+    .replace(/file:\/\/(?=<(?:project-root|public-site-package|temp|user-home|home)>)/g, '')
+    .replace(/[A-Za-z]:\/[^\s'"`),]+/g, '<path>')
+    .replace(/(?:file:\/\/)?\/(?:Users|home|tmp|private\/var|var\/folders)\/[^\s'"`),]+/g, '<path>')
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '<email>')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!scrubbed) return '';
+  if (
+    SECRET_LOOKING_OUTPUT.test(scrubbed)
+    || RAW_MEMORY_EXAMPLE_FIELD.test(scrubbed)
+    || scrubbed.includes(RAW_MEMORY_SENTINEL)
+  ) return REDACTED_DIAGNOSTIC_LINE;
+  return scrubbed.length > TEST_OUTPUT_TAIL_CHAR_LIMIT
+    ? `${scrubbed.slice(0, TEST_OUTPUT_TAIL_CHAR_LIMIT - 1)}…`
+    : scrubbed;
+}
+
+function diagnosticLines(value) {
+  return String(value).split(/\r?\n/).map(sanitizeDiagnosticLine).filter(Boolean);
+}
+
+function diagnosticMessage(value) {
+  return diagnosticLines(value)[0] ?? 'Command failed.';
+}
+
+function failingTestNames(output) {
+  const names = [];
+  for (const line of diagnosticLines(output)) {
+    const tapMatch = line.match(/^not ok \d+ - (.+)$/);
+    const prettyMatch = line.match(/^✖\s+(.+?)(?:\s+\(\d+(?:\.\d+)?ms\))?$/u);
+    const name = tapMatch?.[1] ?? prettyMatch?.[1] ?? null;
+    if (!name || names.includes(name)) continue;
+    names.push(name);
+    if (names.length >= TEST_FAILURE_SUMMARY_LIMIT) break;
+  }
+  return names;
+}
+
+function diagnosticTail(stdout, stderr) {
+  const stdoutLines = diagnosticLines(stdout);
+  if (stdoutLines.length > 0) {
+    return { key: 'stdout_tail', lines: stdoutLines.slice(-TEST_OUTPUT_TAIL_LINE_LIMIT) };
+  }
+  const stderrLines = diagnosticLines(stderr);
+  if (stderrLines.length > 0) {
+    return { key: 'stderr_tail', lines: stderrLines.slice(-TEST_OUTPUT_TAIL_LINE_LIMIT) };
+  }
+  return null;
+}
+
+export function summarizeNpmTestFailure(stdout, stderr) {
+  const combined = `${stdout}\n${stderr}`;
+  const summary = { tap: tapCounts(combined) };
+  const failed = failingTestNames(combined);
+  const tail = diagnosticTail(stdout, stderr);
+  if (failed.length > 0) summary.failing_tests = failed;
+  if (tail) summary[tail.key] = tail.lines;
+  return summary;
 }
 
 function summarizeCheck(stdout) {
@@ -490,9 +556,12 @@ async function runCommandGate(name, command, args, options = {}) {
     gate.signal = error.signal ?? null;
     gate.stderr_bytes = Buffer.byteLength(error.stderr ?? '');
     gate.stdout_bytes = Buffer.byteLength(error.stdout ?? '');
+    if (options.summarizeFailure) {
+      gate.evidence = await options.summarizeFailure(error.stdout ?? '', error.stderr ?? '');
+    }
     gate.error = {
       code: error.killed ? 'COMMAND_TIMEOUT' : (error.code ?? 'COMMAND_FAILED'),
-      message: error.message,
+      message: options.summarizeFailure ? diagnosticMessage(error.message) : error.message,
     };
     if (gate.status === 0) {
       gate.error.code = 'OUTPUT_VALIDATION_FAILED';
@@ -5484,7 +5553,7 @@ export async function runReleaseAudit() {
   const test = await nodeTestInvocation();
   const pack = npmInvocation(['pack', '--dry-run']);
   gates.push(await runCommandGate('npm-check', check.command, check.args, { label: check.label, summarize: summarizeCheck }));
-  gates.push(await runCommandGate('npm-test', test.command, test.args, { label: test.label, timeoutMs: TEST_TIMEOUT_MS, summarize: summarizeTests }));
+  gates.push(await runCommandGate('npm-test', test.command, test.args, { label: test.label, timeoutMs: TEST_TIMEOUT_MS, summarize: summarizeTests, summarizeFailure: summarizeNpmTestFailure }));
   gates.push(await runCommandGate('npm-pack-dry-run', pack.command, pack.args, { label: pack.label, summarize: summarizePack }));
   gates.push(await runDirectBinSmokes());
   gates.push(await runNativeHostInstallPlanGate());

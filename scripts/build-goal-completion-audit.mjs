@@ -119,9 +119,14 @@ async function readText(path) {
   return await readFile(path, 'utf8');
 }
 
-async function readJsonPath(path) {
+async function readJsonPath(path, label = 'JSON input') {
   if (!path) return null;
-  return JSON.parse(await readFile(resolve(path), 'utf8'));
+  try {
+    return JSON.parse(await readFile(resolve(path), 'utf8'));
+  } catch (error) {
+    if (error instanceof SyntaxError) throw new UsageError(`${label} JSON is invalid`);
+    throw new UsageError(`${label} JSON could not be read`);
+  }
 }
 
 function nextActionsForGoalAudit(nextActions, workerInspect) {
@@ -312,13 +317,13 @@ export async function buildGoalCompletionAudit(input = {}, options = {}) {
   const liveUrl = optionalText(input.liveUrl, domain ? `https://${domain}/` : null);
   const expectTitle = optionalText(input.expectTitle, 'Enigma');
   const accountId = optionalText(input.accountId, '<cloudflare-account-id>');
+  const workerInspect = await readJsonPath(input.workerInspect, 'worker inspection');
   const docs = await inspectDocs();
   const handoff = await buildProductionHandoffPacket({ site, projectName, domain, liveUrl, expectTitle, infrastructureReadiness: input.infrastructureReadiness, operatorAcceptancePacket: input.operatorAcceptancePacket, releaseAudit: input.releaseAudit }, {
     env,
     generated_at: generatedAt,
     fetchImpl: options.fetchImpl ?? globalThis.fetch,
   });
-  const workerInspect = await readJsonPath(input.workerInspect);
   const tokenPolicy = buildCloudflareTokenPolicy({
     mode: 'all',
     accountId,
@@ -392,7 +397,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     else process.stdout.write(`${JSON.stringify(result.json, null, 2)}\n`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    process.stdout.write(`${JSON.stringify({ schema: GOAL_COMPLETION_AUDIT_SCHEMA, ok: false, error: { code: error instanceof UsageError ? 'USAGE_ERROR' : 'GOAL_COMPLETION_AUDIT_ERROR', message } }, null, 2)}\n`);
-    process.exitCode = error instanceof UsageError ? 2 : 1;
+    const usageError = error instanceof UsageError || error?.name === 'UsageError';
+    process.stdout.write(`${JSON.stringify({ schema: GOAL_COMPLETION_AUDIT_SCHEMA, ok: false, error: { code: usageError ? 'USAGE_ERROR' : 'GOAL_COMPLETION_AUDIT_ERROR', message } }, null, 2)}\n`);
+    process.exitCode = usageError ? 2 : 1;
   }
 }

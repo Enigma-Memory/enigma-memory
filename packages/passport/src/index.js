@@ -123,11 +123,14 @@ function candidateRelevanceTokens(candidate) {
   return tokens;
 }
 
-function hasTokenOverlap(left, right) {
-  for (const token of left) {
-    if (right.has(token)) return true;
+
+function tokenOverlapScore(queryTokens, memoryTokens) {
+  if (queryTokens.size === 0) return 0;
+  let overlap = 0;
+  for (const token of queryTokens) {
+    if (memoryTokens.has(token)) overlap += 1;
   }
-  return false;
+  return overlap / queryTokens.size;
 }
 
 function strictQueryRelevance(args) {
@@ -148,7 +151,8 @@ function relevanceCandidateSet(args, candidates) {
 
   const relevant = [];
   for (const candidate of candidates) {
-    if (hasTokenOverlap(queryTokens, candidateRelevanceTokens(candidate))) relevant.push(candidate);
+    const relevance = tokenOverlapScore(queryTokens, candidateRelevanceTokens(candidate));
+    if (relevance > 0) relevant.push({ ...candidate, importance: Math.max(candidate.importance ?? 0, relevance) });
   }
   if (relevant.length > 0) return relevant;
   return strictQueryRelevance(args) ? [] : candidates;
