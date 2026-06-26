@@ -1,0 +1,72 @@
+name: Cortex v3 Anchor Build and Test
+
+on:
+  push:
+    paths:
+      - 'cortex-v3/**'
+  pull_request:
+    paths:
+      - 'cortex-v3/**'
+  workflow_dispatch:
+
+env:
+  SOLANA_CLI_VERSION: 1.18.26
+  ANCHOR_VERSION: 0.30.1
+  NODE_VERSION: 20
+
+jobs:
+  anchor-build:
+    name: Anchor Build and Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cortex-v3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: cortex-v3/package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Solana CLI
+        id: cache-solana
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/solana
+          key: solana-${{ runner.os }}-${{ env.SOLANA_CLI_VERSION }}
+
+      - name: Install Solana CLI
+        if: steps.cache-solana.outputs.cache-hit != 'true'
+        run: |
+          sh -c "$(curl -sSfL https://release.solana.com/v${SOLANA_CLI_VERSION}/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+
+      - name: Add Solana to PATH
+        run: echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+
+      - name: Configure Solana
+        run: |
+          mkdir -p ~/.config/solana
+          echo '${{ secrets.SOLANA_DEVNET_WALLET }}' > ~/.config/solana/id.json
+          solana config set --url devnet
+          solana config get
+
+      - name: Install Anchor CLI
+        run: npm install -g @coral-xyz/anchor-cli@${ANCHOR_VERSION}
+
+      - name: Install workspace dependencies
+        run: npm install
+
+      - name: Anchor Build
+        run: anchor build
+
+      - name: Anchor Test
+        run: anchor test --skip-build
+        timeout-minutes: 15
