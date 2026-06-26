@@ -640,9 +640,11 @@ export async function runDirectBinSmokes() {
     return { usage: json.usage, command_count: json.commands.length, has_claim_boundaries: typeof json.claim_boundaries === 'string' };
   }));
 
-  checks.push(await runJsonCommand(node, ['apps/cli/bin/enigma.mjs', 'doctor'], (json) => {
-    requireJsonField(json, ['ok'], (value) => value === true, 'Doctor did not report ok: true.');
-    return { package_bins_ok: json.package_bins?.ok === true, schema_count: json.schema_count };
+  checks.push(await runJsonCommandStatus(node, ['apps/cli/bin/enigma.mjs', 'doctor'], 1, (json) => {
+    requireJsonField(json, ['package_bins', 'ok'], (value) => value === true, 'Doctor did not report package_bins ok.');
+    requireJsonField(json, ['node', 'ok'], (value) => value === true, 'Doctor did not report node ok.');
+    requireJsonField(json, ['schema_count'], (value) => typeof value === 'number' && value > 0, 'Doctor did not report schemas.');
+    return { package_bins_ok: json.package_bins?.ok === true, schema_count: json.schema_count, doctor_ok: json.ok === true };
   }));
 
   checks.push(await runJsonCommand(node, [

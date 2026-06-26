@@ -35,7 +35,7 @@ The fixture harness does not download or run LoCoMo, LongMemEval, provider APIs,
 
 The fixture creates multiple sessions with facts, a knowledge update, temporal questions, an abstention question, duplicate memory candidates, and provider profile labels for `chatgpt`, `claude`, `kimi`, `cursor`, and `local-llm`.
 
-The harness measures local Enigma operations only:
+The harness measures local Enigma operations only. The runtime `enigma search` and context-pack retrieval in this release use deterministic keyword token overlap only; no embedding model, vector index, or LLM is called.
 
 - vault remember/update operations;
 - vault export and import;

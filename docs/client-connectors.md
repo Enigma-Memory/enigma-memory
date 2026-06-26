@@ -30,7 +30,7 @@ One command connects every installed client: `enigma setup --client auto --conne
 
 For a single client, or to preview before writing, use `enigma connect <client> --dry-run` and then drop `--dry-run`.
 
-Provider-native memory is non-canonical cache only in this architecture. The Enigma vault remains canonical, and Enigma receipts prove Enigma-controlled lifecycle events; they do not prove that a hosted provider deleted hidden copies or that a model forgot anything.
+Provider-native memory is non-canonical cache only in this architecture. The Enigma vault remains canonical, and Enigma receipts prove Enigma-controlled lifecycle events; they do not prove that a hosted provider deleted hidden copies or that a model forgot anything. Hosted cloud and BYOC operation are waitlist/operator-deploy only; the relay and gateway binaries are local bootstrap probes, not a live hosted service.
 
 From a source checkout, use this only for package development or source-only docs:
 

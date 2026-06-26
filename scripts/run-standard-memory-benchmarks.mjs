@@ -1280,6 +1280,7 @@ function buildSuiteReport(datasetRows, topK, options) {
       'Scores are retrieval/evidence proxy metrics over official dataset labels, not LLM-generated answer accuracy.',
       'No provider APIs, hosted runtimes, competitor SDKs, or external accounts are called by this runner.',
       'Rows are local deterministic methods only; no third-party competitor scores or benchmark-leadership claims are emitted.',
+      'Product runtime boundary: the shipped enigma context and search commands use keyword token overlap only. The richer stem, role/session/kind/tag, category/task, temporal/date, and phrase/proximity signals below are benchmark-only local approximations and are not used by the product runtime.',
     ],
     command_boundaries: offlineCommandBoundaries({ scoresIncluded: true, datasetFilesRead: true }),
     apples_to_apples_controls: applesToApplesControls(topK),
@@ -1301,6 +1302,7 @@ function buildSuiteReport(datasetRows, topK, options) {
     relevance_logic: {
       token_extraction: 'keyword_filter uses basic lowercase /[a-z0-9]+(?:[-_][a-z0-9]+)*/ overlap after stopword removal; enigma_relevance additionally applies deterministic suffix stemming for ing, ed, and plural s forms',
       production_alignment: 'public-safe local approximation of production query-aware retrieval using query/content stems, role/session/kind/tag hints, category/task hints, temporal/date hints, and phrase/proximity boosts; no private memory is emitted',
+      product_runtime_boundary: 'The shipped enigma context and search product runtime uses keyword token overlap only. Stem, role/session/kind/tag, category/task, temporal/date, and phrase/proximity signals are benchmark-only local approximations and are not used by the product runtime.',
       keyword_filter_fallback: 'empty result when no query/content token overlap exists',
       enigma_relevance_fallback: 'falls back to all local candidates only when no enhanced relevance signal exists, then applies deterministic local ranking and --top-k',
       provider_api_used: false,

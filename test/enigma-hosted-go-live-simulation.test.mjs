@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { execFile } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { buildOperatorAcceptancePacket } from '../scripts/build-operator-acceptance-packet.mjs';
 import https from 'node:https';
 import { createServer } from 'node:net';
@@ -118,11 +121,12 @@ function composeArgs(projectName, ...args) {
   return ['compose', '-p', projectName, '-f', COMPOSE_FILE, ...args];
 }
 
-async function downSimulationCompose(projectName = SIMULATION_COMPOSE_PROJECT, timeout = 120000) {
+async function downSimulationCompose(projectName = SIMULATION_COMPOSE_PROJECT, timeout = 120000, env = process.env) {
   await execFileAsync('docker', composeArgs(projectName, 'down', '-v', '--remove-orphans'), {
     cwd: PROJECT_ROOT,
     timeout,
     windowsHide: true,
+    env,
   });
 }
 
@@ -194,10 +198,12 @@ test('hosted/BYOC go-live simulation produces accepted live evidence', { timeout
   const relayPort = await reserveLoopbackPort();
   let gatewayPort = await reserveLoopbackPort();
   if (gatewayPort === relayPort) gatewayPort = await reserveLoopbackPort();
+  const simSecretsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'enigma-sim-secrets-'));
   const composeEnv = {
     ...process.env,
     ENIGMA_SIM_RELAY_PORT: String(relayPort),
     ENIGMA_SIM_GATEWAY_PORT: String(gatewayPort),
+    ENIGMA_SIM_SECRETS_DIR: simSecretsDir,
   };
   const relayUrl = `https://${SIMULATION_HOST}:${relayPort}`;
   const gatewayUrl = `https://${SIMULATION_HOST}:${gatewayPort}`;
@@ -205,9 +211,9 @@ test('hosted/BYOC go-live simulation produces accepted live evidence', { timeout
   try {
     await cleanupLegacySimulationCompose();
     await cleanupStaleSimulationComposeResources();
-    await downSimulationCompose();
+    await downSimulationCompose(undefined, undefined, composeEnv);
 
-    await execFileAsync(process.execPath, ['scripts/simulate-production-env.mjs'], {
+    await execFileAsync(process.execPath, ['scripts/simulate-production-env.mjs', '--secrets-dir', simSecretsDir], {
       cwd: PROJECT_ROOT,
       timeout: 60000,
       windowsHide: true,
@@ -278,6 +284,11 @@ test('hosted/BYOC go-live simulation produces accepted live evidence', { timeout
       await downSimulationCompose();
     } catch {
       // Best-effort cleanup; do not mask the original failure.
+    }
+    try {
+      fs.rmSync(simSecretsDir, { recursive: true, force: true });
+    } catch {
+      // Best-effort cleanup of the temporary secrets directory.
     }
   }
 
