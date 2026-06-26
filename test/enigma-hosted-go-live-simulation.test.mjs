@@ -281,7 +281,7 @@ test('hosted/BYOC go-live simulation produces accepted live evidence', { timeout
     assert.doesNotMatch(JSON.stringify(collection), /PRIVATE KEY|sk-[A-Za-z0-9_-]{16}/i);
   } finally {
     try {
-      await downSimulationCompose();
+      await downSimulationCompose(undefined, undefined, composeEnv);
     } catch {
       // Best-effort cleanup; do not mask the original failure.
     }
