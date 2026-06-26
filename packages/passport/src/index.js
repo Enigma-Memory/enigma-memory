@@ -134,12 +134,16 @@ function tokenOverlapScore(queryTokens, memoryTokens) {
 }
 
 function strictQueryRelevance(args) {
-  return args.strict_relevance === true
-    || args.strictRelevance === true
-    || args.require_relevance === true
-    || args.requireRelevance === true
-    || args.query_relevance === 'strict'
-    || args.queryRelevance === 'strict';
+  if (args.include_unrelated === true || args.includeUnrelated === true) return false;
+  if (args.no_strict_relevance === true || args.noStrictRelevance === true) return false;
+  if (args.strict_relevance === false || args.strictRelevance === false) return false;
+  if (args.require_relevance === false || args.requireRelevance === false) return false;
+  if (args.query_relevance === 'fallback' || args.queryRelevance === 'fallback') return false;
+  if (args.strict_relevance === true || args.strictRelevance === true) return true;
+  if (args.require_relevance === true || args.requireRelevance === true) return true;
+  if (args.query_relevance === 'strict' || args.queryRelevance === 'strict') return true;
+  const query = typeof args.query === 'string' ? args.query.trim() : String(args.query ?? '').trim();
+  return query.length > 0;
 }
 
 function relevanceCandidateSet(args, candidates) {

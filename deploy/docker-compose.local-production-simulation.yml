@@ -4,6 +4,12 @@
 # SIEM. It is not a production deployment and does not prove hosted/BYOC
 # readiness.
 #
+# REQUIRED ENVIRONMENT VARIABLE:
+#   ENIGMA_SIM_SECRETS_DIR must point to the absolute path of the simulation
+#   secrets directory. Generate it with:
+#     node scripts/simulate-production-env.mjs
+#   which writes the default to ~/.enigma/simulation-secrets.
+#
 # LOCAL DNS NOTE: From the host, map sim.enigmamemory.com (and optional
 # relay.sim.enigmamemory.com and gateway.sim.enigmamemory.com) to 127.0.0.1
 # via /etc/hosts or local DNS. This lets curl -k reach the tls-proxy container
@@ -37,7 +43,7 @@ services:
       KMS_KEY_ID: "local-simulation-kms-key"
     volumes:
       - ./kms-mock.mjs:/app/deploy/kms-mock.mjs:ro
-      - ./secrets-simulation:/app/secrets-simulation:ro
+      - ${ENIGMA_SIM_SECRETS_DIR}:/app/secrets-simulation:ro
       - kms-data:/data
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
@@ -142,6 +148,8 @@ services:
       - backup_target_uri
       - operator_acceptance_evidence_uri
     environment:
+      ENIGMA_GATEWAY_ADMIN_AUTH_BEARER_SHA256: ${ENIGMA_GATEWAY_ADMIN_AUTH_BEARER_SHA256:-operator-required-admin-bearer-sha256}
+      ENIGMA_GATEWAY_DATA_PLANE_AUTH_BEARER_SHA256: ${ENIGMA_GATEWAY_DATA_PLANE_AUTH_BEARER_SHA256:-operator-required-data-plane-bearer-sha256}
       NODE_ENV: production
       ENIGMA_BACKEND_MODE: production
       ENIGMA_REQUIRE_EXTERNAL_STORAGE: "true"
@@ -172,8 +180,6 @@ services:
       ENIGMA_INCIDENT_DRILL_REF: local-simulation-incident-drill-ref
       ENIGMA_BACKUP_RESTORE_DRILL_REF: local-simulation-backup-restore-drill-ref
       ENIGMA_OPERATOR_ACCEPTANCE_DECISION: go
-      ENIGMA_GATEWAY_ADMIN_AUTH_BEARER_SHA256: sha256:6655800954551a39fc1cde811dbe44366ab67b369170b16f4f7c421b5b695870
-      ENIGMA_GATEWAY_DATA_PLANE_AUTH_BEARER_SHA256: sha256:21030e3332a199d4b729cd5a8035fdf43f0abdb541af9ee9917639ff67abdecb
       ENIGMA_GATEWAY_SIGNING_KEY_FILE: /run/secrets/gateway_signing_key
       ENIGMA_KMS_KEY_REF_FILE: /run/secrets/kms_key_ref
       ENIGMA_SIEM_EXPORT_ENDPOINT_FILE: /run/secrets/siem_export_endpoint
@@ -203,8 +209,8 @@ services:
       - "127.0.0.1:${ENIGMA_SIM_RELAY_PORT:-8443}:8443"
       - "127.0.0.1:${ENIGMA_SIM_GATEWAY_PORT:-9443}:9443"
     volumes:
-      - ./secrets-simulation/tls.crt:/etc/nginx/ssl/tls.crt:ro
-      - ./secrets-simulation/tls.key:/etc/nginx/ssl/tls.key:ro
+      - ${ENIGMA_SIM_SECRETS_DIR}/tls.crt:/etc/nginx/ssl/tls.crt:ro
+      - ${ENIGMA_SIM_SECRETS_DIR}/tls.key:/etc/nginx/ssl/tls.key:ro
       - ./nginx.local-production-simulation.conf:/etc/nginx/conf.d/default.conf:ro
     extra_hosts:
       - "sim.enigmamemory.com:127.0.0.1"
@@ -219,19 +225,19 @@ services:
 
 secrets:
   relay_signing_key:
-    file: ./secrets-simulation/relay-signing-key
+    file: ${ENIGMA_SIM_SECRETS_DIR}/relay-signing-key
   gateway_signing_key:
-    file: ./secrets-simulation/gateway-signing-key
+    file: ${ENIGMA_SIM_SECRETS_DIR}/gateway-signing-key
   external_storage_dsn:
-    file: ./secrets-simulation/external-storage-dsn
+    file: ${ENIGMA_SIM_SECRETS_DIR}/external-storage-dsn
   kms_key_ref:
-    file: ./secrets-simulation/kms-key-ref
+    file: ${ENIGMA_SIM_SECRETS_DIR}/kms-key-ref
   backup_target_uri:
-    file: ./secrets-simulation/backup-target-uri
+    file: ${ENIGMA_SIM_SECRETS_DIR}/backup-target-uri
   siem_export_endpoint:
-    file: ./secrets-simulation/siem-export-endpoint
+    file: ${ENIGMA_SIM_SECRETS_DIR}/siem-export-endpoint
   operator_acceptance_evidence_uri:
-    file: ./secrets-simulation/operator-acceptance-evidence-uri
+    file: ${ENIGMA_SIM_SECRETS_DIR}/operator-acceptance-evidence-uri
 
 volumes:
   pgdata:

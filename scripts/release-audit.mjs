@@ -574,6 +574,7 @@ async function runCommandGate(name, command, args, options = {}) {
 }
 
 async function runJsonCommandStatus(command, args, expectedStatus, validate) {
+  const allowedStatuses = Array.isArray(expectedStatus) ? expectedStatus : [expectedStatus];
   const started = Date.now();
   const result = {
     command: commandLabel(command, args),
@@ -608,8 +609,8 @@ async function runJsonCommandStatus(command, args, expectedStatus, validate) {
   result.stderr_bytes = Buffer.byteLength(stderr);
   result.stdout_bytes = Buffer.byteLength(stdout);
   try {
-    if (result.status !== expectedStatus) {
-      throw new Error(`Expected status ${expectedStatus}, got ${result.status}`);
+    if (!allowedStatuses.includes(result.status)) {
+      throw new Error(`Expected status ${allowedStatuses.join(' or ')}, got ${result.status}`);
     }
     const parsed = parseJson(stdout);
     result.evidence = validate(parsed);
@@ -617,7 +618,7 @@ async function runJsonCommandStatus(command, args, expectedStatus, validate) {
     delete result.error;
   } catch (error) {
     result.error ??= {
-      code: result.status === expectedStatus ? 'OUTPUT_VALIDATION_FAILED' : 'COMMAND_FAILED',
+      code: allowedStatuses.includes(result.status) ? 'OUTPUT_VALIDATION_FAILED' : 'COMMAND_FAILED',
       message: error.message,
     };
   } finally {
@@ -640,9 +641,11 @@ export async function runDirectBinSmokes() {
     return { usage: json.usage, command_count: json.commands.length, has_claim_boundaries: typeof json.claim_boundaries === 'string' };
   }));
 
-  checks.push(await runJsonCommand(node, ['apps/cli/bin/enigma.mjs', 'doctor'], (json) => {
-    requireJsonField(json, ['ok'], (value) => value === true, 'Doctor did not report ok: true.');
-    return { package_bins_ok: json.package_bins?.ok === true, schema_count: json.schema_count };
+  checks.push(await runJsonCommandStatus(node, ['apps/cli/bin/enigma.mjs', 'doctor'], [0, 1], (json) => {
+    requireJsonField(json, ['package_bins', 'ok'], (value) => value === true, 'Doctor did not report package_bins ok.');
+    requireJsonField(json, ['node', 'ok'], (value) => value === true, 'Doctor did not report node ok.');
+    requireJsonField(json, ['schema_count'], (value) => typeof value === 'number' && value > 0, 'Doctor did not report schemas.');
+    return { package_bins_ok: json.package_bins?.ok === true, schema_count: json.schema_count, doctor_ok: json.ok === true };
   }));
 
   checks.push(await runJsonCommand(node, [

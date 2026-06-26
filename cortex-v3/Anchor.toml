@@ -1,0 +1,20 @@
+[features]
+seeds = true
+skip-lint = false
+
+[programs.localnet]
+memory_registry = "4uQeVj5tqViQh7yWWGStvkEG1Zmhx6uasJtWCJziofM"
+budget_escrow = "8opHzTAnfzRpPEx21XtnrVTX28YQuCpAjcn1PczScKh"
+capability_registry = "CiDwVBFgWV9E5MvXWoLgnEgn2hK7rJikbvfWavzAQz3"
+royalty_router = "GcdayuLaLyrdmUu324nahyv33G5poQdLUEZ1nEytDeP"
+cortex_treasury = "LX3EUdRUBUa3TbsYXLEUdj9J3prXkWXvLYSWyYyc2Jj"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "Localnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"

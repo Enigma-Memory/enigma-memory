@@ -155,12 +155,12 @@ export function createReceipt(receiptOrArgs, maybeOptions = {}) {
   const previous_receipt_hash = normalizePreviousHash(
     options.previous_receipt_hash ?? options.previousReceiptHash ?? (sequence === 0 ? GENESIS : undefined)
   );
-  const signer = normalizeSigner(options.signer, options.key_id ?? options.keyId, options.privateKey);
   const event_hash = normalizeSha256Root(options.event_hash ?? options.eventHash ?? source.event_hash ?? eventHash(source), 'event_hash');
   const active_set_root = normalizeSha256Root(options.active_set_root ?? options.activeSetRoot ?? EMPTY_MERKLE_ROOT, 'active_set_root');
   const receipt_log_root = normalizeSha256Root(options.receipt_log_root ?? options.receiptLogRoot ?? EMPTY_MERKLE_ROOT, 'receipt_log_root');
   const operation = requiredString(options.operation ?? source.operation, 'operation');
   const timestamp = requiredString(options.timestamp ?? source.timestamp ?? new Date().toISOString(), 'timestamp');
+  const signer = normalizeSigner(options.signer, options.key_id ?? options.keyId, options.privateKey);
 
   const body = {
     schema: RECEIPT_SCHEMA,

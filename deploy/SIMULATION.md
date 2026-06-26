@@ -38,12 +38,15 @@ names so that containers can resolve them locally when needed.
    node scripts/simulate-production-env.mjs
    ```
 
-   Files are written to `deploy/secrets-simulation/` (gitignored).
+   By default files are written outside the repo to
+   `~/.enigma/simulation-secrets`. Use `--secrets-dir <absolute-path>` for a
+   different location; paths inside the repository are rejected.
 
-2. Start the simulation:
+2. Start the simulation with the generated secrets path:
 
    ```bash
-   docker compose -f deploy/docker-compose.local-production-simulation.yml up --build -d
+   export ENIGMA_SIM_SECRETS_DIR="$HOME/.enigma/simulation-secrets"
+   docker compose -f deploy/docker-compose.local-production-simulation.yml --env-file "$ENIGMA_SIM_SECRETS_DIR/simulation.env" up --build -d
    ```
 
 3. Wait for the backend to become ready:
@@ -64,13 +67,13 @@ names so that containers can resolve them locally when needed.
 ## Stop
 
 ```bash
-docker compose -f deploy/docker-compose.local-production-simulation.yml down
+docker compose -f deploy/docker-compose.local-production-simulation.yml --env-file "$ENIGMA_SIM_SECRETS_DIR/simulation.env" down
 ```
 
 To also remove the Postgres volume and mock event data:
 
 ```bash
-docker compose -f deploy/docker-compose.local-production-simulation.yml down -v
+docker compose -f deploy/docker-compose.local-production-simulation.yml --env-file "$ENIGMA_SIM_SECRETS_DIR/simulation.env" down -v
 ```
 
 ## Ports and routes
@@ -86,11 +89,12 @@ docker compose -f deploy/docker-compose.local-production-simulation.yml down -v
 ## Verify secret files
 
 ```bash
+export ENIGMA_SIM_SECRETS_DIR="$HOME/.enigma/simulation-secrets"
 node scripts/simulate-production-env.mjs --check
 ```
 
-This reports whether all required files in `deploy/secrets-simulation/` exist
-and are non-empty.
+This reports whether all required files in the configured simulation secrets
+ directory exist and are non-empty.
 
 ## Simulation-only behavior
 
@@ -144,5 +148,6 @@ Hosted readiness remains blocked until the production commands above observe
 public HTTPS relay/gateway probes, all required hosted refs, and operator
 acceptance `go` for the exact target environment.
 
-Never commit `deploy/secrets-simulation/` or `*.pem` files. Both are
-`.gitignore`d.
+Simulation secrets, TLS keys, and bearer-token digests are kept outside the
+repository. Never commit the simulation secrets directory, `*.pem` files, or
+`simulation.env`. They are generated locally and must not be added to the repo.

@@ -1,8 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { fileURLToPath } from 'node:url';
 import {
   generateSigningKeyPair,
   receiptHash,
@@ -641,7 +644,7 @@ test('compileContextPack applies query-aware optimizer relevance only for implic
   });
   assert.deepEqual(explicitPack.memory_addresses, [irrelevant.memory_addr]);
 
-  const fallbackPack = compileContextPack({
+  const strictDefaultPack = compileContextPack({
     vault,
     passport,
     query: 'zzzxqonly',
@@ -650,7 +653,31 @@ test('compileContextPack applies query-aware optimizer relevance only for implic
     limit: 10,
     now: '2026-06-24T00:05:00.000Z',
   });
-  assert.equal(fallbackPack.memory_addresses.length, 3);
+  assert.deepEqual(strictDefaultPack.memory_addresses, []);
+
+  const escapeHatchPack = compileContextPack({
+    vault,
+    passport,
+    query: 'zzzxqonly',
+    optimize: true,
+    include_unrelated: true,
+    max_estimated_tokens: 512,
+    limit: 10,
+    now: '2026-06-24T00:05:30.000Z',
+  });
+  assert.equal(escapeHatchPack.memory_addresses.length, 3);
+
+  const explicitNoStrictPack = compileContextPack({
+    vault,
+    passport,
+    query: 'zzzxqonly',
+    optimize: true,
+    no_strict_relevance: true,
+    max_estimated_tokens: 512,
+    limit: 10,
+    now: '2026-06-24T00:05:45.000Z',
+  });
+  assert.equal(explicitNoStrictPack.memory_addresses.length, 3);
 
   const strictPack = compileContextPack({
     vault,
@@ -663,6 +690,51 @@ test('compileContextPack applies query-aware optimizer relevance only for implic
     now: '2026-06-24T00:06:00.000Z',
   });
   assert.deepEqual(strictPack.memory_addresses, []);
+});
+
+test('remember stores importance and optimizer ranks it above default-importance memories', async () => {
+  const vault = createVault({ subjectId: 'subject-importance-ranking' });
+  const passport = createPassport({ vault, now: '2026-06-24T00:00:00.000Z' });
+  const low = await remember({
+    vault,
+    text: 'Low priority housekeeping note: organize desk supplies.',
+    purpose: 'fixture',
+    now: '2026-06-24T00:01:00.000Z',
+  });
+  const high = await remember({
+    vault,
+    text: 'High priority deployment note: production region is amethyst harbor.',
+    importance: 0.9,
+    purpose: 'fixture',
+    now: '2026-06-24T00:01:00.000Z',
+  });
+
+  assert.equal(typeof high.memory.importance, 'number');
+  assert.equal(high.memory.importance, 0.9);
+  assert.equal(low.memory.importance, undefined);
+
+  const record = vault.__getRecord(high.memory_addr);
+  assert.equal(record.importance, 0.9);
+
+  const pack = compileContextPack({
+    vault,
+    passport,
+    query: '',
+    optimize: true,
+    limit: 2,
+    now: '2026-06-24T00:02:00.000Z',
+  });
+  assert.deepEqual(pack.memory_addresses, [high.memory_addr, low.memory_addr]);
+  assert.equal(pack.optimization_plan.items[0].address, high.memory_addr);
+  assert.equal(pack.optimization_plan.items[1].address, low.memory_addr);
+});
+
+test('importance is clamped to [0,1] when stored', async () => {
+  const vault = createVault({ subjectId: 'subject-importance-clamp' });
+  const high = await remember({ vault, text: 'High.', importance: 1.5, purpose: 'fixture' });
+  const low = await remember({ vault, text: 'Low.', importance: -0.3, purpose: 'fixture' });
+  assert.equal(vault.__getRecord(high.memory_addr).importance, 1);
+  assert.equal(vault.__getRecord(low.memory_addr).importance, 0);
 });
 
 test('boundary harness detects committed crossing', () => {
@@ -875,3 +947,114 @@ test('createMemoryDriveHealthReport defaults gracefully when benchmark and conne
   assert.equal(report.metrics.token_reduction.status, 'healthy');
   assert.ok(report.overall_score >= 90, `expected overall_score >= 90, got ${report.overall_score}`);
 });
+const execFileAsync = promisify(execFile);
+const CLI_PATH = fileURLToPath(new URL('../apps/cli/bin/enigma.mjs', import.meta.url));
+async function execEnigma(args, options = {}) {
+  return execFileAsync(process.execPath, [CLI_PATH, ...args], { timeout: 30000, ...options });
+}
+
+test('passphrase-derived encrypted keyring round-trips through export and import', () => {
+  const passphrase = 'my-secret-passphrase';
+  const vault = createVault({ passphrase, subjectId: 'enc-test' });
+  assert.equal(vault.keyringType, 'local_secret_encrypted');
+
+  const exported = exportBundle({ vault, passphrase });
+  assert.equal(exported.keyring.type, 'local_secret_encrypted');
+  assert.ok(typeof exported.keyring.salt === 'string' && exported.keyring.salt.length > 0);
+  assert.ok(typeof exported.keyring.iv === 'string' && exported.keyring.iv.length > 0);
+  assert.ok(typeof exported.keyring.tag === 'string' && exported.keyring.tag.length > 0);
+  assert.ok(typeof exported.keyring.ciphertext === 'string' && exported.keyring.ciphertext.length > 0);
+  assert.equal(exported.keyring.vault_key_b64, undefined);
+  assert.equal(exported.keyring.address_key_b64, undefined);
+  assert.equal(exported.keyring.privateKey, undefined);
+  assert.equal(exported.keyring.warning, 'Keyring is encrypted with AES-256-GCM; passphrase required on import.');
+
+  const imported = importBundle({ bundle: exported, passphrase });
+  assert.equal(imported.vault.vaultKey.toString('base64'), vault.vaultKey.toString('base64'));
+  assert.equal(imported.vault.addressKey.toString('base64'), vault.addressKey.toString('base64'));
+  assert.equal(imported.vault.signer.key_id, vault.signer.key_id);
+  assert.equal(imported.vault.signingKeyPair.privateKey !== undefined, true);
+});
+
+test('same passphrase and salt derive identical vault keys and signer', () => {
+  const passphrase = 'deterministic-test';
+  const salt = 'c29tZXNhbHQ='; // base64 'somesalt'
+  const v1 = createVault({ passphrase, salt });
+  const v2 = createVault({ passphrase, salt });
+  assert.equal(v1.vaultKey.toString('base64'), v2.vaultKey.toString('base64'));
+  assert.equal(v1.addressKey.toString('base64'), v2.addressKey.toString('base64'));
+  assert.equal(v1.signer.key_id, v2.signer.key_id);
+});
+
+test('encrypted keyring requires passphrase to import', () => {
+  const passphrase = 'my-secret-passphrase';
+  const vault = createVault({ passphrase });
+  const exported = exportBundle({ vault, passphrase });
+  assert.throws(() => importBundle({ bundle: exported }), /passphrase/i);
+  assert.throws(() => importBundle({ bundle: exported, passphrase: '' }), /passphrase/i);
+});
+
+test('plaintext keyring exports with strong warning and imports with deprecation warning', () => {
+  const vault = createVault({ subjectId: 'plain-test' });
+  const exported = exportBundle({ vault });
+  assert.equal(exported.keyring.type, 'local_secret');
+  assert.equal(exported.keyring.unencrypted, true);
+  assert.match(exported.keyring.warning, /WARNING:/);
+  assert.match(exported.keyring.warning, /plaintext/);
+
+  const imported = importBundle({ bundle: exported });
+  assert.equal(imported.vault.vaultKey.toString('base64'), vault.vaultKey.toString('base64'));
+  assert.ok(Array.isArray(imported.warnings));
+  assert.ok(imported.warnings.some((w) => /deprecated|plaintext/i.test(w)));
+});
+
+test('legacy plaintext keyring without type imports with deprecation warning', () => {
+  const vault = createVault({ subjectId: 'legacy-test' });
+  const exported = exportBundle({ vault });
+  const legacy = structuredClone(exported);
+  delete legacy.keyring.type;
+  const imported = importBundle({ bundle: legacy });
+  assert.equal(imported.vault.vaultKey.toString('base64'), vault.vaultKey.toString('base64'));
+  assert.ok(Array.isArray(imported.warnings));
+});
+
+test('CLI init and status with encrypted bundle', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-enc-'));
+  const bundlePath = join(dir, 'test-enc.json');
+  try {
+    const initResult = await execEnigma(['init', '--bundle', bundlePath, '--passphrase', 'secret']);
+    const initJson = JSON.parse(initResult.stdout);
+    assert.equal(initJson.ok, true);
+
+    const statusResult = await execEnigma(['status', '--bundle', bundlePath, '--passphrase', 'secret']);
+    const statusJson = JSON.parse(statusResult.stdout);
+    assert.equal(statusJson.ok, true);
+    assert.equal(statusJson.schema, 'enigma.passport_status.v1');
+
+    const bundleJson = JSON.parse(await readFile(bundlePath, 'utf8'));
+    assert.equal(bundleJson.keyring.type, 'local_secret_encrypted');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('CLI init without passphrase creates plaintext keyring with warning', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-plain-'));
+  const bundlePath = join(dir, 'test-plain.json');
+  try {
+    const initResult = await execEnigma(['init', '--bundle', bundlePath]);
+    const initJson = JSON.parse(initResult.stdout);
+    assert.equal(initJson.ok, true);
+
+    const bundleJson = JSON.parse(await readFile(bundlePath, 'utf8'));
+    assert.equal(bundleJson.keyring.type, 'local_secret');
+    assert.match(bundleJson.keyring.warning, /WARNING:/);
+
+    const statusResult = await execEnigma(['status', '--bundle', bundlePath]);
+    const statusJson = JSON.parse(statusResult.stdout);
+    assert.equal(statusJson.ok, true);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+

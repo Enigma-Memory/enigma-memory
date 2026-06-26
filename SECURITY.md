@@ -18,11 +18,11 @@ Do not market hosted, BYOC, cloud, on-prem, or hardware production operation as 
 
 Report suspected vulnerabilities through the approved private intake channel for the project:
 
-- Security contact: `security@REPLACE-WITH-APPROVED-DOMAIN`
-- Backup contact: `REPLACE-WITH-SECURITY-CONTACT`
-- PGP / secure portal: `REPLACE-WITH-APPROVED-SECURE-INTAKE`
+- Security contact: `https://github.com/Enigma-Memory/enigma-memory/security/advisories/new`
+- Backup contact: `https://github.com/Enigma-Memory/enigma-memory/security/advisories/new`
+- PGP / secure portal: `https://github.com/Enigma-Memory/enigma-memory/security/advisories/new`
 
-Until those placeholders are replaced by an approved channel, do not send secrets, customer data, raw memory plaintext, exploit payloads, or private keys in an initial report. Send a minimal description, affected component, version/commit, reproduction outline, and your preferred secure contact path.
+Do not send secrets, customer data, raw memory plaintext, exploit payloads, or private keys in an initial report. Send a minimal description, affected component, version/commit, reproduction outline, and your preferred secure contact path.
 
 We aim to acknowledge valid reports within two business days after receipt by an approved channel. Response timing may vary for third-party dependencies, customer-controlled BYOC/on-prem environments, or reports that require legal/customer coordination.
 

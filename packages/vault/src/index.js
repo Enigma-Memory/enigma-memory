@@ -3,9 +3,13 @@ import {
   createDecipheriv,
   createHash,
   createHmac,
+  createPrivateKey,
+  createPublicKey,
   generateKeyPairSync,
+  pbkdf2Sync,
   randomBytes,
   randomUUID,
+  scryptSync,
 } from 'node:crypto';
 import {
   canonicalize,
@@ -46,6 +50,14 @@ const PUBLIC_PLAINTEXT_KEYS = new Set([
 const SAFE_METADATA_DIGEST_RE = /^(?:sha256:)?[a-f0-9]{64}$|^hmac-sha256:[a-f0-9]{64}$/;
 const SOURCE_REF_ROOT_RE = /^sha256:[a-f0-9]{64}$/;
 
+export const KEYRING_ENCRYPTED_TYPE = 'local_secret_encrypted';
+export const KEYRING_PLAINTEXT_TYPE = 'local_secret';
+const DERIVED_KEY_LENGTH = 128; // 32 bytes each: KEK, vaultKey, addressKey, signingSeed
+const SALT_LENGTH = 16;
+const IV_LENGTH = 12;
+const PLAINTEXT_KEYRING_WARNING = 'WARNING: This bundle stores vault keys in plaintext. Anyone with file access can decrypt memory contents. Use --passphrase to encrypt the keyring.';
+const ENCRYPTED_KEYRING_WARNING = 'Keyring is encrypted with AES-256-GCM; passphrase required on import.';
+const DEPRECATION_PLAINTEXT_KEYRING = 'Plaintext keyrings are deprecated; use --passphrase to encrypt new bundles.';
 function normalizedPublicKey(key) {
   return String(key).toLowerCase().replace(/[^a-z0-9]/g, '');
 }
@@ -313,7 +325,84 @@ function keyBytes(key, label) {
   throw new Error(`${label} must be a Buffer or base64 string`);
 }
 
-function signingPair() {
+function buildEd25519Pkcs8(seed) {
+  if (!Buffer.isBuffer(seed) || seed.length !== 32) throw new Error('Ed25519 seed must be 32 bytes');
+  // PKCS#8 PrivateKeyInfo for Ed25519 (OID 1.3.101.112): SEQUENCE { INTEGER 0, AlgorithmIdentifier, OCTET STRING { OCTET STRING seed } }
+  return Buffer.from([
+    0x30, 0x2e,
+      0x02, 0x01, 0x00,
+      0x30, 0x05,
+        0x06, 0x03, 0x2b, 0x65, 0x70,
+      0x04, 0x22,
+        0x04, 0x20,
+          ...seed,
+  ]);
+}
+
+function deriveMasterKeyFromPassphrase(passphrase, salt) {
+  const normalized = Buffer.from(String(passphrase), 'utf8');
+  const saltBuf = typeof salt === 'string' ? Buffer.from(salt, 'base64') : Buffer.from(salt);
+  if (saltBuf.length < 8) throw new Error('Salt must be at least 8 bytes');
+  try {
+    return scryptSync(normalized, saltBuf, DERIVED_KEY_LENGTH);
+  } catch {
+    return pbkdf2Sync(normalized, saltBuf, 600000, DERIVED_KEY_LENGTH, 'sha256');
+  }
+}
+
+function deriveKeysFromPassphrase(passphrase, salt) {
+  const master = deriveMasterKeyFromPassphrase(passphrase, salt);
+  return {
+    kek: master.subarray(0, 32),
+    vaultKey: master.subarray(32, 64),
+    addressKey: master.subarray(64, 96),
+    signingSeed: master.subarray(96, 128),
+  };
+}
+
+function encryptKeyring(plaintextKeyring, kek) {
+  const iv = randomBytes(IV_LENGTH);
+  const cipher = createCipheriv('aes-256-gcm', kek, iv);
+  const plaintext = Buffer.from(JSON.stringify(plaintextKeyring), 'utf8');
+  const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return {
+    iv: iv.toString('base64'),
+    tag: tag.toString('base64'),
+    ciphertext: ciphertext.toString('base64'),
+  };
+}
+
+export function decryptKeyring(keyring, passphrase) {
+  if (keyring?.type !== KEYRING_ENCRYPTED_TYPE) throw new Error('Keyring is not encrypted');
+  if (passphrase === undefined || passphrase === null || String(passphrase).length === 0) {
+    throw new Error('Encrypted keyring requires passphrase');
+  }
+  const { kek } = deriveKeysFromPassphrase(passphrase, keyring.salt);
+  const decipher = createDecipheriv('aes-256-gcm', kek, Buffer.from(keyring.iv, 'base64'));
+  decipher.setAuthTag(Buffer.from(keyring.tag, 'base64'));
+  const plaintext = Buffer.concat([
+    decipher.update(Buffer.from(keyring.ciphertext, 'base64')),
+    decipher.final(),
+  ]).toString('utf8');
+  return JSON.parse(plaintext);
+}
+
+function signingPair(seed) {
+  if (seed !== undefined && seed !== null) {
+    try {
+      const privateKey = createPrivateKey({ key: buildEd25519Pkcs8(seed), format: 'der', type: 'pkcs8' });
+      const publicKey = createPublicKey(privateKey);
+      const publicKeyPem = publicKey.export({ type: 'spki', format: 'pem' });
+      return {
+        key_id: `ed25519:${sha256Hex(publicKeyPem).slice(0, 32)}`,
+        publicKey,
+        privateKey,
+      };
+    } catch {
+      // Fall through to random signing pair if deterministic construction is unsupported.
+    }
+  }
   try {
     const pair = generateSigningKeyPair();
     if (pair && typeof pair.then !== 'function') return pair;
@@ -389,7 +478,7 @@ function metadata(input) {
 
 function pruneUndefined(value) {
   if (Array.isArray(value)) return value.map((item) => pruneUndefined(item));
-  if (value && typeof value === 'object') {
+  if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
     const out = {};
     for (const [key, item] of Object.entries(value)) {
       if (item !== undefined) out[key] = pruneUndefined(item);
@@ -581,7 +670,23 @@ function attachInternals(vault) {
 
 export function createVault(args = {}) {
   const createdAt = nowIso(args.now);
-  const signingKeyPair = args.signingKeyPair ?? signingPair();
+  const passphrase = args.passphrase;
+  const salt = args.salt ?? randomBytes(SALT_LENGTH).toString('base64');
+  let vaultKey;
+  let addressKey;
+  let signingSeed;
+  let keyringType = KEYRING_PLAINTEXT_TYPE;
+  if (passphrase !== undefined && passphrase !== null && String(passphrase).length > 0) {
+    const derived = deriveKeysFromPassphrase(passphrase, salt);
+    vaultKey = derived.vaultKey;
+    addressKey = derived.addressKey;
+    signingSeed = derived.signingSeed;
+    keyringType = KEYRING_ENCRYPTED_TYPE;
+  } else {
+    vaultKey = keyBytes(args.vault_key ?? args.vaultKey, 'vault key');
+    addressKey = keyBytes(args.address_key ?? args.addressKey, 'address key');
+  }
+  const signingKeyPair = args.signingKeyPair ?? signingPair(signingSeed);
   const vault = {
     schema: VAULT_SCHEMA,
     vault_id: args.vault_id ?? args.vaultId ?? `vault_${randomUUID()}`,
@@ -593,8 +698,8 @@ export function createVault(args = {}) {
     updated_at: createdAt,
     encryption: 'local_aead',
     key_id: args.key_id ?? args.keyId ?? `vault-key-${randomUUID()}`,
-    vaultKey: keyBytes(args.vault_key ?? args.vaultKey, 'vault key'),
-    addressKey: keyBytes(args.address_key ?? args.addressKey, 'address key'),
+    vaultKey,
+    addressKey,
     signingKeyPair,
     signer: args.signer ?? signerFor(signingKeyPair),
     memories: new Map(),
@@ -605,8 +710,16 @@ export function createVault(args = {}) {
     sequence: 0,
     active_set_root: ZERO_ROOT,
     receipt_log_root: ZERO_ROOT,
+    keyringType,
   };
   return attachInternals(vault);
+}
+
+function normalizeImportance(value) {
+  if (value === undefined || value === null) return undefined;
+  const num = Number(value);
+  if (!Number.isFinite(num)) return undefined;
+  return Math.max(0, Math.min(1, num));
 }
 
 export function remember(args = {}) {
@@ -636,6 +749,7 @@ export function remember(args = {}) {
     sensitivity: args.sensitivity ?? 'normal',
     purpose_tags: Array.isArray(args.purpose_tags ?? args.purposeTags) ? (args.purpose_tags ?? args.purposeTags) : [],
     retention: args.retention ?? 'durable',
+    importance: normalizeImportance(args.importance),
     state: 'active',
     metadata: metadata(args.metadata),
     created_at: createdAt,
@@ -651,12 +765,13 @@ export function remember(args = {}) {
     actor_id: args.actor_id ?? args.actorId,
     policy_id: args.policy_id ?? args.policyId,
     now: args.now,
-    metadata: {
+    metadata: pruneUndefined({
       memory_id: memoryId,
       kind: record.kind,
       sensitivity: record.sensitivity,
+      importance: record.importance,
       content_commitment: record.content_commitment,
-    },
+    }),
   });
 
   return { memory: publicRecord(record), memory_addr: memoryAddr, event, receipt };
@@ -788,6 +903,39 @@ export function deleteMemory(args = {}) {
   return { memory_addr: memoryAddr, tombstone, event, receipt };
 }
 
+function buildKeyring(vault, passphrase) {
+  if (passphrase !== undefined && passphrase !== null && String(passphrase).length > 0) {
+    const salt = randomBytes(SALT_LENGTH).toString('base64');
+    const { kek } = deriveKeysFromPassphrase(passphrase, salt);
+    const plaintextKeyring = {
+      vault_key_b64: vault.vaultKey.toString('base64'),
+      address_key_b64: vault.addressKey.toString('base64'),
+      privateKey: exportPrivateKey(vault.signingKeyPair),
+    };
+    const encrypted = encryptKeyring(plaintextKeyring, kek);
+    return {
+      type: KEYRING_ENCRYPTED_TYPE,
+      warning: ENCRYPTED_KEYRING_WARNING,
+      salt,
+      iv: encrypted.iv,
+      tag: encrypted.tag,
+      ciphertext: encrypted.ciphertext,
+      signer: vault.signer,
+      publicKey: exportPublicKey(vault.signingKeyPair),
+    };
+  }
+  return {
+    type: KEYRING_PLAINTEXT_TYPE,
+    unencrypted: true,
+    warning: PLAINTEXT_KEYRING_WARNING,
+    vault_key_b64: vault.vaultKey.toString('base64'),
+    address_key_b64: vault.addressKey.toString('base64'),
+    signer: vault.signer,
+    publicKey: exportPublicKey(vault.signingKeyPair),
+    privateKey: exportPrivateKey(vault.signingKeyPair),
+  };
+}
+
 export function exportBundle(args = {}) {
   const vault = args.vault;
   if (!vault) throw new Error('exportBundle requires a vault');
@@ -822,15 +970,7 @@ export function exportBundle(args = {}) {
       receipt_log_root: roots.receipt_log_root,
       sequence: vault.sequence,
     },
-    keyring: {
-      type: 'local_secret',
-      warning: 'Contains local vault keys for offline import; memory payloads remain AES-256-GCM encrypted.',
-      vault_key_b64: vault.vaultKey.toString('base64'),
-      address_key_b64: vault.addressKey.toString('base64'),
-      signer: vault.signer,
-      publicKey: exportPublicKey(vault.signingKeyPair),
-      privateKey: exportPrivateKey(vault.signingKeyPair),
-    },
+    keyring: buildKeyring(vault, args.passphrase),
     memory_objects: [...vault.memories.values()].map(publicRecord),
     active_memory_addresses: [...vault.activeAddresses].sort(),
     tombstones: [...vault.tombstones.values()].sort((a, b) => a.memory_addr.localeCompare(b.memory_addr)),
@@ -850,12 +990,33 @@ export function importBundle(args = {}) {
   const source = args.schema === 'enigma.vault_bundle.v1' ? args : (args.bundle?.bundle ?? args.bundle ?? args);
   const bundle = typeof source === 'string' ? JSON.parse(source) : source;
   if (!bundle || bundle.schema !== 'enigma.vault_bundle.v1') throw new Error('importBundle requires an enigma.vault_bundle.v1 bundle');
-  const restoredSigningKeyPair = bundle.keyring?.privateKey
+  const warnings = [];
+  let vaultKey;
+  let addressKey;
+  let privateKey;
+  const keyring = bundle.keyring;
+  if (keyring?.type === KEYRING_ENCRYPTED_TYPE) {
+    if (args.passphrase === undefined || args.passphrase === null || String(args.passphrase).length === 0) {
+      throw new Error('Encrypted keyring requires passphrase');
+    }
+    const decrypted = decryptKeyring(keyring, args.passphrase);
+    vaultKey = decrypted.vault_key_b64;
+    addressKey = decrypted.address_key_b64;
+    privateKey = decrypted.privateKey;
+  } else {
+    if (keyring?.type === KEYRING_PLAINTEXT_TYPE) {
+      warnings.push(DEPRECATION_PLAINTEXT_KEYRING);
+    }
+    vaultKey = keyring?.vault_key_b64;
+    addressKey = keyring?.address_key_b64;
+    privateKey = keyring?.privateKey;
+  }
+  const restoredSigningKeyPair = privateKey
     ? {
-        key_id: bundle.keyring?.signer?.key_id,
-        signer: bundle.keyring?.signer,
-        publicKey: bundle.keyring?.publicKey,
-        privateKey: bundle.keyring?.privateKey,
+        key_id: keyring?.signer?.key_id,
+        signer: keyring?.signer,
+        publicKey: keyring?.publicKey,
+        privateKey,
       }
     : undefined;
   const vault = createVault({
@@ -864,10 +1025,10 @@ export function importBundle(args = {}) {
     subject_id: bundle.vault?.subject_id,
     actor_id: args.actor_id ?? args.actorId ?? bundle.vault?.actor_id,
     policy_id: bundle.vault?.policy_id,
-    vault_key: bundle.keyring?.vault_key_b64,
-    address_key: bundle.keyring?.address_key_b64,
+    vault_key: vaultKey,
+    address_key: addressKey,
     signingKeyPair: restoredSigningKeyPair,
-    signer: bundle.keyring?.signer,
+    signer: keyring?.signer,
     now: bundle.vault?.created_at,
   });
   vault.created_at = bundle.vault?.created_at ?? vault.created_at;
@@ -900,5 +1061,6 @@ export function importBundle(args = {}) {
       imported_tombstone_count: vault.tombstones.size,
     },
   });
-  return { vault, active_memory_addresses: [...vault.activeAddresses].sort(), tombstones: [...vault.tombstones.values()] };
+  return { vault, active_memory_addresses: [...vault.activeAddresses].sort(), tombstones: [...vault.tombstones.values()], warnings };
+
 }
