@@ -55,6 +55,26 @@ The CLI manifest generator and install-plan preview are the recommended path bec
 
 4. If your browser does not inherit the `ENIGMA_BUNDLE` user environment, create a small local wrapper that sets `ENIGMA_BUNDLE` and then execs the absolute `enigma-native-host` path. Point the manifest `path` to that wrapper. Keep the wrapper owner-writable only.
 
+
+## Fast MCP client setup
+
+For Claude Desktop, Cursor, Kimi Code, and VS Code Cline, avoid hand-editing MCP JSON. After installing the package, use the CLI to create the local bundle and merge only the Enigma MCP server entry into the selected client config:
+
+```sh
+npm install -g enigma-memory && enigma setup --client claude-desktop --write-connectors --overwrite
+npm install -g enigma-memory && enigma setup --client cursor --write-connectors --overwrite
+npm install -g enigma-memory && enigma setup --client kimi-code --write-connectors --overwrite
+npm install -g enigma-memory && enigma setup --client vscode-cline --write-connectors --overwrite
+```
+
+To connect only clients whose config files already exist, use:
+
+```sh
+npm install -g enigma-memory && enigma setup --client auto --connect-installed --overwrite
+```
+
+The generated MCP entry uses `enigma-mcp` with `ENIGMA_BUNDLE` pointing at the local bundle. Existing sibling MCP servers are preserved; changed configs are backed up by `enigma connect`.
+
 ## Generate a manifest
 
 Use the CLI generator instead of hand-editing JSON:

@@ -335,7 +335,7 @@ function reviewPacketCommandRunner() {
       return { stdout: `${JSON.stringify({ schema: 'enigma.release_audit.v1', ok: true, required_failed: [], gates: [{ name: 'review-packet-embedded-boundary', ok: true, status: 0 }] })}\n`, stderr: '' };
     }
     if (args.includes('pack') || joinedArgs.includes('npm pack --dry-run --json --ignore-scripts')) {
-      return { stdout: `${JSON.stringify([{ filename: 'enigma-memory-0.1.15.tgz', files: [{ path: 'README.md' }] }])}\n`, stderr: '' };
+      return { stdout: `${JSON.stringify([{ filename: 'enigma-memory-0.1.16.tgz', files: [{ path: 'README.md' }] }])}\n`, stderr: '' };
     }
     throw new Error(`Unexpected review packet command: ${joinedArgs}`);
   };
@@ -349,21 +349,23 @@ async function firstLine(urlOrPath) {
 }
 
 async function assertCheckFailsWithPackage(mutator, expectedMessage) {
-  const original = await readFile(PACKAGE_JSON_URL, 'utf8');
-  try {
-    const broken = JSON.parse(original);
+  const original = JSON.parse(await readFile(PACKAGE_JSON_URL, 'utf8'));
+  await withTempDir('enigma-check-package-override-', async (dir) => {
+    const broken = structuredClone(original);
     mutator(broken);
-    await writeFile(PACKAGE_JSON_URL, `${JSON.stringify(broken, null, 2)}\n`, 'utf8');
+    const packageOverridePath = join(dir, 'package.json');
+    await writeFile(packageOverridePath, `${JSON.stringify(broken, null, 2)}\n`, 'utf8');
     await assert.rejects(
-      execFileAsync(process.execPath, ['scripts/check.mjs'], { cwd: PROJECT_ROOT_PATH }),
+      execFileAsync(process.execPath, ['scripts/check.mjs'], {
+        cwd: PROJECT_ROOT_PATH,
+        env: { ...process.env, ENIGMA_CHECK_PACKAGE_JSON_OVERRIDE: packageOverridePath },
+      }),
       (error) => {
         assert.match(`${error.stdout ?? ''}\n${error.stderr ?? ''}\n${error.message}`, expectedMessage);
         return true;
       },
     );
-  } finally {
-    await writeFile(PACKAGE_JSON_URL, original, 'utf8');
-  }
+  });
 }
 
 test('package exports and bins import without side effects', async () => {
@@ -1537,6 +1539,11 @@ test('preflight release audit wiring is local-only and documented', async () => 
   assert.equal(packageFilesCover(pkg, RELEASE_AUDIT_SCRIPT), true, 'release audit script must be included in the package file list');
   assert.equal(pkg.scripts?.['cloudflare:ops'], `node ${CLOUDFLARE_OPS_SCRIPT}`);
   assert.equal(packageFilesCover(pkg, CLOUDFLARE_OPS_SCRIPT), true, 'Cloudflare ops script must be included in the package file list');
+  assert.equal(pkg.scripts?.['cloudflare:pages:stage'], 'node scripts/stage-cloudflare-pages-artifact.mjs --site ../enigma-deploy --out .enigma/cloudflare-pages/enigmamemory.com');
+  assert.equal(packageFilesCover(pkg, 'scripts/stage-cloudflare-pages-artifact.mjs'), true, 'Cloudflare Pages staging script must be included in the package file list');
+  assert.equal(pkg.scripts?.['cloudflare:pages:dry-run'], 'node scripts/stage-cloudflare-pages-artifact.mjs --site ../enigma-deploy --out .enigma/cloudflare-pages/enigmamemory.com && node scripts/cloudflare-ops.mjs pages deploy --site .enigma/cloudflare-pages/enigmamemory.com --project-name enigma-memory');
+  assert.equal(pkg.scripts?.['cloudflare:pages:deploy'], 'node scripts/stage-cloudflare-pages-artifact.mjs --site ../enigma-deploy --out .enigma/cloudflare-pages/enigmamemory.com && node scripts/cloudflare-ops.mjs pages deploy --site .enigma/cloudflare-pages/enigmamemory.com --project-name enigma-memory --execute');
+  assert.equal(pkg.scripts?.['cloudflare:pages:verify'], 'node scripts/cloudflare-ops.mjs pages verify --url https://enigmamemory.com/ --project-name enigma-memory --domain enigmamemory.com --cloudflare-live required');
   assert.equal(pkg.scripts?.['production:workplan'], `node ${PRODUCTION_WORKPLAN_SCRIPT}`);
   assert.equal(packageFilesCover(pkg, PRODUCTION_WORKPLAN_SCRIPT), true, 'production workplan script must be included in the package file list');
   assert.equal(pkg.scripts?.['production:status'], `node ${PRODUCTION_STATUS_BOARD_SCRIPT}`);

@@ -3,7 +3,9 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const packageJsonPath = path.join(root, 'package.json');
+const packageJsonPath = process.env.ENIGMA_CHECK_PACKAGE_JSON_OVERRIDE
+  ? path.resolve(process.env.ENIGMA_CHECK_PACKAGE_JSON_OVERRIDE)
+  : path.join(root, 'package.json');
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 const productionRoots = [
   'packages/adapters/src/',

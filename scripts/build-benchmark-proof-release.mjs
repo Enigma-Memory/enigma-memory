@@ -37,6 +37,7 @@ const ALLOWED_FALSE_REPORT_KEYS = new Set([
   'benchmark_leadership_claim',
   'external_provider_calls',
   'llm_answer_accuracy_scored',
+  'credentials_required',
   'raw_benchmark_body_included',
   'report_body_copied',
   'raw_memory_included',
@@ -50,9 +51,41 @@ const ALLOWED_FALSE_REPORT_KEYS = new Set([
   'provider_invoice_savings_claim',
   'hosted_saas_claim',
 ]);
+const ALLOWED_PUBLIC_REPORT_KEYS = new Set([
+  'estimated_prompt_tokens',
+  'baseline_prompt_tokens',
+  'optimized_prompt_tokens',
+]);
 const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|(?:seed phrase|mnemonic phrase|raw memory|private prompt|full transcript|provider response|embedding vector))/iu;
 const ABSOLUTE_LOCAL_PATH_RE = /^(?:[A-Za-z]:[\\/]|\\\\|\/(?:Users|home|tmp|var|etc|mnt|Volumes)\b)/u;
 const CLAIM_SCORE_KEY_RE = /(?:provider|competitor|roi|profit|savings|solana|transaction|answer_accuracy|leaderboard)/iu;
+const PROOF_COMPATIBLE_REPORT_SCHEMAS = new Set([
+  'enigma.memory_benchmark_suite.v1',
+  'enigma.standard_memory_benchmark_suite.v1',
+]);
+const REQUIRED_FALSE_BOUNDARY_KEYS = Object.freeze([
+  'external_provider_calls',
+  'llm_answer_accuracy_scored',
+  'provider_deletion_claim',
+  'model_forgetting_claim',
+  'roi_or_provider_invoice_savings_claim',
+  'compliance_certification_claim',
+  'benchmark_leadership_claim',
+]);
+const OPTIONAL_FALSE_BOUNDARY_KEYS = Object.freeze([
+  'provider_answer_accuracy_claim',
+  'competitor_performance_claim',
+  'solana_submission_claim',
+  'transaction_submitted',
+  'roi_or_profit_claim',
+  'provider_invoice_savings_claim',
+  'hosted_saas_claim',
+  'api_calls_made',
+  'provider_api_calls_made',
+  'network_calls_made',
+  'mem0_adapter_run',
+  'external_competitor_adapters_run',
+]);
 
 class UsageError extends Error {
   constructor(message) {
@@ -139,7 +172,7 @@ export function parseArgs(argv = process.argv.slice(2)) {
 export function usage() {
   return `Usage: node scripts/build-benchmark-proof-release.mjs --report <path> --dataset-ref <ref> --runner-ref <ref> --package-ref <ref> [--score key=value ...] [--out-dir <dir>]
 
-Builds a dependency-free, local benchmark proof release from an existing public-safe benchmark report. The report file is parsed for public-safety checks and hashed, but its body and local path are never copied into the attestation or proof packet. The generated artifacts are local benchmark attestation/proof only: no API calls, provider answer-accuracy claims, competitor performance claims, Solana submissions, hosted SaaS claims, ROI/profit/savings claims, raw memory, prompts, transcripts, embeddings, credentials, account ids, private keys, or provider responses are written.
+Builds a dependency-free, local benchmark proof release from an existing public-safe benchmark report. The report must use a compatible benchmark schema and explicit offline benchmark boundaries. The report file is parsed for public-safety checks and hashed, but its body and local path are never copied into the attestation or proof packet. The generated artifacts are local benchmark attestation/proof only: no API calls, provider answer-accuracy claims, Mem0 or competitor performance claims, Solana submissions, hosted SaaS claims, ROI/profit/savings claims, raw memory, prompts, transcripts, embeddings, credentials, account ids, private keys, or provider responses are written.
 `;
 }
 
@@ -172,7 +205,7 @@ function assertPublicReportPayload(value, path = 'report') {
   }
   if (!isPlainObject(value)) return;
   for (const [key, child] of Object.entries(value)) {
-    if (PRIVATE_REPORT_KEY_RE.test(key)) {
+    if (PRIVATE_REPORT_KEY_RE.test(key) && !ALLOWED_PUBLIC_REPORT_KEYS.has(key)) {
       if (!ALLOWED_FALSE_REPORT_KEYS.has(key) || child !== false) throw new UsageError(`${path}.${key} is not allowed in public benchmark proof artifacts`);
     }
     assertPublicReportPayload(child, `${path}.${key}`);
@@ -190,9 +223,60 @@ function parseJsonReport(bytes) {
 function reportSchema(report) {
   if (!isPlainObject(report)) throw new UsageError('report must be a JSON object');
   if (typeof report.schema !== 'string' || report.schema.trim() === '') throw new UsageError('report.schema must be a non-empty string');
+  if (!PROOF_COMPATIBLE_REPORT_SCHEMAS.has(report.schema)) throw new UsageError(`report.schema is not proof-release compatible: ${report.schema}`);
   if (report.public_safe !== true) throw new UsageError('report.public_safe must be true');
   assertPublicReportPayload(report);
+  assertProofCompatibleBenchmarkBoundaries(report);
   return report.schema;
+}
+
+function requireFalseField(row, key, path) {
+  if (row[key] !== false) throw new UsageError(`${path}.${key} must be false for a public benchmark proof release`);
+}
+
+function assertBoundaryObject(report) {
+  if (!isPlainObject(report.benchmark_boundaries)) throw new UsageError('report.benchmark_boundaries must be present for a public benchmark proof release');
+  return report.benchmark_boundaries;
+}
+
+function assertCommandBoundaries(report) {
+  if (report.command_boundaries === undefined) return;
+  if (!isPlainObject(report.command_boundaries)) throw new UsageError('report.command_boundaries must be an object when present');
+  for (const key of OPTIONAL_FALSE_BOUNDARY_KEYS) {
+    if (report.command_boundaries[key] !== undefined && report.command_boundaries[key] !== false) {
+      throw new UsageError(`report.command_boundaries.${key} must be false for a public benchmark proof release`);
+    }
+  }
+  if (report.command_boundaries.api_spend_possible !== undefined && report.command_boundaries.api_spend_possible !== false) {
+    throw new UsageError('report.command_boundaries.api_spend_possible must be false for a public benchmark proof release');
+  }
+}
+
+function assertExternalAdaptersUnscored(report) {
+  if (!Array.isArray(report.external_competitor_adapters)) return;
+  report.external_competitor_adapters.forEach((row, index) => {
+    if (!isPlainObject(row)) throw new UsageError(`report.external_competitor_adapters[${index}] must be an object`);
+    if (row.scores_included !== false) throw new UsageError(`report.external_competitor_adapters[${index}].scores_included must be false`);
+    for (const key of ['recall', 'answer_accuracy', 'latency', 'cost', 'ranking']) {
+      if (row[key] !== undefined) throw new UsageError(`report.external_competitor_adapters[${index}].${key} is not allowed without a reviewed adapter run`);
+    }
+  });
+}
+
+function assertProofCompatibleBenchmarkBoundaries(report) {
+  const boundaries = assertBoundaryObject(report);
+  for (const key of REQUIRED_FALSE_BOUNDARY_KEYS) requireFalseField(boundaries, key, 'report.benchmark_boundaries');
+  for (const key of OPTIONAL_FALSE_BOUNDARY_KEYS) {
+    if (boundaries[key] !== undefined) requireFalseField(boundaries, key, 'report.benchmark_boundaries');
+  }
+  if (report.schema === 'enigma.standard_memory_benchmark_suite.v1') {
+    if (boundaries.retrieval_evidence_proxy_scored !== true) throw new UsageError('standard benchmark report must set benchmark_boundaries.retrieval_evidence_proxy_scored true');
+  }
+  if (report.schema === 'enigma.memory_benchmark_suite.v1') {
+    if (boundaries.local_only !== true) throw new UsageError('local memory benchmark report must set benchmark_boundaries.local_only true');
+  }
+  assertCommandBoundaries(report);
+  assertExternalAdaptersUnscored(report);
 }
 
 function nonNegativeInteger(value) {
@@ -242,7 +326,7 @@ function assertValidation(validation, label) {
   if (validation?.ok !== true) throw new Error(`${label} validation failed: ${(validation?.errors ?? ['unknown error']).join('; ')}`);
 }
 
-function releaseManifest({ generatedAt, reportHash, schema, args, commitments, attestation, packet }) {
+function releaseManifest({ generatedAt, reportHash, schema, sampleCount, datasetCount, args, commitments, attestation, packet }) {
   const manifest = {
     schema: BENCHMARK_PROOF_RELEASE_SCHEMA,
     generated_at: generatedAt,
@@ -254,6 +338,8 @@ function releaseManifest({ generatedAt, reportHash, schema, args, commitments, a
       report_public_safe: true,
       report_body_copied: false,
       report_path_copied: false,
+      sample_count: sampleCount,
+      dataset_count: datasetCount,
     },
     refs: {
       dataset_ref: args.datasetRef,
@@ -261,6 +347,16 @@ function releaseManifest({ generatedAt, reportHash, schema, args, commitments, a
       package_ref: args.packageRef,
     },
     score_commitments: commitments,
+    command_boundaries: {
+      deterministic_offline_proof_builder: true,
+      report_file_hashed_from_local_disk: true,
+      network_calls_made: false,
+      provider_api_calls_made: false,
+      api_spend_possible: false,
+      solana_transaction_submitted: false,
+      benchmark_scores_generated: false,
+      report_body_copied: false,
+    },
     claim_boundaries: {
       provider_answer_accuracy_claim: false,
       competitor_performance_claim: false,
@@ -306,6 +402,8 @@ export async function buildBenchmarkProofRelease(args, options = {}) {
   const reportHash = sha256Buffer(bytes);
   const report = parseJsonReport(bytes);
   const schema = reportSchema(report);
+  const sampleCount = sampleCountFromReport(report);
+  const datasetCount = Array.isArray(report.datasets) ? report.datasets.length : 0;
   const commitments = scoreCommitments(args.scores, reportHash);
   const metricRoots = commitments.map((score) => score.score_hash);
 
@@ -317,7 +415,7 @@ export async function buildBenchmarkProofRelease(args, options = {}) {
     package_ref: args.packageRef,
     report_hash: reportHash,
     metric_roots: metricRoots,
-    sample_count: sampleCountFromReport(report),
+    sample_count: sampleCount,
     run_count: 1,
   });
   assertValidation(validateBenchmarkAttestation(attestation), 'benchmark attestation');
@@ -329,7 +427,7 @@ export async function buildBenchmarkProofRelease(args, options = {}) {
   });
   assertValidation(validateProofNetworkPacket(packet), 'proof packet');
 
-  const manifest = releaseManifest({ generatedAt, reportHash, schema, args, commitments, attestation, packet });
+  const manifest = releaseManifest({ generatedAt, reportHash, schema, sampleCount, datasetCount, args, commitments, attestation, packet });
   assertPublicReportPayload(manifest, 'manifest');
 
   return Object.freeze({
@@ -377,6 +475,9 @@ export async function main(argv = process.argv.slice(2)) {
     out_dir: outputLabel(args.outDir),
     ...files,
     report_hash: release.report_hash,
+    report_schema: release.report_schema,
+    sample_count: release.manifest.report.sample_count,
+    dataset_count: release.manifest.report.dataset_count,
     report_body_copied: false,
     api_calls_made: false,
   }, null, 2)}\n`);

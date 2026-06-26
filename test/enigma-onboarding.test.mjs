@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { main } from '../apps/cli/bin/enigma.mjs';
 import { platformDefaultConfigPath } from '../packages/connectors/src/index.js';
 
-const DEFAULT_SETUP_CLIENTS = Object.freeze(['generic-mcp', 'claude-desktop', 'cursor', 'kimi-code']);
+const DEFAULT_SETUP_CLIENTS = Object.freeze(['generic-mcp', 'claude-desktop', 'cursor', 'kimi-code', 'vscode-cline']);
 const CONNECTOR_ENV_KEYS = Object.freeze(['HOME', 'USERPROFILE', 'APPDATA']);
 
 function connectorFixtureEnv(dir) {
@@ -80,7 +80,7 @@ test('setup default creates local Memory Passport artifacts without connector wr
     assert.equal(summary.verify_report, '.enigma/verify-report.json');
     assert.equal(summary.artifacts_written, true);
     assert.equal(summary.client_configs_written, false);
-    assert.deepEqual(summary.selected_clients, ['generic-mcp', 'claude-desktop', 'cursor', 'kimi-code']);
+    assert.deepEqual(summary.selected_clients, DEFAULT_SETUP_CLIENTS);
     assert.equal(summary.provider_native_memory_canonical, false);
     assert.equal(summary.claim_boundaries.provider_native_memory_canonical, false);
     assert.equal(summary.memory_plaintext_echoed, false);
@@ -91,7 +91,8 @@ test('setup default creates local Memory Passport artifacts without connector wr
     assert.ok(summary.next_commands.some((command) => command.startsWith('enigma context ')));
     assert.ok(summary.next_commands.some((command) => command.startsWith('enigma verify ')));
     assert.ok(summary.next_commands.some((command) => command.startsWith('enigma connect generic-mcp ') && command.endsWith(' --dry-run')));
-    assert.equal(summary.connectors.length, 4);
+    assert.equal(summary.connectors.length, DEFAULT_SETUP_CLIENTS.length);
+    assert.equal(summary.one_command_install_connect.vscode_cline, 'npm install -g enigma-memory && enigma setup --client vscode-cline --write-connectors --overwrite');
     assert.equal(summary.connectors.every((connector) => connector.connect_plan.dry_run === true), true);
     assert.equal(summary.checks.npm.ok, true);
     assert.equal(summary.checks.vault_path.ok, true);

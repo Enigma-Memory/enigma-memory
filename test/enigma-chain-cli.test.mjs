@@ -199,7 +199,7 @@ test('chain attest creates and verifies a benchmark attestation from public refs
     '--runner-ref',
     'runner://enigma/local-standard-runner-v1',
     '--package-ref',
-    'npm://enigma-memory@0.1.15',
+    'npm://enigma-memory@0.1.16',
     '--score',
     'relevance=0.91',
     '--score',
@@ -268,7 +268,7 @@ test('chain commands fail closed for private payload examples without echoing se
     '--runner-ref',
     'runner://enigma/local-standard-runner-v1',
     '--package-ref',
-    'npm://enigma-memory@0.1.15',
+    'npm://enigma-memory@0.1.16',
     '--out',
     join(dir, 'bad-attestation.json'),
   ]);
@@ -395,4 +395,58 @@ test('chain submit-solana execute mode requires an explicit keypair before impor
   assert.equal(report.ok, false);
   assert.match(report.error.message, /keypair/u);
   assertTextOmits(result.text(), artifactPath, dir, ROOT_B, PRIVATE_SENTINEL);
+});
+
+test('chain submit-solana execute mode validates explicit keypair locally without leaking it', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-chain-submit-keypair-'));
+  const artifactPath = join(dir, 'anchor-batch.json');
+  const keypairPath = join(dir, 'operator-secret-keypair.json');
+
+  const anchorResult = await runCli([
+    'chain',
+    'anchor',
+    '--root',
+    ROOT_C,
+    '--authority',
+    'did:key:z6mkpublicauthorityonly',
+    '--out',
+    artifactPath,
+  ]);
+  assert.equal(anchorResult.code, 0, anchorResult.io.stderr());
+  await writeFile(keypairPath, `${PRIVATE_SENTINEL}\n`, 'utf8');
+
+  const result = await runCli([
+    'chain',
+    'submit-solana',
+    '--file',
+    artifactPath,
+    '--cluster',
+    'devnet',
+    '--keypair',
+    keypairPath,
+    '--execute',
+  ]);
+  assert.notEqual(result.code, 0);
+  const report = result.json();
+  assert.equal(report.ok, false);
+  assert.match(report.error.message, /keypair JSON array/u);
+  assertTextOmits(result.text(), artifactPath, keypairPath, dir, ROOT_C, PRIVATE_SENTINEL);
+
+  await writeFile(keypairPath, '[1,2,3]\n', 'utf8');
+  const shortKeypairResult = await runCli([
+    'chain',
+    'submit-solana',
+    '--file',
+    artifactPath,
+    '--cluster',
+    'devnet',
+    '--keypair',
+    keypairPath,
+    '--execute',
+  ]);
+  assert.notEqual(shortKeypairResult.code, 0);
+  const shortKeypairReport = shortKeypairResult.json();
+  assert.equal(shortKeypairReport.ok, false);
+  assert.match(shortKeypairReport.error.message, /64 secret-key bytes/u);
+  assertTextOmits(shortKeypairResult.text(), artifactPath, keypairPath, dir, ROOT_C);
 });

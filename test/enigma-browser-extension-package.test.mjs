@@ -118,3 +118,21 @@ test('browser extension package output and zip checksum are deterministic', asyn
     'src/native-bridge.js',
   ]);
 });
+
+test('browser and native-host docs show one-command MCP setup before manual JSON fallback', async () => {
+  const docs = await Promise.all([
+    readFile(new URL('../apps/browser-extension/README.md', import.meta.url), 'utf8'),
+    readFile(new URL('../apps/native-host/README.md', import.meta.url), 'utf8'),
+    readFile(new URL('../docs/browser-extension-install.md', import.meta.url), 'utf8'),
+    readFile(new URL('../packages/mcp-server/README.md', import.meta.url), 'utf8'),
+  ]);
+  const mcpContract = await readFile(new URL('../packages/mcp-server/PACKAGE_CONTRACT.md', import.meta.url), 'utf8');
+  for (const doc of docs) {
+    assert.match(doc, /npm install -g enigma-memory && enigma setup --client claude-desktop --write-connectors --overwrite/);
+    assert.match(doc, /npm install -g enigma-memory && enigma setup --client cursor --write-connectors --overwrite/);
+    assert.match(doc, /npm install -g enigma-memory && enigma setup --client kimi-code --write-connectors --overwrite/);
+    assert.match(doc, /npm install -g enigma-memory && enigma setup --client vscode-cline --write-connectors --overwrite/);
+    assert.match(doc, /npm install -g enigma-memory && enigma setup --client auto --connect-installed --overwrite/);
+  }
+  assert.match(mcpContract, /npm install -g enigma-memory && enigma setup --client <id> --write-connectors --overwrite/);
+});

@@ -1,6 +1,6 @@
 # Client connectors
 
-Enigma connects to assistant clients through MCP. The client starts `enigma-mcp` over stdio, and Enigma reads/writes the local vault bundle named by `ENIGMA_BUNDLE`. Start with the public test drive, then create a regular local workspace, then explicitly connect installed/config-present clients when you are ready.
+Enigma connects to assistant clients through MCP. The client starts `enigma-mcp` over stdio, and Enigma reads/writes the local vault bundle named by `ENIGMA_BUNDLE`. Install once, run setup once, then connect the same AI Memory Passport everywhere when you explicitly choose to write a client config.
 
 Supported connector IDs:
 
@@ -12,47 +12,11 @@ Supported connector IDs:
 - `opencode`
 - `generic-mcp`
 
-## Public test drive first
-
-Prove the live npm package path without credentials, hosted SaaS, provider calls, or client-config writes:
-
-```sh
-npm install -g enigma-memory
-enigma test-drive --overwrite
-```
-
-`enigma test-drive --overwrite` writes an isolated demo under `.enigma/test-drive` by default, emits one public-safe JSON summary, and does not print raw private memory plaintext. Use `--dry-run` to preview without writing, or `--out-dir <path>` to choose another isolated demo directory. The local proof/demo is bounded to Enigma-controlled vault state, receipts, checkpoints, committed roots, exported bundle shape, and declared boundary operations; it is not hosted SaaS evidence and does not prove provider deletion or model forgetting.
-
 ## One clear path
-
-After the test drive, create a regular local workspace:
 
 ```sh
 npm install -g enigma-memory
 enigma setup --overwrite
-```
-
-`enigma setup --overwrite` writes local Enigma artifacts under the workspace `.enigma` path and emits deterministic, public-safe JSON without printing raw memory plaintext. It does not write Claude, Cursor, Kimi, VS Code, Roo, OpenCode, or generic MCP client configs.
-
-To auto-detect installed or already-configured clients and show the setup connector plan without mutating client configs:
-
-```sh
-enigma setup --client auto --overwrite
-```
-
-`--client auto` selects clients found by connector detection and falls back to the default setup client list when none are present. The setup output lists selected clients, skipped clients, and the reason for each skip.
-
-To explicitly write connector entries for installed/config-present clients only:
-
-```sh
-enigma setup --connect-installed --overwrite
-```
-
-`--connect-installed` implies auto client selection and is a client-config write flag. It skips missing client configs instead of creating every default client config. Only explicit write flags mutate client configs. Existing `enigma connect <client>` behavior and existing `enigma setup --write-connectors` behavior for explicit/default clients are unchanged.
-
-After setup, use the same local vault from the CLI or connected clients:
-
-```sh
 enigma remember --text-file ./memory.txt
 enigma search --query "..."
 enigma context --query "..." --optimize
@@ -60,13 +24,9 @@ enigma verify --export ./.enigma/export.json
 enigma connect claude-desktop --dry-run
 ```
 
+`enigma setup --overwrite` writes local Enigma artifacts under the workspace `.enigma` path and emits deterministic, public-safe JSON without printing raw memory plaintext. It does not write Claude, Cursor, Kimi, VS Code, Roo, OpenCode, or generic MCP client configs. Client config writes happen only when you explicitly run `enigma connect <client>` without `--dry-run`.
+
 Provider-native memory is non-canonical cache only in this architecture. The Enigma vault remains canonical, and Enigma receipts prove Enigma-controlled lifecycle events; they do not prove that a hosted provider deleted hidden copies or that a model forgot anything.
-
-One-off public test drive without a global install:
-
-```sh
-npx --yes --package enigma-memory enigma test-drive --overwrite
-```
 
 From a source checkout, use this only for package development or source-only docs:
 
@@ -76,14 +36,6 @@ npm install -g .
 ```
 
 ## Preview, then connect
-
-Preview installed/config-present connector targets during setup without changing client configs:
-
-```sh
-enigma setup --client auto --overwrite
-```
-
-The output reports selected clients, skipped clients, and skip reasons. If no installed/config-present client is discovered, auto selection falls back to the default setup client list for planning.
 
 Preview one client without changing it:
 
@@ -97,7 +49,25 @@ enigma connect opencode --dry-run
 enigma connect generic-mcp --dry-run
 ```
 
-When you are ready to write all installed/config-present client configs discovered by setup, use the explicit setup-time write flag:
+When the single-client dry run looks right, remove `--dry-run` for the client you want:
+
+```sh
+enigma connect claude-desktop
+enigma connect cursor
+enigma connect kimi-code
+enigma connect vscode-cline
+enigma connect roo
+enigma connect opencode
+enigma connect generic-mcp
+```
+
+Optional setup-time planning for installed/config-present connector targets remains available:
+
+```sh
+enigma setup --client auto --overwrite
+```
+
+Use the explicit setup-time write flag only when you want setup to write all installed/config-present client configs it discovers:
 
 ```sh
 enigma setup --connect-installed --overwrite

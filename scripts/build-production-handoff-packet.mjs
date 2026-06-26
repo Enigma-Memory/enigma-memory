@@ -224,7 +224,7 @@ function buildNextActions({ projectName, domain, credentialsPresent, pages, infr
     actions.push({
       id: 'deploy-current-static-site',
       owner: 'operator-or-ai-with-token',
-      command: `npm run cloudflare:ops -- pages deploy --site <local-site-dir> --project-name ${shellArg(projectName)} --execute`,
+      command: `npm run cloudflare:pages:stage && npm run cloudflare:ops -- pages deploy --site .enigma/cloudflare-pages/enigmamemory.com --project-name ${shellArg(projectName)} --execute`,
       evidence: `npm run cloudflare:ops -- pages verify --url ${shellArg(`https://${domain}/`)} --project-name ${shellArg(projectName)} --domain ${shellArg(domain)} --cloudflare-live required`,
     });
   }

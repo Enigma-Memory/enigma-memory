@@ -10,6 +10,7 @@ import {
   parseArgs,
   writeBenchmarkProofRelease,
 } from '../scripts/build-benchmark-proof-release.mjs';
+import { runMemoryBenchmarkSuite } from '../scripts/run-memory-benchmarks.mjs';
 import {
   validateBenchmarkAttestation,
   validateProofNetworkPacket,
@@ -18,7 +19,7 @@ import {
 const GENERATED_AT = '2026-06-25T00:00:00.000Z';
 const DATASET_REF = `sha256:${'a'.repeat(64)}`;
 const RUNNER_REF = 'runner:run-standard-memory-benchmarks.mjs@reviewed-2026-06-25';
-const PACKAGE_REF = 'enigma-memory@0.1.15';
+const PACKAGE_REF = 'enigma-memory@0.1.16';
 
 async function withTempDir(fn) {
   const dir = await mkdtemp(join(tmpdir(), 'enigma-benchmark-proof-release-'));
@@ -51,7 +52,15 @@ function publicReport(overrides = {}) {
       provider_deletion_claim: false,
       model_forgetting_claim: false,
       roi_or_provider_invoice_savings_claim: false,
+      compliance_certification_claim: false,
       benchmark_leadership_claim: false,
+    },
+    command_boundaries: {
+      network_calls_made: false,
+      provider_api_calls_made: false,
+      api_spend_possible: false,
+      external_competitor_adapters_run: false,
+      mem0_adapter_run: false,
     },
     metrics: {
       qa: {
@@ -93,8 +102,14 @@ test('benchmark proof release hashes the report without copying raw report body'
     assert.equal(release.manifest.claim_boundaries.competitor_performance_claim, false);
     assert.equal(release.manifest.claim_boundaries.solana_submission_claim, false);
     assert.equal(release.manifest.claim_boundaries.roi_or_profit_claim, false);
+    assert.equal(release.manifest.report.sample_count, 3);
+    assert.equal(release.manifest.report.dataset_count, 0);
+    assert.equal(release.manifest.command_boundaries.network_calls_made, false);
+    assert.equal(release.manifest.command_boundaries.api_spend_possible, false);
+    assert.equal(release.manifest.command_boundaries.solana_transaction_submitted, false);
   });
 });
+
 
 test('benchmark proof release rejects private benchmark payloads before artifact creation', async () => {
   await withTempDir(async (dir) => {
@@ -105,6 +120,54 @@ test('benchmark proof release rejects private benchmark payloads before artifact
       () => buildBenchmarkProofRelease(args, { generated_at: GENERATED_AT }),
       /raw_memory|not allowed|public benchmark proof/i,
     );
+  });
+});
+
+test('benchmark proof release requires offline benchmark boundaries', async () => {
+  await withTempDir(async (dir) => {
+    const report = publicReport();
+    delete report.benchmark_boundaries;
+    const reportPath = await writeReport(dir, report);
+    const args = argsFor(reportPath, join(dir, 'proof-release'));
+
+    await assert.rejects(
+      () => buildBenchmarkProofRelease(args, { generated_at: GENERATED_AT }),
+      /benchmark_boundaries must be present/i,
+    );
+  });
+});
+
+test('benchmark proof release rejects scored external adapter rows', async () => {
+  await withTempDir(async (dir) => {
+    const reportPath = await writeReport(dir, publicReport({
+      external_competitor_adapters: [
+        {
+          id: 'mem0',
+          scores_included: true,
+          recall: 1,
+        },
+      ],
+    }));
+    const args = argsFor(reportPath, join(dir, 'proof-release'));
+
+    await assert.rejects(
+      () => buildBenchmarkProofRelease(args, { generated_at: GENERATED_AT }),
+      /external_competitor_adapters\[0\]\.scores_included must be false/i,
+    );
+  });
+});
+
+test('benchmark proof release accepts local memory suite offline boundaries', async () => {
+  await withTempDir(async (dir) => {
+    const outDir = join(dir, 'proof-release');
+    const reportPath = await writeReport(dir, runMemoryBenchmarkSuite({ generated_at: GENERATED_AT }));
+    const args = argsFor(reportPath, outDir, ['--runner-ref', 'runner:run-memory-benchmarks.mjs@reviewed-2026-06-25']);
+
+    const release = await buildBenchmarkProofRelease(args, { generated_at: GENERATED_AT });
+
+    assert.equal(release.report_schema, 'enigma.memory_benchmark_suite.v1');
+    assert.ok(release.manifest.report.sample_count > 0);
+    assert.equal(release.manifest.command_boundaries.provider_api_calls_made, false);
   });
 });
 

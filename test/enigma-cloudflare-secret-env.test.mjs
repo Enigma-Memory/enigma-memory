@@ -14,6 +14,7 @@ import {
 import { CLOUDFLARE_PAGES_RELEASE_PACKET_SCHEMA } from '../scripts/build-cloudflare-pages-release-packet.mjs';
 import { buildWranglerWorkerDeployPlan, parseCloudflareOpsCommand, runCloudflareOpsCommand } from '../scripts/cloudflare-ops.mjs';
 import { CLOUDFLARE_CREDENTIALS_RESULT_SCHEMA, validateCloudflareCredentials } from '../scripts/validate-cloudflare-credentials.mjs';
+import { stageCloudflarePagesArtifact } from '../scripts/stage-cloudflare-pages-artifact.mjs';
 
 const execFileAsync = promisify(execFile);
 const SECRET = 'cf_token_test_value_1234567890';
@@ -116,6 +117,28 @@ test('Cloudflare credential validator CLI exits blocked without credentials', as
   assert.equal(written.ok, false);
 });
 
+test('Cloudflare Pages staging overlays security headers without source mutation', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-pages-stage-'));
+  const site = join(dir, 'source');
+  const out = join(dir, 'staged');
+  await mkdir(site, { recursive: true });
+  const sourceHeaders = `/*\n  X-Content-Type-Options: nosniff\n  X-Frame-Options: DENY\n  Referrer-Policy: strict-origin-when-cross-origin\n\n/index.html\n  Cache-Control: no-store\n`;
+  await writeFile(join(site, '_headers'), sourceHeaders, 'utf8');
+  await writeFile(join(site, 'index.html'), '<!doctype html><html><head><title>Enigma</title></head><body>Launch</body></html>\n', 'utf8');
+  const result = await stageCloudflarePagesArtifact({ site, out, generated_at: '2026-06-26T00:00:00.000Z' });
+  assert.equal(result.schema, 'enigma.cloudflare_pages_stage.v1');
+  assert.equal(result.ok, true);
+  assert.equal(result.security.ok, true);
+  assert.equal(result.headers_overlay.source_mutated, false);
+  assert.equal(result.staged_site, '<staged-public-site>');
+  assert.equal(await readFile(join(site, '_headers'), 'utf8'), sourceHeaders);
+  const stagedHeaders = await readFile(join(out, '_headers'), 'utf8');
+  assert.match(stagedHeaders, /Permissions-Policy:/);
+  assert.match(stagedHeaders, /Content-Security-Policy:/);
+  assert.match(stagedHeaders, /Cache-Control: no-store/);
+  assert.doesNotMatch(JSON.stringify(result), new RegExp(escapeRegExp(site)));
+});
+
 test('Cloudflare Pages packet CLI accepts env file without printing token', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'enigma-pages-env-file-'));
   const envFile = await writeEnvFile(dir);
@@ -169,6 +192,8 @@ test('Cloudflare ops dry-run accepts env file without printing token', async () 
   assert.equal(output.operation, 'pages.deploy');
   assert.equal(output.dryRun, true);
   assert.equal(output.plan.tokenPrinted, false);
+  assert.equal(output.siteSecurity.ok, true);
+  assert.equal(output.siteSecurity.blocker_count, 0);
   assert.doesNotMatch(run.stdout, new RegExp(SECRET));
   assert.doesNotMatch(run.stdout, new RegExp(escapeRegExp(site)));
 });
@@ -192,6 +217,30 @@ test('Cloudflare ops execute path passes loaded env to Wrangler process', async 
   assert.equal(result.json.tokenPrinted, false);
   assert.doesNotMatch(JSON.stringify(result.json), new RegExp(escapeRegExp(site)));
   assert.doesNotMatch(JSON.stringify(result.json), /customer-subdomain/);
+});
+
+test('Cloudflare ops execute blocks insecure Pages artifact before Wrangler', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-cloudflare-ops-insecure-site-'));
+  const site = join(dir, 'site');
+  await mkdir(site, { recursive: true });
+  await writeFile(join(site, '_headers'), '/*\n  X-Content-Type-Options: nosniff\n', 'utf8');
+  await writeFile(join(site, 'index.html'), '<!doctype html><html><head><title>Enigma</title></head><body>Launch</body></html>\n', 'utf8');
+  const command = parseCloudflareOpsCommand(['pages', 'deploy', '--site', site, '--project-name', 'enigma-memory', '--execute'], {});
+  await assert.rejects(
+    () => runCloudflareOpsCommand(command, {
+      env: { CLOUDFLARE_API_TOKEN: SECRET, CLOUDFLARE_ACCOUNT_ID: 'account-fixture' },
+      execFileImpl: async () => {
+        throw new Error('Wrangler must not execute for insecure Pages artifacts');
+      },
+    }),
+    (error) => {
+      assert.match(error.message, /public site security validation blocked Pages deploy/);
+      assert.match(error.message, /content-security-policy|permissions-policy/i);
+      assert.doesNotMatch(error.message, new RegExp(escapeRegExp(site)));
+      assert.doesNotMatch(error.message, new RegExp(SECRET));
+      return true;
+    },
+  );
 });
 
 test('Cloudflare Worker probe deploy defaults to dry-run and never prints token', async () => {

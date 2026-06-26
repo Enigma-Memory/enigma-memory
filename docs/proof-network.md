@@ -92,7 +92,7 @@ Example:
 ```sh
 enigma chain anchor \
   --root sha256:8f0f7d2b7b7f4f2a3e4b9a3d1f0f2c3b4a5d6e7f8091a2b3c4d5e6f708192a3b \
-  --ref release:enigma:0.1.15 \
+  --ref release:enigma:0.1.16 \
   --ref memory-root:public-demo-2026-06-25 \
   --out ./.enigma/proof-network-anchor.json
 ```
@@ -144,8 +144,8 @@ Example:
 ```sh
 enigma chain revoke \
   --issuer did:example:enigma-issuer \
-  --grant-ref grant:sha256:2a0f6d8c1e3b5a799887766554433221100ffeeddccbbaa998877665544332211 \
-  --reason-ref operator-request:2026-06-25 \
+  --grant-hash sha256:2a0f6d8c1e3b5a799887766554433221100ffeeddccbbaa998877665544332211 \
+  --reason operator-request-2026-06-25 \
   --out ./.enigma/proof-network-revocation.json
 ```
 
@@ -166,8 +166,8 @@ Example with a report hash:
 enigma chain attest \
   --report-hash sha256:5c3a2e1d0f9b8a7766554433221100ffeeddccbbaa99887766554433221100ff \
   --dataset-ref locomo:file-sha256:6a7b8c9d0e1f2233445566778899aabbccddeeff00112233445566778899aabb \
-  --runner-ref enigma-standard-memory-benchmark:0.1.15 \
-  --package-ref npm:@enigma-ai/enigma:0.1.15 \
+  --runner-ref enigma-standard-memory-benchmark:0.1.16 \
+  --package-ref npm://enigma-memory@0.1.16 \
   --out ./.enigma/proof-network-attestation.json
 ```
 
@@ -177,8 +177,8 @@ Example with a local report file:
 enigma chain attest \
   --report-file ./.enigma/standard-memory-benchmark.json \
   --dataset-ref longmemeval:file-sha256:7b8c9d0e1f2233445566778899aabbccddeeff00112233445566778899aabbcc \
-  --runner-ref enigma-standard-memory-benchmark:0.1.15 \
-  --package-ref npm:@enigma-ai/enigma:0.1.15 \
+  --runner-ref enigma-standard-memory-benchmark:0.1.16 \
+  --package-ref npm://enigma-memory@0.1.16 \
   --out ./.enigma/proof-network-attestation.json
 ```
 
@@ -210,6 +210,31 @@ enigma chain verify --file ./.enigma/proof-network-packet.json
 ```
 
 A successful local verification means the artifact matches a supported proof-network shape and safety boundary. It does not mean a live account exists, a transaction was accepted, or a public rail was contacted.
+
+## Flow: optional Solana Memo dry-run
+
+`enigma chain submit-solana` is the safe handoff from a verified local artifact to the optional Solana proof rail. It defaults to dry-run, validates the artifact first, and prints only the compact Memo reference that would be submitted.
+
+Dry-run command:
+
+```sh
+enigma chain submit-solana \
+  --file ./.enigma/proof-network-anchor.json \
+  --cluster devnet
+```
+
+Execute command, only after devnet gate approval and with an explicit operator keypair:
+
+```sh
+enigma chain submit-solana \
+  --file ./.enigma/proof-network-anchor.json \
+  --cluster devnet \
+  --rpc https://api.devnet.solana.com \
+  --keypair ./operator-devnet-keypair.json \
+  --execute
+```
+
+Execute mode submits one Solana Memo instruction containing only `memo_ref` JSON: schema, artifact hash, cluster, and compact proof commitment. It does not submit the artifact body, raw memory, prompts, transcripts, embeddings, provider responses, private keys, local paths, or customer identifiers.
 
 ## Privacy boundaries
 

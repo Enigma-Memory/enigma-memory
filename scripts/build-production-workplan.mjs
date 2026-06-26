@@ -234,6 +234,8 @@ export function buildProductionWorkplan(inputs = {}, options = {}) {
   const endpointRefs = missingHostedEndpointRefs(hosted);
   const stateBlockers = hostedStateBlockers(hosted);
 
+  const finalDependencyCommand = 'npm run production:dependencies -- --goal-audit .enigma/goal-audit-current.json --release-audit .enigma/release-audit-current.json --worker-inspect .enigma/worker-inspect-result-current.json --whitepaper .enigma/whitepaper-claims-current.json --cloudflare-credentials .enigma/cloudflare-credentials-current.json --edge-deploy .enigma/edge-backend-deployment-current.json --edge-live .enigma/edge-backend-bootstrap-live-current.json --storage-bootstrap .enigma/cloudflare-storage-bootstrap-current.json';
+
   const phases = [
     makePhase({
       id: 'cloudflare_credentials',
@@ -309,7 +311,7 @@ export function buildProductionWorkplan(inputs = {}, options = {}) {
       owner: 'operator-or-reviewer',
       prerequisites: ['cloudflare_credentials', 'cloudflare_worker_permission', 'hosted_backend_refs', 'operator_acceptance', 'release_gates'],
       blockers: dependencyReport.launch_ready === true ? [] : ['launch_ready is false'],
-      commands: [release.next_command, staticSite.next_command, whitepaper.next_command, 'npm run production:goal-audit -- --site <public-site-dir> --domain enigmamemory.com --release-audit .enigma/release-audit-current.json', 'npm run production:dependencies -- --goal-audit .enigma/goal-audit-current.json --release-audit .enigma/release-audit-current.json --worker-inspect .enigma/worker-inspect-validation-current.json --whitepaper .enigma/whitepaper-claims-current.json --cloudflare-credentials .enigma/cloudflare-credentials-current.json --edge-deploy .enigma/edge-backend-deployment-current.json --edge-live .enigma/edge-backend-bootstrap-live-current.json --storage-bootstrap .enigma/cloudflare-storage-bootstrap-current.json'],
+      commands: [release.next_command, staticSite.next_command, whitepaper.next_command, 'npm run production:goal-audit -- --site <public-site-dir> --domain enigmamemory.com --release-audit .enigma/release-audit-current.json', finalDependencyCommand],
       evidence: [...release.evidence, ...staticSite.evidence, ...whitepaper.evidence],
       details: { goal_complete: dependencyReport.goal_complete === true, launch_ready: dependencyReport.launch_ready === true },
     }),

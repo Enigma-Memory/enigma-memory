@@ -2,50 +2,35 @@
 
 Enigma Memory is a local-first AI Memory Passport. It gives you one canonical local memory vault, receipt-backed proof for Enigma-controlled events, and MCP connections into assistants such as Claude Desktop, Cursor, Kimi Code, and generic MCP clients.
 
-Start with `enigma init --dry-run` below. You do not need to understand relay, gateway, mesh, browser, desktop, or hosted infrastructure before trying Enigma locally.
+Start with `enigma setup --overwrite` below. You do not need to understand relay, gateway, mesh, browser, desktop, hosted infrastructure, or the proof network before trying Enigma locally.
 
 The package path needs no database, provider credential, cloud credential, npm publishing token, or external account. Hosted cloud and BYOC operation are separate advanced modes that require real deployment credentials, domains, TLS, durable storage, KMS/secrets, monitoring, backups, and operator acceptance.
 
 Enigma does not claim that a closed provider deleted internal data, that model weights forgot, or that provider-native memory disappeared. It proves facts about Enigma-controlled vault state, receipts, checkpoints, and declared boundary operations.
 
-## First run: install and inspect the safe local plan
+## Install once, use everywhere
 
-The top public path is the published npm package plus the first-run planner:
+Prerequisites:
+
+- Node.js `>=24`
+- No database, package registry account, provider credential, cloud credential, hosted Enigma account, or external account for the local setup path
+- Git only when you choose the advanced source-checkout path
+
+Use Enigma as a one-time AI Memory Passport setup: install the package, create the local Enigma workspace once, then use the same memory/search/context/verify/connect loop from any supported client.
 
 ```sh
 npm install -g enigma-memory
-enigma init --dry-run
+enigma setup --overwrite
+enigma remember --text-file ./memory.txt
+enigma search --query "..."
+enigma context --query "..." --optimize
+enigma verify --export ./.enigma/export.json
+enigma connect claude-desktop --dry-run
 ```
 
-`enigma init --dry-run` prints a public-safe JSON plan with exact next commands. It does not write local artifacts or third-party client configs, does not require provider credentials, hosted Enigma SaaS, Solana, or a browser extension, and states `provider_credentials_required:false`, `hosted_saas_live:false`, and `raw_memory_printed:false`.
+`enigma setup --overwrite` writes local Enigma artifacts under the workspace `.enigma` path and emits deterministic, public-safe JSON without printing raw memory plaintext. It does not write Claude, Cursor, Kimi, or other third-party app configs. Client config writes happen only when you explicitly run `enigma connect <client>` without `--dry-run`; keep `--dry-run` while reviewing the planned MCP entry.
 
-When the plan looks right, create the local Memory Passport artifacts:
-
-```sh
-enigma init --overwrite
-```
-
-The execute path writes only local Enigma artifacts under the workspace `.enigma` path by default. It still does not write Claude, Cursor, Kimi, or other third-party app configs unless you explicitly add `--connect`.
-
-Public demo path, preserved for reviewers who want the isolated proof/demo bundle:
-
-```sh
-enigma test-drive --overwrite
-```
-
-`enigma test-drive --overwrite` needs no database, provider API key, cloud credential, npm publishing token, package registry account, or hosted Enigma account. It runs entirely on the local filesystem, does not call OpenAI, Anthropic, Cloudflare, hosted Enigma, or other external providers, and does not write Claude, Cursor, Kimi, or other third-party client configs.
-
-By default the command writes an isolated demo under `.enigma/test-drive`. Use `--dry-run` to print the plan without writing, or `--out-dir <path>` to choose another isolated demo directory. The default bundle and proof artifacts live inside that directory.
-
-The test-drive output is a single public-safe JSON summary. It points to the local setup artifacts, search/status output, cross-model demo report, and benchmark pointers, and it prints exact next commands for testers without printing raw private memory plaintext. The proof is bounded to the local demo: Enigma-controlled vault state, receipts, checkpoints, committed roots, exported bundle shape, and declared boundary operations. It is not evidence that hosted SaaS is live, that a closed provider deleted internal data, that model weights forgot, or that provider-native memory disappeared.
-
-When you are ready to connect real local clients that are already installed or already configured:
-
-```sh
-enigma init --connect --overwrite
-```
-
-`--connect` is the explicit first-run client-config write path. With default client selection it skips missing client configs instead of creating every default client config.
+The local Enigma vault remains canonical. Provider-native memory is non-canonical and should be treated as a convenience cache only. Enigma receipts prove Enigma-controlled vault state, receipts, checkpoints, and declared boundary operations; they do not prove provider deletion, provider model forgetting, provider-native memory removal, hosted availability, ROI/savings, or compliance certification.
 
 ## Enigma Proof Network
 
@@ -55,59 +40,6 @@ The `enigma chain anchor|grant|revoke|attest|verify` commands are local planning
 
 Start with the category narrative in [`docs/market-category-narrative.md`](docs/market-category-narrative.md), then read the technical overview in [`docs/proof-network.md`](docs/proof-network.md), use its [Solana role](docs/proof-network.md#solana-role) section for the Solana-ready anchoring boundary, and read [`docs/proof-network-faq.md`](docs/proof-network-faq.md) for claim boundaries.
 
-## Install once, use everywhere
-
-Prerequisites:
-
-- Node.js `>=24`
-- No database, package registry account, provider credential, or cloud credential for the local test-drive or setup paths
-- Git only when you choose the advanced source-checkout path
-
-Use Enigma as a one-time AI Memory Passport setup: install the package, inspect the local plan, create the local Enigma workspace once, then use the same memory/search/context/verify/connect loop from any supported client.
-
-```sh
-npm install -g enigma-memory
-enigma init --dry-run
-enigma init --overwrite
-```
-
-`enigma init --overwrite` is the safe default for creating a regular local workspace after reviewing the plan. It writes local Enigma artifacts under the workspace `.enigma` path and emits deterministic, public-safe JSON without printing raw memory plaintext. It does not write Claude, Cursor, Kimi, or other third-party app configs.
-
-To let first-run setup detect installed or already-configured clients and show the connector plan without mutating client configs:
-
-```sh
-enigma init --client auto --dry-run
-```
-
-`--client auto` selects clients found by connector detection and falls back to the default setup client list when none are present. The init output lists which clients were selected, which were skipped, and why.
-
-Only when you are ready to explicitly write connector entries for installed/config-present clients:
-
-```sh
-enigma init --connect --overwrite
-```
-
-`--connect` implies installed/config-present client selection when no explicit `--client` is supplied and is an explicit client-config write flag. It skips missing client configs instead of creating every default client config. Existing setup commands remain available: `enigma setup --overwrite`, `enigma setup --client auto --overwrite`, and `enigma setup --connect-installed --overwrite`. Existing explicit connector writes remain available through `enigma connect <client>` without `--dry-run`; keep `--dry-run` while reviewing a single planned MCP entry.
-
-After init or setup, use the same local vault from the CLI or connected clients:
-
-```sh
-enigma remember --text-file ./memory.txt
-enigma search --query "..."
-enigma context --query "..." --optimize
-enigma verify --export ./.enigma/export.json
-enigma connect claude-desktop --dry-run
-```
-
-`enigma context --query ...` automatically applies local relevance scoring; `--optimize` is still accepted when you want explicit optimizer evidence or token/cost bounds.
-
-The local Enigma vault remains canonical. Provider-native memory is non-canonical and should be treated as a convenience cache only. Enigma receipts prove Enigma-controlled vault state, receipts, checkpoints, and declared boundary operations; they do not prove provider deletion, provider model forgetting, provider-native memory removal, hosted availability, ROI/savings, or compliance certification.
-
-One-off public test drive without a global install:
-
-```sh
-npx --yes --package enigma-memory enigma test-drive --overwrite
-```
 
 ## Advanced/source-only path
 
@@ -214,7 +146,7 @@ Supported connector profiles are:
 - `opencode`
 - `generic-mcp`
 
-After `enigma init --dry-run` previews the local package path and `enigma init --overwrite` creates a regular local workspace, preview a client connection before writing anything:
+After `enigma setup --overwrite`, preview a client connection before writing anything:
 
 ```sh
 enigma connect claude-desktop --dry-run
@@ -223,11 +155,59 @@ enigma connect kimi-code --dry-run
 enigma connect generic-mcp --dry-run
 ```
 
-For the one-time setup flow, `enigma init --client auto --dry-run` reports the installed/config-present clients that connector detection selected and the clients it skipped with reasons. It remains read-only for client configs. `enigma init --connect --overwrite` is the explicit init-time write path for installed/config-present clients by default; missing configs are skipped rather than created. The older `enigma setup --client auto --overwrite` and `enigma setup --connect-installed --overwrite` commands remain available.
+Remove `--dry-run` from `enigma connect <client>` only after you are ready for Enigma to merge the `mcpServers.enigma` entry into that specific client config. The safe default setup command never writes third-party app configs.
 
-Remove `--dry-run` from `enigma connect <client>` only after you are ready for Enigma to merge the `mcpServers.enigma` entry into that specific client config. The safe default init/setup command never writes third-party app configs.
+Copy-paste MCP snippets:
 
-Manual MCP entry for Claude Desktop, Cursor, Kimi Code, or any generic MCP client:
+Claude Desktop:
+
+```json
+{
+  "mcpServers": {
+    "enigma": {
+      "command": "enigma-mcp",
+      "args": [],
+      "env": {
+        "ENIGMA_BUNDLE": "/absolute/path/to/.enigma/bundle.json"
+      }
+    }
+  }
+}
+```
+
+Cursor:
+
+```json
+{
+  "mcpServers": {
+    "enigma": {
+      "command": "enigma-mcp",
+      "args": [],
+      "env": {
+        "ENIGMA_BUNDLE": "/absolute/path/to/.enigma/bundle.json"
+      }
+    }
+  }
+}
+```
+
+Kimi Code:
+
+```json
+{
+  "mcpServers": {
+    "enigma": {
+      "command": "enigma-mcp",
+      "args": [],
+      "env": {
+        "ENIGMA_BUNDLE": "/absolute/path/to/.enigma/bundle.json"
+      }
+    }
+  }
+}
+```
+
+Generic MCP:
 
 ```json
 {

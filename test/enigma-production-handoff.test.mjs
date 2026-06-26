@@ -136,7 +136,7 @@ test('production handoff packet summarizes current blockers without secrets', as
   assert.match(packet.next_actions.find((item) => item.id === 'generate-operator-evidence-starter')?.evidence ?? '', /evidence-refs\.template\.json/);
   assert.match(packet.next_actions.find((item) => item.id === 'optional-standalone-worker-probe')?.command ?? '', /workers inspect-probe/);
   assert.doesNotMatch(JSON.stringify(packet.next_actions), /cloudflare:ops -- [^"]* -- --/);
-  assert.match(packet.next_actions.find((item) => item.id === 'deploy-current-static-site')?.command ?? '', /--site <local-site-dir>/);
+  assert.match(packet.next_actions.find((item) => item.id === 'deploy-current-static-site')?.command ?? '', /cloudflare:pages:stage .*--site \.enigma\/cloudflare-pages\/enigmamemory\.com/);
   assert.match(packet.blockers.join('\n'), /missing refs\.backend_host/);
   assert.doesNotMatch(JSON.stringify(packet), new RegExp(token));
   assert.doesNotMatch(JSON.stringify(packet), /Bearer|PRIVATE KEY|sk-/i);

@@ -53,7 +53,7 @@ export const DEFAULT_GATEWAY_PORT = 8797;
 const DEFAULT_QUICKSTART_MEMORY = 'Enigma quickstart demo memory: local proof bundles can be created and verified without provider or cloud credentials.';
 const DEFAULT_CROSS_MODEL_DEMO_BUNDLE = '.enigma/cross-model-demo-bundle.json';
 const DEFAULT_CROSS_MODEL_MEMORY = 'Enigma cross-model demo memory: a local encrypted memory can be packaged for ChatGPT, Claude, Kimi, Cursor, and a local LLM without provider credentials.';
-const DEFAULT_SETUP_CLIENTS = Object.freeze(['generic-mcp', 'claude-desktop', 'cursor', 'kimi-code']);
+const DEFAULT_SETUP_CLIENTS = Object.freeze(['generic-mcp', 'claude-desktop', 'cursor', 'kimi-code', 'vscode-cline']);
 const SETUP_CLAIM_BOUNDARIES = Object.freeze({
   local_only: true,
   provider_credentials_required: false,
@@ -1043,6 +1043,20 @@ function publicSetupError(error, rawDisplays, publicDisplays) {
   return new Error(message);
 }
 
+function oneCommandInstallConnect(bundleDisplay = DEFAULT_BUNDLE, outDirDisplay = dirname(bundleDisplay)) {
+  const parts = ['npm install -g enigma-memory && enigma setup'];
+  if (bundleDisplay !== DEFAULT_BUNDLE) parts.push(`--bundle ${commandPath(bundleDisplay)}`);
+  if (outDirDisplay !== dirname(bundleDisplay)) parts.push(`--out-dir ${commandPath(outDirDisplay)}`);
+  const base = parts.join(' ');
+  return {
+    installed_clients: `${base} --client auto --connect-installed --overwrite`,
+    claude_desktop: `${base} --client claude-desktop --write-connectors --overwrite`,
+    cursor: `${base} --client cursor --write-connectors --overwrite`,
+    kimi_code: `${base} --client kimi-code --write-connectors --overwrite`,
+    vscode_cline: `${base} --client vscode-cline --write-connectors --overwrite`,
+  };
+}
+
 function setupNextCommands(bundleInput, exportDisplay, clients, writeConnectors) {
   const primaryClient = clients[0] ?? DEFAULT_SETUP_CLIENTS[0];
   const commands = [
@@ -1297,6 +1311,7 @@ export async function setupCommand(flags, io) {
     client_selection: publicSetupClientSelection(selection),
     connector_write_skips: connectorWriteSkips(connectors),
     connectors,
+    one_command_install_connect: oneCommandInstallConnect(displays.bundle, publicPathDisplay(outDirInput, 'out-dir')),
     mcp_config_snippets: Object.fromEntries(connectors.map((connector) => [connector.client_id, connector.mcp_config_snippet])),
     connect_plans: Object.fromEntries(connectors.map((connector) => [connector.client_id, connector.connect_plan])),
     next_commands: setupNextCommands(displays.bundle, displays.export, clients, connectorWritesRequested && (!connectInstalled || anyConnectorWritePerformed)),
@@ -1938,7 +1953,7 @@ export async function testDriveCommand(flags, io) {
     out_dir: outDirInput,
     bundle: bundleInput,
     install_command: `npm install -g ${packageJson.name ?? 'enigma-memory'}`,
-    release_target: '0.1.15',
+    release_target: '0.1.16',
     artifacts_written: !dryRun,
     client_configs_written: false,
     client_config_write_required: false,
@@ -2122,6 +2137,7 @@ export async function installCommand(flags, io) {
     mcp_command: connectorOptions(flags).mcpCommand ?? 'enigma-mcp',
     clients: profiles,
     mcp_config_snippets: snippets,
+    one_command_install_connect: oneCommandInstallConnect(bundlePath, dirname(bundlePath)),
     out: out && out !== true ? resolve(String(out)) : undefined,
   }, io);
   return 0;
@@ -2445,11 +2461,11 @@ async function readSolanaKeypair(path) {
   } catch {
     throw new Error('Unable to read a valid Solana --keypair JSON array.');
   }
-  if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('Solana --keypair must be a JSON array of secret-key bytes.');
+  if (!Array.isArray(parsed) || parsed.length !== 64) throw new Error('Solana --keypair must be a JSON array of 64 secret-key bytes.');
   const bytes = new Uint8Array(parsed.length);
   for (let i = 0; i < parsed.length; i += 1) {
     const value = parsed[i];
-    if (!Number.isInteger(value) || value < 0 || value > 255) throw new Error('Solana --keypair must be a JSON array of secret-key bytes.');
+    if (!Number.isInteger(value) || value < 0 || value > 255) throw new Error('Solana --keypair must be a JSON array of 64 secret-key bytes.');
     bytes[i] = value;
   }
   return bytes;
@@ -2955,6 +2971,15 @@ function usage() {
       '--dry-run': 'Plan setup without writing local artifacts or client configs.',
       '--write-connectors': 'Also write selected client MCP config files. Defaults to false.',
     },
+    install_options: {
+      'one-command installed clients': 'npm install -g enigma-memory && enigma setup --client auto --connect-installed --overwrite',
+      'one-command Claude Desktop': 'npm install -g enigma-memory && enigma setup --client claude-desktop --write-connectors --overwrite',
+      'one-command Cursor': 'npm install -g enigma-memory && enigma setup --client cursor --write-connectors --overwrite',
+      'one-command Kimi Code': 'npm install -g enigma-memory && enigma setup --client kimi-code --write-connectors --overwrite',
+      'one-command VS Code Cline': 'npm install -g enigma-memory && enigma setup --client vscode-cline --write-connectors --overwrite',
+      '--client <id>': 'Limit generated MCP snippets to one supported client.',
+      '--out <path>': 'Write generated MCP snippets to a JSON file for review without hand-editing client config JSON.',
+    },
     quickstart_options: {
       '--bundle <path>': 'Bundle JSON to create. Defaults to .enigma/bundle.json.',
       '--out-dir <path>': 'Directory for context-pack.json, export.json, and verify-report.json. Defaults to the bundle directory.',
@@ -3022,7 +3047,7 @@ function usage() {
       revoke: 'enigma chain revoke --grant-hash <sha256:...> --reason <public-reason-code> [--revocation-ref <public-ref>] [--out <file>]',
       attest: 'enigma chain attest (--report-hash <sha256:...> | --report-file <report.json>) --dataset-ref <sha256:...> --runner-ref <public-runner-ref> --package-ref <public-package-ref> [--score name=value] [--out <file>]',
       verify: 'enigma chain verify --file <proof-artifact.json>',
-      submit_solana: 'enigma chain submit-solana --file <proof-artifact.json> --cluster <devnet|testnet|mainnet-beta|localnet> [--rpc <url>] [--execute --keypair <solana-keypair.json>]',
+      submit_solana: 'enigma chain submit-solana --file <proof-artifact.json> --cluster <devnet|testnet|mainnet-beta|localnet> [--rpc <url>] [--execute --keypair <solana-cli-64-byte-keypair.json>]',
       boundary: 'Proof Network chain commands default to local planning and dry-run validation. submit-solana only submits a Solana Memo transaction when --execute is passed; it carries compact public-safe commitment/ref JSON, never raw memory or artifact bodies.',
     },
     relay_gateway_options: {

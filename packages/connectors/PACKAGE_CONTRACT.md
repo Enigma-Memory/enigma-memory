@@ -9,6 +9,7 @@ This package is part of Enigma, the provider-agnostic AI memory and proof layer.
 - Explicit `configPath` overrides default OS-aware paths for `win32`, `darwin`, and `linux`.
 - `connectClient` reads JSON, merges only the Enigma MCP server entry, backs up an existing changed file with a timestamp suffix, writes pretty JSON, is idempotent, and supports `dryRun` planned writes.
 - `disconnectClient` removes only the Enigma server entry, leaves all other client configuration intact, backs up an existing changed file first, and supports `dryRun` planned writes.
+- `planConnectWizard` must expose a one-command install/connect string, a setup command, a direct connect command, and an MCP config preview for each supported client so onboarding does not require hand-editing JSON.
 - Connector receipts, plans, and demo artifacts must not contain raw memory plaintext.
 - Public exports are `supportedClients`, `getClientProfile`, `renderMcpConfig`, `connectClient`, `disconnectClient`, `detectClientConnector`, `detectConnectors`, `doctorConnectors`, `planConnectWizard`, `platformDefaultConfigPath`, and `runConnectorDemo`.
 

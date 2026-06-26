@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { applyCloudflareSecretEnvFileFromArgv, CloudflareSecretEnvError } from './cloudflare-secret-env.mjs';
+import { PUBLIC_SITE_SECURITY_RESULT_SCHEMA, validatePublicSiteSecurity } from './validate-public-site-security.mjs';
 
 const execFile = promisify(execFileCallback);
 
@@ -46,6 +47,8 @@ Commands:
 
   pages deploy --site <dir> --project-name <name> [--execute]
       Without --execute, prints the exact Wrangler deploy plan only.
+      Dry-run output includes local public-site security validation.
+      --execute refuses artifacts with local security blockers before invoking Wrangler.
       With --execute, runs Wrangler through npm exec/npx without printing the token.
 
   pages verify --url <https-url> --project-name <name> [--domain <host>] \\
@@ -262,6 +265,35 @@ function redactOperationalPayload(value) {
 
 function redactPlanOutput(plan) {
   return redactOperationalPayload(plan);
+}
+
+function redactPublicSiteSecurityBlocker(entry) {
+  return {
+    message: redactOperationalText(entry?.message ?? ''),
+    ...(entry?.path === undefined ? {} : { path: redactOperationalText(String(entry.path)) }),
+  };
+}
+
+function publicSiteSecurityDeploySummary(result) {
+  return {
+    schema: PUBLIC_SITE_SECURITY_RESULT_SCHEMA,
+    ok: result?.ok === true,
+    status: result?.status ?? 'blocked',
+    blocker_count: Array.isArray(result?.blockers) ? result.blockers.length : 0,
+    blockers: Array.isArray(result?.blockers) ? result.blockers.map(redactPublicSiteSecurityBlocker) : [],
+    checked: redactOperationalPayload(result?.checked ?? {}),
+    claimBoundary: result?.claim_boundary ?? [],
+  };
+}
+
+function publicSiteSecurityErrorMessage(summary) {
+  const blockerText = summary.blockers
+    .slice(0, 5)
+    .map((entry) => (entry.path ? `${entry.path}: ${entry.message}` : entry.message))
+    .join('; ');
+  return blockerText.length > 0
+    ? `public site security validation blocked Pages deploy: ${blockerText}`
+    : 'public site security validation blocked Pages deploy';
 }
 
 function parsePositiveInteger(value, name) {
@@ -1518,6 +1550,7 @@ export async function runCloudflareOpsCommand(command, {
 
   if (command.kind === 'pages.deploy') {
     const plan = buildWranglerPagesDeployPlan(command);
+    const siteSecurity = publicSiteSecurityDeploySummary(await validatePublicSiteSecurity({ site: command.site }));
     if (!command.execute) {
       return {
         json: {
@@ -1526,10 +1559,12 @@ export async function runCloudflareOpsCommand(command, {
           dryRun: true,
           execute: false,
           plan: redactPlanOutput(plan),
+          siteSecurity,
           claimBoundary: 'Plan only; no Cloudflare Pages deployment was executed.',
         },
       };
     }
+    if (!siteSecurity.ok) throw new UsageError(publicSiteSecurityErrorMessage(siteSecurity));
     const result = await execFileImpl(plan.command, plan.args, { shell: plan.usesShell === true, windowsHide: true, maxBuffer: 10 * 1024 * 1024, env });
     return {
       json: {

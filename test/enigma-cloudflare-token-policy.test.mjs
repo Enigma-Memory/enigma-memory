@@ -37,6 +37,10 @@ test('Cloudflare token policy lists least-privilege Pages and registrar permissi
   assert.match(policy.planned_api_calls.map((item) => item.path).join('\n'), /\/workers\/domains/);
   assert.ok(policy.planned_api_calls.every((item) => item.token_printed === false));
   assert.match(policy.verification_commands.join('\n'), /workers inspect-probe --name enigma-hosted-probe/);
+  assert.match(policy.verification_commands.join('\n'), /cloudflare:pages:stage/);
+  assert.match(policy.verification_commands.join('\n'), /cloudflare:pages:dry-run/);
+  assert.match(policy.verification_commands.join('\n'), /\.enigma\/cloudflare-pages\/enigmamemory\.com/);
+  assert.match(policy.verification_commands.join('\n'), /pages verify --url https:\/\/enigmamemory\.com\//);
   assert.doesNotMatch(policy.verification_commands.join('\n'), /cloudflare:ops -- [^\n]* -- --/);
   assert.doesNotMatch(JSON.stringify(policy), /Bearer|PRIVATE KEY|sk-/i);
 });

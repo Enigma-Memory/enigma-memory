@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import https from 'node:https';
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
@@ -79,6 +80,42 @@ function redactProbeBody(value, path = 'probe.body') {
     redactProbeBody(child, `${path}.${key}`);
   }
   return value;
+}
+
+export function localSimulationLoopbackFetch(url, init = {}) {
+  const parsed = new URL(url);
+  const host = parsed.hostname.toLowerCase();
+  if (parsed.protocol !== 'https:' || (host !== 'sim.enigmamemory.com' && !host.endsWith('.sim.enigmamemory.com'))) {
+    throw new Error('--local-simulation-loopback only supports https://*.sim.enigmamemory.com simulation probes');
+  }
+  const request = {
+    hostname: '127.0.0.1',
+    port: parsed.port || 443,
+    path: `${parsed.pathname}${parsed.search}`,
+    method: init.method || 'GET',
+    headers: init.headers,
+    rejectUnauthorized: false,
+    servername: parsed.hostname,
+  };
+  return new Promise((resolve, reject) => {
+    const req = https.request(request, (res) => {
+      const chunks = [];
+      res.on('data', (chunk) => chunks.push(chunk));
+      res.on('end', () => {
+        const text = Buffer.concat(chunks).toString('utf8');
+        resolve({
+          ok: res.statusCode >= 200 && res.statusCode < 300,
+          status: res.statusCode,
+          statusText: res.statusMessage || '',
+          url,
+          redirected: false,
+          text: async () => text,
+        });
+      });
+    });
+    req.on('error', reject);
+    req.end();
+  });
 }
 
 async function fetchProbe(url, { fetchImpl = globalThis.fetch, observedAt }) {
@@ -189,6 +226,10 @@ function parseArgs(argv) {
     }
     if (!arg.startsWith('--')) throw new Error(`Unexpected argument: ${arg}`);
     const name = arg.slice(2);
+    if (name === 'local-simulation-loopback') {
+      flags.set(name, true);
+      continue;
+    }
     const value = argv[index + 1];
     if (!value || value.startsWith('--')) throw new Error(`${arg} requires a value`);
     flags.set(name, value);
@@ -198,7 +239,7 @@ function parseArgs(argv) {
 }
 
 function usage() {
-  return `Usage: node scripts/collect-hosted-backend-live-evidence.mjs --relay-url <https-base> --gateway-url <https-base> --refs-json <refs.json> --domain <domain> --environment-id <id> --cloud-provider <provider> --region <region> --owner <owner> --operator-decision go --operator-packet-ref <ref> --operator-approved-at <iso> --operator-approved-by <name> [--out <collection.json>] [--evidence-out <evidence.json>]\n\nCollects public HTTPS /livez and /readyz evidence for relay and gateway, then validates it with validate-hosted-backend-live. It never sends credentials and does not deploy infrastructure.\n`;
+  return `Usage: node scripts/collect-hosted-backend-live-evidence.mjs --relay-url <https-base> --gateway-url <https-base> --refs-json <refs.json> --domain <domain> --environment-id <id> --cloud-provider <provider> --region <region> --owner <owner> --operator-decision go --operator-packet-ref <ref> --operator-approved-at <iso> --operator-approved-by <name> [--out <collection.json>] [--evidence-out <evidence.json>] [--local-simulation-loopback]\n\nCollects public HTTPS /livez and /readyz evidence for relay and gateway, then validates it with validate-hosted-backend-live. It never sends credentials and does not deploy infrastructure. The --local-simulation-loopback flag is restricted to https://*.sim.enigmamemory.com local simulation probes with self-signed TLS and must not be used as production evidence.\n`;
 }
 
 async function runCli(argv = process.argv.slice(2), { fetchImpl = globalThis.fetch } = {}) {
@@ -212,6 +253,7 @@ async function runCli(argv = process.argv.slice(2), { fetchImpl = globalThis.fet
   const refs = await readJsonFile(refsPath);
   const environment = await maybeReadJsonFile(readFlag(flags, 'environment-json'));
   const operatorAcceptance = await maybeReadJsonFile(readFlag(flags, 'operator-acceptance-json'));
+  const selectedFetchImpl = flags.get('local-simulation-loopback') === true ? localSimulationLoopbackFetch : fetchImpl;
   const collection = await collectHostedBackendLiveEvidence({
     relayBaseUrl: readFlag(flags, 'relay-url'),
     gatewayBaseUrl: readFlag(flags, 'gateway-url'),
@@ -233,7 +275,7 @@ async function runCli(argv = process.argv.slice(2), { fetchImpl = globalThis.fet
     operatorApprovedAt: readFlag(flags, 'operator-approved-at'),
     operatorApprovedBy: readFlag(flags, 'operator-approved-by'),
     observed_at: readFlag(flags, 'observed-at') ?? new Date().toISOString(),
-    fetchImpl,
+    fetchImpl: selectedFetchImpl,
   });
   const collectionJson = `${JSON.stringify(collection, null, 2)}\n`;
   const evidenceJson = `${JSON.stringify(collection.evidence, null, 2)}\n`;

@@ -566,6 +566,15 @@ function connectCommandFor(clientId, platform) {
   return `enigma connect ${clientId} --bundle "${publicBundlePlaceholder(platform)}"`;
 }
 
+function setupConnectCommandFor(clientId, platform) {
+  return `enigma setup --client ${clientId} --write-connectors --bundle "${publicBundlePlaceholder(platform)}" --overwrite`;
+}
+
+function installConnectCommandFor(clientId, platform) {
+  return `npm install -g enigma-memory && ${setupConnectCommandFor(clientId, platform)}`;
+}
+
+
 function wizardStepsForClient(clientId, platform) {
   const steps = [
     {
@@ -635,6 +644,10 @@ export function planConnectWizard(clientIdOrOptions = {}, maybeOptions = {}) {
       display_name: CLIENT_DEFINITIONS[clientId].display_name,
       default_config_path: publicDefaultConfigPath(clientId, platform),
       steps: wizardStepsForClient(clientId, platform),
+      one_command_install_connect: installConnectCommandFor(clientId, platform),
+      setup_connect_command: setupConnectCommandFor(clientId, platform),
+      connect_command: connectCommandFor(clientId, platform),
+      mcp_config_preview: renderMcpConfig(clientId, { platform, bundlePath: publicBundlePlaceholder(platform) }),
     })),
   };
 }

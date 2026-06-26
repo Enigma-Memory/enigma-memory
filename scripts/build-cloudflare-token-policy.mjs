@@ -167,8 +167,12 @@ export function buildCloudflareTokenPolicy(input = {}) {
   const domain = optionalText(input.domain, 'enigmamemory.com');
   const verificationCommands = [
     'npm run cloudflare:ops -- token verify --account-id <account-id>',
-    'npm run cloudflare:pages:packet -- --site ../github-upload/enigma-memory-site/_public_site --project-name enigma-memory --domain enigmamemory.com --live-url https://enigmamemory.com/ --expect-title Enigma',
-    'npm run production:handoff -- --site ../github-upload/enigma-memory-site/_public_site --project-name enigma-memory --domain enigmamemory.com --live-url https://enigmamemory.com/ --expect-title Enigma',
+    'npm run cloudflare:pages:stage',
+    'npm run cloudflare:pages:packet -- --site .enigma/cloudflare-pages/enigmamemory.com --project-name enigma-memory --domain enigmamemory.com --live-url https://enigmamemory.com/ --expect-title "Enigma"',
+    'npm run cloudflare:pages:dry-run',
+    'npm run cloudflare:pages:deploy',
+    'npm run cloudflare:ops -- --cloudflare-env-file <local-secret-file> pages verify --url https://enigmamemory.com/ --project-name enigma-memory --domain enigmamemory.com --cloudflare-live required',
+    'npm run production:handoff -- --site .enigma/cloudflare-pages/enigmamemory.com --project-name enigma-memory --domain enigmamemory.com --live-url https://enigmamemory.com/ --expect-title "Enigma"',
   ];
   if (includeMode(mode, 'hosted-probe')) {
     verificationCommands.splice(1, 0, 'npm run cloudflare:ops -- workers inspect-probe --name enigma-hosted-probe');

@@ -212,6 +212,8 @@ Use [`cloudflare-token-and-domain-runbook.md`](cloudflare-token-and-domain-runbo
 6. Build and preflight the public static artifact locally before any Pages deploy.
 7. Deploy Pages only after explicit execution approval, then attach the custom domain through the dashboard/API/manual DNS steps and wait for SSL/TLS active status.
 
+For the current `enigmamemory.com` Pages path from this workspace, use `../enigma-deploy` as the source artifact from `cd enigma`, but deploy the staged copy: run `npm run cloudflare:pages:stage`, `npm run cloudflare:pages:packet -- --site .enigma/cloudflare-pages/enigmamemory.com --project-name enigma-memory --domain enigmamemory.com --live-url https://enigmamemory.com/ --expect-title "Enigma"`, `npm run cloudflare:pages:dry-run`, `npm run cloudflare:pages:deploy`, and finally `npm run cloudflare:ops -- --cloudflare-env-file <local-secret-file> pages verify --url https://enigmamemory.com/ --project-name enigma-memory --domain enigmamemory.com --cloudflare-live required`. The staging step overlays deployment/security headers without mutating the source site artifact. If the staged packet or dry-run reports local public-site security blockers, stop and fix the artifact or staging script instead of deploying it.
+
 The first setup token may need all-zone Zone Read/DNS Edit while the final zone does not exist or must be discovered. Rotate it after the domain exists and replace it with an exact-zone token. A Pages preview URL, domain registration receipt, or DNS record alone does not make hosted/BYOC live; the hosted/BYOC checklist and operator acceptance packet still apply.
 
 ### Relay/gateway Cloudflare Workers custom-domain bootstrap
