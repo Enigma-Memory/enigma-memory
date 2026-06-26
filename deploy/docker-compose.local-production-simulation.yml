@@ -147,9 +147,9 @@ services:
       - siem_export_endpoint
       - backup_target_uri
       - operator_acceptance_evidence_uri
-    env_file:
-      - ${ENIGMA_SIM_SECRETS_DIR}/simulation.env
     environment:
+      ENIGMA_GATEWAY_ADMIN_AUTH_BEARER_SHA256: ${ENIGMA_GATEWAY_ADMIN_AUTH_BEARER_SHA256:-operator-required-admin-bearer-sha256}
+      ENIGMA_GATEWAY_DATA_PLANE_AUTH_BEARER_SHA256: ${ENIGMA_GATEWAY_DATA_PLANE_AUTH_BEARER_SHA256:-operator-required-data-plane-bearer-sha256}
       NODE_ENV: production
       ENIGMA_BACKEND_MODE: production
       ENIGMA_REQUIRE_EXTERNAL_STORAGE: "true"
