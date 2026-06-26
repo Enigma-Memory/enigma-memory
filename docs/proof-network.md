@@ -92,7 +92,7 @@ Example:
 ```sh
 enigma chain anchor \
   --root sha256:8f0f7d2b7b7f4f2a3e4b9a3d1f0f2c3b4a5d6e7f8091a2b3c4d5e6f708192a3b \
-  --ref release:enigma:0.1.13 \
+  --ref release:enigma:0.1.15 \
   --ref memory-root:public-demo-2026-06-25 \
   --out ./.enigma/proof-network-anchor.json
 ```
@@ -166,8 +166,8 @@ Example with a report hash:
 enigma chain attest \
   --report-hash sha256:5c3a2e1d0f9b8a7766554433221100ffeeddccbbaa99887766554433221100ff \
   --dataset-ref locomo:file-sha256:6a7b8c9d0e1f2233445566778899aabbccddeeff00112233445566778899aabb \
-  --runner-ref enigma-standard-memory-benchmark:0.1.13 \
-  --package-ref npm:@enigma-ai/enigma:0.1.13 \
+  --runner-ref enigma-standard-memory-benchmark:0.1.15 \
+  --package-ref npm:@enigma-ai/enigma:0.1.15 \
   --out ./.enigma/proof-network-attestation.json
 ```
 
@@ -177,8 +177,8 @@ Example with a local report file:
 enigma chain attest \
   --report-file ./.enigma/standard-memory-benchmark.json \
   --dataset-ref longmemeval:file-sha256:7b8c9d0e1f2233445566778899aabbccddeeff00112233445566778899aabbcc \
-  --runner-ref enigma-standard-memory-benchmark:0.1.13 \
-  --package-ref npm:@enigma-ai/enigma:0.1.13 \
+  --runner-ref enigma-standard-memory-benchmark:0.1.15 \
+  --package-ref npm:@enigma-ai/enigma:0.1.15 \
   --out ./.enigma/proof-network-attestation.json
 ```
 

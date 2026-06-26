@@ -44,14 +44,12 @@ jobs:
           await writeFile('package.json', `${JSON.stringify(pkg, null, 2)}\n`, 'utf8');
           JS
 
-      - name: Run Enigma test drive
-        run: npx enigma test-drive --overwrite
-
-      - name: Run Enigma setup
-        run: npx enigma setup --overwrite
-
-      - name: Run Enigma doctor
-        run: npx enigma doctor
+      - name: Run public installer smoke path
+        run: |
+          npx enigma test-drive --dry-run
+          npx enigma setup --overwrite
+          npx enigma doctor
+          echo "Next client-connect preview: npx enigma connect <client> --dry-run"
 
       - name: Run local memory benchmark
         run: |

@@ -1,6 +1,6 @@
 {
   "name": "enigma-memory",
-  "version": "0.1.13",
+  "version": "0.1.15",
   "type": "module",
   "description": "Provider-agnostic AI memory passport and offline-verifiable proof layer.",
   "license": "Apache-2.0",
@@ -69,6 +69,7 @@
     "scripts/run-memory-benchmarks.mjs",
     "scripts/download-standard-benchmarks.mjs",
     "scripts/run-standard-memory-benchmarks.mjs",
+    "scripts/build-benchmark-proof-release.mjs",
     "scripts/build-installer-assets.mjs",
     "scripts/package-browser-extension.mjs",
     "scripts/build-production-readiness-manifest.mjs",
@@ -83,6 +84,7 @@
     "scripts/build-production-dependency-report.mjs",
     "scripts/build-production-workplan.mjs",
     "scripts/build-production-status-board.mjs",
+    "scripts/build-production-unblocker.mjs",
     "scripts/build-ai-orchestration-plan.mjs",
     "scripts/validate-cloudflare-credentials.mjs",
     "scripts/run-backend-readiness-smoke.mjs",
@@ -187,6 +189,7 @@
     "benchmark:memory-suite": "node scripts/run-memory-benchmarks.mjs",
     "benchmark:datasets": "node scripts/download-standard-benchmarks.mjs",
     "benchmark:standard": "node scripts/run-standard-memory-benchmarks.mjs",
+    "benchmark:proof-release": "node scripts/build-benchmark-proof-release.mjs",
     "installer:assets": "node scripts/build-installer-assets.mjs",
     "browser:extension:package": "node scripts/package-browser-extension.mjs",
     "production:manifest": "node scripts/build-production-readiness-manifest.mjs",
@@ -201,6 +204,7 @@
     "production:dependencies": "node scripts/build-production-dependency-report.mjs",
     "production:workplan": "node scripts/build-production-workplan.mjs",
     "production:status": "node scripts/build-production-status-board.mjs",
+    "production:unblocker": "node scripts/build-production-unblocker.mjs",
     "production:orchestration": "node scripts/build-ai-orchestration-plan.mjs",
     "production:manifests": "node scripts/validate-production-manifests.mjs",
     "production:backend-smoke": "node scripts/run-backend-readiness-smoke.mjs",
@@ -234,6 +238,9 @@
     "production:threat-model": "node scripts/validate-security-threat-model.mjs",
     "simulate:production": "node scripts/simulate-production-env.mjs",
     "wait:backend": "node scripts/wait-for-backend-ready.mjs"
+  },
+  "optionalDependencies": {
+    "@solana/web3.js": "^1.98.2"
   },
   "engines": {
     "node": ">=24"

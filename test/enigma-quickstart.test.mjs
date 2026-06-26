@@ -76,6 +76,7 @@ test('quickstart fails closed when an output file already exists', async () => {
   assert.equal(summary.ok, false);
   assert.equal(summary.error.code, 'CLI_ERROR');
   assert.match(summary.error.message, /already exists/);
+  assert.equal(summary.error.message.includes(dir), false);
   assert.equal(await readFile(bundlePath, 'utf8'), '{}\n');
 });
 
@@ -108,6 +109,7 @@ test('quickstart memory file input does not echo plaintext to stdout', async () 
   assert.equal(await main(['quickstart', '--bundle', join(dir, 'bundle.json'), '--out-dir', dir, '--memory-file', memoryPath], io.io), 0, io.stderr());
   assert.equal(io.stdout().includes(privateMemory), false);
   assert.equal(JSON.stringify(io.json()).includes(privateMemory), false);
+  assert.equal(io.stdout().includes(dir), false);
 });
 
 test('quickstart writes an ok verify report', async () => {

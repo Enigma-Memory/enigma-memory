@@ -61,7 +61,16 @@ test('installer asset generator returns deterministic public manifest in dry-run
   assert.deepEqual(first.files.map((file) => file.path), expectedFilePaths);
   assert.deepEqual(first.assets.map((asset) => asset.path), codePointSorted([...expectedFilePaths, 'installer-assets-manifest.json']));
   assert.deepEqual(first.assets.map((asset) => [asset.path, asset.sha256]), second.assets.map((asset) => [asset.path, asset.sha256]));
-  assert.equal(assetByPath(first, 'installer-assets-manifest.json').content.includes('"sha256"'), true);
+  const manifestContent = assetByPath(first, 'installer-assets-manifest.json').content;
+  const manifest = JSON.parse(manifestContent);
+  assert.equal(manifestContent.includes('"sha256"'), true);
+  assert.equal(manifest.output_dir, '<requested-output-dir>');
+  assert.equal(manifest.installer_smoke.next_client_connect, 'enigma connect <client> --dry-run');
+  assert.deepEqual(manifest.installer_smoke.mutation_requires, ['--execute', '-Execute']);
+  assert.equal(manifest.safety.embeds_account_ids, false);
+  assert.equal(manifest.safety.embeds_provider_responses, false);
+  assert.equal(manifest.safety.embeds_private_keys, false);
+  assert.doesNotMatch(manifestContent, LOCAL_OR_SECRET_RE);
   assert.doesNotMatch(publicJson(first), LOCAL_OR_SECRET_RE);
 });
 
@@ -74,17 +83,50 @@ test('installer scripts are source installers with safe dry-run defaults', () =>
 
   assert.match(windows, /Dry-run is the default/);
   assert.match(windows, /param\(/);
+  assert.match(windows, /-Execute/);
+  assert.match(windows, /if \(-not \$Execute\)/);
   assert.match(windows, /npm install -g enigma-memory/);
+  assert.match(windows, /enigma test-drive --dry-run/);
+  assert.match(windows, /enigma setup --bundle <bundle> --overwrite/);
+  assert.match(windows, /enigma doctor/);
+  assert.match(windows, /\$NextClientConnect = 'enigma connect <client> --dry-run'/);
   assert.doesNotMatch(windows, /Invoke-WebRequest|curl|Start-BitsTransfer|signtool/i);
 
   assert.match(linux, /Dry-run is the default/);
+  assert.match(linux, /--execute/);
+  assert.match(linux, /if \[ "\$execute" -ne 1 \]/);
   assert.match(linux, /npm install -g enigma-memory/);
+  assert.match(linux, /enigma test-drive --dry-run/);
+  assert.match(linux, /enigma setup --bundle <bundle> --overwrite/);
+  assert.match(linux, /enigma doctor/);
+  assert.match(linux, /Next client-connect preview: \$next_client_connect/);
   assert.doesNotMatch(linux, /curl|wget|sudo|\.deb|\.rpm/i);
 
   assert.match(formula, /Draft only/);
   assert.match(formula, /REPLACE_WITH_RELEASE_TARBALL_SHA256/);
+  assert.match(formula, /enigma test-drive --dry-run/);
+  assert.match(formula, /enigma setup --dry-run/);
+  assert.match(formula, /enigma doctor/);
+  assert.match(formula, /enigma connect <client> --dry-run/);
   assert.equal(macosManifest.generated_native_pkg, false);
   assert.equal(macosManifest.source_only, true);
+  assert.equal(macosManifest.package_id, '<reverse-dns-package-id>');
+  assert.deepEqual(macosManifest.commands, [
+    ['npm', 'install', '-g', 'enigma-memory'],
+    ['enigma', 'test-drive', '--dry-run'],
+    ['enigma', 'setup', '--overwrite'],
+    ['enigma', 'doctor'],
+  ]);
+  assert.deepEqual(macosManifest.next_client_connect, ['enigma', 'connect', '<client>', '--dry-run']);
+  assert.deepEqual(macosManifest.execution_gate.mutation_requires, ['--execute', '-Execute']);
+  assert.deepEqual(result.installer_smoke.default_preview_commands, [
+    'npm install -g enigma-memory',
+    'enigma test-drive --dry-run',
+    'enigma setup --overwrite',
+    'enigma doctor',
+  ]);
+  assert.equal(result.installer_smoke.next_client_connect, 'enigma connect <client> --dry-run');
+  assert.deepEqual(result.installer_smoke.mutation_requires, ['--execute', '-Execute']);
 
   for (const asset of result.assets) assert.doesNotMatch(asset.content, LOCAL_OR_SECRET_RE, asset.path);
 });
