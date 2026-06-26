@@ -281,6 +281,101 @@ test('setup memory file input does not echo plaintext to stdout', async () => {
   assert.equal(JSON.stringify(summary).includes(privateMemory), false);
 });
 
+test('init dry-run prints a public-safe first-run plan without writing artifacts', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-init-dry-run-'));
+  const bundlePath = join(dir, 'bundle.json');
+  const io = makeIo();
+
+  assert.equal(await main(['init', '--bundle', bundlePath, '--out-dir', dir, '--dry-run'], io.io), 0, io.stderr());
+  const summary = io.json();
+  const serialized = JSON.stringify(summary);
+
+  assert.equal(summary.ok, true);
+  assert.equal(summary.command, 'enigma init');
+  assert.equal(summary.dry_run, true);
+  assert.equal(summary.artifacts_written, false);
+  assert.equal(summary.client_configs_written, false);
+  assert.equal(summary.provider_credentials_required, false);
+  assert.equal(summary.hosted_saas_live, false);
+  assert.equal(summary.raw_memory_printed, false);
+  assert.equal(summary.solana_required, false);
+  assert.equal(summary.browser_extension_required, false);
+  assert.equal(summary.bundle, '<bundle-path>');
+  assert.equal(summary.out_dir, '<out-dir>');
+  assert.equal(serialized.includes(dir), false);
+  assert.ok(summary.next_commands[0].startsWith('enigma init --bundle "<bundle-path>" --out-dir "<out-dir>"'));
+  assert.ok(summary.next_commands[0].includes('--overwrite'));
+  assert.ok(summary.next_commands.some((command) => command.startsWith('enigma remember ')));
+  assert.ok(summary.next_commands.some((command) => command.startsWith('enigma verify ')));
+  assert.equal(summary.connectors.every((connector) => connector.connect_plan.dry_run === true), true);
+  await assert.rejects(() => readFile(bundlePath, 'utf8'), /ENOENT/);
+  await assert.rejects(() => readFile(join(dir, 'context-pack.json'), 'utf8'), /ENOENT/);
+  await assert.rejects(() => readFile(join(dir, 'export.json'), 'utf8'), /ENOENT/);
+  await assert.rejects(() => readFile(join(dir, 'verify-report.json'), 'utf8'), /ENOENT/);
+});
+
+test('init execute creates local artifacts without client config writes by default', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-init-execute-'));
+
+  await withConnectorFixtureEnv(dir, async () => {
+    const defaultConfigPaths = DEFAULT_SETUP_CLIENTS.map((clientId) => platformDefaultConfigPath(clientId));
+    const io = makeIo();
+    assert.equal(await main(['init', '--bundle', join(dir, 'bundle.json'), '--out-dir', dir, '--overwrite'], io.io), 0, io.stderr());
+    const summary = io.json();
+
+    assert.equal(summary.ok, true);
+    assert.equal(summary.artifacts_written, true);
+    assert.equal(summary.client_configs_written, false);
+    assert.equal(summary.client_config_write_requested, false);
+    assert.deepEqual(summary.selected_clients, DEFAULT_SETUP_CLIENTS);
+    assert.equal(summary.connectors.every((connector) => connector.connect_plan.dry_run === true), true);
+    assert.equal(JSON.stringify(summary).includes(dir), false);
+    for (const configPath of defaultConfigPaths) {
+      assert.equal(await pathExists(configPath), false, `${configPath} must not be created`);
+    }
+    assert.equal((await readJson(join(dir, 'bundle.json'))).schema, 'enigma.vault_bundle.v1');
+    assert.equal((await readJson(join(dir, 'context-pack.json'))).schema, 'enigma.context_pack.v1');
+    assert.equal((await readJson(join(dir, 'export.json'))).schema, 'enigma.vault_bundle.v1');
+    assert.equal((await readJson(join(dir, 'verify-report.json'))).ok, true);
+  });
+});
+
+test('init client selection planning accepts explicit clients without connector writes', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-init-clients-'));
+  const io = makeIo();
+
+  assert.equal(await main(['init', '--bundle', join(dir, 'bundle.json'), '--out-dir', dir, '--client', 'cursor,kimi-code', '--client', 'claude-desktop', '--dry-run'], io.io), 0, io.stderr());
+  const summary = io.json();
+
+  assert.deepEqual(summary.selected_clients, ['cursor', 'kimi-code', 'claude-desktop']);
+  assert.deepEqual(summary.connectors.map((connector) => connector.client_id), ['cursor', 'kimi-code', 'claude-desktop']);
+  assert.equal(summary.client_configs_written, false);
+  assert.equal(summary.connectors.every((connector) => connector.connect_plan.dry_run === true), true);
+  assert.ok(summary.next_commands[0].includes('--client cursor'));
+  assert.ok(summary.next_commands[0].includes('--client kimi-code'));
+  assert.ok(summary.next_commands[0].includes('--client claude-desktop'));
+  assert.equal(JSON.stringify(summary).includes(dir), false);
+});
+
+test('init memory file input does not echo raw memory', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-init-memory-file-'));
+  const memoryPath = join(dir, 'memory.txt');
+  const privateMemory = 'private init phrase must never be echoed';
+  await writeFile(memoryPath, privateMemory, 'utf8');
+
+  const io = makeIo();
+  assert.equal(await main(['init', '--bundle', join(dir, 'bundle.json'), '--out-dir', dir, '--memory-file', memoryPath, '--overwrite'], io.io), 0, io.stderr());
+  const stdout = io.stdout();
+  const summary = io.json();
+
+  assert.equal(stdout.includes(privateMemory), false);
+  assert.equal(summary.memory_source, 'memory_file');
+  assert.equal(summary.memory_plaintext_echoed, false);
+  assert.equal(summary.raw_memory_printed, false);
+  assert.equal(JSON.stringify(summary).includes(privateMemory), false);
+  assert.equal(JSON.stringify(summary).includes(dir), false);
+});
+
 test('doctor reports first-run diagnostics without echoing local paths', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'enigma-doctor-diagnostics-'));
   const bundlePath = join(dir, 'bundle.json');

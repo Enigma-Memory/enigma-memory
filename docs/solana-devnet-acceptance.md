@@ -6,6 +6,54 @@ Enigma is the private memory controller for AI. Solana is an optional proof, per
 
 Until every applicable gate below is complete and approved, public language must stay at the local-planning boundary: Enigma can prepare and validate Solana-ready public-safe artifacts; it must not claim that transactions were submitted, finalized, settled, deployed, audited, certified, or live.
 
+## CLI submission path
+
+`enigma chain submit-solana` is the production-safe handoff from a local proof-network artifact to the optional Solana proof rail. It validates the artifact with the same proof-network validators used by `enigma chain verify`, rejects private payload markers before transaction construction, and binds the artifact to a compact Memo-program reference containing only:
+
+- the proof artifact schema;
+- the artifact hash;
+- the selected cluster;
+- an Enigma proof commitment over those public values.
+
+Dry-run is the default and does not require a network, keypair, or `@solana/web3.js`:
+
+```sh
+enigma chain submit-solana \
+  --file ./proof-artifacts/anchor-batch.json \
+  --cluster devnet
+```
+
+Dry-run output includes `transaction_submitted:false`, `raw_memory_on_chain:false`, the compact `memo_ref`, and a `would_submit` plan. It must not print the raw artifact body, raw memory, prompts, transcripts, provider responses, private keys, keypair bytes, or local absolute paths. Passing `--rpc` or `--keypair` during dry-run is accepted for command rehearsal, but those values are not required and are not echoed:
+
+```sh
+enigma chain submit-solana \
+  --file ./proof-artifacts/benchmark-attestation.json \
+  --cluster devnet \
+  --rpc https://api.devnet.solana.com \
+  --keypair ./operator-devnet-keypair.json
+```
+
+Network submission is opt-in only. Execute mode requires an explicit Solana cluster and keypair, lazily loads `@solana/web3.js`, and submits one Memo-program transaction containing only the compact `memo_ref` JSON:
+
+```sh
+enigma chain submit-solana \
+  --file ./proof-artifacts/anchor-batch.json \
+  --cluster devnet \
+  --rpc https://api.devnet.solana.com \
+  --keypair ./operator-devnet-keypair.json \
+  --execute
+```
+
+Successful execute output may report `transaction_submitted:true` and a Solana transaction signature. That signature is evidence for only the selected cluster and artifact hash; it is not a mainnet claim, hosted-SaaS claim, compliance claim, provider-deletion claim, model-forgetting claim, benchmark-superiority claim, or customer-production claim.
+
+Limitations:
+
+- Only `devnet`, `testnet`, `mainnet-beta`, and `localnet` are accepted cluster values.
+- The submitted instruction is a Solana Memo transaction, not an Enigma on-chain program deployment or account-state mutation.
+- The Memo payload is intentionally compact and public-safe; it is not a storage layer for proof artifact bodies.
+- `--execute` should not be used for public devnet or mainnet claims until the gate checklist below is complete for the exact artifact, cluster, transaction, signer custody process, and claim wording.
+- Mainnet submissions require separate operator, legal, security, fee-payer, key-custody, incident-response, and release-owner approval before any public wording changes.
+
 ## Claim levels
 
 | Claim level | Allowed language | Required evidence |

@@ -105,7 +105,7 @@ npx --yes --package enigma-memory enigma test-drive --overwrite
 npx --yes --package enigma-memory enigma chain anchor --root sha256:8f8f... --root sha256:9a9a... --ref demo-local-vault --authority demo-public-authority --batch-ref demo-anchor-batch --out .enigma/proof-anchor-batch.json
 npx --yes --package enigma-memory enigma chain grant --subject did:example:agent --capability memory.read --scope demo-scope --resource-ref sha256:8f8f... --policy-hash sha256:7e7e... --expires-at 2026-07-01T00:00:00Z --grant-ref demo-grant --out .enigma/proof-capability-grant.json
 npx --yes --package enigma-memory enigma chain revoke --grant-hash sha256:6d6d... --reason scope-ended --revocation-ref demo-revocation --out .enigma/proof-capability-revocation.json
-npx --yes --package enigma-memory enigma chain attest --report-file benchmark-report.json --dataset-ref sha256:5c5c... --runner-ref enigma-standard-runner --package-ref enigma-memory@0.1.13 --score accuracy=0.92 --out .enigma/proof-benchmark-attestation.json
+npx --yes --package enigma-memory enigma chain attest --report-file benchmark-report.json --dataset-ref sha256:5c5c... --runner-ref enigma-standard-runner --package-ref enigma-memory@0.1.15 --score accuracy=0.92 --out .enigma/proof-benchmark-attestation.json
 npx --yes --package enigma-memory enigma chain verify --file .enigma/proof-anchor-batch.json
 ```
 

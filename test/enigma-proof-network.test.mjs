@@ -78,8 +78,8 @@ function attestationInput(overrides = {}) {
     attested_at: GENERATED_AT,
     benchmark_ref: 'benchmark:standard-memory-v1',
     dataset_ref: 'dataset:locomo-public-root-only',
-    runner_ref: 'runner:enigma-standard-memory-benchmark-0.1.13',
-    package_ref: 'package:enigma-memory-0.1.13',
+    runner_ref: 'runner:enigma-standard-memory-benchmark-0.1.15',
+    package_ref: 'package:enigma-memory-0.1.15',
     report_hash: ROOT_A,
     metric_roots: [ROOT_B, ROOT_C, ROOT_D],
     sample_count: 128,
@@ -190,8 +190,8 @@ test('proof-network creates and validates benchmark attestations from public rep
   assert.match(attestation.benchmark_attestation_id, /^pnb_[a-f0-9]{32}$/);
   assert.equal(attestation.report_hash, ROOT_A);
   assert.equal(attestation.dataset_ref, 'dataset:locomo-public-root-only');
-  assert.equal(attestation.runner_ref, 'runner:enigma-standard-memory-benchmark-0.1.13');
-  assert.equal(attestation.package_ref, 'package:enigma-memory-0.1.13');
+  assert.equal(attestation.runner_ref, 'runner:enigma-standard-memory-benchmark-0.1.15');
+  assert.equal(attestation.package_ref, 'package:enigma-memory-0.1.15');
   assert.deepEqual(attestation.metric_roots, [ROOT_B, ROOT_C, ROOT_D]);
   assertDigest(attestation.metric_root);
   assert.equal(attestation.sample_count, 128);

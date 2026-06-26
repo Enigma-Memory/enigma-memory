@@ -596,6 +596,14 @@ test('compileContextPack applies query-aware optimizer relevance only for implic
     purpose_tags: ['deployment', 'region'],
     now: '2026-06-24T00:01:00.000Z',
   });
+  await remember({
+    vault,
+    text: 'Deployment housekeeping note: 2026 launch checklist uses generic routing.',
+    purpose: 'fixture',
+    kind: 'fact',
+    purpose_tags: ['deployment'],
+    now: '2026-06-24T00:01:30.000Z',
+  });
   const irrelevant = await remember({
     vault,
     text: 'Personal cooking note: use 2026 breakfast oatmeal with cinnamon.',
@@ -611,7 +619,7 @@ test('compileContextPack applies query-aware optimizer relevance only for implic
     query: 'Which deployment region should quasaronly use in 2026?',
     optimize: true,
     max_estimated_tokens: 512,
-    limit: 10,
+    limit: 1,
     now: '2026-06-24T00:03:00.000Z',
   });
   assert.deepEqual(pack.memory_addresses, [relevant.memory_addr]);
@@ -642,7 +650,7 @@ test('compileContextPack applies query-aware optimizer relevance only for implic
     limit: 10,
     now: '2026-06-24T00:05:00.000Z',
   });
-  assert.equal(fallbackPack.memory_addresses.length, 2);
+  assert.equal(fallbackPack.memory_addresses.length, 3);
 
   const strictPack = compileContextPack({
     vault,

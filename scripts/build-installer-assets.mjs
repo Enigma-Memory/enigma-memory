@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 export const INSTALLER_ASSET_SCHEMA = 'enigma.installer_assets.v1';
 export const INSTALLER_ASSET_PACKAGE = 'enigma-memory';
-export const INSTALLER_ASSET_VERSION = '0.1.13';
+export const INSTALLER_ASSET_VERSION = '0.1.15';
 export const INSTALLER_ASSET_GENERATED_AT = '1970-01-01T00:00:00.000Z';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
@@ -94,14 +94,48 @@ function assertPublicSafe(content, label = 'asset') {
 }
 
 function windowsInstallerScript() {
-  return `# Enigma Memory source installer for Windows PowerShell.\n# Dry-run is the default; pass -Execute to mutate global npm state and create local quickstart files.\nparam(\n  [switch]$Execute,\n  [string]$Bundle = '.\\.enigma\\bundle.json'\n)\n$ErrorActionPreference = 'Stop'\n$PackageName = '${INSTALLER_ASSET_PACKAGE}'\n\nWrite-Output 'Enigma Memory Windows installer source asset'\nWrite-Output 'Default mode: dry-run. No native .exe, code-signing, tokens, or hosted credentials are included.'\nWrite-Output "Package: $PackageName"\nWrite-Output "Bundle: $Bundle"\n\n$steps = @(\n  'npm install -g enigma-memory',\n  'enigma quickstart --bundle <bundle> --overwrite',\n  'enigma doctor'\n)\n\nif (-not $Execute) {\n  Write-Output 'Preview only. Re-run with -Execute after reviewing these steps.'\n  $steps | ForEach-Object { Write-Output "DRY-RUN: $_" }\n  exit 0\n}\n\nnpm install -g $PackageName\nenigma quickstart --bundle $Bundle --overwrite\nenigma doctor\n`;
+  return `# Enigma Memory source installer for Windows PowerShell.
+# Dry-run is the default; pass -Execute to mutate global npm state and create local setup files.
+param(
+  [switch]$Execute,
+  [string]$Bundle = '.\\.enigma\\bundle.json'
+)
+$ErrorActionPreference = 'Stop'
+$PackageName = '${INSTALLER_ASSET_PACKAGE}'
+$NextClientConnect = 'enigma connect <client> --dry-run'
+
+Write-Output 'Enigma Memory Windows installer source asset'
+Write-Output 'Default mode: dry-run. No native .exe, code-signing, tokens, or hosted credentials are included.'
+Write-Output "Package: $PackageName"
+Write-Output "Bundle: $Bundle"
+
+$steps = @(
+  'npm install -g enigma-memory',
+  'enigma test-drive --dry-run',
+  'enigma setup --bundle <bundle> --overwrite',
+  'enigma doctor',
+  "Next client-connect preview: $NextClientConnect"
+)
+
+if (-not $Execute) {
+  Write-Output 'Preview only. Re-run with -Execute after reviewing these steps.'
+  $steps | ForEach-Object { Write-Output "DRY-RUN: $_" }
+  exit 0
+}
+
+npm install -g $PackageName
+enigma test-drive --dry-run
+enigma setup --bundle $Bundle --overwrite
+enigma doctor
+Write-Output "Next client-connect preview: $NextClientConnect"
+`;
 }
 
 function linuxInstallerScript() {
   return [
     '#!/usr/bin/env sh',
     '# Enigma Memory source installer for Linux.',
-    '# Dry-run is the default; pass --execute to mutate global npm state and create local quickstart files.',
+    '# Dry-run is the default; pass --execute to mutate global npm state and create local setup files.',
     'set -eu',
     '',
     'execute=0',
@@ -112,7 +146,7 @@ function linuxInstallerScript() {
     '    --dry-run) execute=0 ;;',
     '    --bundle) shift; bundle="${1:-}" ;;',
     '    --help|-h)',
-    "      printf '%s\\n' 'Usage: ./install-linux.sh [--execute] [--bundle ./.enigma/bundle.json]'",
+    "      printf '%s\\n' 'Usage: ./install-linux.sh [--execute|--dry-run] [--bundle ./.enigma/bundle.json]'",
     '      exit 0',
     '      ;;',
     '    *)',
@@ -124,6 +158,7 @@ function linuxInstallerScript() {
     'done',
     '',
     `package='${INSTALLER_ASSET_PACKAGE}'`,
+    "next_client_connect='enigma connect <client> --dry-run'",
     "printf '%s\\n' 'Enigma Memory Linux installer source asset'",
     "printf '%s\\n' 'Default mode: dry-run. No native package, signing key, tokens, or hosted credentials are included.'",
     'printf \'%s\\n\' "Package: $package"',
@@ -132,24 +167,86 @@ function linuxInstallerScript() {
     'if [ "$execute" -ne 1 ]; then',
     "  printf '%s\\n' 'Preview only. Re-run with --execute after reviewing these steps.'",
     "  printf '%s\\n' 'DRY-RUN: npm install -g enigma-memory'",
-    "  printf '%s\\n' 'DRY-RUN: enigma quickstart --bundle <bundle> --overwrite'",
+    "  printf '%s\\n' 'DRY-RUN: enigma test-drive --dry-run'",
+    "  printf '%s\\n' 'DRY-RUN: enigma setup --bundle <bundle> --overwrite'",
     "  printf '%s\\n' 'DRY-RUN: enigma doctor'",
+    '  printf \'%s\\n\' "DRY-RUN: Next client-connect preview: $next_client_connect"',
     '  exit 0',
     'fi',
     '',
     'npm install -g "$package"',
-    'enigma quickstart --bundle "$bundle" --overwrite',
+    'enigma test-drive --dry-run',
+    'enigma setup --bundle "$bundle" --overwrite',
     'enigma doctor',
+    'printf \'%s\\n\' "Next client-connect preview: $next_client_connect"',
     '',
   ].join('\n');
 }
 
 function homebrewFormulaDraft() {
-  return `# Draft only. This formula is not submitted to a Homebrew tap by this generator.\n# Release engineering must replace the tarball URL and sha256 after a real source archive exists.\nclass EnigmaMemory < Formula\n  desc "Provider-agnostic AI memory passport and offline-verifiable proof layer"\n  homepage "https://github.com/Enigma-Memory/enigma-memory"\n  url "https://example.invalid/enigma-memory-${INSTALLER_ASSET_VERSION}.tar.gz"\n  sha256 "REPLACE_WITH_RELEASE_TARBALL_SHA256"\n  license "Apache-2.0"\n\n  depends_on "node"\n\n  def install\n    system "npm", "install", *Language::Node.local_npm_install_args\n    bin.install_symlink libexec/"bin/enigma"\n    bin.install_symlink libexec/"bin/enigma-verify"\n    bin.install_symlink libexec/"bin/enigma-mcp"\n    bin.install_symlink libexec/"bin/enigma-relay"\n    bin.install_symlink libexec/"bin/enigma-gateway"\n    bin.install_symlink libexec/"bin/enigma-native-host"\n  end\n\n  test do\n    assert_match "enigma", shell_output("#{bin}/enigma --help")\n  end\nend\n`;
+  return `# Draft only. This formula is not submitted to a Homebrew tap by this generator.
+# Release engineering must replace the tarball URL and sha256 after a real source archive exists.
+# Post-install smoke path:
+#   enigma test-drive --dry-run
+#   enigma setup --overwrite
+#   enigma doctor
+#   enigma connect <client> --dry-run
+class EnigmaMemory < Formula
+  desc "Provider-agnostic AI memory passport and offline-verifiable proof layer"
+  homepage "https://github.com/Enigma-Memory/enigma-memory"
+  url "https://example.invalid/enigma-memory-${INSTALLER_ASSET_VERSION}.tar.gz"
+  sha256 "REPLACE_WITH_RELEASE_TARBALL_SHA256"
+  license "Apache-2.0"
+
+  depends_on "node"
+
+  def install
+    system "npm", "install", *Language::Node.local_npm_install_args
+    bin.install_symlink libexec/"bin/enigma"
+    bin.install_symlink libexec/"bin/enigma-verify"
+    bin.install_symlink libexec/"bin/enigma-mcp"
+    bin.install_symlink libexec/"bin/enigma-relay"
+    bin.install_symlink libexec/"bin/enigma-gateway"
+    bin.install_symlink libexec/"bin/enigma-native-host"
+  end
+
+  test do
+    assert_match "enigma", shell_output("#{bin}/enigma --help")
+    assert_match "enigma.test_drive.v1", shell_output("#{bin}/enigma test-drive --dry-run")
+    assert_match "enigma.setup.v1", shell_output("#{bin}/enigma setup --dry-run")
+    shell_output("#{bin}/enigma doctor")
+    puts "Next client-connect preview: enigma connect <client> --dry-run"
+  end
+end
+`;
 }
 
 function macosPkgReadme() {
-  return `# macOS pkgbuild source manifest\n\nThis directory is an honest source plan for a future macOS package. It is not a signed .pkg and it does not claim notarization.\n\nCurrent supported path:\n\n\`\`\`sh\nnpm install -g ${INSTALLER_ASSET_PACKAGE}\nenigma quickstart --bundle ./.enigma/bundle.json --overwrite\nenigma doctor\n\`\`\`\n\nBlockers before shipping a native .pkg:\n\n- A reproducible package staging tree for the npm-installed command shims.\n- macOS pkgbuild/productbuild tooling on a macOS release runner.\n- Developer ID Installer certificate, signing identity selection, and notarization workflow.\n- Human review that package scripts do not print local absolute paths, credentials, account identifiers, raw memory, or provider transcripts.\n\nThe generated JSON manifest in this directory records those blockers explicitly.\n`;
+  return `# macOS pkgbuild source manifest
+
+This directory is an honest source plan for a future macOS package. It is not a signed .pkg and it does not claim notarization.
+
+Current supported path:
+
+\`\`\`sh
+npm install -g ${INSTALLER_ASSET_PACKAGE}
+enigma test-drive --dry-run
+enigma setup --overwrite
+enigma doctor
+enigma connect <client> --dry-run
+\`\`\`
+
+\`enigma connect <client> --dry-run\` is the next client-connect preview command. Remove \`--dry-run\` only after reviewing the planned client config change.
+
+Blockers before shipping a native .pkg:
+
+- A reproducible package staging tree for the npm-installed command shims.
+- macOS pkgbuild/productbuild tooling on a macOS release runner.
+- Developer ID Installer certificate, signing identity selection, and notarization workflow.
+- Human review that package scripts do not print local absolute paths, credentials, account identifiers, raw memory, or provider transcripts.
+
+The generated JSON manifest in this directory records those blockers explicitly.
+`;
 }
 
 function macosPkgManifest() {
@@ -159,13 +256,19 @@ function macosPkgManifest() {
     version: INSTALLER_ASSET_VERSION,
     generated_native_pkg: false,
     source_only: true,
-    package_id: 'ai.enigma.memory',
+    package_id: '<reverse-dns-package-id>',
     install_prefix: '<homebrew-or-npm-managed-prefix>',
     commands: [
       ['npm', 'install', '-g', INSTALLER_ASSET_PACKAGE],
-      ['enigma', 'quickstart', '--bundle', '<bundle-path>', '--overwrite'],
+      ['enigma', 'test-drive', '--dry-run'],
+      ['enigma', 'setup', '--overwrite'],
       ['enigma', 'doctor'],
     ],
+    next_client_connect: ['enigma', 'connect', '<client>', '--dry-run'],
+    execution_gate: {
+      default_mode: 'dry-run',
+      mutation_requires: ['--execute', '-Execute'],
+    },
     blockers: [
       { code: 'MACOS_PKGBUILD_TOOLING_REQUIRED', message: 'pkgbuild/productbuild must run on a macOS release runner.' },
       { code: 'MACOS_SIGNING_REQUIRED', message: 'A Developer ID Installer certificate and notarization workflow are required before distributing a .pkg.' },
@@ -215,10 +318,23 @@ export function buildInstallerAssets(options = {}, runtime = {}) {
     generated_native_installers: false,
     files,
     native_installers: nativeInstallerBlockers(runtime.tooling),
+    installer_smoke: {
+      default_preview_commands: [
+        'npm install -g enigma-memory',
+        'enigma test-drive --dry-run',
+        'enigma setup --overwrite',
+        'enigma doctor',
+      ],
+      next_client_connect: 'enigma connect <client> --dry-run',
+      mutation_requires: ['--execute', '-Execute'],
+    },
     safety: {
       embeds_tokens: false,
       embeds_local_absolute_paths: false,
       embeds_raw_memory: false,
+      embeds_account_ids: false,
+      embeds_provider_responses: false,
+      embeds_private_keys: false,
       default_dry_run: true,
       requires_write_flag_for_filesystem_mutation: true,
     },

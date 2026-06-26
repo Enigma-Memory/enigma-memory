@@ -5,9 +5,11 @@
 import https from 'node:https'
 import { parseArgs } from 'node:util'
 
+const RELAY_PORT = process.env.ENIGMA_SIM_RELAY_PORT || '8443'
+const GATEWAY_PORT = process.env.ENIGMA_SIM_GATEWAY_PORT || '9443'
 const ENDPOINTS = [
-  { name: 'relay', url: 'https://localhost:8443/readyz' },
-  { name: 'gateway', url: 'https://localhost:9443/readyz' },
+  { name: 'relay', url: `https://localhost:${RELAY_PORT}/readyz` },
+  { name: 'gateway', url: `https://localhost:${GATEWAY_PORT}/readyz` },
 ]
 
 function parseCliArgs(argv) {

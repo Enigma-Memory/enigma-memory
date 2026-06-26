@@ -344,6 +344,13 @@ export async function buildProductionHandoffPacket(input = {}, options = {}) {
   const liveUrl = optionalText(input.liveUrl, domain ? `https://${domain}/` : null);
   const expectTitle = optionalText(input.expectTitle, 'Enigma');
 
+  const providedInfrastructure = requireInfrastructureReadinessResult(await loadInfrastructureReadiness(input));
+  const operatorPacket = await loadOperatorAcceptancePacket(input) ?? await buildOperatorAcceptancePacket({ generated_at: generatedAt });
+  assertNoSecretOutput('operator acceptance packet', operatorPacket);
+  const operatorAcceptance = validateOperatorAcceptancePacket(operatorPacket, { generated_at: generatedAt });
+  if (operatorAcceptance.ok === true) requireInfrastructureReadinessResult(operatorPacket.readiness);
+  const providedReleaseAudit = requireReleaseAuditResult(await loadReleaseAudit(input));
+
   const pages = await buildCloudflarePagesReleasePacket({
     site,
     projectName,
@@ -356,7 +363,6 @@ export async function buildProductionHandoffPacket(input = {}, options = {}) {
     fetchImpl: options.fetchImpl ?? globalThis.fetch,
   });
 
-  const providedInfrastructure = requireInfrastructureReadinessResult(await loadInfrastructureReadiness(input));
   const infrastructure = providedInfrastructure ?? await runInfrastructureReadiness({
     manifest: await buildProductionReadinessManifest({
       env,
@@ -369,11 +375,6 @@ export async function buildProductionHandoffPacket(input = {}, options = {}) {
     now: new Date(generatedAt),
     fetchImpl: options.fetchImpl ?? globalThis.fetch,
   });
-  const operatorPacket = await loadOperatorAcceptancePacket(input) ?? await buildOperatorAcceptancePacket({ generated_at: generatedAt });
-  assertNoSecretOutput('operator acceptance packet', operatorPacket);
-  const operatorAcceptance = validateOperatorAcceptancePacket(operatorPacket, { generated_at: generatedAt });
-  if (operatorAcceptance.ok === true) requireInfrastructureReadinessResult(operatorPacket.readiness);
-  const providedReleaseAudit = requireReleaseAuditResult(await loadReleaseAudit(input));
 
   const hostedProbe = buildHostedProbeWorkerBundle({ generated_at: generatedAt });
   const pageSummary = summarizePages(pages);

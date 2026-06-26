@@ -325,6 +325,7 @@ test('goal completion audit CLI writes public-safe JSON', async () => {
     '--site', site,
     '--project-name', 'enigma-memory',
     '--domain', 'enigmamemory.com',
+    '--live-url', 'data:text/html,%3Ctitle%3EEnigma%20%E2%80%94%20Verifiable%20AI%20memory%20plane%3C%2Ftitle%3E',
     '--account-id', 'account-fixture',
     '--out', outPath,
   ], {
@@ -340,6 +341,7 @@ test('goal completion audit CLI writes public-safe JSON', async () => {
   assert.equal(fileAudit.schema, GOAL_COMPLETION_AUDIT_SCHEMA);
   assert.equal(stdoutAudit.complete, false);
   assert.equal(stdoutAudit.release_posture, 'local_package_artifact_ready_with_blocked_live_infrastructure');
+  assert.match(stdoutAudit.blockers.join('\n'), /live-domain-current-site: live URL must be HTTPS/);
   assert.match(stdoutAudit.next_actions.map((item) => item.id).join('\n'), /final-release-audit/);
   assert.doesNotMatch(result.stdout, /Bearer|PRIVATE KEY|sk-/i);
   assert.doesNotMatch(result.stdout, /enigma-goal-audit-site-/i);
@@ -362,7 +364,32 @@ test('goal completion audit CLI redacts unreadable packet paths from errors', as
     windowsHide: true,
   }), (error) => {
     assert.match(error.stdout, /operator acceptance packet JSON could not be read/);
+    assert.equal(JSON.parse(error.stdout).error.code, 'USAGE_ERROR');
     assert.doesNotMatch(error.stdout, /enigma-goal-audit-missing-packet|operator-packet\.json|enigma-goal-audit-site-/i);
+    return true;
+  });
+});
+
+test('goal completion audit loads supplied packet path before live fetch', async () => {
+  const site = await writeSite();
+  const missingPacketPath = join(tmpdir(), 'enigma-goal-fetch-order-missing-packet', 'operator-packet.json');
+  await assert.rejects(() => buildGoalCompletionAudit({
+    site,
+    projectName: 'enigma-memory',
+    domain: 'enigmamemory.com',
+    liveUrl: 'https://enigmamemory.com/',
+    expectTitle: 'Enigma',
+    accountId: 'account-fixture',
+    operatorAcceptancePacket: missingPacketPath,
+  }, {
+    env: {},
+    generated_at: '2026-06-24T00:00:00.000Z',
+    fetchImpl: async () => {
+      throw new Error('live fetch should not run before packet read');
+    },
+  }), (error) => {
+    assert.match(error.message, /operator acceptance packet JSON could not be read/);
+    assert.doesNotMatch(error.message, /enigma-goal-fetch-order-missing-packet|operator-packet\.json|enigma-goal-audit-site-/i);
     return true;
   });
 });

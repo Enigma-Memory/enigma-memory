@@ -90,6 +90,14 @@ async function assertFailsClosed(args) {
   if (report.error) assert.equal(report.error.code, 'CLI_ERROR');
 }
 
+function assertTextOmits(text, ...values) {
+  for (const value of values) {
+    const string = String(value);
+    assert.equal(text.includes(string), false, `output leaked ${string}`);
+    assert.equal(text.includes(string.replaceAll('\\', '\\\\')), false, `output leaked escaped ${string}`);
+  }
+}
+
 test('chain anchor creates and verifies a public-safe Solana-ready anchor batch', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'enigma-chain-anchor-'));
   const out = join(dir, 'anchor-batch.json');
@@ -191,7 +199,7 @@ test('chain attest creates and verifies a benchmark attestation from public refs
     '--runner-ref',
     'runner://enigma/local-standard-runner-v1',
     '--package-ref',
-    'npm://enigma-memory@0.1.13',
+    'npm://enigma-memory@0.1.15',
     '--score',
     'relevance=0.91',
     '--score',
@@ -260,10 +268,131 @@ test('chain commands fail closed for private payload examples without echoing se
     '--runner-ref',
     'runner://enigma/local-standard-runner-v1',
     '--package-ref',
-    'npm://enigma-memory@0.1.13',
+    'npm://enigma-memory@0.1.15',
     '--out',
     join(dir, 'bad-attestation.json'),
   ]);
 
   await assertFailsClosed(['chain', 'verify', '--file', privateArtifactPath]);
+});
+
+test('chain submit-solana dry-run validates a proof artifact and emits only a compact memo ref', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-chain-submit-solana-'));
+  const artifactPath = join(dir, 'anchor-batch.json');
+  const unusedKeypairPath = join(dir, 'unused-secret-keypair.json');
+  const publicRef = 'memory-root://public/submit-solana/dry-run';
+  const privateRpc = 'https://user:pass@example.invalid/private-rpc';
+
+  const anchorResult = await runCli([
+    'chain',
+    'anchor',
+    '--root',
+    ROOT_A,
+    '--ref',
+    publicRef,
+    '--authority',
+    'did:key:z6mkpublicauthorityonly',
+    '--out',
+    artifactPath,
+  ]);
+  assert.equal(anchorResult.code, 0, anchorResult.io.stderr());
+
+  const result = await runCli([
+    'chain',
+    'submit-solana',
+    '--file',
+    artifactPath,
+    '--cluster',
+    'devnet',
+    '--rpc',
+    privateRpc,
+    '--keypair',
+    unusedKeypairPath,
+  ]);
+  assert.equal(result.code, 0, result.io.stderr());
+  const report = result.json();
+  assert.equal(report.ok, true);
+  assert.equal(report.mode, 'dry-run');
+  assert.equal(report.cluster, 'devnet');
+  assert.equal(report.transaction_submitted, false);
+  assert.equal(report.raw_memory_on_chain, false);
+  assert.match(report.artifact_hash, /^sha256:[a-f0-9]{64}$/u);
+  assert.match(report.proof_commitment, /^sha256:[a-f0-9]{64}$/u);
+  assert.equal(report.memo_ref.artifact_hash, report.artifact_hash);
+  assert.equal(report.memo_ref.proof_commitment, report.proof_commitment);
+  assert.equal(report.would_submit.payload, 'memo_ref');
+  assertTextOmits(result.text(), artifactPath, unusedKeypairPath, dir, privateRpc, ROOT_A, publicRef, PRIVATE_SENTINEL);
+});
+
+test('chain submit-solana rejects private artifacts without echoing payloads or paths', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-chain-submit-private-'));
+  const privateArtifactPath = join(dir, 'private-artifact.json');
+  await writeFile(privateArtifactPath, `${JSON.stringify({
+    schema: 'enigma.proof_network.anchor_batch.v1',
+    raw_memory: PRIVATE_SENTINEL,
+    transaction_submitted: false,
+    raw_memory_on_chain: false,
+  })}\n`, 'utf8');
+
+  const result = await runCli([
+    'chain',
+    'submit-solana',
+    '--file',
+    privateArtifactPath,
+    '--cluster',
+    'devnet',
+  ]);
+  assert.notEqual(result.code, 0);
+  assert.equal(result.json().ok, false);
+  assertTextOmits(result.text(), privateArtifactPath, dir, PRIVATE_SENTINEL);
+
+  const schemaPathArtifact = join(dir, 'schema-path-artifact.json');
+  await writeFile(schemaPathArtifact, `${JSON.stringify({
+    schema: schemaPathArtifact,
+    transaction_submitted: false,
+    raw_memory_on_chain: false,
+  })}\n`, 'utf8');
+  const schemaPathResult = await runCli([
+    'chain',
+    'submit-solana',
+    '--file',
+    schemaPathArtifact,
+    '--cluster',
+    'devnet',
+  ]);
+  assert.notEqual(schemaPathResult.code, 0);
+  assert.equal(schemaPathResult.json().ok, false);
+  assertTextOmits(schemaPathResult.text(), schemaPathArtifact, dir);
+});
+
+test('chain submit-solana execute mode requires an explicit keypair before importing Solana client code', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-chain-submit-execute-'));
+  const artifactPath = join(dir, 'anchor-batch.json');
+
+  const anchorResult = await runCli([
+    'chain',
+    'anchor',
+    '--root',
+    ROOT_B,
+    '--authority',
+    'did:key:z6mkpublicauthorityonly',
+    '--out',
+    artifactPath,
+  ]);
+  assert.equal(anchorResult.code, 0, anchorResult.io.stderr());
+
+  const result = await runCli([
+    'chain',
+    'submit-solana',
+    '--file',
+    artifactPath,
+    '--cluster',
+    'devnet',
+    '--execute',
+  ]);
+  assert.notEqual(result.code, 0);
+  const report = result.json();
+  assert.equal(report.ok, false);
+  assert.match(report.error.message, /keypair/u);
+  assertTextOmits(result.text(), artifactPath, dir, ROOT_B, PRIVATE_SENTINEL);
 });

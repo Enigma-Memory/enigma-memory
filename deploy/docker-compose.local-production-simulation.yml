@@ -9,6 +9,8 @@
 # via /etc/hosts or local DNS. This lets curl -k reach the tls-proxy container
 # whose ports are published on the loopback interface. For real validation the
 # operator must point the chosen public domain at the deployment's public IP.
+name: enigma-local-production-simulation
+
 services:
   postgres:
     image: postgres:17-alpine
@@ -67,7 +69,7 @@ services:
       context: ..
       dockerfile: Dockerfile
     image: enigma-local:simulation
-    entrypoint: ["enigma-relay"]
+    entrypoint: ["/usr/local/bin/enigma-relay"]
     command: ["serve", "--host", "0.0.0.0", "--port", "8787"]
     secrets:
       - relay_signing_key
@@ -119,10 +121,10 @@ services:
       - /tmp:rw,noexec,nosuid,size=64m
     healthcheck:
       test: ["CMD-SHELL", "node -e \"Promise.all([fetch('http://127.0.0.1:8787/livez'),fetch('http://127.0.0.1:8787/readyz')]).then(rs=>process.exit(rs.every(r=>r.ok)?0:1)).catch(()=>process.exit(1))\""]
-      interval: 15s
+      interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 10s
+      retries: 12
+      start_period: 30s
     restart: unless-stopped
 
   gateway:
@@ -130,7 +132,7 @@ services:
       context: ..
       dockerfile: Dockerfile
     image: enigma-local:simulation
-    entrypoint: ["enigma-gateway"]
+    entrypoint: ["/usr/local/bin/enigma-gateway"]
     command: ["serve", "--host", "0.0.0.0", "--port", "8797"]
     secrets:
       - gateway_signing_key
@@ -189,17 +191,17 @@ services:
       - /tmp:rw,noexec,nosuid,size=64m
     healthcheck:
       test: ["CMD-SHELL", "node -e \"Promise.all([fetch('http://127.0.0.1:8797/livez'),fetch('http://127.0.0.1:8797/readyz')]).then(rs=>process.exit(rs.every(r=>r.ok)?0:1)).catch(()=>process.exit(1))\""]
-      interval: 15s
+      interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 10s
+      retries: 12
+      start_period: 30s
     restart: unless-stopped
 
   tls-proxy:
     image: nginx:alpine
     ports:
-      - "127.0.0.1:8443:8443"
-      - "127.0.0.1:9443:9443"
+      - "127.0.0.1:${ENIGMA_SIM_RELAY_PORT:-8443}:8443"
+      - "127.0.0.1:${ENIGMA_SIM_GATEWAY_PORT:-9443}:9443"
     volumes:
       - ./secrets-simulation/tls.crt:/etc/nginx/ssl/tls.crt:ro
       - ./secrets-simulation/tls.key:/etc/nginx/ssl/tls.key:ro

@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { execFile } from 'node:child_process';
 import { buildOperatorAcceptancePacket } from '../scripts/build-operator-acceptance-packet.mjs';
 import https from 'node:https';
+import { createServer } from 'node:net';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { collectHostedBackendLiveEvidence } from '../scripts/collect-hosted-backend-live-evidence.mjs';
@@ -23,8 +24,26 @@ const PROJECT_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const COMPOSE_FILE = 'deploy/docker-compose.local-production-simulation.yml';
 const SIM_REFS_PATH = '.enigma/sim-hosted-refs.json';
 const SIM_OPERATOR_ACCEPTANCE_PATH = '.enigma/sim-operator-acceptance.json';
-const RELAY_URL = 'https://sim.enigmamemory.com:8443';
-const GATEWAY_URL = 'https://sim.enigmamemory.com:9443';
+const SIMULATION_HOST = 'sim.enigmamemory.com';
+const SIMULATION_COMPOSE_PROJECT_PREFIX = 'enigma-go-live-sim-';
+const SIMULATION_COMPOSE_PROJECT = `${SIMULATION_COMPOSE_PROJECT_PREFIX}${process.pid}-${Date.now().toString(36)}`;
+const LEGACY_COMPOSE_PROJECT = 'deploy';
+const LEGACY_COMPOSE_CONTAINERS = [
+  'deploy-postgres-1',
+  'deploy-kms-mock-1',
+  'deploy-siem-mock-1',
+  'deploy-relay-1',
+  'deploy-gateway-1',
+  'deploy-tls-proxy-1',
+  'deploy_postgres_1',
+  'deploy_kms-mock_1',
+  'deploy_siem-mock_1',
+  'deploy_relay_1',
+  'deploy_gateway_1',
+  'deploy_tls-proxy_1',
+];
+const LEGACY_COMPOSE_NETWORK = 'deploy_default';
+const LEGACY_COMPOSE_VOLUMES = ['deploy_pgdata', 'deploy_kms-data', 'deploy_siem-data'];
 
 function dockerComposeAvailable() {
   const result = spawnSync('docker', ['compose', 'version'], {
@@ -42,6 +61,21 @@ function dockerLinuxContainersAvailable() {
     shell: false,
   });
   return result.status === 0 && result.stdout.trim() === 'linux';
+}
+
+function reserveLoopbackPort() {
+  return new Promise((resolve, reject) => {
+    const server = createServer();
+    server.on('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      const port = typeof address === 'object' && address !== null ? address.port : null;
+      server.close((error) => {
+        if (error) reject(error);
+        else resolve(port);
+      });
+    });
+  });
 }
 
 function fetchImpl(url, init = {}) {
@@ -80,6 +114,76 @@ function simulationRefs() {
   return Object.fromEntries(REQUIRED_REF_KEYS.map((key) => [key, `simulation://${key}/verified`]));
 }
 
+function composeArgs(projectName, ...args) {
+  return ['compose', '-p', projectName, '-f', COMPOSE_FILE, ...args];
+}
+
+async function downSimulationCompose(projectName = SIMULATION_COMPOSE_PROJECT, timeout = 120000) {
+  await execFileAsync('docker', composeArgs(projectName, 'down', '-v', '--remove-orphans'), {
+    cwd: PROJECT_ROOT,
+    timeout,
+    windowsHide: true,
+  });
+}
+
+async function tryDocker(args, timeout = 30000) {
+  try {
+    await execFileAsync('docker', args, {
+      cwd: PROJECT_ROOT,
+      timeout,
+      windowsHide: true,
+    });
+  } catch {
+    // Best-effort cleanup; missing resources are expected.
+  }
+}
+
+async function dockerLines(args, timeout = 30000) {
+  try {
+    const { stdout } = await execFileAsync('docker', args, {
+      cwd: PROJECT_ROOT,
+      timeout,
+      windowsHide: true,
+    });
+    return stdout.split(/\r?\n/).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+async function cleanupNamedDockerResources(listArgs, removeArgs) {
+  const names = await dockerLines(listArgs);
+  if (names.length > 0) {
+    await tryDocker([...removeArgs, ...names]);
+  }
+}
+
+async function cleanupStaleSimulationComposeResources() {
+  await cleanupNamedDockerResources(
+    ['ps', '-aq', '--filter', `name=${SIMULATION_COMPOSE_PROJECT_PREFIX}`],
+    ['rm', '-f'],
+  );
+  await cleanupNamedDockerResources(
+    ['network', 'ls', '-q', '--filter', `name=${SIMULATION_COMPOSE_PROJECT_PREFIX}`],
+    ['network', 'rm'],
+  );
+  await cleanupNamedDockerResources(
+    ['volume', 'ls', '-q', '--filter', `name=${SIMULATION_COMPOSE_PROJECT_PREFIX}`],
+    ['volume', 'rm'],
+  );
+}
+
+async function cleanupLegacySimulationCompose() {
+  try {
+    await downSimulationCompose(LEGACY_COMPOSE_PROJECT, 60000);
+  } catch {
+    // Fall through to exact legacy resource cleanup below.
+  }
+  await tryDocker(['rm', '-f', ...LEGACY_COMPOSE_CONTAINERS]);
+  await tryDocker(['network', 'rm', LEGACY_COMPOSE_NETWORK]);
+  await tryDocker(['volume', 'rm', ...LEGACY_COMPOSE_VOLUMES]);
+}
+
 test('hosted/BYOC go-live simulation produces accepted live evidence', { timeout: 300000 }, async (t) => {
   if (!dockerComposeAvailable() || !dockerLinuxContainersAvailable()) {
     t.skip('Docker Compose with Linux containers not available');
@@ -87,22 +191,37 @@ test('hosted/BYOC go-live simulation produces accepted live evidence', { timeout
   }
 
   const started = Date.now();
+  const relayPort = await reserveLoopbackPort();
+  let gatewayPort = await reserveLoopbackPort();
+  if (gatewayPort === relayPort) gatewayPort = await reserveLoopbackPort();
+  const composeEnv = {
+    ...process.env,
+    ENIGMA_SIM_RELAY_PORT: String(relayPort),
+    ENIGMA_SIM_GATEWAY_PORT: String(gatewayPort),
+  };
+  const relayUrl = `https://${SIMULATION_HOST}:${relayPort}`;
+  const gatewayUrl = `https://${SIMULATION_HOST}:${gatewayPort}`;
 
   try {
+    await cleanupLegacySimulationCompose();
+    await cleanupStaleSimulationComposeResources();
+    await downSimulationCompose();
+
     await execFileAsync(process.execPath, ['scripts/simulate-production-env.mjs'], {
       cwd: PROJECT_ROOT,
       timeout: 60000,
       windowsHide: true,
     });
-
-    await execFileAsync('docker', ['compose', '-f', COMPOSE_FILE, 'up', '--build', '-d'], {
+    await execFileAsync('docker', composeArgs(SIMULATION_COMPOSE_PROJECT, 'up', '--build', '-d'), {
       cwd: PROJECT_ROOT,
+      env: composeEnv,
       timeout: 240000,
       windowsHide: true,
     });
 
     await execFileAsync(process.execPath, ['scripts/wait-for-backend-ready.mjs', '--timeout', '120'], {
       cwd: PROJECT_ROOT,
+      env: composeEnv,
       timeout: 150000,
       windowsHide: true,
     });
@@ -121,8 +240,8 @@ test('hosted/BYOC go-live simulation produces accepted live evidence', { timeout
     });
 
     const collection = await collectHostedBackendLiveEvidence({
-      relayBaseUrl: RELAY_URL,
-      gatewayBaseUrl: GATEWAY_URL,
+      relayBaseUrl: relayUrl,
+      gatewayBaseUrl: gatewayUrl,
       refs,
       environmentId: 'local-simulation',
       domain: 'sim.enigmamemory.com',
@@ -156,11 +275,7 @@ test('hosted/BYOC go-live simulation produces accepted live evidence', { timeout
     assert.doesNotMatch(JSON.stringify(collection), /PRIVATE KEY|sk-[A-Za-z0-9_-]{16}/i);
   } finally {
     try {
-      await execFileAsync('docker', ['compose', '-f', COMPOSE_FILE, 'down', '-v'], {
-        cwd: PROJECT_ROOT,
-        timeout: 120000,
-        windowsHide: true,
-      });
+      await downSimulationCompose();
     } catch {
       // Best-effort cleanup; do not mask the original failure.
     }

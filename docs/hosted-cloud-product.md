@@ -49,6 +49,16 @@ Hosted cloud remains blocked until an operator wires and records evidence for al
 
 A `provided` operator evidence ref means the contract can point to external evidence. It still does not by itself make hosted cloud sellable; an operator must complete the release checklist and issue go-live approval. A `blocked_external_dependency` ref is an explicit blocker, not fake evidence.
 
+## Consolidated unblocker report
+
+Before treating hosted cloud as sellable, run the consolidated public-safe unblocker report:
+
+```sh
+npm run production:unblocker -- --out .enigma/production-unblocker.json
+```
+
+The report emits `enigma.production_unblocker.v1` with hosted cloud, Solana proof rail, benchmark claim, installer distribution, npm install, and monitoring/ops status in one place. It is dry-run/planning by default, requires no credentials, and does not create accounts, deploy infrastructure, submit transactions, call providers, or mutate external systems. Hosted cloud should remain `blocked_external_dependency` until real external provider evidence and operator go-live approval exist.
+
 ## Customer lifecycle packet
 
 `npm run production:hosted-customer -- --tenant <id> --domain <domain> --environment <env> --out <file>` builds `enigma.hosted_cloud.customer_lifecycle_packet.v1` readiness evidence for a tenant launch packet. Operators may pass repeatable `--evidence-ref <key=status:ref>` values and `--operator-go-live-ref <ref>` when real external evidence exists. The command writes public-safe validation evidence only: it creates no hosted account, tenant, vault, API key, invoice, support ticket, backup, Cloudflare resource, provider resource, secret, or deployment.
