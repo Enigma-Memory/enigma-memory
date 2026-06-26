@@ -1,0 +1,11 @@
+{
+  "name": "cortex-v3-node",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
