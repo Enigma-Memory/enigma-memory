@@ -15,7 +15,7 @@ import {
   validateProofNetworkPacket,
 } from '../packages/proof-network/src/index.js';
 
-export const PROOF_NETWORK_PACKET_RELEASE_TARGET = '0.1.16';
+export const PROOF_NETWORK_PACKET_RELEASE_TARGET = '0.1.17';
 
 const HASH_RE = /^(?:sha256:)?[a-f0-9]{64}$/iu;
 const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|\b(?:raw[\s_-]*memory|plaintext[\s_-]*prompts?|plain[\s_-]*text[\s_-]*prompts?|private[\s_-]*prompts?|provider[\s_-]*responses?|full[\s_-]*transcript|decrypted[\s_-]*memory|credentials?|secrets?|passwords?|private[\s_-]*keys?|api[\s_-]*key[\s_-]*(?:secret|material|value)|api[\s_-]*secrets?|access[\s_-]*tokens?|refresh[\s_-]*tokens?|token[\s_-]*values?|credential[\s_-]*material|tenant[\s_-]*names?)\b)/iu;

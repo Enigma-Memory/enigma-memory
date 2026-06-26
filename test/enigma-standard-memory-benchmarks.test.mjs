@@ -1,17 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import {
+  STANDARD_MEMORY_BENCHMARK_PROTOCOL_PLAN_SCHEMA,
   STANDARD_MEMORY_BENCHMARK_SUITE_SCHEMA,
   buildStandardBenchmarkDryRunPlan,
+  buildStandardBenchmarkProtocolPlan,
   parseLocomoDataset,
   parseLongMemEvalDataset,
   runStandardMemoryBenchmarkSuite,
   runStandardMemoryBenchmarkSuiteFromFiles,
 } from '../scripts/run-standard-memory-benchmarks.mjs';
+import { buildBenchmarkProofRelease } from '../scripts/build-benchmark-proof-release.mjs';
 
 const LOCOMO_SENTINELS = [
   'violet-penguin-door',
@@ -372,6 +375,121 @@ test('standard benchmark LongMemEval sample mode limits local-file parsing witho
     assert.doesNotMatch(text, /"content"\s*:/u);
     assert.doesNotMatch(text, /"question"\s*:/u);
     assert.doesNotMatch(text, /"answer"\s*:/u);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+const PROTOCOL_PLAN_OPTIONS = {
+  generated_at: '2026-06-26T00:00:00.000Z',
+  locomo: 'locomo10.json',
+  longmemeval: 'longmemeval_s_cleaned.json',
+  max_locomo_qa: 25,
+  max_longmemeval_items: 25,
+  top_k: 4,
+};
+
+test('standard benchmark protocol plan records full-answer readiness without network or providers', () => {
+  const plan = buildStandardBenchmarkProtocolPlan(PROTOCOL_PLAN_OPTIONS);
+
+  assert.equal(plan.schema, STANDARD_MEMORY_BENCHMARK_PROTOCOL_PLAN_SCHEMA);
+  assert.equal(plan.schema, 'enigma.standard_memory_benchmark_protocol_plan.v1');
+  assert.equal(plan.public_safe, true);
+  assert.equal(plan.protocol_plan, true);
+  assert.equal(plan.dry_run, true);
+  assert.equal(plan.top_k, 4);
+  assert.deepEqual(plan.datasets_planned.map((row) => row.id), ['locomo', 'longmemeval']);
+  assert.ok(plan.category_set.includes('multi-session QA'));
+  assert.ok(plan.category_set.includes('abstention'));
+  assert.equal(plan.answerer.model_ref, 'model:answerer-not-selected');
+  assert.equal(plan.judge.model_ref, 'model:judge-not-selected');
+  assert.equal(plan.answerer.fixed, false);
+  assert.equal(plan.judge.fixed, false);
+  assert.equal(plan.prompt_refs.length, 2);
+  assert.equal(plan.protocol_refs.length, 1);
+  assert.ok(plan.competitor_adapter_refs.includes('adapter:mem0@not-pinned'));
+
+  assert.equal(plan.protocol_boundaries.network_required, false);
+  assert.equal(plan.protocol_boundaries.provider_calls_made, false);
+  assert.equal(plan.protocol_boundaries.answers_generated, false);
+  assert.equal(plan.protocol_boundaries.judged, false);
+  assert.equal(plan.protocol_boundaries.competitor_adapters_run, false);
+  assert.equal(plan.protocol_boundaries.api_spend_possible, false);
+  assert.equal(plan.command_boundaries.network_calls_made, false);
+  assert.equal(plan.command_boundaries.provider_api_calls_made, false);
+  assert.equal(plan.command_boundaries.api_spend_possible, false);
+  assert.equal(plan.command_boundaries.mem0_adapter_run, false);
+  assert.equal(plan.benchmark_boundaries.llm_answer_accuracy_scored, false);
+  assert.equal(plan.benchmark_boundaries.retrieval_evidence_proxy_scored, false);
+  assert.equal(plan.benchmark_boundaries.external_provider_calls, false);
+  assert.deepEqual(plan.external_competitor_adapters.map((row) => row.id), ['mem0']);
+  assert.equal(plan.external_competitor_adapters[0].scores_included, false);
+  assert.ok(Array.isArray(plan.cost_estimate_inputs.dataset_sample_limits));
+  assert.equal(plan.cost_estimate_inputs.budget_cap_set, false);
+
+  const text = serialize(plan);
+  for (const sentinel of [...LOCOMO_SENTINELS, ...LONGMEMEVAL_SENTINELS]) {
+    assert.doesNotMatch(text, new RegExp(sentinel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'u'));
+  }
+  assert.doesNotMatch(text, /"content"\s*:/u);
+  assert.doesNotMatch(text, /"question"\s*:/u);
+  assert.doesNotMatch(text, /"answer"\s*:/u);
+  assert.doesNotMatch(text, /provider deletion|model forgetting|benchmark leadership/iu);
+  assert.ok(plan.review_rules.length > 0);
+  assert.ok(plan.non_claims.length > 0);
+});
+
+test('standard benchmark protocol plan binds pinned refs and is deterministic', () => {
+  const base = { ...PROTOCOL_PLAN_OPTIONS, answerer_ref: 'model:answerer@2026-06-01', judge_ref: 'model:judge@2026-06-01', protocol_ref: 'protocol:full-answer@v1' };
+  const plan = buildStandardBenchmarkProtocolPlan(base);
+
+  assert.equal(plan.answerer.model_ref, 'model:answerer@2026-06-01');
+  assert.equal(plan.judge.model_ref, 'model:judge@2026-06-01');
+  assert.equal(plan.answerer.fixed, true);
+  assert.equal(plan.judge.fixed, true);
+  assert.equal(plan.protocol_controls.prompts_fixed, true);
+  assert.equal(plan.protocol_controls.same_answerer_model_for_all_rows, true);
+
+  const again = serialize(buildStandardBenchmarkProtocolPlan(base));
+  assert.equal(serialize(plan), again);
+
+  assert.throws(() => buildStandardBenchmarkProtocolPlan({ locomo: 'l.json', answerer_ref: 'Bad Ref With Spaces' }), /answerer_ref/u);
+});
+
+test('protocol plan proof release accepts the readiness report but rejects raw answers, prompts, provider responses, and competitor scores', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-protocol-proof-'));
+  try {
+    const planPath = join(dir, 'protocol-plan.json');
+    await writeFile(planPath, `${JSON.stringify(buildStandardBenchmarkProtocolPlan(PROTOCOL_PLAN_OPTIONS), null, 2)}\n`, 'utf8');
+    const baseArgs = {
+      report: planPath,
+      datasetRef: 'dataset:locomo-longmemeval@reviewed',
+      runnerRef: 'runner:run-standard-memory-benchmarks.mjs@protocol-plan',
+      packageRef: 'enigma-memory@0.1.17',
+      scores: [],
+    };
+
+    const release = await buildBenchmarkProofRelease(baseArgs, { generated_at: '2026-06-26T00:00:00.000Z' });
+    assert.equal(release.report_schema, STANDARD_MEMORY_BENCHMARK_PROTOCOL_PLAN_SCHEMA);
+    const tampered = async (mutate) => {
+      const badPath = join(dir, 'tampered.json');
+      const body = JSON.parse(await readFile(planPath, 'utf8'));
+      await writeFile(badPath, `${JSON.stringify(mutate(body), null, 2)}\n`, 'utf8');
+      return buildBenchmarkProofRelease({ ...baseArgs, report: badPath }, { generated_at: '2026-06-26T00:00:00.000Z' });
+    };
+    assert.equal(release.manifest.claim_boundaries.provider_answer_accuracy_claim, false);
+    assert.equal(release.manifest.claim_boundaries.competitor_performance_claim, false);
+    assert.equal(release.manifest.claim_boundaries.benchmark_leadership_claim === undefined || release.manifest.claim_boundaries.benchmark_leadership_claim === false, true);
+    assert.equal(release.manifest.claim_boundaries.raw_memory_included, false);
+    assert.equal(release.manifest.claim_boundaries.prompts_included, false);
+    assert.equal(release.manifest.claim_boundaries.provider_responses_included, false);
+
+    await assert.rejects(() => tampered((r) => ({ ...r, raw_answers: ['a private generated answer'] })), /raw_answers/u);
+    await assert.rejects(() => tampered((r) => ({ ...r, generated_answer: 'model answered privately' })), /generated_answer/u);
+    await assert.rejects(() => tampered((r) => ({ ...r, prompts: ['you are a helpful assistant'] })), /prompts/u);
+    await assert.rejects(() => tampered((r) => ({ ...r, provider_responses: [{ content: 'resp' }] })), /provider_responses/u);
+    await assert.rejects(() => tampered((r) => ({ ...r, external_competitor_adapters: [{ id: 'mem0', name: 'Mem0', scores_included: false, recall: 0.9 }] })), /recall/u);
+    await assert.rejects(() => tampered((r) => ({ ...r, protocol_boundaries: { ...r.protocol_boundaries, answers_generated: true } })), /answers_generated/u);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

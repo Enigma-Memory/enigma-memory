@@ -595,6 +595,47 @@ A CLI or UI should show a concise SMART table first, then drill-down evidence:
 
 The product should default to safe blocking language: `proof_network_ready.eligible_for_anchor_batch` is false unless every public-safety and source-root condition passes. This makes health reports usable as local operational evidence now and as future proof-network anchor inputs without changing the privacy model.
 
+## CLI surface
+
+The reference implementation ships the health core in the passport package as `createMemoryDriveHealthReport(args)` and exposes it through a two-part CLI command that emits the report as JSON to stdout:
+
+```sh
+enigma drive health --bundle <path> \
+  [--now <iso>] \
+  [--benchmark-summary <path>] \
+  [--connector-summary <path>] \
+  [--replicas <path>] \
+  [--latest-anchor-batch-ref <ref>] \
+  [--out <file>]
+```
+
+- `--bundle <path>` is the local Enigma vault bundle to inspect (defaults to `.enigma/bundle.json`). A missing or unreadable bundle returns a clean CLI error rather than crashing.
+- `--now <iso>` fixes the timestamp used for age calculations so output is deterministic and reproducible; it defaults to a stable timestamp when omitted.
+- `--benchmark-summary`, `--connector-summary`, and `--replicas` are optional JSON files carrying public-safe retrieval, connector, and replica metadata. When omitted, the corresponding metrics default gracefully to a measured:false healthy state instead of failing the report.
+- `--out <path>` additionally writes the JSON report to a file.
+
+### Output shape
+
+Every emitted object uses schema `enigma.memory_drive_health_report.v1` and contains only public-safe hashes, roots, refs, integer counts, ratios in `0..1`, booleans, statuses, ISO-8601 timestamps, thresholds, and claim text. The top-level fields are:
+
+- `schema`, `report_ref` (`health_report_sha256:<hex>`), `created_at`;
+- `drive_ref`, `namespace_ref`, `source_root` (`memory_root_sha256:<hex>`), `policy_ref`;
+- `overall_status` (`healthy` | `watch` | `degraded` | `critical`) and `overall_score` (0-100, conservative: any critical metric caps the drive at 49, any degraded metric caps it at 70);
+- `transaction_submitted: false` and `raw_memory_on_chain: false` on every report;
+- `privacy_boundaries` (all `*_included` flags false), `roots` (`active_set_root`, `receipt_log_root`);
+- `metrics`: the ten SMART-style attributes (freshness, duplicate_rate, tombstone_risk, stale_derived_artifacts, retrieval_hit_rate, token_reduction, leakage_scan, receipt_coverage, connector_health, sync_fork_risk), each with `status`, `score`, `observed`, `thresholds`, `evidence_refs`, and `recommended_actions`;
+- `recommended_actions` (deduplicated across metrics), `claim_boundaries`;
+- `proof_network_ready`: a conservative block with `eligible_for_anchor_batch`, `blocking_reasons`, `public_payload_only`, and `suggested_anchor_fields` (artifact_type `memory_drive_health_report`, artifact_schema `enigma.memory_drive_health_report.v1`, artifact_root echoing `report_ref`, source_root, and counts). This block maps cleanly onto a proof-network registry `health_report` entry: `report_ref` becomes `artifact_hash`, `artifact_schema` becomes `artifact_schema_ref`.
+
+### Claim boundary
+
+A Memory Drive health report is **local operational evidence**, not a proof of outcome. It:
+
+- is computed locally from public-safe counters, roots, receipt metadata, tombstones, and derived/context-pack refs only, with no network or chain calls;
+- never contains raw memory, prompts, connector bodies, identity labels, or secret material (a leakage scan runs over the report before it is emitted);
+- does **not** prove provider deletion, model forgetting, compliance certification, or live-chain settlement, and never claims a submitted transaction or on-chain memory (`transaction_submitted` and `raw_memory_on_chain` are always false).
+
+
 ## Implementation requirements
 
 The first implementation should treat health reporting as a pure local planner:

@@ -341,7 +341,7 @@ The negative fixture set should include intentionally unsafe keys and values so 
   "subject": {
     "name_ref": "public-package-or-client-ref",
     "version": "0.0.0",
-    "enigma_version": "0.1.16"
+    "enigma_version": "0.1.17"
   },
   "commands": [
     {

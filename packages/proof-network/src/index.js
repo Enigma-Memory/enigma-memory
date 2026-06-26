@@ -5,12 +5,16 @@ export const PROOF_NETWORK_CAPABILITY_GRANT_SCHEMA = 'enigma.proof_network.capab
 export const PROOF_NETWORK_CAPABILITY_REVOCATION_SCHEMA = 'enigma.proof_network.capability_revocation.v1';
 export const PROOF_NETWORK_BENCHMARK_ATTESTATION_SCHEMA = 'enigma.proof_network.benchmark_attestation.v1';
 export const PROOF_NETWORK_PACKET_SCHEMA = 'enigma.proof_network.packet.v1';
+export const PROOF_NETWORK_REGISTRY_ENTRY_SCHEMA = 'enigma.proof_network.registry_entry.v1';
+export const PROOF_NETWORK_REGISTRY_BATCH_SCHEMA = 'enigma.proof_network.registry_batch.v1';
 
 export const ANCHOR_BATCH_SCHEMA = PROOF_NETWORK_ANCHOR_BATCH_SCHEMA;
 export const CAPABILITY_GRANT_SCHEMA = PROOF_NETWORK_CAPABILITY_GRANT_SCHEMA;
 export const CAPABILITY_REVOCATION_SCHEMA = PROOF_NETWORK_CAPABILITY_REVOCATION_SCHEMA;
 export const BENCHMARK_ATTESTATION_SCHEMA = PROOF_NETWORK_BENCHMARK_ATTESTATION_SCHEMA;
 export const PACKET_SCHEMA = PROOF_NETWORK_PACKET_SCHEMA;
+export const REGISTRY_ENTRY_SCHEMA = PROOF_NETWORK_REGISTRY_ENTRY_SCHEMA;
+export const REGISTRY_BATCH_SCHEMA = PROOF_NETWORK_REGISTRY_BATCH_SCHEMA;
 
 export const PROOF_NETWORK_SCHEMAS = Object.freeze({
   anchor_batch: PROOF_NETWORK_ANCHOR_BATCH_SCHEMA,
@@ -18,6 +22,8 @@ export const PROOF_NETWORK_SCHEMAS = Object.freeze({
   capability_revocation: PROOF_NETWORK_CAPABILITY_REVOCATION_SCHEMA,
   benchmark_attestation: PROOF_NETWORK_BENCHMARK_ATTESTATION_SCHEMA,
   packet: PROOF_NETWORK_PACKET_SCHEMA,
+  registry_entry: PROOF_NETWORK_REGISTRY_ENTRY_SCHEMA,
+  registry_batch: PROOF_NETWORK_REGISTRY_BATCH_SCHEMA,
 });
 
 const SHA256_PREFIX = 'sha256:';
@@ -36,6 +42,14 @@ const SAFE_FIELD_NAMES = new Set(Object.keys(SAFE_BOOLEAN_BOUNDARIES));
 const FORBIDDEN_KEY_RE = /(?:^|_)(?:raw|plaintext|plain_text|prompt|prompts|message|messages|text|content|document|documents|transcript|transcripts|completion|completions|embedding|embeddings|acl|acl_body|access_control_list|provider_response|provider_responses|response_body|credential|credentials|api_key|secret|password|private_key|seed|seed_phrase|mnemonic|tenant_name|customer_name|organization_name|org_name)(?:$|_)/iu;
 const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|(?:seed phrase|mnemonic phrase|raw memory|private prompt|full transcript|provider response|embedding vector))/iu;
 const SUPPORTED_ARTIFACT_SCHEMAS = new Set(Object.values(PROOF_NETWORK_SCHEMAS));
+const REGISTRY_ENTRY_TYPES = Object.freeze(new Set([
+  'anchor_batch',
+  'benchmark_attestation',
+  'connector_conformance',
+  'health_report',
+  'operator_receipt',
+  'settlement_job',
+]));
 
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -296,6 +310,10 @@ function artifactHash(artifact, index) {
       return requiredString(artifact.benchmark_attestation_hash, `artifacts[${index}].benchmark_attestation_hash`);
     case PROOF_NETWORK_PACKET_SCHEMA:
       return requiredString(artifact.proof_network_packet_hash, `artifacts[${index}].proof_network_packet_hash`);
+    case PROOF_NETWORK_REGISTRY_ENTRY_SCHEMA:
+      return requiredString(artifact.registry_entry_hash, `artifacts[${index}].registry_entry_hash`);
+    case PROOF_NETWORK_REGISTRY_BATCH_SCHEMA:
+      return requiredString(artifact.registry_batch_hash, `artifacts[${index}].registry_batch_hash`);
     default:
       throw new TypeError(`artifacts[${index}] has unsupported schema`);
   }
@@ -313,6 +331,10 @@ function validateSupportedArtifact(artifact) {
       return validateBenchmarkAttestation(artifact);
     case PROOF_NETWORK_PACKET_SCHEMA:
       return validateProofNetworkPacket(artifact);
+    case PROOF_NETWORK_REGISTRY_ENTRY_SCHEMA:
+      return validateRegistryEntry(artifact);
+    case PROOF_NETWORK_REGISTRY_BATCH_SCHEMA:
+      return validateRegistryBatch(artifact);
     default:
       return Object.freeze({ ok: false, valid: false, errors: Object.freeze(['unsupported artifact schema']) });
   }
@@ -568,3 +590,120 @@ export function validateProofNetworkPacket(packet) {
     validateIdentity(packet, errors, 'proof_network_packet_id', 'proof_network_packet_hash', 'pnp');
   });
 }
+
+function registryEntryType(value, field = 'entry_type') {
+  const type = optionalString(value, undefined, field);
+  if (type === undefined || !REGISTRY_ENTRY_TYPES.has(type)) {
+    throw new TypeError(`${field} must be one of ${[...REGISTRY_ENTRY_TYPES].join(', ')}`);
+  }
+  return type;
+}
+
+export function createRegistryEntry(input = {}) {
+  requiredObject(input, 'input');
+  assertNoPrivateProofPayload(input, 'input');
+  const entryType = registryEntryType(input.entry_type ?? input.entryType ?? input.type, 'entry_type');
+  const artifactHash = digestRef(input.artifact_hash ?? input.artifactHash ?? input.digest_ref ?? input.digestRef, 'artifact_hash');
+  const artifactSchemaRef = publicRef(input.artifact_schema_ref ?? input.artifactSchemaRef ?? input.schema_ref ?? input.schemaRef, 'artifact_schema_ref');
+  const digestRefs = digestArray(input.digest_refs ?? input.digestRefs ?? input.digest_roots ?? input.digestRoots ?? input.roots ?? artifactHash, 'digest_refs', { min: 1, max: 64 });
+  const signerRefs = publicRefArray(input.signer_refs ?? input.signerRefs ?? input.signer_ref ?? input.signerRef, 'signer_refs', { min: 0, max: 64 });
+  const entryRef = optionalPublicRef(input.entry_ref ?? input.entryRef, refFromDigest('registry-entry', artifactHash), 'entry_ref');
+  const body = {
+    schema: PROOF_NETWORK_REGISTRY_ENTRY_SCHEMA,
+    registered_at: isoTimestamp(input.registered_at ?? input.registeredAt ?? input.created_at ?? input.createdAt ?? input.generated_at ?? input.generatedAt, 'registered_at'),
+    entry_type: entryType,
+    entry_ref: entryRef,
+    registry_ref: optionalPublicRef(input.registry_ref ?? input.registryRef ?? input.marketplace_ref ?? input.marketplaceRef, 'registry:memory-drive-marketplace', 'registry_ref'),
+    artifact_schema_ref: artifactSchemaRef,
+    artifact_hash: artifactHash,
+    digest_root: sha256Json(digestRefs),
+    digest_refs: digestRefs,
+    signer_refs: signerRefs,
+    entry_count: nonNegativeInteger(input.entry_count ?? input.entryCount ?? input.count, 'entry_count', 1),
+    ...((input.signature_ref ?? input.signatureRef) ? { signature_ref: signatureRef(input.signature_ref ?? input.signatureRef, 'signature_ref') } : {}),
+    ...SAFE_BOOLEAN_BOUNDARIES,
+  };
+  return freezeArtifact(body, 'registry_entry_id', 'registry_entry_hash', 'pnrg');
+}
+
+export function validateRegistryEntry(entry) {
+  return collectValidation((errors) => {
+    requiredObject(entry, 'entry');
+    assertNoPrivateProofPayload(entry, 'entry');
+    if (entry.schema !== PROOF_NETWORK_REGISTRY_ENTRY_SCHEMA) errors.push(`schema must be ${PROOF_NETWORK_REGISTRY_ENTRY_SCHEMA}`);
+    requireSafeBoundaries(entry, errors, 'entry');
+    isoTimestamp(entry.registered_at, 'registered_at');
+    if (!REGISTRY_ENTRY_TYPES.has(entry.entry_type)) errors.push(`entry_type must be one of ${[...REGISTRY_ENTRY_TYPES].join(', ')}`);
+    publicRef(entry.entry_ref, 'entry_ref');
+    publicRef(entry.registry_ref, 'registry_ref');
+    publicRef(entry.artifact_schema_ref, 'artifact_schema_ref');
+    digestRef(entry.artifact_hash, 'artifact_hash');
+    const digestRefs = digestArray(entry.digest_refs, 'digest_refs', { min: 1, max: 64 });
+    if (entry.digest_root !== sha256Json(digestRefs)) errors.push('digest_root mismatch');
+    publicRefArray(entry.signer_refs, 'signer_refs', { min: 0, max: 64 });
+    nonNegativeInteger(entry.entry_count, 'entry_count');
+    if (entry.signature_ref !== undefined) signatureRef(entry.signature_ref, 'signature_ref');
+    validateIdentity(entry, errors, 'registry_entry_id', 'registry_entry_hash', 'pnrg');
+  });
+}
+
+export function createRegistryBatch(input = {}) {
+  requiredObject(input, 'input');
+  assertNoPrivateProofPayload(input, 'input');
+  const entries = Object.freeze(arrayInput(input.entries ?? input.registry_entries ?? input.registryEntries).map((entry, index) => {
+    requiredObject(entry, `entries[${index}]`);
+    if (entry.schema !== PROOF_NETWORK_REGISTRY_ENTRY_SCHEMA) throw new TypeError(`entries[${index}] must be a ${PROOF_NETWORK_REGISTRY_ENTRY_SCHEMA}`);
+    const validation = validateRegistryEntry(entry);
+    if (!validation.ok) throw new TypeError(`entries[${index}] is invalid: ${validation.errors.join('; ')}`);
+    return Object.freeze(entry);
+  }));
+  if (entries.length === 0) throw new TypeError('entries must be non-empty');
+  if (entries.length > 128) throw new TypeError('entries must contain at most 128 entries');
+  const entryHashes = Object.freeze(entries.map((entry) => requiredString(entry.registry_entry_hash, 'entries.registry_entry_hash')).sort());
+  const registryRoot = sha256Json(entryHashes);
+  const body = {
+    schema: PROOF_NETWORK_REGISTRY_BATCH_SCHEMA,
+    created_at: isoTimestamp(input.created_at ?? input.createdAt ?? input.generated_at ?? input.generatedAt, 'created_at'),
+    registry_ref: optionalPublicRef(input.registry_ref ?? input.registryRef ?? input.marketplace_ref ?? input.marketplaceRef, refFromDigest('registry-batch', registryRoot), 'registry_ref'),
+    entry_count: entries.length,
+    registry_root: registryRoot,
+    entry_hashes: entryHashes,
+    entries,
+    ...SAFE_BOOLEAN_BOUNDARIES,
+  };
+  return freezeArtifact(body, 'registry_batch_id', 'registry_batch_hash', 'pnrb');
+}
+
+export function validateRegistryBatch(batch) {
+  return collectValidation((errors) => {
+    requiredObject(batch, 'batch');
+    assertNoPrivateProofPayload(batch, 'batch');
+    if (batch.schema !== PROOF_NETWORK_REGISTRY_BATCH_SCHEMA) errors.push(`schema must be ${PROOF_NETWORK_REGISTRY_BATCH_SCHEMA}`);
+    requireSafeBoundaries(batch, errors, 'batch');
+    isoTimestamp(batch.created_at, 'created_at');
+    publicRef(batch.registry_ref, 'registry_ref');
+    const entries = Array.isArray(batch.entries) ? batch.entries : [];
+    if (entries.length === 0 || entries.length > 128) errors.push('entries must contain 1-128 entries');
+    const entryHashes = [];
+    for (const [index, entry] of entries.entries()) {
+      requiredObject(entry, `entries[${index}]`);
+      if (entry.schema !== PROOF_NETWORK_REGISTRY_ENTRY_SCHEMA) {
+        errors.push(`entries[${index}] must be a ${PROOF_NETWORK_REGISTRY_ENTRY_SCHEMA}`);
+        continue;
+      }
+      const validation = validateRegistryEntry(entry);
+      if (!validation.ok) errors.push(`entries[${index}] is invalid: ${validation.errors.join('; ')}`);
+      entryHashes.push(requiredString(entry.registry_entry_hash, `entries[${index}].registry_entry_hash`));
+    }
+    entryHashes.sort();
+    if (batch.entry_count !== entries.length) errors.push('entry_count mismatch');
+    if (batch.registry_root !== sha256Json(entryHashes)) errors.push('registry_root mismatch');
+    if (JSON.stringify(batch.entry_hashes) !== JSON.stringify(entryHashes)) errors.push('entry_hashes mismatch');
+    validateIdentity(batch, errors, 'registry_batch_id', 'registry_batch_hash', 'pnrb');
+  });
+}
+
+export const createProofRegistryEntry = createRegistryEntry;
+export const validateProofRegistryEntry = validateRegistryEntry;
+export const createProofRegistryBatch = createRegistryBatch;
+export const validateProofRegistryBatch = validateRegistryBatch;

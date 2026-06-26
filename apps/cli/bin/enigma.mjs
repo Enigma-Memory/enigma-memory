@@ -6,7 +6,7 @@ import { access, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promi
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createVault, remember, recall, updateMemory, deleteMemory, exportBundle } from '../../../packages/vault/src/index.js';
-import { createPassport, compileContextPack } from '../../../packages/passport/src/index.js';
+import { createPassport, compileContextPack, createMemoryDriveHealthReport } from '../../../packages/passport/src/index.js';
 import { runBoundarySimulation } from '../../../packages/boundary/src/index.js';
 import { startStdioServer } from '../../../packages/mcp-server/src/index.js';
 import { runMeshDemo } from '../../../packages/mesh/src/index.js';
@@ -36,11 +36,15 @@ import {
   createCapabilityGrant,
   createCapabilityRevocation,
   createProofNetworkAnchorBatch,
+  createRegistryEntry,
+  createRegistryBatch,
   sha256Json as proofNetworkSha256Json,
   validateBenchmarkAttestation,
   validateCapabilityGrant,
   validateCapabilityRevocation,
   validateProofNetworkAnchorBatch,
+  validateRegistryEntry,
+  validateRegistryBatch,
   validateProofNetworkPacket,
 } from '../../../packages/proof-network/src/index.js';
 
@@ -1059,13 +1063,16 @@ function oneCommandInstallConnect(bundleDisplay = DEFAULT_BUNDLE, outDirDisplay 
 
 function setupNextCommands(bundleInput, exportDisplay, clients, writeConnectors) {
   const primaryClient = clients[0] ?? DEFAULT_SETUP_CLIENTS[0];
+  const bundle = commandPath(bundleInput);
   const commands = [
-    `enigma remember --bundle ${commandPath(bundleInput)} --text-file ./memory.txt`,
-    `enigma search --bundle ${commandPath(bundleInput)} --query "project context"`,
-    `enigma context --bundle ${commandPath(bundleInput)} --query "project context"`,
+    `enigma status --bundle ${bundle}`,
+    `enigma drive health --bundle ${bundle}`,
+    `enigma remember --bundle ${bundle} --text-file ./memory.txt`,
+    `enigma search --bundle ${bundle} --query "project context"`,
+    `enigma context --bundle ${bundle} --query "project context"`,
     `enigma verify --export ${commandPath(exportDisplay)}`,
   ];
-  if (!writeConnectors) commands.push(`enigma connect ${primaryClient} --bundle ${commandPath(bundleInput)} --dry-run`);
+  if (!writeConnectors) commands.push(`enigma connect ${primaryClient} --bundle ${bundle} --dry-run`);
   return commands;
 }
 
@@ -1086,10 +1093,13 @@ function initNextCommands({ dryRun, bundleDisplay, outDirDisplay, exportDisplay,
 
 function doctorNextCommands(bundleDisplay, client) {
   const clientId = client ?? DEFAULT_SETUP_CLIENTS[0];
+  const bundle = commandPath(bundleDisplay);
   return [
-    `enigma setup --bundle ${commandPath(bundleDisplay)}`,
-    `enigma doctor --bundle ${commandPath(bundleDisplay)} --client ${clientId}`,
-    `enigma connect ${clientId} --bundle ${commandPath(bundleDisplay)}`,
+    `enigma status --bundle ${bundle}`,
+    `enigma drive health --bundle ${bundle}`,
+    `enigma setup --bundle ${bundle}`,
+    `enigma doctor --bundle ${bundle} --client ${clientId}`,
+    `enigma connect ${clientId} --bundle ${bundle}`,
   ];
 }
 
@@ -1690,6 +1700,27 @@ async function statusCommand(flags, io) {
   print(passportStatusReport({ bundlePath, stored, vault, passport }), io);
   return 0;
 }
+async function readOptionalJsonInput(flags, names) {
+  const path = getFlag(flags, names);
+  if (!path) return null;
+  if (!(await fileExists(path))) return null;
+  return readJson(path);
+}
+
+async function driveHealthCommand(flags, io) {
+  const bundlePath = resolve(String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE)));
+  const { vault, passport } = await loadState(bundlePath);
+  const benchmarkSummary = await readOptionalJsonInput(flags, ['benchmark-summary', 'benchmarkSummary']);
+  const connectorSummary = await readOptionalJsonInput(flags, ['connector-summary', 'connectorSummary']);
+  const replicas = await readOptionalJsonInput(flags, ['replicas']);
+  const latestAnchorBatchRef = getFlag(flags, ['latest-anchor-batch-ref', 'latestAnchorBatchRef']);
+  const now = getFlag(flags, ['now'], '2026-06-25T00:00:00.000Z');
+  const report = createMemoryDriveHealthReport({ vault, passport, benchmarkSummary, connectorSummary, replicas, latestAnchorBatchRef, now });
+  const outPath = getFlag(flags, ['out']);
+  if (outPath) await writeJson(outPath, report);
+  print(report, io);
+  return 0;
+}
 
 function testDrivePathDisplay(outDirInput, name) {
   return isAbsolute(outDirInput) ? join(outDirInput, name) : quickstartPathDisplay(outDirInput, name);
@@ -1746,6 +1777,7 @@ function testDriveNextCommands(bundleDisplay, crossModelReportDisplay) {
   const quotedReport = commandPath(crossModelReportDisplay);
   return [
     `enigma status --bundle ${quotedBundle}`,
+    `enigma drive health --bundle ${quotedBundle}`,
     `enigma search --bundle ${quotedBundle} --query "local proof bundle"`,
     `enigma demo cross-model --bundle ${quotedBundle} --out ${quotedReport}`,
     'enigma setup --overwrite',
@@ -1760,6 +1792,7 @@ function testDriveFlowCommands({ bundleDisplay, outDirInput, crossModelReportDis
   return [
     `enigma quickstart --bundle ${quotedBundle} --out-dir ${quotedOutDir}${overwriteSuffix}`,
     `enigma status --bundle ${quotedBundle}`,
+    `enigma drive health --bundle ${quotedBundle}`,
     `enigma search --bundle ${quotedBundle} --query "local proof bundle"`,
     `enigma demo cross-model --bundle ${quotedBundle} --out ${quotedReport}`,
   ];
@@ -1953,7 +1986,7 @@ export async function testDriveCommand(flags, io) {
     out_dir: outDirInput,
     bundle: bundleInput,
     install_command: `npm install -g ${packageJson.name ?? 'enigma-memory'}`,
-    release_target: '0.1.16',
+    release_target: '0.1.17',
     artifacts_written: !dryRun,
     client_configs_written: false,
     client_config_write_required: false,
@@ -2405,6 +2438,8 @@ function chainArtifactValidator(artifact) {
   if (schema === 'enigma.proof_network.capability_revocation.v1') return [schema, validateCapabilityRevocation];
   if (schema === 'enigma.proof_network.benchmark_attestation.v1') return [schema, validateBenchmarkAttestation];
   if (schema === 'enigma.proof_network.packet.v1') return [schema, validateProofNetworkPacket];
+  if (schema === 'enigma.proof_network.registry_entry.v1') return [schema, validateRegistryEntry];
+  if (schema === 'enigma.proof_network.registry_batch.v1') return [schema, validateRegistryBatch];
   throw new Error(schema ? 'Unsupported proof-network artifact schema.' : 'Unsupported proof-network artifact schema: missing.');
 }
 
@@ -2702,6 +2737,60 @@ export async function chainVerifyCommand(flags, io, positionalFile = undefined) 
   return result.ok === true ? 0 : 1;
 }
 
+export async function chainRegisterCommand(flags, io) {
+  const entryType = requireFlag(flags, ['entry-type', 'entryType', 'type'], 'entry-type');
+  const artifactHashFlag = getFlag(flags, ['artifact-hash', 'artifactHash', 'digest-ref', 'digestRef', 'artifact-ref', 'artifactRef']);
+  const artifactFile = getFlag(flags, ['artifact-file', 'artifactFile']);
+  const resolvedArtifactHash = artifactHashFlag || (artifactFile ? await sha256PublicFile(resolve(String(artifactFile))) : undefined);
+  if (!resolvedArtifactHash) throw new Error('Missing required --artifact-hash or --artifact-file.');
+  const digestRefs = flagValues(flags, ['digest-ref', 'digest-refs', 'digestRef', 'digestRefs', 'root', 'roots']);
+  const entry = createRegistryEntry({
+    entry_type: entryType,
+    artifact_hash: resolvedArtifactHash,
+    artifact_schema_ref: requireFlag(flags, ['artifact-schema-ref', 'artifactSchemaRef', 'schema-ref', 'schemaRef'], 'artifact-schema-ref'),
+    digest_refs: digestRefs.length ? digestRefs : resolvedArtifactHash,
+    signer_refs: flagValues(flags, ['signer', 'signers', 'signer-ref', 'signerRef', 'signer-refs', 'signerRefs', 'attestor', 'attestor-ref', 'attestorRef']),
+    registry_ref: getFlag(flags, ['registry-ref', 'registryRef', 'marketplace-ref', 'marketplaceRef']),
+    entry_ref: getFlag(flags, ['entry-ref', 'entryRef']),
+    entry_count: getFlag(flags, ['entry-count', 'entryCount', 'count']),
+    created_at: getFlag(flags, ['created-at', 'createdAt', 'registered-at', 'registeredAt']),
+    transaction_submitted: false,
+    raw_memory_on_chain: false,
+  });
+  assertChainArtifact(validateRegistryEntry, entry);
+  return chainWriteOrPrint(flags, io, entry, {
+    artifact_type: entry.schema,
+    registry_entry_id: entry.registry_entry_id,
+    registry_entry_hash: entry.registry_entry_hash ?? proofNetworkSha256Json(entry),
+  });
+}
+
+export async function chainRegistryCommand(flags, io, positionalFile = undefined) {
+  const entryPaths = flagValues(flags, ['entry', 'entries', 'entry-file', 'entryFile']);
+  const positionalEntry = positionalFile && !String(positionalFile).startsWith('--') ? positionalFile : undefined;
+  const paths = entryPaths.length ? entryPaths : (positionalEntry ? [positionalEntry] : []);
+  if (paths.length === 0) throw new Error('Missing required --entry <registry-entry.json>.');
+  const entries = [];
+  for (const entryPath of paths) {
+    const entry = await readJson(resolve(entryPath));
+    assertNoPrivateProofPayload(entry);
+    entries.push(entry);
+  }
+  const batch = createRegistryBatch({
+    entries,
+    registry_ref: getFlag(flags, ['registry-ref', 'registryRef', 'marketplace-ref', 'marketplaceRef']),
+    created_at: getFlag(flags, ['created-at', 'createdAt']),
+    transaction_submitted: false,
+    raw_memory_on_chain: false,
+  });
+  assertChainArtifact(validateRegistryBatch, batch);
+  return chainWriteOrPrint(flags, io, batch, {
+    artifact_type: batch.schema,
+    registry_batch_id: batch.registry_batch_id,
+    registry_batch_hash: batch.registry_batch_hash ?? proofNetworkSha256Json(batch),
+  });
+}
+
 
 export async function meterEventCommand(flags, io) {
   const event = createUsageEvent({
@@ -2927,6 +3016,9 @@ function usage() {
       'chain attest',
       'chain verify',
       'chain submit-solana',
+      'chain register',
+      'chain registry',
+      'drive health',
     ],
     connector_options: {
       '--bundle <path>': 'Absolute local Enigma vault bundle path rendered as ENIGMA_BUNDLE.',
@@ -3047,8 +3139,25 @@ function usage() {
       revoke: 'enigma chain revoke --grant-hash <sha256:...> --reason <public-reason-code> [--revocation-ref <public-ref>] [--out <file>]',
       attest: 'enigma chain attest (--report-hash <sha256:...> | --report-file <report.json>) --dataset-ref <sha256:...> --runner-ref <public-runner-ref> --package-ref <public-package-ref> [--score name=value] [--out <file>]',
       verify: 'enigma chain verify --file <proof-artifact.json>',
+      register: 'enigma chain register --entry-type <anchor_batch|benchmark_attestation|connector_conformance|health_report|operator_receipt|settlement_job> (--artifact-hash <sha256:...> | --artifact-file <artifact.json>) --artifact-schema-ref <schema-id> [--digest-ref <sha256:...>] [--signer <public-ref>] [--registry-ref <public-ref>] [--entry-ref <public-ref>] [--entry-count <n>] [--out <file>]',
+      registry: 'enigma chain registry --entry <registry-entry.json> [--entry <registry-entry.json>] [--registry-ref <public-ref>] [--out <file>]',
       submit_solana: 'enigma chain submit-solana --file <proof-artifact.json> --cluster <devnet|testnet|mainnet-beta|localnet> [--rpc <url>] [--execute --keypair <solana-cli-64-byte-keypair.json>]',
       boundary: 'Proof Network chain commands default to local planning and dry-run validation. submit-solana only submits a Solana Memo transaction when --execute is passed; it carries compact public-safe commitment/ref JSON, never raw memory or artifact bodies.',
+    },
+    memory_drive_health: {
+      command: 'enigma drive health --bundle <path> [--now <iso>] [--benchmark-summary <path>] [--connector-summary <path>] [--replicas <path>] [--latest-anchor-batch-ref <ref>] [--out <file>]',
+      schema: 'enigma.memory_drive_health_report.v1',
+      output_shape: 'SMART-style report: overall_status/overall_score, ten metrics (freshness, duplicate_rate, tombstone_risk, stale_derived_artifacts, retrieval_hit_rate, token_reduction, leakage_scan, receipt_coverage, connector_health, sync_fork_risk), each with status/score/observed/thresholds/evidence_refs/recommended_actions, plus roots, privacy_boundaries, claim_boundaries, and a conservative proof_network_ready block.',
+      options: {
+        '--bundle <path>': 'Local Enigma vault bundle to inspect. Defaults to .enigma/bundle.json.',
+        '--now <iso>': 'ISO-8601 timestamp used for age calculations. Defaults to a deterministic timestamp.',
+        '--benchmark-summary <path>': 'Optional JSON file with public-safe retrieval probes (probe_count, top_k, hit_at_k, exact_coverage, abstention_correctness). Omit to default gracefully.',
+        '--connector-summary <path>': 'Optional JSON file with public-safe connector health (connector_count, healthy_connector_count, lagging_connector_count, error_rate_24h, cursor_gap_count). Omit to default gracefully.',
+        '--replicas <path>': 'Optional JSON file of replica root reports for sync fork risk.',
+        '--latest-anchor-batch-ref <ref>': 'Optional public-safe proof-network anchor batch ref for receipt coverage.',
+        '--out <path>': 'Write the JSON report to a file in addition to stdout.',
+      },
+      boundary: 'Computed locally from public-safe counters, roots, receipt metadata, tombstones, and derived/context-pack refs only. No network or chain calls; transaction_submitted and raw_memory_on_chain are always false. It is local operational evidence, not provider-deletion, model-forgetting, compliance, or live-chain-settlement proof.',
     },
     relay_gateway_options: {
       '--host <host>': 'Bind host. Defaults to 127.0.0.1.',
@@ -3076,10 +3185,10 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     print(usage(), io);
     return 0;
   }
-  const twoPartCommands = ['boundary', 'mcp', 'mesh', 'enterprise', 'capsule', 'relay', 'gateway', 'connect', 'disconnect', 'import', 'native-host', 'meter', 'settlement', 'chain', 'demo', 'passport'];
+  const twoPartCommands = ['boundary', 'mcp', 'mesh', 'enterprise', 'capsule', 'relay', 'gateway', 'connect', 'disconnect', 'import', 'native-host', 'meter', 'settlement', 'chain', 'demo', 'passport', 'drive'];
   const flags = parseArgs(twoPartCommands.includes(command) ? argv.slice(2) : argv.slice(1));
   const positionalFile = optionalPositional(argv[2]);
-  if ((command === 'chain' && (!subcommand || subcommand === '--help' || subcommand === '-h' || flags.has('help'))) || ((flags.has('help') || argv.includes('-h')) && (command === 'init' || command === 'setup' || command === 'test-drive' || command === 'search' || command === 'status' || (command === 'passport' && subcommand === 'status') || ((command === 'relay' || command === 'gateway') && (subcommand === 'serve' || subcommand === 'demo')) || (command === 'native-host' && (subcommand === 'manifest' || subcommand === 'install-plan')) || (command === 'demo' && subcommand === 'cross-model')))) {
+  if ((command === 'chain' && (!subcommand || subcommand === '--help' || subcommand === '-h' || flags.has('help'))) || ((flags.has('help') || argv.includes('-h')) && (command === 'init' || command === 'setup' || command === 'test-drive' || command === 'search' || command === 'status' || (command === 'passport' && subcommand === 'status') || ((command === 'relay' || command === 'gateway') && (subcommand === 'serve' || subcommand === 'demo')) || (command === 'native-host' && (subcommand === 'manifest' || subcommand === 'install-plan')) || (command === 'demo' && subcommand === 'cross-model') || (command === 'drive' && subcommand === 'health')))) {
     print(usage(), io);
     return 0;
   }
@@ -3101,6 +3210,7 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     if (command === 'search') return await searchCommand(flags, io);
     if (command === 'status') return await statusCommand(flags, io);
     if (command === 'passport' && subcommand === 'status') return await statusCommand(flags, io);
+    if (command === 'drive' && subcommand === 'health') return await driveHealthCommand(flags, io);
     if (command === 'export') return await exportCommand(flags, io);
     if (command === 'import') return await importCommand(subcommand, flags, io, positionalFile);
     if (command === 'capsule' && subcommand === 'export') return await capsuleExportCommand(flags, io, positionalFile);
@@ -3127,6 +3237,8 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     if (command === 'chain' && subcommand === 'attest') return await chainAttestCommand(flags, io);
     if (command === 'chain' && subcommand === 'verify') return await chainVerifyCommand(flags, io, positionalFile);
     if (command === 'chain' && subcommand === 'submit-solana') return await chainSubmitSolanaCommand(flags, io, positionalFile);
+    if (command === 'chain' && subcommand === 'register') return await chainRegisterCommand(flags, io);
+    if (command === 'chain' && subcommand === 'registry') return await chainRegistryCommand(flags, io, positionalFile);
     if (command === 'native-host' && subcommand === 'install-plan') return await nativeHostInstallPlanCommand(flags, io);
     if (command === 'mesh' && subcommand === 'demo') return await meshDemoCommand(flags, io);
     if (command === 'enterprise' && subcommand === 'demo') return await enterpriseDemoCommand(flags, io);

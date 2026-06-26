@@ -39,6 +39,7 @@ function quoted(path) {
 function expectedNextCommands(bundle, crossModelReport) {
   return [
     `enigma status --bundle ${quoted(bundle)}`,
+    `enigma drive health --bundle ${quoted(bundle)}`,
     `enigma search --bundle ${quoted(bundle)} --query "local proof bundle"`,
     `enigma demo cross-model --bundle ${quoted(bundle)} --out ${quoted(crossModelReport)}`,
     'enigma setup --overwrite',
