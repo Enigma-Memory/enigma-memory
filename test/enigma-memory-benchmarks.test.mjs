@@ -179,6 +179,11 @@ test('memory benchmark states citations, boundaries, and same-boundary provider 
   assert.equal(report.benchmark_boundaries.credentials_required, false);
   assert.equal(report.benchmark_boundaries.external_downloads_required, false);
   assert.equal(report.benchmark_boundaries.external_provider_calls, false);
+  assert.equal(report.benchmark_boundaries.llm_answer_accuracy_scored, false);
+  assert.equal(report.benchmark_boundaries.provider_api_calls_made, false);
+  assert.equal(report.benchmark_boundaries.api_spend_possible, false);
+  assert.equal(report.benchmark_boundaries.mem0_adapter_run, false);
+  assert.equal(report.benchmark_boundaries.external_competitor_adapters_run, false);
   assert.equal(report.benchmark_boundaries.provider_deletion_claim, false);
   assert.equal(report.benchmark_boundaries.model_forgetting_claim, false);
   assert.equal(report.benchmark_boundaries.roi_or_provider_invoice_savings_claim, false);

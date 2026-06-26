@@ -211,6 +211,8 @@ test('connector detection and wizard planner cover all supported clients with pu
     assert.equal(client.steps[0].command, 'npm install -g enigma-memory');
     assert.equal(client.steps[2].command, `enigma doctor --client ${client.client_id}`);
     assert.match(client.steps.find((step) => step.id === 'connect_client').command, new RegExp(`enigma connect ${client.client_id}`));
+    assert.match(client.one_command_install_connect, new RegExp(`npm install -g enigma-memory && enigma setup --client ${client.client_id}`));
+    assert.equal(client.mcp_config_preview.mcpServers.enigma.command, 'enigma-mcp');
   }
   const kimi = plan.clients.find((client) => client.client_id === 'kimi-code');
   assert.ok(kimi.steps.some((step) => step.id === 'kimi_gui_path_caveat' && step.command.includes('--mcp-command "/absolute/path/to/enigma-mcp"')));

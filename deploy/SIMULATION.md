@@ -103,50 +103,46 @@ and are non-empty.
   `sim.enigmamemory.com`, `relay.sim.enigmamemory.com`,
   `gateway.sim.enigmamemory.com`, and `*.sim.enigmamemory.com`.
 
-## Collect hosted backend live evidence
+## Shortest path from local simulation to hosted readiness
 
-The simulation can be probed as if it were a public hosted deployment by
-using the public-looking domain `sim.enigmamemory.com`. Because the domain
-has no real DNS record, the collector resolves it to `127.0.0.1` locally and
-accepts the self-signed certificate.
+The local simulation proves that the relay, gateway, fail-closed readiness
+checks, hosted-live collector, and hosted-live validator can interoperate. It
+does **not** produce production go-live evidence because it uses loopback DNS,
+self-signed TLS, mocked KMS/SIEM services, and fixture operator approval.
 
-1. Build a simulation operator acceptance packet:
+Run the local proof without external credentials:
 
-   ```bash
-   node scripts/build-operator-acceptance-packet.mjs \
-     --complete-fixture --decision go --packet-id sim-operator-acceptance \
-     --tenant enigma-sim --deployment-mode hosted --environment local-simulation \
-     --target-regions local --requested-go-live-date 2026-06-25 \
-     --evidence-repository https://github.com/enigma-memory/evidence/sim \
-     --packet-owner "Simulation Owner" \
-     --last-updated 2026-06-25T00:00:00.000Z \
-     --owners-json .enigma/sim-owner-overrides.json \
-     --evidence-refs .enigma/sim-evidence-overrides.json \
-     --out .enigma/sim-operator-acceptance.json --validate
-   ```
+```bash
+node --test test/enigma-hosted-go-live-simulation.test.mjs
+```
 
-2. Collect and validate live evidence:
+That test starts `deploy/docker-compose.local-production-simulation.yml`,
+builds a simulation-only operator acceptance packet, collects relay/gateway
+`/livez` and `/readyz` evidence, validates it with
+`scripts/validate-hosted-backend-live.mjs`, and tears the stack down. For manual
+simulation probing, `production:hosted-collect -- --local-simulation-loopback`
+is restricted to `https://*.sim.enigmamemory.com` loopback probes with
+self-signed TLS and must not be used as production evidence.
 
-   ```bash
-   node .enigma/collect-sim-evidence.mjs \
-     --relay-url https://sim.enigmamemory.com:8443 \
-     --gateway-url https://sim.enigmamemory.com:9443 \
-     --refs-json .enigma/sim-hosted-refs.json \
-     --domain sim.enigmamemory.com --environment-id local-simulation \
-     --cloud-provider local --region local --owner enigma-sim \
-     --operator-decision go \
-     --operator-packet-ref .enigma/sim-operator-acceptance.json \
-     --operator-approved-at <iso8601> --operator-approved-by enigma-sim \
-     --out .enigma/hosted-backend-live-collection.json \
-     --evidence-out .enigma/hosted-backend-live-simulated.json
+Move from that local proof to real hosted relay/gateway readiness with the same
+script chain, replacing every template with operator-owned production evidence:
 
-   node scripts/validate-hosted-backend-live.mjs \
-     --evidence .enigma/hosted-backend-live-simulated.json
-   ```
+```bash
+npm run production:evidence-starter -- --out-dir <evidence-dir> --domain enigmamemory.com --tenant <tenant-id> --environment production
+npm run production:backend-env -- --out-dir <backend-env-kit-dir> --domain enigmamemory.com --tenant <tenant-id> --environment production
+# Operator deploys relay/gateway from deploy/docker-compose.production.example.yml or deploy/kubernetes/enigma-backend.example.yaml using private filled env/secrets.
+npm run production:manifests -- --out <evidence-dir>/production-manifests.json
+npm run production:storage -- --out <evidence-dir>/production-storage-migration.json
+npm run infrastructure:readiness -- --manifest <evidence-dir>/infrastructure-readiness-manifest.json --live --cloudflare-live required > <evidence-dir>/infrastructure-readiness-live.json
+npm run production:hosted-collect -- --relay-url https://relay.enigmamemory.com --gateway-url https://gateway.enigmamemory.com --refs-json <evidence-dir>/hosted-refs.json --domain enigmamemory.com --environment-id production --cloud-provider <provider> --region <region> --owner <owner> --operator-decision go --operator-packet-ref <operator-packet-ref> --operator-approved-at <iso8601> --operator-approved-by <operator> --out <evidence-dir>/hosted-backend-live-collection.json --evidence-out <evidence-dir>/hosted-backend-live.json
+npm run production:hosted-live -- --evidence <evidence-dir>/hosted-backend-live.json
+npm run production:acceptance:packet -- --out <evidence-dir>/operator-acceptance-packet.json --owners-json <evidence-dir>/owner-approval-refs.json --evidence-refs <evidence-dir>/evidence-refs.json --readiness <evidence-dir>/infrastructure-readiness-live.json --manifest <evidence-dir>/infrastructure-readiness-manifest.json --storage <evidence-dir>/production-storage-migration.json --release-audit .enigma/release-audit-current.json --production-manifests <evidence-dir>/production-manifests.json --decision go --tenant <tenant-id> --target-regions <regions> --requested-go-live-date <date> --evidence-repository <evidence-repository> --packet-owner <operator> --validate
+npm run production:acceptance -- --packet <evidence-dir>/operator-acceptance-packet.json
+```
 
-The expected result is `status: accepted` with all four probes observed and no
-blockers. The wrapper does not mutate DNS or deploy infrastructure and never
-sends credentials.
+Hosted readiness remains blocked until the production commands above observe
+public HTTPS relay/gateway probes, all required hosted refs, and operator
+acceptance `go` for the exact target environment.
 
 Never commit `deploy/secrets-simulation/` or `*.pem` files. Both are
 `.gitignore`d.

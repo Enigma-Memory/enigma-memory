@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import {
   HOSTED_BACKEND_LIVE_COLLECTION_SCHEMA,
   collectHostedBackendLiveEvidence,
+  localSimulationLoopbackFetch,
 } from '../scripts/collect-hosted-backend-live-evidence.mjs';
 import { HOSTED_BACKEND_LIVE_EVIDENCE_SCHEMA, REQUIRED_REF_KEYS } from '../scripts/validate-hosted-backend-live.mjs';
 
@@ -127,6 +128,13 @@ test('hosted backend collector rejects redirected public probes', async () => {
   })), /must not redirect/);
 });
 
+test('hosted backend collector local simulation fetch is restricted to simulation hostnames', async () => {
+  assert.throws(
+    () => localSimulationLoopbackFetch('https://relay.enigmamemory.com/readyz'),
+    /only supports https:\/\/\*\.sim\.enigmamemory\.com/,
+  );
+});
+
 test('hosted backend collector CLI help is public-safe', () => {
   const run = spawnSync(process.execPath, ['scripts/collect-hosted-backend-live-evidence.mjs', '--help'], {
     cwd: process.cwd(),
@@ -135,6 +143,7 @@ test('hosted backend collector CLI help is public-safe', () => {
   });
   assert.equal(run.status, 0);
   assert.match(run.stdout, /Collects public HTTPS/);
+  assert.match(run.stdout, /local-simulation-loopback/);
   assert.doesNotMatch(run.stdout, /Bearer\s+/);
 });
 
@@ -146,6 +155,38 @@ test('hosted backend collector CLI fails closed without refs file', () => {
   });
   assert.equal(run.status, 1);
   assert.match(run.stderr, /path must be of type string|refs-json/i);
+});
+
+test('hosted backend collector CLI keeps local simulation loopback off production hosts', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-hosted-collector-loopback-'));
+  try {
+    const refsPath = join(dir, 'refs.json');
+    await writeFile(refsPath, JSON.stringify(refs()), 'utf8');
+    const run = spawnSync(process.execPath, [
+      'scripts/collect-hosted-backend-live-evidence.mjs',
+      '--local-simulation-loopback',
+      '--relay-url', 'https://relay.enigmamemory.com',
+      '--gateway-url', 'https://gateway.enigmamemory.com',
+      '--refs-json', refsPath,
+      '--domain', 'enigmamemory.com',
+      '--environment-id', 'prod-us-central',
+      '--cloud-provider', 'operator-cloud',
+      '--region', 'us-central',
+      '--owner', 'operator',
+      '--operator-decision', 'go',
+      '--operator-packet-ref', 'operator-acceptance#go',
+      '--operator-approved-at', OBSERVED_AT,
+      '--operator-approved-by', 'operator',
+    ], {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+      windowsHide: true,
+    });
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /only supports https:\/\/\*\.sim\.enigmamemory\.com/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test('hosted backend collector CLI writes explicit evidence when supplied files and live fetch are mocked by fixture import', async () => {

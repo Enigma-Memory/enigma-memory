@@ -33,7 +33,7 @@ enigma chain submit-solana \
   --keypair ./operator-devnet-keypair.json
 ```
 
-Network submission is opt-in only. Execute mode requires an explicit Solana cluster and keypair, lazily loads `@solana/web3.js`, and submits one Memo-program transaction containing only the compact `memo_ref` JSON:
+Network submission is opt-in only. Execute mode requires an explicit Solana cluster and Solana CLI-style 64-byte secret-key JSON keypair, lazily loads `@solana/web3.js`, and submits one Memo-program transaction containing only the compact `memo_ref` JSON:
 
 ```sh
 enigma chain submit-solana \

@@ -132,13 +132,17 @@ node scripts/package-browser-extension.mjs --zip ./dist/enigma-browser-extension
 
 The packager validates the unpacked extension, denies source maps/private files/credential-shaped content/local user paths, and emits public-safe JSON with file checksums. It does not submit to any browser store.
 
-1. Install the npm package so the local native host is available:
+1. Install the npm package, create the local bundle, and connect the MCP client you use most often:
 
    ```sh
-   npm install -g enigma-memory
+   npm install -g enigma-memory && enigma setup --client claude-desktop --write-connectors --overwrite
+   npm install -g enigma-memory && enigma setup --client cursor --write-connectors --overwrite
+   npm install -g enigma-memory && enigma setup --client kimi-code --write-connectors --overwrite
+   npm install -g enigma-memory && enigma setup --client vscode-cline --write-connectors --overwrite
    ```
 
-2. Create or select a local bundle and make it available to the browser-launched native host through `ENIGMA_BUNDLE` or a local wrapper.
+   To write only client configs that already exist on the machine, use `npm install -g enigma-memory && enigma setup --client auto --connect-installed --overwrite`.
+2. Keep the same local bundle available to the browser-launched native host through `ENIGMA_BUNDLE` or a local wrapper.
 3. Load `enigma/apps/browser-extension` as an unpacked extension in Chrome or Edge, or load `manifest.json` as a temporary add-on in Firefox.
 4. Copy the local extension ID from the browser developer page.
 5. Generate the native host manifest:

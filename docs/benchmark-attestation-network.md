@@ -169,7 +169,7 @@ Minimum public-safe attestation skeleton:
   "track": "public_practice",
   "program": {
     "name": "enigma_benchmark_attestation_network",
-    "version": "0.1.15",
+    "version": "0.1.16",
     "policy_ref": "sha256:policy-root"
   },
   "run": {
@@ -177,7 +177,7 @@ Minimum public-safe attestation skeleton:
     "nonce": "sha256:run-nonce-commitment",
     "status": "completed",
     "runner_ref": "sha256:runner-root",
-    "package_ref": "npm:enigma-memory@0.1.15",
+    "package_ref": "npm:enigma-memory@0.1.16",
     "adapter_ref": "local:enigma-relevance",
     "environment_ref": "sha256:environment-summary-root"
   },

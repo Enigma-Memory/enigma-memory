@@ -201,7 +201,7 @@ enigma chain attest \
   --report-hash sha256:5555555555555555555555555555555555555555555555555555555555555555 \
   --dataset-ref enigma-fixture:deterministic-local:v1 \
   --runner-ref enigma-memory:local-benchmark-runner:v1 \
-  --package-ref npm:enigma-memory@0.1.15 \
+  --package-ref npm:enigma-memory@0.1.16 \
   --score recall_at_5=1 \
   --score p95_latency_ms=14 \
   --out .enigma/proof-network/benchmark-attestation.json
@@ -219,7 +219,7 @@ enigma chain attest \
   --report-file .enigma/benchmarks/report.json \
   --dataset-ref enigma-fixture:deterministic-local:v1 \
   --runner-ref enigma-memory:scripts/run-memory-benchmarks.mjs \
-  --package-ref npm:enigma-memory@0.1.15 \
+  --package-ref npm:enigma-memory@0.1.16 \
   --score recall_at_5=1 \
   --score p95_latency_ms=14 \
   --out .enigma/proof-network/benchmark-attestation.json
@@ -236,7 +236,7 @@ Expected public-safe output shape from `chain attest`:
   "report_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
   "dataset_ref": "enigma-fixture:deterministic-local:v1",
   "runner_ref": "enigma-memory:local-benchmark-runner:v1",
-  "package_ref": "npm:enigma-memory@0.1.15",
+  "package_ref": "npm:enigma-memory@0.1.16",
   "scores": {
     "recall_at_5": 1,
     "p95_latency_ms": 14

@@ -241,7 +241,7 @@ const attestation = createBenchmarkAttestation({
   report_hash: 'sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
   dataset_ref: 'dataset-ref-public',
   runner_ref: 'runner-ref-public',
-  package_ref: 'npm:enigma-memory@0.1.15',
+  package_ref: 'npm:enigma-memory@0.1.16',
   metric_roots: ['sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'],
   sample_count: 120,
   run_count: 1,

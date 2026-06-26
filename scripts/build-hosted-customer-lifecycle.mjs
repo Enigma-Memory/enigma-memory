@@ -28,7 +28,7 @@ import {
 } from 'enigma-memory/hosted-cloud';
 
 export const HOSTED_CUSTOMER_LIFECYCLE_PACKET_SCHEMA = HOSTED_CLOUD_CUSTOMER_LIFECYCLE_PACKET_SCHEMA;
-export const HOSTED_CUSTOMER_LIFECYCLE_RELEASE_TARGET = '0.1.15';
+export const HOSTED_CUSTOMER_LIFECYCLE_RELEASE_TARGET = '0.1.16';
 
 const PROVIDED = 'provided';
 const BLOCKED_MISSING = 'blocked_missing_evidence';

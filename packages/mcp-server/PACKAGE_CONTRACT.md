@@ -17,5 +17,6 @@ This package is part of Enigma, the provider-agnostic AI memory and proof layer.
 - `enigma_init` creates a local vault bundle if it is missing and never returns local key material.
 - Public exports are `toolDescriptors`, `resourceDescriptors`, `promptDescriptors`, `handlers`, `enigma_init`, `enigma_remember`, `enigma_search`, `enigma_context_pack`, `enigma_delete`, `enigma_verify_receipts`, `enigma_passport_summary_resource`, `enigma_standard_memory_prompt`, `handleJsonRpcRequest`, and `startStdioServer`.
 - The executable entrypoint is `bin/enigma-mcp.mjs`.
+- Developer onboarding should point Claude Desktop, Cursor, Kimi Code, and VS Code users to `npm install -g enigma-memory && enigma setup --client <id> --write-connectors --overwrite` before any manual MCP JSON fallback.
 
 Package-specific implementation details are governed by `research/handoff-enigma/09_BUILD_BACKLOG.md` and `research/handoff-enigma/12_KIMI_BUILD_BRIEF.md`.

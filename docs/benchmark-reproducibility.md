@@ -4,7 +4,7 @@ This guide explains how to reproduce the current local Enigma memory benchmark, 
 
 ## What is reproducible today
 
-The current planned package is `enigma-memory@0.1.15`. Two benchmark paths are reproducible without provider credentials:
+The current planned package is `enigma-memory@0.1.16`. Two benchmark paths are reproducible without provider credentials:
 
 1. The local deterministic memory suite, available through the package script and the script file it wraps:
 
@@ -20,12 +20,15 @@ The current planned package is `enigma-memory@0.1.15`. Two benchmark paths are r
 2. The official-dataset standard runner, which consumes locally downloaded LoCoMo and/or LongMemEval JSON files:
 
    ```sh
+   node scripts/run-standard-memory-benchmarks.mjs --locomo .enigma/benchmarks/datasets/locomo10.json --longmemeval .enigma/benchmarks/datasets/longmemeval_s_cleaned.json --max-locomo-qa 25 --max-longmemeval-items 25 --top-k 5 --dry-run
    node scripts/run-standard-memory-benchmarks.mjs --locomo .enigma/benchmarks/datasets/locomo10.json --longmemeval .enigma/benchmarks/datasets/longmemeval_s_cleaned.json --max-locomo-qa 25 --max-longmemeval-items 25 --top-k 5 --out .enigma/standard-memory-benchmark-sample.json
    ```
 
-   The standard report schema is `enigma.standard_memory_benchmark_suite.v1`. It scores retrieval/evidence coverage over official dataset records with local deterministic methods only. It does not call LLM providers, generate final answers, grade natural-language answer correctness, call competitor SDKs, or create provider/competitor scores.
+   The `--dry-run` command emits `enigma.standard_memory_benchmark_plan.v1`: a public-safe offline plan with file names, sample caps, top-k, local method rows, a requirements-only Mem0 adapter row, and explicit boundaries. It does not read dataset files, hash data, produce scores, call APIs, run Mem0 or competitor adapters, generate answers, or spend provider budget.
 
-   In that standard report, `keyword_filter` is intentionally the simpler lexical baseline. `enigma_relevance` is the deterministic Enigma retrieval approximation: it uses deterministic query expansion, term normalization and stemming, task/category and temporal/date hints, role/session metadata, phrase/proximity scoring, and final reranking for evidence diversity. It does not use raw answer text, evidence labels, or `has_answer` flags to choose records. It must be interpreted only as retrieval/evidence proxy scoring over the local dataset file named in the report, not as LLM answer accuracy, provider performance, competitor performance, or leaderboard standing.
+   The scored standard report schema is `enigma.standard_memory_benchmark_suite.v1`. It scores retrieval/evidence coverage over official dataset records with local deterministic methods only and includes a requirements-only Mem0 row with `scores_included:false`. It does not call LLM providers, generate final answers, grade natural-language answer correctness, call Mem0 or other competitor SDKs, or create provider/competitor scores.
+
+   In that standard report, `keyword_filter` is intentionally the simpler lexical baseline. `enigma_relevance` is the deterministic Enigma retrieval approximation: it uses deterministic query expansion, term normalization and stemming, task/category and temporal/date hints, role/session metadata, phrase/proximity scoring, and final reranking for evidence diversity. It does not use raw answer text, evidence labels, or `has_answer` flags to choose records. It must be interpreted only as retrieval/evidence proxy scoring over the local dataset file named in the report, not as LLM answer accuracy, provider performance, Mem0/competitor performance, or leaderboard standing.
 
    | Standard-runner row | Retrieval boundary |
    | --- | --- |
@@ -64,7 +67,7 @@ Do not commit downloaded files or raw benchmark conversations. The package `.git
 
 ## Reproduce and save local fixture JSON
 
-1. Use a clean checkout containing `enigma-memory@0.1.15`.
+1. Use a clean checkout containing `enigma-memory@0.1.16`.
 2. From a repository root that contains `enigma/package.json`, enter the package directory:
 
    ```sh
@@ -94,7 +97,15 @@ Interpret improvements as local fixture behavior. Enigma reduces context-pack es
 
 ## Run the official-dataset standard benchmark
 
-The standard runner reads local dataset files produced by the downloader and writes a public-safe proxy report to the path supplied with `--out`. A bounded sample is the safest first run:
+The standard runner reads local dataset files produced by the downloader and writes a public-safe proxy report to the path supplied with `--out`. Preview the exact offline boundary first:
+
+```sh
+node scripts/run-standard-memory-benchmarks.mjs --locomo .enigma/benchmarks/datasets/locomo10.json --longmemeval .enigma/benchmarks/datasets/longmemeval_s_cleaned.json --max-locomo-qa 25 --max-longmemeval-items 25 --top-k 5 --dry-run
+```
+
+That command proves only the planned local files, sample bounds, `--top-k`, deterministic local rows, and no-API/no-Mem0/no-competitor/no-score boundary. It does not prove the files exist, hash the datasets, or report accuracy.
+
+A bounded scored sample is the safest first run:
 
 ```sh
 node scripts/run-standard-memory-benchmarks.mjs --locomo .enigma/benchmarks/datasets/locomo10.json --longmemeval .enigma/benchmarks/datasets/longmemeval_s_cleaned.json --max-locomo-qa 25 --max-longmemeval-items 25 --top-k 5 --out .enigma/standard-memory-benchmark-sample.json
@@ -106,6 +117,7 @@ Useful runner options:
 - `--longmemeval <path>` supplies a local LongMemEval JSON file. Use one cleaned split per run when you want split-specific evidence.
 - `--max-locomo-qa <n>` and `--max-longmemeval-items <n>` bound the sample size.
 - `--top-k <n>` controls retrieval depth; the default is `5`.
+- `--dry-run` prints the public-safe offline plan and does not read dataset files or produce scores.
 - `--out <path>` writes public-safe JSON to that path. Without `--out`, the report is printed to stdout.
 
 If only `--locomo` or only `--longmemeval` is supplied, the runner scores only that dataset.
@@ -130,7 +142,7 @@ Public sharing should include the generated benchmark report JSON and generated 
 
 ## Proof-network benchmark attestations
 
-For the planned 0.1.15 proof-network layer, benchmark results should be represented as a public-safe local attestation rather than by publishing raw benchmark inputs. The attestation JSON uses `schema: "enigma.proof_network.benchmark_attestation.v1"` and may be bundled in `enigma.proof_network.packet.v1` for review. The benchmark proof-release flow is local planning only: it does not call APIs, submit transactions, or claim hosted SaaS behavior, and generated artifacts must keep `transaction_submitted: false` and `raw_memory_on_chain: false`.
+For the planned 0.1.16 proof-network layer, benchmark results should be represented as a public-safe local attestation rather than by publishing raw benchmark inputs. The attestation JSON uses `schema: "enigma.proof_network.benchmark_attestation.v1"` and may be bundled in `enigma.proof_network.packet.v1` for review. The benchmark proof-release flow is local planning only: it does not call APIs, submit transactions, or claim hosted SaaS behavior, and generated artifacts must keep `transaction_submitted: false` and `raw_memory_on_chain: false`.
 
 Hash the generated benchmark report and companion dataset manifest, then attest only the report hash, schema name, dataset refs, runner refs, package refs, score commitments, record counts, top-k/sample bounds, and timestamps needed for review. The public artifacts must not contain raw dataset rows, raw conversations, prompts, private questions, private answers, provider responses, embeddings, credentials, tenant names, account ids, local absolute paths, unpublished benchmark scores, or the raw benchmark report body.
 
@@ -139,12 +151,12 @@ Use a `sha256:<hex>` commitment for the report and manifest. The proof-release s
 After running one of the benchmark commands above and confirming the report is public-safe, create a local proof release:
 
 ```sh
-npm run benchmark:proof-release -- --report .enigma/standard-memory-benchmark-sample.json --dataset-ref "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" --runner-ref "runner:run-standard-memory-benchmarks.mjs@reviewed-revision" --package-ref "enigma-memory@0.1.15" --score "retrieval_evidence_proxy=<value-copied-from-report>" --out-dir .enigma/benchmark-proof-release
+npm run benchmark:proof-release -- --report .enigma/standard-memory-benchmark-sample.json --dataset-ref "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" --runner-ref "runner:run-standard-memory-benchmarks.mjs@reviewed-revision" --package-ref "enigma-memory@0.1.16" --score "retrieval_evidence_proxy=<value-copied-from-report>" --out-dir .enigma/benchmark-proof-release
 ```
 
-The command writes `benchmark-attestation.json`, `benchmark-proof-packet.json`, and `benchmark-proof-release.json` in the output directory. The release manifest uses `schema: "enigma.benchmark_proof_release.v1"` and records explicit boundaries: local benchmark attestation only, no API calls, no provider answer-accuracy claim, no competitor performance claim, no Solana submission claim, no hosted SaaS claim, and no ROI/profit/provider-savings claim.
+The command writes `benchmark-attestation.json`, `benchmark-proof-packet.json`, and `benchmark-proof-release.json` in the output directory. The release manifest uses `schema: "enigma.benchmark_proof_release.v1"` and records explicit boundaries: local benchmark attestation only, local report file hashing only, no network calls, no provider APIs, no API spend, no provider answer-accuracy claim, no competitor performance claim, no Solana submission claim, no hosted SaaS claim, and no ROI/profit/provider-savings claim.
 
-When a report file is supplied, the generated attestation is a reproducibility receipt for a specific local report hash and explicitly supplied aggregate score commitments. It is not evidence of provider answer accuracy, competitor performance, Solana settlement, ROI, hosted-cloud readiness, provider deletion, model forgetting, or live model behavior.
+When a report file is supplied, the generated attestation is a reproducibility receipt for a specific local report hash and explicitly supplied aggregate score commitments. The proof builder now requires a compatible benchmark schema plus explicit offline `benchmark_boundaries`, and rejects scored external adapter rows. It is not evidence of provider answer accuracy, Mem0 or competitor performance, Solana settlement, ROI, hosted-cloud readiness, provider deletion, model forgetting, or live model behavior.
 
 ## Local baseline rows in the report
 

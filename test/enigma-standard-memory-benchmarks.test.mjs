@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import {
   STANDARD_MEMORY_BENCHMARK_SUITE_SCHEMA,
+  buildStandardBenchmarkDryRunPlan,
   parseLocomoDataset,
   parseLongMemEvalDataset,
   runStandardMemoryBenchmarkSuite,
@@ -188,8 +189,49 @@ test('standard benchmark suite scores official-dataset retrieval proxies without
   assert.doesNotMatch(text, /"question"\s*:/u);
   assert.doesNotMatch(text, /"answer"\s*:/u);
   assert.doesNotMatch(text, /benchmark leadership|provider deletion|model forgetting/iu);
+  assert.equal(report.command_boundaries.network_calls_made, false);
+  assert.equal(report.command_boundaries.provider_api_calls_made, false);
+  assert.equal(report.command_boundaries.api_spend_possible, false);
+  assert.equal(report.command_boundaries.mem0_adapter_run, false);
+  assert.equal(report.command_boundaries.gold_labels_used_for_retrieval, false);
+  assert.equal(report.command_boundaries.gold_labels_used_for_scoring, true);
+  assert.equal(report.apples_to_apples_controls.same_top_k_for_all_methods, true);
+  assert.equal(report.apples_to_apples_controls.local_deterministic_methods_only, true);
+  assert.equal(report.relevance_logic.gold_labels_used_for_retrieval, false);
+  assert.deepEqual(report.external_competitor_adapters.map((row) => row.id), ['mem0']);
+  assert.equal(report.external_competitor_adapters[0].scores_included, false);
+  assert.equal(report.external_competitor_adapters[0].can_run_in_this_harness, false);
+  assert.equal(Object.prototype.hasOwnProperty.call(report.external_competitor_adapters[0], 'recall'), false);
 });
 
+test('standard benchmark dry run prints offline plan without scores or dataset reads', () => {
+  const plan = buildStandardBenchmarkDryRunPlan({
+    generated_at: '2026-06-25T00:00:00.000Z',
+    locomo: 'locomo10.json',
+    longmemeval: 'longmemeval_s_cleaned.json',
+    max_locomo_qa: 10,
+    max_longmemeval_items: 11,
+    top_k: 4,
+  });
+
+  assert.equal(plan.schema, 'enigma.standard_memory_benchmark_plan.v1');
+  assert.equal(plan.public_safe, true);
+  assert.equal(plan.dry_run, true);
+  assert.equal(plan.top_k, 4);
+  assert.deepEqual(plan.datasets_planned.map((row) => row.local_file_name), ['locomo10.json', 'longmemeval_s_cleaned.json']);
+  assert.deepEqual(plan.datasets_planned.map((row) => row.sample_limit), [10, 11]);
+  assert.equal(plan.command_boundaries.dataset_files_read_from_local_disk, false);
+  assert.equal(plan.command_boundaries.benchmark_scores_included, false);
+  assert.equal(plan.command_boundaries.provider_api_calls_made, false);
+  assert.equal(plan.command_boundaries.api_spend_possible, false);
+  assert.equal(plan.command_boundaries.mem0_adapter_run, false);
+  assert.equal(plan.command_boundaries.gold_labels_used_for_retrieval, false);
+  assert.equal(plan.command_boundaries.gold_labels_used_for_scoring, false);
+  assert.equal(plan.apples_to_apples_controls.same_top_k_for_all_methods, true);
+  assert.deepEqual(plan.external_competitor_adapters.map((row) => row.id), ['mem0']);
+  assert.equal(plan.external_competitor_adapters[0].scores_included, false);
+  assert.equal(plan.external_competitor_adapters[0].can_run_in_this_harness, false);
+});
 test('standard benchmark gives Enigma lower or equal tokens than full context at nonzero recall', () => {
   const report = runStandardMemoryBenchmarkSuite({
     generated_at: '2026-06-25T00:00:00.000Z',

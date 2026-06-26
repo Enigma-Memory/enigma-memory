@@ -117,6 +117,8 @@ test('production workplan orders blockers into public-safe phases', () => {
   assert.ok(byId.get('hosted_backend_refs').commands.some((command) => command.includes('production:backend-env')));
   assert.equal(byId.get('operator_acceptance').details.blocker_breakdown.evidence, 30);
   assert.equal(byId.get('final_release_verification').details.launch_ready, false);
+  assert.ok(byId.get('final_release_verification').commands.some((command) => command.includes('--worker-inspect .enigma/worker-inspect-result-current.json')));
+  assert.equal(byId.get('final_release_verification').commands.some((command) => command.includes('worker-inspect-validation-current.json')), false);
   assert.doesNotMatch(JSON.stringify(workplan), /Bearer\s+[A-Za-z0-9._~+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|sk-[A-Za-z0-9_-]{16,}/i);
 });
 
