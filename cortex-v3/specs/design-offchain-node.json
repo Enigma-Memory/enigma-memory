@@ -1,0 +1,13 @@
+{
+  "runtime": "Node.js ESM",
+  "entrypoints": ["src/server.mjs", "src/mcp-server.mjs"],
+  "modules": {
+    "HTTP API": ["/health", "POST /ingest", "GET /retrieve/:id"],
+    "MCP server": ["tools/list", "tools/call store_memory", "tools/call retrieve_memory"],
+    "Encryption": "AES-256-GCM placeholder",
+    "Immunology": "contradiction + prompt-injection detection (stub)",
+    "Replay": "scheduled consolidation (stub)",
+    "Royalties": "receipt anchoring via HTTP (stub)"
+  },
+  "tests": "6 passing (4 HTTP + 2 MCP)"
+}
