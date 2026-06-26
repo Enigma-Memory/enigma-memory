@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -27,6 +28,14 @@ const PROJECT_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const COMPOSE_FILE = 'deploy/docker-compose.local-production-simulation.yml';
 const SIM_REFS_PATH = '.enigma/sim-hosted-refs.json';
 const SIM_OPERATOR_ACCEPTANCE_PATH = '.enigma/sim-operator-acceptance.json';
+function sha256Hex(value) {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function gatewayBearerSha256(secretsDir, name) {
+  const token = fs.readFileSync(path.join(secretsDir, name));
+  return `sha256:${sha256Hex(token)}`;
+}
 const SIMULATION_HOST = 'sim.enigmamemory.com';
 const SIMULATION_COMPOSE_PROJECT_PREFIX = 'enigma-go-live-sim-';
 const SIMULATION_COMPOSE_PROJECT = `${SIMULATION_COMPOSE_PROJECT_PREFIX}${process.pid}-${Date.now().toString(36)}`;
@@ -218,6 +227,8 @@ test('hosted/BYOC go-live simulation produces accepted live evidence', { timeout
       timeout: 60000,
       windowsHide: true,
     });
+    composeEnv.ENIGMA_GATEWAY_ADMIN_AUTH_BEARER_SHA256 = gatewayBearerSha256(simSecretsDir, 'gateway-admin-auth-bearer');
+    composeEnv.ENIGMA_GATEWAY_DATA_PLANE_AUTH_BEARER_SHA256 = gatewayBearerSha256(simSecretsDir, 'gateway-data-plane-auth-bearer');
     await execFileAsync('docker', composeArgs(SIMULATION_COMPOSE_PROJECT, 'up', '--build', '-d'), {
       cwd: PROJECT_ROOT,
       env: composeEnv,

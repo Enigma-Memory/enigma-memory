@@ -46,7 +46,7 @@ names so that containers can resolve them locally when needed.
 
    ```bash
    export ENIGMA_SIM_SECRETS_DIR="$HOME/.enigma/simulation-secrets"
-   docker compose -f deploy/docker-compose.local-production-simulation.yml up --build -d
+   docker compose -f deploy/docker-compose.local-production-simulation.yml --env-file "$ENIGMA_SIM_SECRETS_DIR/simulation.env" up --build -d
    ```
 
 3. Wait for the backend to become ready:
@@ -67,13 +67,13 @@ names so that containers can resolve them locally when needed.
 ## Stop
 
 ```bash
-docker compose -f deploy/docker-compose.local-production-simulation.yml down
+docker compose -f deploy/docker-compose.local-production-simulation.yml --env-file "$ENIGMA_SIM_SECRETS_DIR/simulation.env" down
 ```
 
 To also remove the Postgres volume and mock event data:
 
 ```bash
-docker compose -f deploy/docker-compose.local-production-simulation.yml down -v
+docker compose -f deploy/docker-compose.local-production-simulation.yml --env-file "$ENIGMA_SIM_SECRETS_DIR/simulation.env" down -v
 ```
 
 ## Ports and routes
