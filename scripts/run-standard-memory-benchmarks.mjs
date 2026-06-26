@@ -62,6 +62,16 @@ const LONGMEMEVAL_SOURCE_URLS = Object.freeze([
   'https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/longmemeval_s_cleaned.json',
   'https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/longmemeval_m_cleaned.json',
 ]);
+const LOCOMO_TASK_CATEGORIES = Object.freeze(['multi-session QA', 'event summarization', 'multimodal generation over long conversations']);
+const LONGMEMEVAL_TASK_CATEGORIES = Object.freeze(['information extraction', 'multi-session reasoning', 'temporal reasoning', 'knowledge updates', 'abstention']);
+const DATASET_TASK_CATEGORIES = Object.freeze({ locomo: LOCOMO_TASK_CATEGORIES, longmemeval: LONGMEMEVAL_TASK_CATEGORIES });
+export const STANDARD_MEMORY_BENCHMARK_PROTOCOL_PLAN_SCHEMA = 'enigma.standard_memory_benchmark_protocol_plan.v1';
+const PROTOCOL_REF_RE = /^[a-z0-9][a-z0-9._:/@+-]{2,191}$/u;
+const DEFAULT_ANSWERER_MODEL_REF = 'model:answerer-not-selected';
+const DEFAULT_JUDGE_MODEL_REF = 'model:judge-not-selected';
+const DEFAULT_ANSWER_PROMPT_REF = 'prompt:standard-answer@not-pinned';
+const DEFAULT_JUDGE_PROMPT_REF = 'prompt:standard-judge@not-pinned';
+const DEFAULT_PROTOCOL_REF = 'protocol:apples-to-apples-full-answer@not-pinned';
 
 const QUERY_RELEVANCE_STOPWORDS = new Set([
   'about',
@@ -139,6 +149,23 @@ function parseArgs(argv = process.argv.slice(2)) {
       index += 1;
     } else if (arg === '--out') {
       options.out = requiredFlagValue(argv, index, arg);
+      index += 1;
+    } else if (arg === '--protocol-plan') {
+      options.protocol_plan = true;
+    } else if (arg === '--answerer-ref') {
+      options.answerer_ref = requiredFlagValue(argv, index, arg);
+      index += 1;
+    } else if (arg === '--judge-ref') {
+      options.judge_ref = requiredFlagValue(argv, index, arg);
+      index += 1;
+    } else if (arg === '--answer-prompt-ref') {
+      options.answer_prompt_ref = requiredFlagValue(argv, index, arg);
+      index += 1;
+    } else if (arg === '--judge-prompt-ref') {
+      options.judge_prompt_ref = requiredFlagValue(argv, index, arg);
+      index += 1;
+    } else if (arg === '--protocol-ref') {
+      options.protocol_ref = requiredFlagValue(argv, index, arg);
       index += 1;
     } else if (arg === '--dry-run') {
       options.dry_run = true;
@@ -241,7 +268,7 @@ export function buildStandardBenchmarkDryRunPlan(options = {}) {
     generated_at: options.generated_at ?? new Date().toISOString(),
     package: {
       name: 'enigma-memory',
-      version: '0.1.16',
+      version: '0.1.17',
     },
     public_safe: true,
     dry_run: true,
@@ -258,6 +285,135 @@ export function buildStandardBenchmarkDryRunPlan(options = {}) {
       'This dry run does not read dataset files and produces no benchmark score.',
       'No provider APIs, hosted memory services, Mem0 runtime, competitor SDKs, LLM generators, or evaluator models are called.',
       'A scored report requires a separate non-dry-run command against the exact local dataset files and hashes.',
+    ],
+  };
+}
+function protocolRef(value, label, fallback) {
+  if (value === undefined || value === null) return fallback;
+  const normalized = typeof value === 'string' ? value.trim() : String(value);
+  if (normalized === '') throw new Error(`${label} must be a non-empty public ref`);
+  if (!PROTOCOL_REF_RE.test(normalized)) throw new Error(`${label} must be a lowercase public ref using letters, numbers, . _ : / @ + or -`);
+  return normalized;
+}
+
+function protocolPlanCategorySet(datasets) {
+  const categorySet = [];
+  const seen = new Set();
+  for (const row of datasets) {
+    for (const category of DATASET_TASK_CATEGORIES[row.id] ?? []) {
+      if (!seen.has(category)) {
+        seen.add(category);
+        categorySet.push(category);
+      }
+    }
+  }
+  return categorySet;
+}
+
+export function buildStandardBenchmarkProtocolPlan(options = {}) {
+  const topK = optionalPositiveInteger(options.top_k ?? options.topK, 'top_k') ?? 5;
+  const datasets = datasetPlanRows(options);
+  if (datasets.length === 0) throw new Error('Provide --locomo <path> and/or --longmemeval <path>');
+  const answererProvided = (options.answerer_ref ?? options.answererModelRef) !== undefined;
+  const judgeProvided = (options.judge_ref ?? options.judgeModelRef) !== undefined;
+  const answererRef = protocolRef(options.answerer_ref ?? options.answererModelRef, 'answerer_ref', DEFAULT_ANSWERER_MODEL_REF);
+  const judgeRef = protocolRef(options.judge_ref ?? options.judgeModelRef, 'judge_ref', DEFAULT_JUDGE_MODEL_REF);
+  const answerPromptRef = protocolRef(options.answer_prompt_ref ?? options.answerPromptRef, 'answer_prompt_ref', DEFAULT_ANSWER_PROMPT_REF);
+  const judgePromptRef = protocolRef(options.judge_prompt_ref ?? options.judgePromptRef, 'judge_prompt_ref', DEFAULT_JUDGE_PROMPT_REF);
+  const protocolRefValue = protocolRef(options.protocol_ref ?? options.protocolRef, 'protocol_ref', DEFAULT_PROTOCOL_REF);
+  const promptsFixed = answererProvided && judgeProvided;
+  return {
+    schema: STANDARD_MEMORY_BENCHMARK_PROTOCOL_PLAN_SCHEMA,
+    generated_at: options.generated_at ?? new Date().toISOString(),
+    package: {
+      name: 'enigma-memory',
+      version: '0.1.17',
+    },
+    public_safe: true,
+    protocol_plan: true,
+    dry_run: true,
+    top_k: topK,
+    category_set: protocolPlanCategorySet(datasets),
+    datasets_planned: datasets,
+    answerer: {
+      model_ref: answererRef,
+      temperature: 0,
+      max_tokens: 1024,
+      fixed: answererProvided,
+    },
+    judge: {
+      model_ref: judgeRef,
+      kind: 'llm-as-judge-or-exact-match-not-selected',
+      temperature: 0,
+      max_tokens: 512,
+      fixed: judgeProvided,
+    },
+    prompt_refs: [answerPromptRef, judgePromptRef],
+    protocol_refs: [protocolRefValue],
+    competitor_adapter_refs: STANDARD_EXTERNAL_COMPETITOR_ADAPTERS.map((adapter) => `adapter:${adapter.id}@not-pinned`),
+    external_competitor_adapters: STANDARD_EXTERNAL_COMPETITOR_ADAPTERS.map((adapter) => ({
+      ...adapter,
+      required_artifacts: [...adapter.required_artifacts],
+      adapter_ref: `adapter:${adapter.id}@not-pinned`,
+    })),
+    apples_to_apples_controls: applesToApplesControls(topK),
+    protocol_controls: {
+      same_answerer_model_for_all_rows: answererProvided,
+      same_judge_model_for_all_rows: judgeProvided,
+      same_prompts_for_all_rows: promptsFixed,
+      same_competitor_adapters_for_enigma_and_baselines: false,
+      answerer_model_fixed: answererProvided,
+      judge_model_fixed: judgeProvided,
+      prompts_fixed: promptsFixed,
+      temperature_fixed: false,
+      budget_caps_set: false,
+    },
+    cost_estimate_inputs: {
+      dataset_sample_limits: datasets.map((row) => ({ dataset: row.id, sample_limit: row.sample_limit })),
+      answerer_temperature: 0,
+      answerer_max_tokens: 1024,
+      judge_temperature: 0,
+      judge_max_tokens: 512,
+      max_retries: 0,
+      request_timeout_ms: null,
+      budget_cap_required_before_run: true,
+      budget_cap_set: false,
+    },
+    benchmark_boundaries: {
+      official_dataset_files_required: true,
+      credentials_required: false,
+      external_provider_calls: false,
+      llm_answer_accuracy_scored: false,
+      retrieval_evidence_proxy_scored: false,
+      raw_question_text_included: false,
+      raw_answer_text_included: false,
+      raw_conversation_text_included: false,
+      provider_deletion_claim: false,
+      model_forgetting_claim: false,
+      roi_or_provider_invoice_savings_claim: false,
+      compliance_certification_claim: false,
+      benchmark_leadership_claim: false,
+    },
+    protocol_boundaries: {
+      network_required: false,
+      provider_calls_made: false,
+      answers_generated: false,
+      judged: false,
+      competitor_adapters_run: false,
+      api_spend_possible: false,
+    },
+    command_boundaries: offlineCommandBoundaries({ scoresIncluded: false, datasetFilesRead: false }),
+    review_rules: [
+      'report hash format: sha256:<hex> over the public-safe protocol-plan JSON bytes',
+      'dataset ref, runner ref, package ref, environment ref, and verifier ref formats are pinned before a live run',
+      'metric scope: this artifact plans the full-answer protocol only; it is not a score',
+      'limitation: no provider answer-accuracy, competitor-performance, benchmark-leadership, ROI, provider-deletion, model-forgetting, or compliance claim is made',
+    ],
+    non_claims: [
+      'This protocol plan is a readiness artifact: it records the planned full-answer protocol dimensions and does not execute it.',
+      'No network is used, no provider APIs are called, no answers are generated, no answers are judged, and no competitor adapters are run.',
+      'Answerer/judge model refs, prompt refs, and competitor adapter refs are public-safe references only; they are not credentials, model calls, prompts, or scores.',
+      'A scored full-answer run requires a separate credentialed command with frozen models, prompts, evaluator, dataset manifest, and budget caps.',
     ],
   };
 }
@@ -830,7 +986,7 @@ export function parseLocomoDataset(data, options = {}) {
     source_url: LOCOMO_SOURCE_URL,
     license: 'CC BY-NC 4.0',
     parser: 'conversation session turns as memory records; qa evidence labels mapped to dialog ids such as D1:3 and semicolon-separated labels',
-    task_categories: ['multi-session QA', 'event summarization', 'multimodal generation over long conversations'],
+    task_categories: [...LOCOMO_TASK_CATEGORIES],
     records,
     queries,
   };
@@ -906,7 +1062,7 @@ export function parseLongMemEvalDataset(data, options = {}) {
     source_url: LONGMEMEVAL_SOURCE_URLS,
     license: 'See Hugging Face dataset card and upstream LongMemEval repository for the selected cleaned file.',
     parser: 'haystack_sessions turns as memory records; has_answer:true turns and answer_session_ids are used as evidence labels; _abs ids are evaluated as abstention cases',
-    task_categories: ['information extraction', 'multi-session reasoning', 'temporal reasoning', 'knowledge updates', 'abstention'],
+    task_categories: [...LONGMEMEVAL_TASK_CATEGORIES],
     records,
     queries,
   };
@@ -1110,7 +1266,7 @@ function buildSuiteReport(datasetRows, topK, options) {
     generated_at: options.generated_at ?? new Date().toISOString(),
     package: {
       name: 'enigma-memory',
-      version: '0.1.16',
+      version: '0.1.17',
     },
     public_safe: true,
     top_k: topK,
@@ -1162,7 +1318,7 @@ function buildSuiteReport(datasetRows, topK, options) {
 }
 
 function usage() {
-  return `Usage: node scripts/run-standard-memory-benchmarks.mjs [--locomo <path>] [--longmemeval <path>] [--max-locomo-qa <n>] [--max-longmemeval-items <n>] [--top-k <n>] [--out <path>] [--dry-run]\n\nProduces schema ${STANDARD_MEMORY_BENCHMARK_SUITE_SCHEMA}. Raw question, answer, and conversation text are never written to the report. With --longmemeval and --max-longmemeval-items, the local top-level JSON array is streamed for hashing and only the requested sample items are parsed. Use --dry-run to print a public-safe offline execution plan without reading dataset files or producing scores.`;
+  return `Usage: node scripts/run-standard-memory-benchmarks.mjs [--locomo <path>] [--longmemeval <path>] [--max-locomo-qa <n>] [--max-longmemeval-items <n>] [--top-k <n>] [--out <path>] [--dry-run] [--protocol-plan [--answerer-ref <ref>] [--judge-ref <ref>] [--answer-prompt-ref <ref>] [--judge-prompt-ref <ref>] [--protocol-ref <ref>]]\n\nProduces schema ${STANDARD_MEMORY_BENCHMARK_SUITE_SCHEMA}. Raw question, answer, and conversation text are never written to the report. With --longmemeval and --max-longmemeval-items, the local top-level JSON array is streamed for hashing and only the requested sample items are parsed. Use --dry-run to print a public-safe offline execution plan without reading dataset files or producing scores. Use --protocol-plan to print a public-safe full-answer benchmark PROTOCOL plan (schema ${STANDARD_MEMORY_BENCHMARK_PROTOCOL_PLAN_SCHEMA}) recording the planned category set, top-k, answerer/judge model refs, prompt/protocol refs, competitor adapter refs, and cost-estimate inputs, with explicit network_required:false, provider_calls_made:false, answers_generated:false, and judged:false boundaries; it does not call providers, generate answers, judge answers, or run competitor adapters.`;
 }
 
 async function main() {
@@ -1171,9 +1327,11 @@ async function main() {
     console.log(usage());
     return;
   }
-  const report = options.dry_run
-    ? buildStandardBenchmarkDryRunPlan(options)
-    : await runStandardMemoryBenchmarkSuiteFromFiles(options);
+  const report = options.protocol_plan
+    ? buildStandardBenchmarkProtocolPlan(options)
+    : options.dry_run
+      ? buildStandardBenchmarkDryRunPlan(options)
+      : await runStandardMemoryBenchmarkSuiteFromFiles(options);
   const serialized = `${JSON.stringify(report, null, 2)}\n`;
   if (options.out) {
     const outPath = resolve(options.out);

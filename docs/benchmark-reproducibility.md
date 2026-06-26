@@ -4,7 +4,7 @@ This guide explains how to reproduce the current local Enigma memory benchmark, 
 
 ## What is reproducible today
 
-The current planned package is `enigma-memory@0.1.16`. Two benchmark paths are reproducible without provider credentials:
+The current planned package is `enigma-memory@0.1.17`. Two benchmark paths are reproducible without provider credentials:
 
 1. The local deterministic memory suite, available through the package script and the script file it wraps:
 
@@ -67,7 +67,7 @@ Do not commit downloaded files or raw benchmark conversations. The package `.git
 
 ## Reproduce and save local fixture JSON
 
-1. Use a clean checkout containing `enigma-memory@0.1.16`.
+1. Use a clean checkout containing `enigma-memory@0.1.17`.
 2. From a repository root that contains `enigma/package.json`, enter the package directory:
 
    ```sh
@@ -142,7 +142,7 @@ Public sharing should include the generated benchmark report JSON and generated 
 
 ## Proof-network benchmark attestations
 
-For the planned 0.1.16 proof-network layer, benchmark results should be represented as a public-safe local attestation rather than by publishing raw benchmark inputs. The attestation JSON uses `schema: "enigma.proof_network.benchmark_attestation.v1"` and may be bundled in `enigma.proof_network.packet.v1` for review. The benchmark proof-release flow is local planning only: it does not call APIs, submit transactions, or claim hosted SaaS behavior, and generated artifacts must keep `transaction_submitted: false` and `raw_memory_on_chain: false`.
+For the planned 0.1.17 proof-network layer, benchmark results should be represented as a public-safe local attestation rather than by publishing raw benchmark inputs. The attestation JSON uses `schema: "enigma.proof_network.benchmark_attestation.v1"` and may be bundled in `enigma.proof_network.packet.v1` for review. The benchmark proof-release flow is local planning only: it does not call APIs, submit transactions, or claim hosted SaaS behavior, and generated artifacts must keep `transaction_submitted: false` and `raw_memory_on_chain: false`.
 
 Hash the generated benchmark report and companion dataset manifest, then attest only the report hash, schema name, dataset refs, runner refs, package refs, score commitments, record counts, top-k/sample bounds, and timestamps needed for review. The public artifacts must not contain raw dataset rows, raw conversations, prompts, private questions, private answers, provider responses, embeddings, credentials, tenant names, account ids, local absolute paths, unpublished benchmark scores, or the raw benchmark report body.
 
@@ -151,7 +151,7 @@ Use a `sha256:<hex>` commitment for the report and manifest. The proof-release s
 After running one of the benchmark commands above and confirming the report is public-safe, create a local proof release:
 
 ```sh
-npm run benchmark:proof-release -- --report .enigma/standard-memory-benchmark-sample.json --dataset-ref "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" --runner-ref "runner:run-standard-memory-benchmarks.mjs@reviewed-revision" --package-ref "enigma-memory@0.1.16" --score "retrieval_evidence_proxy=<value-copied-from-report>" --out-dir .enigma/benchmark-proof-release
+npm run benchmark:proof-release -- --report .enigma/standard-memory-benchmark-sample.json --dataset-ref "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" --runner-ref "runner:run-standard-memory-benchmarks.mjs@reviewed-revision" --package-ref "enigma-memory@0.1.17" --score "retrieval_evidence_proxy=<value-copied-from-report>" --out-dir .enigma/benchmark-proof-release
 ```
 
 The command writes `benchmark-attestation.json`, `benchmark-proof-packet.json`, and `benchmark-proof-release.json` in the output directory. The release manifest uses `schema: "enigma.benchmark_proof_release.v1"` and records explicit boundaries: local benchmark attestation only, local report file hashing only, no network calls, no provider APIs, no API spend, no provider answer-accuracy claim, no competitor performance claim, no Solana submission claim, no hosted SaaS claim, and no ROI/profit/provider-savings claim.
@@ -179,6 +179,55 @@ Use these standards as dataset sources, citations, and task-category references,
 - LongMemEval: https://arxiv.org/abs/2410.10813 and cleaned HuggingFace JSON files `https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/longmemeval_oracle.json`, `https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/longmemeval_s_cleaned.json`, and `https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/longmemeval_m_cleaned.json` — cite for information extraction, multi-session reasoning, temporal reasoning, knowledge updates, and abstention.
 
 The local report mirrors some task categories from those benchmarks but does not download or score official records. The standard runner consumes official local dataset files and scores retrieval/evidence coverage; it does not run the original papers' full LLM evaluation pipelines or claim leaderboard-equivalent answer accuracy.
+
+## Full-answer benchmark protocol plan (--protocol-plan)
+
+The scored standard runner is retrieval/evidence proxy only. A true apples-to-apples full-answer run (same category set, same top-k, same frozen answerer and judge, same prompts, same competitor adapters) is a separate, credentialed benchmark that this package does not execute. `--protocol-plan` is the readiness layer between the two: it emits a public-safe plan of that future protocol without reading datasets, calling providers, generating answers, judging answers, or running competitor adapters.
+
+```sh
+cd enigma
+node scripts/run-standard-memory-benchmarks.mjs --locomo .enigma/benchmarks/datasets/locomo10.json --longmemeval .enigma/benchmarks/datasets/longmemeval_s_cleaned.json --max-locomo-qa 25 --max-longmemeval-items 25 --top-k 5 --protocol-plan --out .enigma/standard-memory-benchmark-protocol-plan.json
+```
+
+Optionally pin the public-safe model/prompt/protocol refs so the plan records exactly which artifacts a future live run must freeze (defaults mark every ref `not-selected`/`not-pinned`):
+
+```sh
+node scripts/run-standard-memory-benchmarks.mjs --locomo .enigma/benchmarks/datasets/locomo10.json --top-k 5 --protocol-plan \
+  --answerer-ref "model:answerer@frozen-revision" \
+  --judge-ref "model:judge@frozen-revision" \
+  --answer-prompt-ref "prompt:standard-answer@frozen-revision" \
+  --judge-prompt-ref "prompt:standard-judge@frozen-revision" \
+  --protocol-ref "protocol:apples-to-apples-full-answer@frozen-revision" \
+  --out .enigma/standard-memory-benchmark-protocol-plan.json
+```
+
+The emitted schema is `enigma.standard_memory_benchmark_protocol_plan.v1`. It records the planned category set (the same LoCoMo/LongMemEval task categories the scored report uses), `--top-k`, the answerer model ref and judge model ref, the prompt refs and protocol ref, the requirements-only competitor adapter refs, and cost-estimate inputs (sample limits, token caps, temperature, retries, timeout, and a `budget_cap_set:false` flag). It does not contain raw questions, raw answers, prompts, provider responses, embeddings, credentials, dataset bytes, or scores.
+
+The plan carries explicit boundaries that must read `false`:
+
+| Boundary | Meaning |
+| --- | --- |
+| `protocol_boundaries.network_required` | No network is used to produce the plan. |
+| `protocol_boundaries.provider_calls_made` | No provider APIs are called. |
+| `protocol_boundaries.answers_generated` | No model answers are generated. |
+| `protocol_boundaries.judged` | No answers are judged or graded. |
+| `protocol_boundaries.competitor_adapters_run` | No Mem0 or other competitor adapters are run. |
+| `benchmark_boundaries.llm_answer_accuracy_scored` | The plan is not a score. |
+| `benchmark_boundaries.retrieval_evidence_proxy_scored` | The plan does not even score the retrieval proxy. |
+
+The protocol plan can be turned into a local proof release with the same command used for a scored report, because the proof-release builder accepts either a local retrieval proxy report or a protocol-plan report:
+
+```sh
+npm run benchmark:proof-release -- --report .enigma/standard-memory-benchmark-protocol-plan.json --dataset-ref "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" --runner-ref "runner:run-standard-memory-benchmarks.mjs@protocol-plan" --package-ref "enigma-memory@0.1.17" --out-dir .enigma/benchmark-protocol-proof-release
+```
+
+The resulting attestation uses the existing `enigma.proof_network.benchmark_attestation.v1` schema and binds the protocol-plan report hash plus `report_hash_only` metric roots; it does not copy the report body. A protocol-plan proof release is evidence of protocol readiness only. It is not evidence that answers were generated, that answers were judged, that any provider or competitor was called or outperformed, or that benchmark leadership, ROI, provider deletion, model forgetting, or compliance was achieved. Competitor adapter refs are references, not scores; a reference is never a superiority claim.
+
+### What the protocol plan proves and does not prove
+
+**Proves:** the exact category set, top-k, planned answerer/judge model refs, prompt/protocol refs, competitor adapter refs, and cost-estimate inputs that a future full-answer run would freeze, plus the explicit no-network/no-provider/no-answers/no-judgement boundary.
+
+**Does not prove:** that any model answered correctly, that any model was judged, that any provider or competitor ran, that prompts are final, that a budget cap was set, or that the planned run would favor Enigma. Pinned refs mark which artifacts a future run must freeze; they are not a claim that the run happened or succeeded.
 
 ## Future provider answer-accuracy runs
 

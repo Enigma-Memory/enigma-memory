@@ -84,7 +84,7 @@ Strategic requirement: verification must work offline and be easy to embed in te
 
 ### 3. Proof Network artifacts
 
-The 0.1.16 proof-network surface should focus on pure, local artifacts:
+The 0.1.17 proof-network surface should focus on pure, local artifacts:
 
 - `enigma.proof_network.anchor_batch.v1`
 - `enigma.proof_network.capability_grant.v1`
@@ -287,7 +287,7 @@ Mitigation: keep schemas public, verifier simple, examples clear, and integratio
 
 Risk: building network abstractions too early distracts from memory product usefulness.
 
-Mitigation: keep 0.1.16 proof work pure, local, and directly tied to CLI/docs/tests. Do not build live infrastructure until artifact quality, privacy boundaries, and developer workflows are proven.
+Mitigation: keep 0.1.17 proof work pure, local, and directly tied to CLI/docs/tests. Do not build live infrastructure until artifact quality, privacy boundaries, and developer workflows are proven.
 
 ## Claim boundaries
 
@@ -315,7 +315,7 @@ This boundary makes the investor story stronger, not weaker. The market is crowd
 
 ## Next milestones
 
-### 0.1.16 release milestone
+### 0.1.17 release milestone
 
 - Publish proof-network pure functions and schemas.
 - Add local `enigma chain` planning and verification commands.

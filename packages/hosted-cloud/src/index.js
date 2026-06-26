@@ -10,6 +10,7 @@ export const HOSTED_CLOUD_BACKUP_DRILL_SCHEMA = 'enigma.hosted_cloud.backup_dril
 export const HOSTED_CLOUD_INCIDENT_SLA_SCHEMA = 'enigma.hosted_cloud.incident_sla_refs.v1';
 export const HOSTED_CLOUD_CUSTOMER_LIFECYCLE_PACKET_SCHEMA = 'enigma.hosted_cloud.customer_lifecycle_packet.v1';
 export const HOSTED_CLOUD_API_KEY_LIFECYCLE_PACKET_SCHEMA = 'enigma.hosted_cloud.api_key_lifecycle_packet.v1';
+export const HOSTED_CLOUD_READINESS_PACKET_SCHEMA = 'enigma.hosted_cloud.readiness_packet.v1';
 
 export const HOSTED_CLOUD_EXTERNAL_BLOCKERS = Object.freeze([
   'auth_provider',
@@ -106,9 +107,40 @@ const API_KEY_LIFECYCLE_BLOCKER_LABELS = Object.freeze({
   audit_log: 'Hosted API key lifecycle audit evidence is not provided.',
   operator_approval: 'Explicit public-safe operator API key lifecycle approval is not provided.',
 });
+export const HOSTED_CLOUD_READINESS_SURFACES = Object.freeze([
+  'auth',
+  'billing',
+  'legal_dpa',
+  'support',
+  'security_review',
+  'monitoring',
+  'backup',
+  'kms_byok',
+]);
+const READINESS_BLOCKER_LABELS = Object.freeze({
+  auth: 'Auth provider readiness evidence is not provided.',
+  billing: 'Billing provider readiness evidence is not provided.',
+  legal_dpa: 'Legal and data-processing terms readiness evidence is not provided.',
+  support: 'Support ownership readiness evidence is not provided.',
+  security_review: 'External security review readiness evidence is not provided.',
+  monitoring: 'Monitoring readiness evidence is not provided.',
+  backup: 'Backup and disaster recovery readiness evidence is not provided.',
+  kms_byok: 'KMS / bring-your-own-key readiness evidence is not provided.',
+  operator_go_live: 'Explicit operator go-live approval is not provided.',
+});
+const READINESS_SURFACE_LIFECYCLE_PHASE = Object.freeze({
+  auth: 'account',
+  billing: 'billing',
+  legal_dpa: 'legal',
+  support: 'support',
+  security_review: 'security_review',
+  monitoring: 'monitoring',
+  backup: 'backup',
+  kms_byok: 'vault',
+});
 const API_KEY_SECRET_MATERIAL_KEY_RE = /(?:^|_)(?:raw_?api_?key|raw_?key|plaintext_?api_?key|plain_text_?api_?key|plaintext_?key|plain_text_?key|api_?key_?value|key_?value|key_?material|secret_?key|key_?secret|value)(?:$|_)/iu;
-const FORBIDDEN_KEY_RE = /(?:^|_)(?:raw_?memory|plaintext|plain_text|prompt|prompts|completion|completions|message_body|transcript|conversation|provider_?response|response_?body|credential|credentials|secret|password|private_?key|bearer|access_token|refresh_token|token_value|api_key_value|api_secret|token_?roi|token_?profit|roi_claim|profit_claim|provider_?deletion|provider_?erasure|model_?forgetting|model_?erasure)(?:$|_)/iu;
-const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|\b(?:raw memory|plaintext prompts?|plain text prompts?|private prompts?|provider responses?|full transcript|decrypted memory|credentials?|secrets?|passwords?|private keys?|api key secret|api secrets?|access tokens?|refresh tokens?|token values?|credential material)\b)/iu;
+const FORBIDDEN_KEY_RE = /(?:^|_)(?:raw_?memory|raw_?key|raw_?api_?key|raw_?token|plaintext|plain_text|prompt|prompts|completion|completions|message_body|transcript|conversation|provider_?response|response_?body|credential|credentials|secret|password|private_?key|bearer|access_token|refresh_token|token_value|api_key_value|api_secret|token_?roi|token_?profit|roi_claim|profit_claim|provider_?deletion|provider_?erasure|model_?forgetting|model_?erasure)(?:$|_)/iu;
+const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}|\b(?:raw memory|plaintext prompts?|plain text prompts?|private prompts?|provider responses?|full transcript|decrypted memory|credentials?|secrets?|passwords?|private keys?|api key secret|api secrets?|access tokens?|refresh tokens?|token values?|credential material)\b)/iu;
 const FORBIDDEN_CLAIM_RE = /(?:token\s+(?:roi|profit|return|investment|price)|(?:roi|profit|return)\s+(?:from|on)\s+token|guaranteed\s+(?:savings|profit|return)|provider(?:-side|\s+side)?\s+(?:deletion|erasure)|model\s+(?:forgetting|forgot|erasure)|makes?\s+models?\s+forget|deleted\s+from\s+every\s+provider)/iu;
 
 function isPlainObject(value) {
@@ -959,6 +991,67 @@ function validateCustomerLifecycleReadiness(readiness, expected) {
   assertSameLifecycleArray(readiness.external_blockers, expected.external_blockers, 'readiness.external_blockers');
   assertSameLifecycleArray(readiness.missing_evidence_refs, expected.missing_evidence_refs, 'readiness.missing_evidence_refs');
 }
+function lifecycleNextActions(readiness, operatorGoLiveRef) {
+  const actions = [];
+  for (const missing of readiness.missing_evidence_refs) {
+    actions.push({
+      action: `provide_${missing.key}_evidence`,
+      surface: missing.key,
+      ref: missing.ref,
+    });
+  }
+  if (operatorGoLiveRef === null) {
+    actions.push({
+      action: 'obtain_operator_go_live_approval',
+      surface: 'operator_go_live',
+      ref: 'blocked:operator_go_live',
+    });
+  }
+  if (actions.length === 0) {
+    actions.push({
+      action: 'lifecycle_complete_review_before_selling',
+      surface: 'operator_go_live',
+    });
+  }
+  return actions;
+}
+
+function customerLifecycleDashboard(contracts, requiredEvidenceRefs, readiness, operatorGoLiveRef) {
+  const dashboardContract = isPlainObject(contracts.dashboard) ? contracts.dashboard : null;
+  const providedEvidenceCount = CUSTOMER_LIFECYCLE_REQUIRED_EVIDENCE_PHASES
+    .filter((phase) => requiredEvidenceRefs[phase].status === PROVIDED).length;
+  return {
+    counts: {
+      account_count: dashboardContract ? dashboardContract.account_count : 0,
+      active_api_key_count: dashboardContract ? dashboardContract.active_api_key_count : 0,
+      hosted_vault_count: dashboardContract ? dashboardContract.hosted_vault_count : 0,
+      open_incident_count: dashboardContract ? dashboardContract.open_incident_count : 0,
+      lifecycle_phase_count: HOSTED_CLOUD_CUSTOMER_LIFECYCLE_PHASES.length,
+      provided_evidence_count: providedEvidenceCount,
+      missing_evidence_count: readiness.missing_evidence_refs.length,
+      external_blocker_count: readiness.external_blockers.length,
+    },
+    status_refs: {
+      billing_period_ref: isPlainObject(contracts.billing) ? contracts.billing.billing_record_id : 'blocked:billing',
+      backup_drill_ref: isPlainObject(contracts.backup) ? contracts.backup.backup_drill_id : 'blocked:backup',
+      incident_sla_ref: isPlainObject(contracts.incident_sla) ? contracts.incident_sla.incident_sla_id : 'blocked:incident_sla',
+      operator_go_live_ref: operatorGoLiveRef,
+    },
+    blocker_refs: readiness.external_blockers.map((blocker) => ({
+      surface: blocker.key,
+      ref: blocker.ref,
+      blocker: blocker.blocker,
+    })),
+    next_actions: lifecycleNextActions(readiness, operatorGoLiveRef),
+    safety_summary: {
+      evidence_validation_only: true,
+      key_material_absent: true,
+      token_material_absent: true,
+      auth_material_absent: true,
+      customer_content_absent: true,
+    },
+  };
+}
 
 export function buildCustomerLifecyclePacket(input = {}) {
   if (!isPlainObject(input)) throw new TypeError('buildCustomerLifecyclePacket requires an options object');
@@ -980,6 +1073,7 @@ export function buildCustomerLifecyclePacket(input = {}) {
     missing_evidence_refs: readiness.missing_evidence_refs,
     operator_go_live_ref: operatorGoLiveRef,
     readiness,
+    dashboard: customerLifecycleDashboard(contracts, requiredEvidenceRefs, readiness, operatorGoLiveRef),
     hosted_cloud_sellable: readiness.hosted_cloud_sellable,
     guarantees: customerLifecycleSafetyGuarantees(),
     public_safety_guarantees: customerLifecycleSafetyGuarantees(),
@@ -1008,6 +1102,7 @@ export function validateCustomerLifecyclePacket(packet) {
   assertSameLifecycleArray(packet.missing_evidence_refs, expectedReadiness.missing_evidence_refs, 'missing_evidence_refs');
   validateCustomerLifecycleReadiness(packet.readiness, expectedReadiness);
   if (packet.hosted_cloud_sellable !== expectedReadiness.hosted_cloud_sellable) throw new TypeError('hosted_cloud_sellable must match readiness.hosted_cloud_sellable');
+  assertSameLifecycleObject(packet.dashboard, customerLifecycleDashboard(packet.contracts, requiredEvidenceRefs, expectedReadiness, operatorGoLiveRef), 'dashboard');
   validateCustomerLifecycleSafetyGuarantees(packet.guarantees ?? packet.public_safety_guarantees);
   return true;
 }
@@ -1398,5 +1493,378 @@ export function validateApiKeyLifecyclePacket(packet) {
   if (packet.customer_api_keys_live !== expectedReadiness.customer_api_keys_live) throw new TypeError('customer_api_keys_live must match readiness.customer_api_keys_live');
   validateApiKeyLifecycleSafetyGuarantees(packet.guarantees ?? packet.public_safety_guarantees);
   validateApiKeyLifecycleSafetyGuarantees(packet.public_safety_guarantees ?? packet.guarantees);
+  return true;
+}
+
+function readinessEvidenceRefFor(surface, value, lifecyclePhaseEvidence) {
+  const fallback = { ref: `blocked:${surface}`, status: BLOCKED, blocker: READINESS_BLOCKER_LABELS[surface] };
+  if (value === undefined || value === null) {
+    if (lifecyclePhaseEvidence && lifecyclePhaseEvidence.status === PROVIDED) {
+      return { ref: lifecyclePhaseEvidence.ref, status: PROVIDED };
+    }
+    return fallback;
+  }
+  if (typeof value === 'string') {
+    return { ref: requirePublicSafeLifecycleRef(value, `required_evidence_refs.${surface}`), status: PROVIDED };
+  }
+  if (!isPlainObject(value)) throw new TypeError(`required_evidence_refs.${surface} must be a string or object`);
+  const status = stringOrDefault(value.status, PROVIDED);
+  if (!EVIDENCE_STATUSES.has(status)) throw new TypeError(`required_evidence_refs.${surface}.status is invalid`);
+  const ref = status === PROVIDED
+    ? requirePublicSafeLifecycleRef(value.ref, `required_evidence_refs.${surface}.ref`)
+    : requiredString(value.ref, `required_evidence_refs.${surface}.ref`);
+  assertNoForbiddenPayload(ref, `required_evidence_refs.${surface}.ref`);
+  const evidence = { ref, status };
+  const blocker = optionalString(value.blocker, `required_evidence_refs.${surface}.blocker`);
+  if (status === BLOCKED) evidence.blocker = blocker ?? READINESS_BLOCKER_LABELS[surface];
+  return evidence;
+}
+
+function readinessEvidenceRefsFrom(input, lifecycleEvidenceRefs) {
+  const explicitRefs = input.required_evidence_refs ?? input.requiredEvidenceRefs
+    ?? input.readiness_evidence_refs ?? input.readinessEvidenceRefs;
+  const refs = isPlainObject(explicitRefs) ? explicitRefs : {};
+  const evidenceRefs = {};
+  for (const surface of HOSTED_CLOUD_READINESS_SURFACES) {
+    const lifecyclePhase = READINESS_SURFACE_LIFECYCLE_PHASE[surface];
+    const lifecycleEvidence = lifecycleEvidenceRefs ? lifecycleEvidenceRefs[lifecyclePhase] : undefined;
+    evidenceRefs[surface] = readinessEvidenceRefFor(surface, refs[surface], lifecycleEvidence);
+  }
+  return evidenceRefs;
+}
+
+function propagatedCustomerLifecycleBlockersFrom(lifecycleSellable, lifecycleExternalBlockers) {
+  if (lifecycleSellable === null) {
+    return [{
+      key: 'customer_lifecycle_packet',
+      ref: 'blocked:customer_lifecycle:missing',
+      blocker: 'No customer lifecycle packet is embedded; readiness cannot confirm lifecycle sellability.',
+    }];
+  }
+  if (lifecycleSellable) return [];
+  const blockers = [{
+    key: 'customer_lifecycle_packet',
+    ref: 'blocked:customer_lifecycle:not_sellable',
+    blocker: 'Embedded customer lifecycle packet is not sellable.',
+  }];
+  for (const blocker of lifecycleExternalBlockers) {
+    blockers.push({
+      key: `customer_lifecycle.${blocker.key}`,
+      ref: blocker.ref,
+      blocker: blocker.blocker,
+    });
+  }
+  return blockers;
+}
+
+function propagatedApiKeyLifecycleBlockersFrom(operatorApprovalRef, apiKeyExternalBlockers) {
+  if (operatorApprovalRef === undefined) {
+    return [{
+      key: 'api_key_lifecycle_packet',
+      ref: 'blocked:api_key_lifecycle:missing',
+      blocker: 'No API key lifecycle packet is embedded; readiness cannot confirm API key lifecycle operator approval evidence.',
+    }];
+  }
+  return apiKeyExternalBlockers.map((blocker) => ({
+    key: `api_key_lifecycle.${blocker.key}`,
+    ref: blocker.ref,
+    blocker: blocker.blocker,
+  }));
+}
+
+function cloudReadinessAssessment(requiredEvidenceRefs, operatorGoLiveRef, lifecycleSellable, apiKeyOperatorApprovalRef, propagatedBlockers) {
+  const missingEvidenceRefs = HOSTED_CLOUD_READINESS_SURFACES
+    .filter((surface) => requiredEvidenceRefs[surface].status !== PROVIDED)
+    .map((surface) => ({
+      key: surface,
+      ref: requiredEvidenceRefs[surface].ref,
+      blocker: requiredEvidenceRefs[surface].blocker ?? READINESS_BLOCKER_LABELS[surface],
+    }));
+  const externalBlockers = [...missingEvidenceRefs, ...propagatedBlockers];
+  if (operatorGoLiveRef === null) {
+    externalBlockers.push({
+      key: 'operator_go_live',
+      ref: 'blocked:operator_go_live',
+      blocker: READINESS_BLOCKER_LABELS.operator_go_live,
+    });
+  }
+  const sellable = missingEvidenceRefs.length === 0
+    && propagatedBlockers.length === 0
+    && operatorGoLiveRef !== null;
+  return {
+    ...HOSTED_CLOUD_CONTRACT_READY,
+    status: sellable ? 'operator_approved_readiness_packet' : 'blocked_readiness_evidence_or_operator_go_live',
+    evidence_validation_only: true,
+    lifecycle_evidence_complete: missingEvidenceRefs.length === 0,
+    lifecycle_packet_sellable: lifecycleSellable === true,
+    lifecycle_packet_embedded: lifecycleSellable !== null,
+    api_key_lifecycle_operator_approved: apiKeyOperatorApprovalRef !== undefined && apiKeyOperatorApprovalRef !== null,
+    api_key_lifecycle_packet_embedded: apiKeyOperatorApprovalRef !== undefined,
+    operator_go_live_approved: operatorGoLiveRef !== null,
+    external_wiring_ready: externalBlockers.length === 0,
+    hosted_cloud_sellable: sellable,
+    selling_gate: sellable
+      ? 'evidence_complete_operator_go_live_approved'
+      : 'blocked_until_readiness_evidence_and_operator_go_live',
+    propagated_lifecycle_blockers: propagatedBlockers,
+    external_blockers: externalBlockers,
+    missing_evidence_refs: missingEvidenceRefs,
+  };
+}
+
+function readinessSurfaceRows(requiredEvidenceRefs, operatorGoLiveRef) {
+  const rows = HOSTED_CLOUD_READINESS_SURFACES.map((surface) => {
+    const evidence = requiredEvidenceRefs[surface];
+    const row = {
+      surface,
+      evidence_ref: evidence.ref,
+      evidence_status: evidence.status,
+      ready: evidence.status === PROVIDED,
+    };
+    if (evidence.status === BLOCKED) row.blocker = evidence.blocker ?? READINESS_BLOCKER_LABELS[surface];
+    return row;
+  });
+  const goLiveRow = {
+    surface: 'operator_go_live',
+    evidence_ref: operatorGoLiveRef ?? 'blocked:operator_go_live',
+    evidence_status: operatorGoLiveRef === null ? BLOCKED : PROVIDED,
+    ready: operatorGoLiveRef !== null,
+  };
+  if (operatorGoLiveRef === null) goLiveRow.blocker = READINESS_BLOCKER_LABELS.operator_go_live;
+  rows.push(goLiveRow);
+  return rows;
+}
+
+function readinessNextActions(readiness, operatorGoLiveRef) {
+  const actions = [];
+  for (const missing of readiness.missing_evidence_refs) {
+    actions.push({
+      action: `provide_${missing.key}_evidence`,
+      surface: missing.key,
+      ref: missing.ref,
+    });
+  }
+  if (readiness.propagated_lifecycle_blockers && readiness.propagated_lifecycle_blockers.length > 0) {
+    actions.push({
+      action: 'resolve_customer_lifecycle_blockers',
+      surface: 'customer_lifecycle_packet',
+      ref: readiness.propagated_lifecycle_blockers[0].ref,
+    });
+  }
+  if (operatorGoLiveRef === null) {
+    actions.push({
+      action: 'obtain_operator_go_live_approval',
+      surface: 'operator_go_live',
+      ref: 'blocked:operator_go_live',
+    });
+  }
+  if (actions.length === 0) {
+    actions.push({
+      action: 'readiness_complete_review_before_selling',
+      surface: 'operator_go_live',
+    });
+  }
+  return actions;
+}
+
+function cloudReadinessDashboard(requiredEvidenceRefs, readiness, operatorGoLiveRef, lifecycleRef) {
+  const providedCount = HOSTED_CLOUD_READINESS_SURFACES
+    .filter((surface) => requiredEvidenceRefs[surface].status === PROVIDED).length;
+  return {
+    counts: {
+      readiness_surface_count: HOSTED_CLOUD_READINESS_SURFACES.length + 1,
+      provided_evidence_count: providedCount,
+      missing_evidence_count: readiness.missing_evidence_refs.length,
+      external_blocker_count: readiness.external_blockers.length,
+    },
+    status_refs: {
+      customer_lifecycle_packet_ref: lifecycleRef,
+      operator_go_live_ref: operatorGoLiveRef,
+    },
+    blocker_refs: readiness.external_blockers.map((blocker) => ({
+      surface: blocker.key,
+      ref: blocker.ref,
+      blocker: blocker.blocker,
+    })),
+    next_actions: readinessNextActions(readiness, operatorGoLiveRef),
+    safety_summary: {
+      evidence_validation_only: true,
+      key_material_absent: true,
+      token_material_absent: true,
+      auth_material_absent: true,
+      customer_content_absent: true,
+    },
+  };
+}
+
+function cloudReadinessSafetyGuarantees() {
+  return {
+    opaque_reference_only: true,
+    customer_content_absent: true,
+    sensitive_text_absent: true,
+    auth_material_absent: true,
+    provider_payloads_absent: true,
+    evidence_validation_only: true,
+    financial_outcome_claim_absent: true,
+    remote_erasure_claim_absent: true,
+  };
+}
+
+function validateCloudReadinessSafetyGuarantees(guarantees) {
+  if (!isPlainObject(guarantees)) throw new TypeError('public_safety_guarantees must be present');
+  requiredTrue(guarantees.opaque_reference_only, 'public_safety_guarantees.opaque_reference_only');
+  requiredTrue(guarantees.customer_content_absent, 'public_safety_guarantees.customer_content_absent');
+  requiredTrue(guarantees.sensitive_text_absent, 'public_safety_guarantees.sensitive_text_absent');
+  requiredTrue(guarantees.auth_material_absent, 'public_safety_guarantees.auth_material_absent');
+  requiredTrue(guarantees.provider_payloads_absent, 'public_safety_guarantees.provider_payloads_absent');
+  requiredTrue(guarantees.evidence_validation_only, 'public_safety_guarantees.evidence_validation_only');
+  requiredTrue(guarantees.financial_outcome_claim_absent, 'public_safety_guarantees.financial_outcome_claim_absent');
+  requiredTrue(guarantees.remote_erasure_claim_absent, 'public_safety_guarantees.remote_erasure_claim_absent');
+}
+
+function validateCloudReadinessReadiness(readiness, expected) {
+  if (!isPlainObject(readiness)) throw new TypeError('readiness must be present');
+  requiredTrue(readiness.contract_ready, 'readiness.contract_ready');
+  if (readiness.integration_kind !== HOSTED_CLOUD_CONTRACT_READY.integration_kind) throw new TypeError('readiness.integration_kind must remain contract_validator_only');
+  requiredTrue(readiness.no_external_provider_calls, 'readiness.no_external_provider_calls');
+  requiredTrue(readiness.evidence_validation_only, 'readiness.evidence_validation_only');
+  if (readiness.status !== expected.status) throw new TypeError('readiness.status must match readiness evidence and operator go-live approval');
+  if (readiness.lifecycle_evidence_complete !== expected.lifecycle_evidence_complete) throw new TypeError('readiness.lifecycle_evidence_complete must match required_evidence_refs');
+  if (readiness.lifecycle_packet_sellable !== expected.lifecycle_packet_sellable) throw new TypeError('readiness.lifecycle_packet_sellable must match embedded lifecycle packet');
+  if (readiness.lifecycle_packet_embedded !== expected.lifecycle_packet_embedded) throw new TypeError('readiness.lifecycle_packet_embedded must match embedded lifecycle packet');
+  if (readiness.api_key_lifecycle_operator_approved !== expected.api_key_lifecycle_operator_approved) throw new TypeError('readiness.api_key_lifecycle_operator_approved must match embedded API key lifecycle operator approval evidence');
+  if (readiness.api_key_lifecycle_packet_embedded !== expected.api_key_lifecycle_packet_embedded) throw new TypeError('readiness.api_key_lifecycle_packet_embedded must match embedded API key lifecycle packet');
+  if (readiness.operator_go_live_approved !== expected.operator_go_live_approved) throw new TypeError('readiness.operator_go_live_approved must match operator_go_live_ref');
+  if (readiness.external_wiring_ready !== expected.external_wiring_ready) throw new TypeError('readiness.external_wiring_ready must match blockers');
+  if (readiness.hosted_cloud_sellable !== expected.hosted_cloud_sellable) throw new TypeError('readiness.hosted_cloud_sellable must match readiness evidence and operator go-live approval');
+  if (readiness.selling_gate !== expected.selling_gate) throw new TypeError('readiness.selling_gate must match readiness evidence and operator go-live approval');
+  assertSameLifecycleArray(readiness.propagated_lifecycle_blockers, expected.propagated_lifecycle_blockers, 'readiness.propagated_lifecycle_blockers');
+  assertSameLifecycleArray(readiness.external_blockers, expected.external_blockers, 'readiness.external_blockers');
+  assertSameLifecycleArray(readiness.missing_evidence_refs, expected.missing_evidence_refs, 'readiness.missing_evidence_refs');
+}
+
+function validateReadinessEvidenceRefs(packet) {
+  if (!isPlainObject(packet.required_evidence_refs)) throw new TypeError('required_evidence_refs must be present');
+  for (const key of Object.keys(packet.required_evidence_refs)) {
+    if (!HOSTED_CLOUD_READINESS_SURFACES.includes(key)) throw new TypeError(`required_evidence_refs.${key} is not a readiness surface`);
+  }
+  const requiredEvidenceRefs = {};
+  for (const surface of HOSTED_CLOUD_READINESS_SURFACES) {
+    if (!Object.prototype.hasOwnProperty.call(packet.required_evidence_refs, surface)) throw new TypeError(`required_evidence_refs.${surface} must be present`);
+    requiredEvidenceRefs[surface] = readinessEvidenceRefFor(surface, packet.required_evidence_refs[surface], null);
+  }
+  return requiredEvidenceRefs;
+}
+
+export function buildHostedCloudReadinessPacket(input = {}) {
+  if (!isPlainObject(input)) throw new TypeError('buildHostedCloudReadinessPacket requires an options object');
+  assertNoForbiddenPayload(input, 'input');
+  const generatedAt = isoTimestamp(input.generated_at ?? input.generatedAt, 'generated_at');
+  const operatorGoLiveRef = operatorGoLiveRefFromInput(input);
+  let lifecycleSellable = null;
+  let lifecycleEvidenceRefs = null;
+  let lifecycleRef = null;
+  let apiKeyOperatorApprovalRef = undefined;
+  let apiKeyLifecycleRef = null;
+  const providedLifecyclePacket = input.customer_lifecycle_packet ?? input.customerLifecyclePacket;
+  if (providedLifecyclePacket !== undefined && providedLifecyclePacket !== null) {
+    if (!isPlainObject(providedLifecyclePacket)) throw new TypeError('customer_lifecycle_packet must be an object');
+    validateCustomerLifecyclePacket(providedLifecyclePacket);
+    lifecycleSellable = providedLifecyclePacket.hosted_cloud_sellable;
+    lifecycleEvidenceRefs = providedLifecyclePacket.required_evidence_refs;
+    lifecycleRef = {
+      schema: providedLifecyclePacket.schema,
+      packet_id: providedLifecyclePacket.packet_id,
+      contract_hash: providedLifecyclePacket.contract_hash,
+      hosted_cloud_sellable: providedLifecyclePacket.hosted_cloud_sellable,
+    };
+  }
+  const providedApiKeyPacket = input.api_key_lifecycle_packet ?? input.apiKeyLifecyclePacket;
+  if (providedApiKeyPacket !== undefined && providedApiKeyPacket !== null) {
+    if (!isPlainObject(providedApiKeyPacket)) throw new TypeError('api_key_lifecycle_packet must be an object');
+    validateApiKeyLifecyclePacket(providedApiKeyPacket);
+    apiKeyOperatorApprovalRef = providedApiKeyPacket.operator_approval_ref;
+    apiKeyLifecycleRef = {
+      schema: providedApiKeyPacket.schema,
+      packet_id: providedApiKeyPacket.packet_id,
+      contract_hash: providedApiKeyPacket.contract_hash,
+      operator_approval_ref: providedApiKeyPacket.operator_approval_ref,
+    };
+  }
+  const lifecycleExternalBlockers = (providedLifecyclePacket && isPlainObject(providedLifecyclePacket)) ? providedLifecyclePacket.external_blockers : [];
+  const apiKeyExternalBlockers = (providedApiKeyPacket && isPlainObject(providedApiKeyPacket)) ? providedApiKeyPacket.external_blockers : [];
+  const propagatedBlockers = [
+    ...propagatedCustomerLifecycleBlockersFrom(lifecycleSellable, lifecycleExternalBlockers),
+    ...propagatedApiKeyLifecycleBlockersFrom(apiKeyOperatorApprovalRef, apiKeyExternalBlockers),
+  ];
+  const requiredEvidenceRefs = readinessEvidenceRefsFrom(input, lifecycleEvidenceRefs);
+  const readiness = cloudReadinessAssessment(requiredEvidenceRefs, operatorGoLiveRef, lifecycleSellable, apiKeyOperatorApprovalRef, propagatedBlockers);
+  const body = {
+    schema: HOSTED_CLOUD_READINESS_PACKET_SCHEMA,
+    readiness_id: stringOrDefault(input.readiness_id ?? input.readinessId, undefined),
+    generated_at: generatedAt,
+    customer_lifecycle_packet: lifecycleRef,
+    api_key_lifecycle_packet: apiKeyLifecycleRef,
+    required_evidence_refs: requiredEvidenceRefs,
+    readiness_surfaces: readinessSurfaceRows(requiredEvidenceRefs, operatorGoLiveRef),
+    propagated_lifecycle_blockers: readiness.propagated_lifecycle_blockers,
+    operator_go_live_ref: operatorGoLiveRef,
+    external_blockers: readiness.external_blockers,
+    missing_evidence_refs: readiness.missing_evidence_refs,
+    readiness,
+    dashboard: cloudReadinessDashboard(requiredEvidenceRefs, readiness, operatorGoLiveRef, lifecycleRef),
+    hosted_cloud_sellable: readiness.hosted_cloud_sellable,
+    guarantees: cloudReadinessSafetyGuarantees(),
+    public_safety_guarantees: cloudReadinessSafetyGuarantees(),
+  };
+  const packet = withContractIdentity(body, 'hcrp', 'readiness_id');
+  validateHostedCloudReadinessPacket(packet);
+  return packet;
+}
+
+export function validateHostedCloudReadinessPacket(packet) {
+  if (!isPlainObject(packet)) throw new TypeError('packet must be an object');
+  assertNoForbiddenPayload(packet, 'packet');
+  if (packet.schema !== HOSTED_CLOUD_READINESS_PACKET_SCHEMA) throw new TypeError(`schema must be ${HOSTED_CLOUD_READINESS_PACKET_SCHEMA}`);
+  requiredString(packet.readiness_id, 'readiness_id');
+  isoTimestamp(packet.generated_at, 'generated_at');
+  requiredString(packet.contract_hash, 'contract_hash');
+  if (!Object.prototype.hasOwnProperty.call(packet, 'customer_lifecycle_packet')) throw new TypeError('customer_lifecycle_packet must be present');
+  if (packet.customer_lifecycle_packet !== null) {
+    if (!isPlainObject(packet.customer_lifecycle_packet)) throw new TypeError('customer_lifecycle_packet must be an object or null');
+    requiredString(packet.customer_lifecycle_packet.schema, 'customer_lifecycle_packet.schema');
+    requiredString(packet.customer_lifecycle_packet.packet_id, 'customer_lifecycle_packet.packet_id');
+    requiredString(packet.customer_lifecycle_packet.contract_hash, 'customer_lifecycle_packet.contract_hash');
+    requiredBoolean(packet.customer_lifecycle_packet.hosted_cloud_sellable, 'customer_lifecycle_packet.hosted_cloud_sellable');
+  }
+  if (!Object.prototype.hasOwnProperty.call(packet, 'api_key_lifecycle_packet')) throw new TypeError('api_key_lifecycle_packet must be present');
+  if (packet.api_key_lifecycle_packet !== null) {
+    if (!isPlainObject(packet.api_key_lifecycle_packet)) throw new TypeError('api_key_lifecycle_packet must be an object or null');
+    requiredString(packet.api_key_lifecycle_packet.schema, 'api_key_lifecycle_packet.schema');
+    requiredString(packet.api_key_lifecycle_packet.packet_id, 'api_key_lifecycle_packet.packet_id');
+    requiredString(packet.api_key_lifecycle_packet.contract_hash, 'api_key_lifecycle_packet.contract_hash');
+    if (!Object.prototype.hasOwnProperty.call(packet.api_key_lifecycle_packet, 'operator_approval_ref')) throw new TypeError('api_key_lifecycle_packet.operator_approval_ref must be present');
+    if (packet.api_key_lifecycle_packet.operator_approval_ref !== null) {
+      requirePublicSafeLifecycleRef(packet.api_key_lifecycle_packet.operator_approval_ref, 'api_key_lifecycle_packet.operator_approval_ref');
+    }
+  }
+  if (!Array.isArray(packet.propagated_lifecycle_blockers)) throw new TypeError('propagated_lifecycle_blockers must be an array');
+  const requiredEvidenceRefs = validateReadinessEvidenceRefs(packet);
+  const operatorGoLiveRef = operatorGoLiveRefFromPacket(packet);
+  const lifecycleSellable = packet.customer_lifecycle_packet === null
+    ? null
+    : packet.customer_lifecycle_packet.hosted_cloud_sellable;
+  const apiKeyOperatorApprovalRef = packet.api_key_lifecycle_packet === null
+    ? undefined
+    : packet.api_key_lifecycle_packet.operator_approval_ref;
+  const expectedReadiness = cloudReadinessAssessment(requiredEvidenceRefs, operatorGoLiveRef, lifecycleSellable, apiKeyOperatorApprovalRef, packet.propagated_lifecycle_blockers);
+  assertSameLifecycleArray(packet.readiness_surfaces, readinessSurfaceRows(requiredEvidenceRefs, operatorGoLiveRef), 'readiness_surfaces');
+  assertSameLifecycleArray(packet.external_blockers, expectedReadiness.external_blockers, 'external_blockers');
+  assertSameLifecycleArray(packet.missing_evidence_refs, expectedReadiness.missing_evidence_refs, 'missing_evidence_refs');
+  validateCloudReadinessReadiness(packet.readiness, expectedReadiness);
+  if (packet.hosted_cloud_sellable !== expectedReadiness.hosted_cloud_sellable) throw new TypeError('hosted_cloud_sellable must match readiness.hosted_cloud_sellable');
+  assertSameLifecycleObject(packet.dashboard, cloudReadinessDashboard(requiredEvidenceRefs, expectedReadiness, operatorGoLiveRef, packet.customer_lifecycle_packet), 'dashboard');
+  validateCloudReadinessSafetyGuarantees(packet.guarantees ?? packet.public_safety_guarantees);
+  validateCloudReadinessSafetyGuarantees(packet.public_safety_guarantees ?? packet.guarantees);
   return true;
 }

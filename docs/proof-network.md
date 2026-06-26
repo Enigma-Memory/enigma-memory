@@ -16,6 +16,8 @@ The initial artifact families are:
 | Capability revocation | `enigma.proof_network.capability_revocation.v1` | Records that a prior grant or scope is no longer accepted by verifiers after the revocation artifact is recognized. |
 | Benchmark attestation | `enigma.proof_network.benchmark_attestation.v1` | Binds a benchmark report hash to dataset, runner, package, and environment refs without publishing raw benchmark contents. |
 | Proof packet | `enigma.proof_network.packet.v1` | Bundles supported proof-network artifacts and verification metadata for review or handoff. |
+| Registry entry | `enigma.proof_network.registry_entry.v1` | Indexes one anchor batch, benchmark attestation, connector conformance attestation, health report, operator receipt, or settlement job ref into a public-safe marketplace registry by digest refs, signer refs, and schema ref only. |
+| Registry batch | `enigma.proof_network.registry_batch.v1` | Aggregates registry entries into one registry root so a marketplace index can be reviewed or handed off as a single commitment. |
 
 The pure package API for these artifacts should stay side-effect free: constructors create public-safe JSON, validators check exact schema shape and privacy flags, `sha256Json` hashes canonical JSON, and `assertNoPrivateProofPayload` rejects private key names or values before an artifact can be emitted. The API must not call a network, touch the filesystem, invoke provider SDKs, or infer missing private context.
 
@@ -92,7 +94,7 @@ Example:
 ```sh
 enigma chain anchor \
   --root sha256:8f0f7d2b7b7f4f2a3e4b9a3d1f0f2c3b4a5d6e7f8091a2b3c4d5e6f708192a3b \
-  --ref release:enigma:0.1.16 \
+  --ref release:enigma:0.1.17 \
   --ref memory-root:public-demo-2026-06-25 \
   --out ./.enigma/proof-network-anchor.json
 ```
@@ -166,8 +168,8 @@ Example with a report hash:
 enigma chain attest \
   --report-hash sha256:5c3a2e1d0f9b8a7766554433221100ffeeddccbbaa99887766554433221100ff \
   --dataset-ref locomo:file-sha256:6a7b8c9d0e1f2233445566778899aabbccddeeff00112233445566778899aabb \
-  --runner-ref enigma-standard-memory-benchmark:0.1.16 \
-  --package-ref npm://enigma-memory@0.1.16 \
+  --runner-ref enigma-standard-memory-benchmark:0.1.17 \
+  --package-ref npm://enigma-memory@0.1.17 \
   --out ./.enigma/proof-network-attestation.json
 ```
 
@@ -177,12 +179,62 @@ Example with a local report file:
 enigma chain attest \
   --report-file ./.enigma/standard-memory-benchmark.json \
   --dataset-ref longmemeval:file-sha256:7b8c9d0e1f2233445566778899aabbccddeeff00112233445566778899aabbcc \
-  --runner-ref enigma-standard-memory-benchmark:0.1.16 \
-  --package-ref npm://enigma-memory@0.1.16 \
+  --runner-ref enigma-standard-memory-benchmark:0.1.17 \
+  --package-ref npm://enigma-memory@0.1.17 \
   --out ./.enigma/proof-network-attestation.json
 ```
 
 The public attestation should include only the report hash and refs. It should not include raw benchmark rows, questions, answers, conversations, private file paths, credentials, or provider outputs.
+
+## Flow: register
+
+Registry entries index one already-created proof artifact into a public-safe marketplace registry. The entry never copies the artifact body; it binds the artifact hash to a schema ref, digest refs, signer refs, an entry type, and a registry namespace ref.
+
+1. The operator creates or selects a supported artifact (anchor batch, benchmark attestation, connector conformance attestation, health report, operator receipt, or settlement job ref) and keeps its body private.
+2. The CLI records only the artifact hash, the artifact schema ref, the public-safe digest refs and signer refs to index, and the entry type.
+3. The CLI validates that no private payload is present and emits a registry entry with `transaction_submitted:false` and `raw_memory_on_chain:false`.
+4. A reviewer can later resolve the artifact hash through approved private channels; the registry entry reveals only that a digest was indexed under a schema by named signers.
+
+Supported entry types are `anchor_batch`, `benchmark_attestation`, `connector_conformance`, `health_report`, `operator_receipt`, and `settlement_job`. An unsupported entry type is rejected before an entry is created.
+
+Example:
+
+```sh
+enigma chain register \
+  --entry-type benchmark_attestation \
+  --artifact-hash sha256:5c3a2e1d0f9b8a7766554433221100ffeeddccbbaa99887766554433221100ff \
+  --artifact-schema-ref enigma.proof_network.benchmark_attestation.v1 \
+  --digest-ref sha256:8f0f7d2b7b7f4f2a3e4b9a3d1f0f2c3b4a5d6e7f8091a2b3c4d5e6f708192a3b \
+  --signer did:key:zpublicattestor \
+  --registry-ref registry:memory-drive-marketplace \
+  --entry-ref registry-entry://enigma/public/benchmark-1 \
+  --out ./.enigma/proof-network-registry-entry.json
+```
+
+A registry entry answers "which digest was indexed under which schema by which signers, in which registry namespace?" It does not publish the artifact body, the report rows, the memory behind a root, customer or tenant identifiers, or any private review content.
+
+## Flow: registry
+
+Registry batches aggregate registry entries into one registry root so a marketplace index can be reviewed or handed off as a single commitment.
+
+1. The operator selects registry entries that have already passed local validation.
+2. The CLI sorts the entry hashes and hashes them into a registry root.
+3. The CLI emits a registry batch with the entry list, entry count, registry root, and the same safety boundaries.
+4. A reviewer verifies the batch locally and resolves individual entries through approved private channels.
+
+The registry root is deterministic and independent of entry input order: the same set of entries always yields the same registry root.
+
+Example:
+
+```sh
+enigma chain registry \
+  --entry ./.enigma/proof-network-registry-entry.json \
+  --entry ./.enigma/proof-network-registry-entry-health.json \
+  --registry-ref registry:memory-drive-marketplace \
+  --out ./.enigma/proof-network-registry-batch.json
+```
+
+A registry batch is a local planning artifact. It does not broadcast to a marketplace, register on a live chain, or prove that any third party adopted the index.
 
 ## Flow: packet
 
@@ -207,6 +259,8 @@ enigma chain verify --file ./.enigma/proof-network-grant.json
 enigma chain verify --file ./.enigma/proof-network-revocation.json
 enigma chain verify --file ./.enigma/proof-network-attestation.json
 enigma chain verify --file ./.enigma/proof-network-packet.json
+enigma chain verify --file ./.enigma/proof-network-registry-entry.json
+enigma chain verify --file ./.enigma/proof-network-registry-batch.json
 ```
 
 A successful local verification means the artifact matches a supported proof-network shape and safety boundary. It does not mean a live account exists, a transaction was accepted, or a public rail was contacted.
@@ -247,6 +301,7 @@ Proof-network artifacts are public-safe only when they follow these boundaries:
 | Benchmark evidence | Report hash, dataset ref, runner ref, package ref, environment ref | Raw questions, answers, conversations, provider responses, private dataset rows |
 | Solana planning | Batch root, schema id, public keys, PDA seed descriptions | Private keys, seed phrases, API keys, local file paths, raw memory |
 | Review packet | Supported proof artifacts, hashes, signatures, verification metadata | Secrets, private operational notes, unredacted logs |
+| Registry index | Artifact hash, schema ref, digest refs, signer refs, registry namespace ref, entry type, count | Artifact bodies, report rows, memory behind roots, customer or tenant identifiers |
 
 The private-payload guard should reject both key names and values that look like private data. Reviewers should treat that guard as a safety net, not as permission to put sensitive fields near public artifacts.
 
@@ -254,11 +309,12 @@ The private-payload guard should reject both key names and values that look like
 
 Allowed public claims are intentionally narrow:
 
-- Enigma can produce local proof-network JSON artifacts for anchors, grants, revocations, benchmark attestations, and packets.
+- Enigma can produce local proof-network JSON artifacts for anchors, grants, revocations, benchmark attestations, packets, registry entries, and registry batches.
 - The artifacts are designed to contain public-safe hashes, roots, refs, counts, timestamps, signatures, and schema identifiers.
 - The local verifier can validate supported proof-network artifact shapes and reject private payload patterns.
 - Anchor batches are Solana-ready planning payloads for compact commitments, with `transaction_submitted:false`.
 - Raw memory is not intended to be placed on a public rail by these artifacts.
+- Registry entries index an already-created artifact by digest refs, signer refs, and schema ref only; registry batches hash entries into one registry root for review or handoff. Neither claims that a marketplace or live chain adopted the index.
 
 Forbidden public claims include:
 
@@ -268,6 +324,7 @@ Forbidden public claims include:
 - saying a revocation changes third-party systems or private stores that do not consume the revocation artifact;
 - saying a benchmark attestation proves answer quality or provider ranking;
 - saying the system replaces separate audits, changes public-market outcomes, or controls systems that do not consume the artifact.
+- saying a registry entry or registry batch was published to a live marketplace, registered on a live chain, or adopted by any third party;
 
 ## Reviewer checklist
 
