@@ -212,38 +212,48 @@ Treat both `201 Created` and `202 Accepted` as expected registration responses. 
 
 ## 8. Build and preflight the public site before deploy
 
-Cloudflare deployment should use a generated public artifact, not raw internal/staging source. Build and inspect the public artifact first when the static site package is present:
+Cloudflare deployment should use the generated public artifact, not raw internal/staging source. For the current Enigma launch site artifact in this workspace, stage the artifact with deployment/security headers, then run public-safe checks from the repository root:
 
 ```sh
-python scripts/build_public_site.py
-python scripts/preflight_public_site.py --site _public_site
+cd enigma
+npm run cloudflare:pages:stage
+npm run production:site -- --site .enigma/cloudflare-pages/enigmamemory.com
+npm run cloudflare:pages:packet -- --site .enigma/cloudflare-pages/enigmamemory.com --project-name enigma-memory --domain enigmamemory.com --live-url https://enigmamemory.com/ --expect-title "Enigma"
 ```
 
-The preflight is local and credential-free. It does not prove Cloudflare deployment, DNS/TLS, cache state, or live availability.
+`cloudflare:pages:stage` copies `../enigma-deploy` into `.enigma/cloudflare-pages/enigmamemory.com` and overlays required Cloudflare Pages security headers without mutating the source site artifact. These checks are local or public-read only and credential-free unless `--cloudflare-env-file` is supplied. They do not prove Cloudflare deployment, DNS/TLS, cache state, or hosted backend availability. If the staged packet reports `local_artifact_ready:false` or any `blockers`, stop; `cloudflare:ops pages deploy --execute` refuses to upload artifacts that fail the local public-site security check.
 
 ## 9. Deploy Cloudflare Pages
 
-Pages deploys must also be dry-run/plan-only by default. Do not upload assets unless the operator explicitly asks for deployment after local build/preflight review.
+Pages deploys must also be dry-run/plan-only by default. Do not upload assets unless the operator explicitly asks for deployment after local build/preflight review and the staged packet above has no local blockers.
 
-If using Wrangler manually after explicit deployment approval:
+The exact dry-run for `enigmamemory.com` stages the current artifact, validates it, and prints the Wrangler plan without mutating Cloudflare:
 
 ```sh
-npx wrangler pages deploy _public_site --project-name enigma-memory
+cd enigma
+npm run cloudflare:pages:dry-run
 ```
 
-The repository helper prints the deployment plan without mutating Cloudflare when `--execute` is omitted:
+After explicit deployment approval, run the execute command from a shell that already has `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` set:
 
 ```sh
-npm run cloudflare:ops -- pages deploy --project-name enigma-memory --site _public_site
+npm run cloudflare:pages:deploy
 ```
 
-After explicit deployment approval, add `--execute`:
+If the operator uses a local-only env file instead of already-exported environment variables, stage first and then run the generic helper:
 
 ```sh
-npm run cloudflare:ops -- pages deploy --project-name enigma-memory --site _public_site --execute
+npm run cloudflare:pages:stage
+npm run cloudflare:ops -- --cloudflare-env-file <local-secret-file> pages deploy --site .enigma/cloudflare-pages/enigmamemory.com --project-name enigma-memory --execute
 ```
 
 Record the generated `*.pages.dev` preview URL for review. A Pages preview URL is not final publication and does not close domain/DNS/TLS acceptance blockers.
+
+Verify the canonical host after deploy:
+
+```sh
+npm run cloudflare:ops -- --cloudflare-env-file <local-secret-file> pages verify --url https://enigmamemory.com/ --project-name enigma-memory --domain enigmamemory.com --cloudflare-live required
+```
 
 ## 10. Attach the custom domain
 

@@ -37,6 +37,25 @@ export const STANDARD_MEMORY_BENCHMARK_METHODS = Object.freeze([
   }),
 ]);
 
+export const STANDARD_EXTERNAL_COMPETITOR_ADAPTERS = Object.freeze([
+  Object.freeze({
+    id: 'mem0',
+    name: 'Mem0',
+    status: 'not_run_requires_credentials_or_runtime',
+    target_type: 'external_adapter',
+    can_run_in_this_harness: false,
+    scores_included: false,
+    required_artifacts: Object.freeze([
+      'Mem0 platform credentials or open-source runtime',
+      'Pinned Mem0 SDK/package versions',
+      'Fixed extraction, update, retrieval, reset, model, and tool policy',
+      'Same reviewed dataset manifest, split, top-k, and scorer as Enigma rows',
+    ]),
+    official_doc: 'https://docs.mem0.ai/',
+    boundary_reason: 'The standard runner has no Mem0 credentials, SDK/runtime, fixed memory loop, reset policy, model/tool environment, or reviewed adapter scorer, so no Mem0 score is produced.',
+  }),
+]);
+
 const LOCOMO_SOURCE_URL = 'https://raw.githubusercontent.com/snap-research/locomo/main/data/locomo10.json';
 const LONGMEMEVAL_SOURCE_URLS = Object.freeze([
   'https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/longmemeval_oracle.json',
@@ -121,6 +140,8 @@ function parseArgs(argv = process.argv.slice(2)) {
     } else if (arg === '--out') {
       options.out = requiredFlagValue(argv, index, arg);
       index += 1;
+    } else if (arg === '--dry-run') {
+      options.dry_run = true;
     } else if (arg === '--help' || arg === '-h') {
       options.help = true;
     } else {
@@ -145,6 +166,100 @@ function positiveInteger(value, name) {
 function optionalPositiveInteger(value, name) {
   if (value === undefined || value === null) return undefined;
   return positiveInteger(value, name);
+}
+
+function datasetPlanRows(options) {
+  const rows = [];
+  if (options.locomo !== undefined || options.locomoPath !== undefined) {
+    rows.push({
+      id: 'locomo',
+      label: 'LoCoMo',
+      local_file_name: publicFileName(options.locomo ?? options.locomoPath),
+      source_url: LOCOMO_SOURCE_URL,
+      license: 'CC BY-NC 4.0',
+      sample_limit: optionalPositiveInteger(options.max_locomo_qa ?? options.maxLocomoQa, 'max_locomo_qa') ?? null,
+      parser: 'conversation session turns as memory records; qa evidence labels score support only',
+    });
+  }
+  if (options.longmemeval !== undefined || options.longmemevalPath !== undefined || options.longMemEvalPath !== undefined) {
+    rows.push({
+      id: 'longmemeval',
+      label: 'LongMemEval',
+      local_file_name: publicFileName(options.longmemeval ?? options.longmemevalPath ?? options.longMemEvalPath),
+      source_url: LONGMEMEVAL_SOURCE_URLS,
+      license: 'Review upstream Hugging Face dataset card and LongMemEval repository terms.',
+      sample_limit: optionalPositiveInteger(options.max_longmemeval_items ?? options.maxLongMemEvalItems, 'max_longmemeval_items') ?? null,
+      parser: 'haystack_sessions turns as memory records; answer-session labels score support only',
+    });
+  }
+  return rows;
+}
+
+function offlineCommandBoundaries({ scoresIncluded, datasetFilesRead }) {
+  return {
+    deterministic_offline_runner: true,
+    dataset_files_read_from_local_disk: datasetFilesRead,
+    network_calls_made: false,
+    provider_api_calls_made: false,
+    api_spend_possible: false,
+    hosted_memory_service_called: false,
+    external_competitor_adapters_run: false,
+    mem0_adapter_run: false,
+    llm_used: false,
+    llm_answer_accuracy_scored: false,
+    retrieval_evidence_proxy_scored: scoresIncluded,
+    benchmark_scores_included: scoresIncluded,
+    raw_question_text_included: false,
+    raw_answer_text_included: false,
+    raw_conversation_text_included: false,
+    gold_labels_used_for_retrieval: false,
+    gold_labels_used_for_scoring: scoresIncluded,
+  };
+}
+
+function applesToApplesControls(topK) {
+  return {
+    same_top_k_for_all_methods: true,
+    top_k: topK,
+    same_parser_per_dataset: true,
+    same_local_records_per_dataset: true,
+    same_gold_evidence_labels_per_dataset_for_scoring_only: true,
+    local_deterministic_methods_only: true,
+    provider_runtime_fixed: false,
+    competitor_runtime_fixed: false,
+    answer_generator_fixed: false,
+    evaluator_model_fixed: false,
+  };
+}
+
+export function buildStandardBenchmarkDryRunPlan(options = {}) {
+  const topK = optionalPositiveInteger(options.top_k ?? options.topK, 'top_k') ?? 5;
+  const datasets = datasetPlanRows(options);
+  if (datasets.length === 0) throw new Error('Provide --locomo <path> and/or --longmemeval <path>');
+  return {
+    schema: 'enigma.standard_memory_benchmark_plan.v1',
+    generated_at: options.generated_at ?? new Date().toISOString(),
+    package: {
+      name: 'enigma-memory',
+      version: '0.1.16',
+    },
+    public_safe: true,
+    dry_run: true,
+    top_k: topK,
+    datasets_planned: datasets,
+    local_methods: STANDARD_MEMORY_BENCHMARK_METHODS.map((method) => ({ ...method })),
+    external_competitor_adapters: STANDARD_EXTERNAL_COMPETITOR_ADAPTERS.map((adapter) => ({
+      ...adapter,
+      required_artifacts: [...adapter.required_artifacts],
+    })),
+    command_boundaries: offlineCommandBoundaries({ scoresIncluded: false, datasetFilesRead: false }),
+    apples_to_apples_controls: applesToApplesControls(topK),
+    non_claims: [
+      'This dry run does not read dataset files and produces no benchmark score.',
+      'No provider APIs, hosted memory services, Mem0 runtime, competitor SDKs, LLM generators, or evaluator models are called.',
+      'A scored report requires a separate non-dry-run command against the exact local dataset files and hashes.',
+    ],
+  };
 }
 
 function publicFileName(path) {
@@ -995,7 +1110,7 @@ function buildSuiteReport(datasetRows, topK, options) {
     generated_at: options.generated_at ?? new Date().toISOString(),
     package: {
       name: 'enigma-memory',
-      version: '0.1.15',
+      version: '0.1.16',
     },
     public_safe: true,
     top_k: topK,
@@ -1010,6 +1125,8 @@ function buildSuiteReport(datasetRows, topK, options) {
       'No provider APIs, hosted runtimes, competitor SDKs, or external accounts are called by this runner.',
       'Rows are local deterministic methods only; no third-party competitor scores or benchmark-leadership claims are emitted.',
     ],
+    command_boundaries: offlineCommandBoundaries({ scoresIncluded: true, datasetFilesRead: true }),
+    apples_to_apples_controls: applesToApplesControls(topK),
     benchmark_boundaries: {
       official_dataset_files_required: true,
       credentials_required: false,
@@ -1032,15 +1149,20 @@ function buildSuiteReport(datasetRows, topK, options) {
       enigma_relevance_fallback: 'falls back to all local candidates only when no enhanced relevance signal exists, then applies deterministic local ranking and --top-k',
       provider_api_used: false,
       llm_used: false,
+      gold_labels_used_for_retrieval: false,
     },
     local_methods: STANDARD_MEMORY_BENCHMARK_METHODS.map((method) => ({ ...method })),
+    external_competitor_adapters: STANDARD_EXTERNAL_COMPETITOR_ADAPTERS.map((adapter) => ({
+      ...adapter,
+      required_artifacts: [...adapter.required_artifacts],
+    })),
     datasets: datasetRows,
     dataset_rows: datasetRows,
   };
 }
 
 function usage() {
-  return `Usage: node scripts/run-standard-memory-benchmarks.mjs [--locomo <path>] [--longmemeval <path>] [--max-locomo-qa <n>] [--max-longmemeval-items <n>] [--top-k <n>] [--out <path>]\n\nProduces schema ${STANDARD_MEMORY_BENCHMARK_SUITE_SCHEMA}. Raw question, answer, and conversation text are never written to the report. With --longmemeval and --max-longmemeval-items, the local top-level JSON array is streamed for hashing and only the requested sample items are parsed.`;
+  return `Usage: node scripts/run-standard-memory-benchmarks.mjs [--locomo <path>] [--longmemeval <path>] [--max-locomo-qa <n>] [--max-longmemeval-items <n>] [--top-k <n>] [--out <path>] [--dry-run]\n\nProduces schema ${STANDARD_MEMORY_BENCHMARK_SUITE_SCHEMA}. Raw question, answer, and conversation text are never written to the report. With --longmemeval and --max-longmemeval-items, the local top-level JSON array is streamed for hashing and only the requested sample items are parsed. Use --dry-run to print a public-safe offline execution plan without reading dataset files or producing scores.`;
 }
 
 async function main() {
@@ -1049,7 +1171,9 @@ async function main() {
     console.log(usage());
     return;
   }
-  const report = await runStandardMemoryBenchmarkSuiteFromFiles(options);
+  const report = options.dry_run
+    ? buildStandardBenchmarkDryRunPlan(options)
+    : await runStandardMemoryBenchmarkSuiteFromFiles(options);
   const serialized = `${JSON.stringify(report, null, 2)}\n`;
   if (options.out) {
     const outPath = resolve(options.out);

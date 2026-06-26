@@ -2,47 +2,29 @@
 
 Enigma Memory is a local-first SDK, CLI, MCP server, and service-contract package. The developer surfaces are designed to be copied without secrets, cloud credentials, hidden local paths, or account identifiers.
 
-## Public test-drive loop
+## CLI memory passport loop
 
 For most developers, start with the installed CLI before reading the SDK internals or service contracts:
 
 ```sh
 npm install -g enigma-memory
-enigma test-drive --overwrite
-```
-
-`enigma test-drive --overwrite` is zero-credential, local-only, and public-safe by default. It writes an isolated demo under `.enigma/test-drive`, keeps the default bundle inside that directory, emits one JSON summary, and does not print raw private memory plaintext. Use `--dry-run` to preview without writing or `--out-dir <path>` to choose another isolated demo directory.
-
-The test drive runs the local proof/demo path only: setup artifacts, search/status output, a cross-model demo report, and benchmark pointers. It does not call external providers, contact hosted Enigma SaaS, require OpenAI/Anthropic/Cloudflare credentials, create accounts, or write third-party client configs. Keep public claims bounded to local Enigma-controlled vault state, receipts, checkpoints, committed roots, exported bundle shape, and declared boundary operations.
-
-To explicitly connect real local clients that are already installed or already configured:
-
-```sh
-enigma setup --connect-installed --overwrite
-```
-
-`--connect-installed` implies auto selection, writes only for installed/config-present clients, and skips missing configs instead of creating every default client config. Only explicit write flags mutate client configs; `enigma connect <client>` without `--dry-run` remains the single-client write path, and existing `enigma setup --write-connectors` behavior for explicit/default clients is unchanged. Treat provider-native memory as non-canonical cache only; the local Enigma vault is canonical.
-
-## CLI memory passport loop
-
-After the public test drive, create a regular local workspace when you want day-to-day CLI usage:
-
-```sh
-npm install -g enigma-memory
 enigma setup --overwrite
-```
-
-`enigma setup --overwrite` is the safe default for a regular local workspace. It writes local Enigma artifacts under the workspace `.enigma` path and emits deterministic, public-safe JSON without printing raw memory plaintext. It does not write third-party app configs.
-
-After setup, use the same local vault from the CLI or connected clients:
-
-```sh
 enigma remember --text-file ./memory.txt
 enigma search --query "..."
 enigma context --query "..." --optimize
 enigma verify --export ./.enigma/export.json
 enigma connect claude-desktop --dry-run
 ```
+
+`enigma setup --overwrite` writes local Enigma artifacts under the workspace `.enigma` path and emits deterministic, public-safe JSON without printing raw memory plaintext. It does not write third-party app configs unless you explicitly run `enigma connect <client>` without `--dry-run`. Treat provider-native memory as non-canonical cache only; the local Enigma vault is canonical.
+
+Optional public test-drive loop:
+
+```sh
+npx --yes --package enigma-memory enigma test-drive --overwrite
+```
+
+`enigma test-drive --overwrite` is zero-credential, local-only, and public-safe by default. It does not call external providers, contact hosted Enigma SaaS, require OpenAI/Anthropic/Cloudflare credentials, create accounts, or write third-party client configs.
 
 ## Copyable starting points
 
@@ -105,7 +87,7 @@ npx --yes --package enigma-memory enigma test-drive --overwrite
 npx --yes --package enigma-memory enigma chain anchor --root sha256:8f8f... --root sha256:9a9a... --ref demo-local-vault --authority demo-public-authority --batch-ref demo-anchor-batch --out .enigma/proof-anchor-batch.json
 npx --yes --package enigma-memory enigma chain grant --subject did:example:agent --capability memory.read --scope demo-scope --resource-ref sha256:8f8f... --policy-hash sha256:7e7e... --expires-at 2026-07-01T00:00:00Z --grant-ref demo-grant --out .enigma/proof-capability-grant.json
 npx --yes --package enigma-memory enigma chain revoke --grant-hash sha256:6d6d... --reason scope-ended --revocation-ref demo-revocation --out .enigma/proof-capability-revocation.json
-npx --yes --package enigma-memory enigma chain attest --report-file benchmark-report.json --dataset-ref sha256:5c5c... --runner-ref enigma-standard-runner --package-ref enigma-memory@0.1.15 --score accuracy=0.92 --out .enigma/proof-benchmark-attestation.json
+npx --yes --package enigma-memory enigma chain attest --report-file benchmark-report.json --dataset-ref sha256:5c5c... --runner-ref enigma-standard-runner --package-ref enigma-memory@0.1.5 --score accuracy=0.92 --out .enigma/proof-benchmark-attestation.json
 npx --yes --package enigma-memory enigma chain verify --file .enigma/proof-anchor-batch.json
 ```
 
@@ -135,7 +117,7 @@ This path is intentionally copyable: npm install, run a local test drive, genera
 
 ## MCP client loop
 
-The same installed package can be used by Claude Desktop, Cursor, Kimi Code, or any generic MCP client. Run `enigma test-drive --overwrite` first if you want a zero-credential local proof before touching real client configs. The smooth setup path is `enigma setup --client auto --overwrite` to plan detected clients, then `enigma setup --connect-installed --overwrite` only when you explicitly want setup to write installed/config-present client configs. Manual snippets remain useful when a client needs a copied entry; replace the bundle path with the local path from your setup output, and restart the client.
+The same installed package can be used by Claude Desktop, Cursor, Kimi Code, or any generic MCP client. The smooth path is still one local setup plus a dry-run connector preview: `enigma setup --overwrite`, then `enigma connect claude-desktop --dry-run` or the matching client id. Remove `--dry-run` only when you explicitly want Enigma to write that client config. Manual snippets remain useful when a client needs a copied entry; replace the bundle path with the local path from your setup output, and restart the client.
 
 Claude Desktop:
 

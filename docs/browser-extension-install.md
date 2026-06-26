@@ -27,21 +27,24 @@ node scripts/package-browser-extension.mjs --zip ./dist/enigma-browser-extension
 
 The ZIP command does not publish, sign, upload, or submit the extension.
 
-## Install the native host first
+## Install the native host and MCP connector first
 
-Install the npm package so both `enigma` and `enigma-native-host` are available:
-
-```sh
-npm install -g enigma-memory
-```
-
-Create or select a local bundle:
+Install the npm package, create the local bundle, and let Enigma merge the MCP server entry into the selected client config. Pick the command for the client you use:
 
 ```sh
-enigma init --bundle <absolute-bundle-path> --subject local-user --display-name "Local user"
+npm install -g enigma-memory && enigma setup --client claude-desktop --write-connectors --overwrite
+npm install -g enigma-memory && enigma setup --client cursor --write-connectors --overwrite
+npm install -g enigma-memory && enigma setup --client kimi-code --write-connectors --overwrite
+npm install -g enigma-memory && enigma setup --client vscode-cline --write-connectors --overwrite
 ```
 
-Set `ENIGMA_BUNDLE` for the browser-launched host process, or point the native-host manifest at a small local wrapper that sets `ENIGMA_BUNDLE=<absolute-bundle-path>` before launching `enigma-native-host`. Native messaging manifests require an absolute executable path; they do not expand shell aliases, `~`, `$HOME`, `%USERPROFILE%`, or command arguments.
+If you want Enigma to touch only client config files that already exist, use:
+
+```sh
+npm install -g enigma-memory && enigma setup --client auto --connect-installed --overwrite
+```
+
+Set `ENIGMA_BUNDLE` for the browser-launched host process to the same bundle path reported by setup, or point the native-host manifest at a small local wrapper that sets `ENIGMA_BUNDLE=<absolute-bundle-path>` before launching `enigma-native-host`. Native messaging manifests require an absolute executable path; they do not expand shell aliases, `~`, `$HOME`, `%USERPROFILE%`, or command arguments.
 
 Resolve the absolute host executable path:
 

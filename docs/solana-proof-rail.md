@@ -437,7 +437,7 @@ Mainnet use is blocked until all gates below are satisfied for the exact program
 - Use domain tags for every hash: `anchor_batch`, `capability_grant`, `capability_revocation`, `benchmark_attestation`, `job_escrow`, `operator_registry`, and `packet`.
 - Prefer fixed-size byte arrays and enums in instruction args. Avoid variable user text and arbitrary JSON on-chain.
 - Keep account sizes bounded. Store hash lists off-chain behind roots when a vector could grow without a hard cap.
-- Every chain-writing CLI command should have a local planning mode first. The default for release `0.1.15` planning artifacts is no transaction submission.
+- Every chain-writing CLI command should have a local planning mode first. The default for release `0.1.16` planning artifacts is no transaction submission.
 - Chain refs should include cluster, program id, signature/account id, and slot. They should not include RPC URLs with credentials.
 
 ## Future implementation checklist

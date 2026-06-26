@@ -49,6 +49,8 @@ Hosted cloud remains blocked until an operator wires and records evidence for al
 
 A `provided` operator evidence ref means the contract can point to external evidence. It still does not by itself make hosted cloud sellable; an operator must complete the release checklist and issue go-live approval. A `blocked_external_dependency` ref is an explicit blocker, not fake evidence.
 
+Hosted relay/gateway readiness is a separate backend health boundary, not hosted-cloud sellability. Operators may validate the backend path with `npm run production:hosted-collect` followed by `npm run production:hosted-live`, but those commands only prove public HTTPS relay/gateway probes and required hosted refs for the named environment. They do not wire auth, billing, legal terms, support, security review, customer lifecycle, API key lifecycle, or operator SaaS go-live approval.
+
 ## Consolidated unblocker report
 
 Before treating hosted cloud as sellable, run the consolidated public-safe unblocker report:

@@ -12,12 +12,13 @@ For official-dataset retrieval/evidence proxy scoring over operator-downloaded f
 
 ```sh
 cd enigma
+node scripts/run-standard-memory-benchmarks.mjs --locomo ./data/locomo10.json --longmemeval ./data/longmemeval_s_cleaned.json --max-locomo-qa 100 --max-longmemeval-items 100 --top-k 5 --dry-run
 node scripts/run-standard-memory-benchmarks.mjs --locomo ./data/locomo10.json --out ./.enigma/locomo-standard-memory-benchmark.json
 node scripts/run-standard-memory-benchmarks.mjs --longmemeval ./data/longmemeval_s_cleaned.json --top-k 5 --out ./.enigma/longmemeval-standard-memory-benchmark.json
 node scripts/run-standard-memory-benchmarks.mjs --locomo ./data/locomo10.json --longmemeval ./data/longmemeval_s_cleaned.json --max-locomo-qa 100 --max-longmemeval-items 100 --out ./.enigma/standard-memory-benchmark.json
 ```
 
-The standard report schema is `enigma.standard_memory_benchmark_suite.v1`. It reads local official dataset JSON files only, scores deterministic retrieval/evidence coverage proxies, and still excludes raw question, answer, and conversation text from reports.
+The standard dry-run schema is `enigma.standard_memory_benchmark_plan.v1`. It prints planned local file names, sample bounds, local deterministic method rows, a requirements-only Mem0 adapter row, apples-to-apples controls, and explicit no-network/no-provider/no-Mem0/no-score boundaries without reading dataset files. The scored standard report schema is `enigma.standard_memory_benchmark_suite.v1`. It reads local official dataset JSON files only, scores deterministic retrieval/evidence coverage proxies, includes Mem0 as requirements-only with `scores_included:false`, and still excludes raw question, answer, and conversation text from reports.
 
 The report schema is `enigma.memory_benchmark_suite.v1`. It is public-safe by design: aggregate metrics, commitments, citations, boundaries, and cross-provider profile labels are emitted, but raw fixture memory, question text, and answer text are not included.
 
@@ -52,9 +53,11 @@ Numeric token and latency values in generated reports are local fixture measurem
 
 ## Official dataset retrieval/proxy runner
 
-`scripts/run-standard-memory-benchmarks.mjs` is the dependency-free runner for official dataset files already present on disk. It supports `--locomo <path>`, `--longmemeval <path>`, `--max-locomo-qa <n>`, `--max-longmemeval-items <n>`, `--top-k <n>` (default `5`), and optional `--out <path>`. Supplying only one dataset path scores only that dataset.
+`scripts/run-standard-memory-benchmarks.mjs` is the dependency-free runner for official dataset files already present on disk. It supports `--locomo <path>`, `--longmemeval <path>`, `--max-locomo-qa <n>`, `--max-longmemeval-items <n>`, `--top-k <n>` (default `5`), `--dry-run`, and optional `--out <path>`. Supplying only one dataset path scores only that dataset.
 
-Reports include only the input file name plus the input SHA-256, not the full local path, so operator usernames or workstation directories are not persisted.
+Use `--dry-run` before a scored run when publishing benchmark evidence. The plan proves only command shape and offline boundaries: it does not read or hash the files, prove they exist, produce scores, call provider APIs, run Mem0, run competitor SDKs, generate answers, grade answer accuracy, or spend API budget.
+
+Reports include only the input file name plus the input SHA-256, not the full local path, so operator usernames or workstation directories are not persisted. Scored reports also include `command_boundaries` and `apples_to_apples_controls` so reviewers can see that all local rows used the same parsed records, same `--top-k`, same scoring labels, and no gold labels for retrieval selection.
 
 The runner parses LoCoMo `conversation` session turns as memory records and maps evidence labels such as `D1:3` or `D8:6; D9:17` to dialog IDs. It parses LongMemEval `haystack_sessions` turns as memory records, uses `has_answer: true` turns plus `answer_session_ids` as gold evidence, and treats `_abs` question IDs as abstention cases.
 
