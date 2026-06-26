@@ -16,10 +16,13 @@ The source package now has pure contract builders and validators in `packages/ho
 - backup drill records;
 - incident and SLA reference records;
 - customer lifecycle packets that aggregate those surfaces for launch-readiness evidence.
+- hosted cloud readiness aggregator packets that roll all lifecycle surfaces, auth, billing, legal/DPA, support, security review, monitoring, backup, KMS/BYOK, and operator go-live refs into one public-safe readiness assessment.
 
 These functions are contract and validation code only. They do not call an auth provider, billing provider, cloud deployment, KMS, backup target, support desk, status page, SIEM, or model provider. They are safe to import as package code because they do not start servers, read user files, mutate deployment state, publish packages, or contact external accounts.
 
 The lifecycle packet public APIs are `buildCustomerLifecyclePacket(input)` / `validateCustomerLifecyclePacket(packet)` and `buildApiKeyLifecyclePacket(input)` / `validateApiKeyLifecyclePacket(packet)` under `enigma-memory/hosted-cloud`; the script commands below emit the same schemas for release evidence.
+
+The readiness aggregator APIs are `buildHostedCloudReadinessPacket(input)` / `validateHostedCloudReadinessPacket(packet)` under `enigma-memory/hosted-cloud`; the `--readiness` script flag emits the same schema for release evidence.
 
 The validators enforce hosted-cloud boundaries:
 
@@ -74,6 +77,32 @@ The lifecycle packet records lifecycle phases, required surfaces, external block
 The command writes public-safe validation evidence only. It must not receive or print raw API keys, bearer tokens, credentials, provider response bodies, plaintext prompts, raw memory, customer content, financial ROI claims, provider deletion claims, or model forgetting claims. It creates no hosted account, customer API key, provider secret, KMS key, rotation job, revocation job, audit export, invoice, support ticket, Cloudflare resource, provider resource, or deployment.
 
 The packet records lifecycle events, required evidence refs, missing evidence refs, malformed operation blockers, the operator approval ref, readiness status, `customer_api_keys_live`, and no-secret/no-plaintext guarantees. Missing evidence refs, blocked evidence refs, malformed operation surfaces, or absent operator approval keep `customer_api_keys_live:false`.
+
+## Contract-ready vs sellable
+
+Hosted cloud has two distinct readiness states:
+
+- **Contract-ready**: The contract builders and validators exist, produce deterministic public-safe JSON, and enforce the privacy firewall (no raw memory, plaintext prompts, provider payloads, credentials, API key material, or forbidden claims). Every surface emits `readiness.contract_ready: true` and `readiness.integration_kind: "contract_validator_only"`. This state is reached now — the package code is safe to import and validates evidence structure.
+
+- **Sellable**: The hosted cloud product is ready to sell to customers. This requires every readiness surface to have provided evidence refs, both the customer lifecycle packet and API key lifecycle packet to be embedded and approved, and an explicit operator go-live approval ref. This state is not reached until real external provider wiring, legal approval, security review, and operator sign-off exist.
+
+A readiness packet or lifecycle packet may mark `hosted_cloud_sellable: true` only when all evidence refs are provided, both underlying lifecycle packets are sellable, and an operator go-live approval ref is supplied. Contract-ready is a code-quality state; sellable is an operational state that depends on external systems and human approval.
+
+## Hosted cloud readiness aggregator
+
+`npm run production:hosted-customer -- --readiness --tenant <id> --domain <domain> --environment <env> --operator-go-live-ref <ref> --out <file>` builds `enigma.hosted_cloud.readiness_packet.v1`, a single public-safe packet that rolls all lifecycle surfaces plus auth, billing, legal/DPA, support, security review, monitoring, backup, KMS/BYOK, and operator go-live refs into one readiness assessment.
+
+The readiness aggregator:
+
+- accepts an optional `customer_lifecycle_packet` and `api_key_lifecycle_packet` (or builds a lifecycle packet from script args);
+- derives readiness surface evidence from the lifecycle packet's phase evidence when available;
+- propagates `external_blockers` from both embedded lifecycle packets as `propagated_lifecycle_blockers` (prefixed `customer_lifecycle.*` and `api_key_lifecycle.*`) — these are never masked;
+- gates `hosted_cloud_sellable` on: all 8 readiness surfaces provided + operator go-live ref + customer lifecycle packet embedded and sellable + API key lifecycle packet embedded with operator approval ref;
+- gates API key lifecycle readiness on `operator_approval_ref` (operator-provided evidence), not a self-asserted boolean;
+- emits a `dashboard` block with counts, status refs, blocker refs, next actions, and safety summary for a future tenant dashboard;
+- emits a schema-versioned packet with `propagated_lifecycle_blockers`, `readiness_surfaces`, and no-secret/no-plaintext guarantees.
+
+If either lifecycle packet is missing, a propagated blocker notes its absence. If either is embedded but not sellable/approved, its individual blockers propagate through. The readiness packet never claims live hosted SaaS, provider wiring, or deployment — it is evidence validation only.
 
 ## Non-claims
 

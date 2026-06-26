@@ -1,6 +1,6 @@
 {
   "name": "enigma-memory",
-  "version": "0.1.16",
+  "version": "0.1.17",
   "type": "module",
   "description": "Provider-agnostic AI memory passport and offline-verifiable proof layer.",
   "license": "Apache-2.0",

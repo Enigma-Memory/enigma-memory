@@ -141,7 +141,7 @@ npx --yes --package enigma-memory enigma chain attest \
   --report-hash sha256:6666666666666666666666666666666666666666666666666666666666666666 \
   --dataset-ref dataset:quickstart-public-fixture:v1 \
   --runner-ref runner:enigma-local:v1 \
-  --package-ref npm:enigma-memory@0.1.16 \
+  --package-ref npm:enigma-memory@0.1.17 \
   --score recall_at_5=1 \
   --score p95_latency_ms=14 \
   --out .enigma/proof-quickstart/benchmark-attestation.json
@@ -154,7 +154,7 @@ npx --yes --package enigma-memory enigma chain attest \
   --report-file .enigma/proof-quickstart/reviewed-benchmark-report.json \
   --dataset-ref dataset:quickstart-public-fixture:v1 \
   --runner-ref runner:enigma-local:v1 \
-  --package-ref npm:enigma-memory@0.1.16 \
+  --package-ref npm:enigma-memory@0.1.17 \
   --score recall_at_5=1 \
   --score p95_latency_ms=14 \
   --out .enigma/proof-quickstart/benchmark-attestation.json
@@ -282,7 +282,7 @@ const attestation = createBenchmarkAttestation({
   report_hash: 'sha256:6666666666666666666666666666666666666666666666666666666666666666',
   dataset_ref: 'dataset:quickstart-public-fixture:v1',
   runner_ref: 'runner:enigma-local:v1',
-  package_ref: 'npm:enigma-memory@0.1.16',
+  package_ref: 'npm:enigma-memory@0.1.17',
   sample_count: 12,
   run_count: 1,
 });

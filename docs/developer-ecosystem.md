@@ -8,15 +8,17 @@ For most developers, start with the installed CLI before reading the SDK interna
 
 ```sh
 npm install -g enigma-memory
-enigma setup --overwrite
+enigma init
+enigma setup --client auto --connect-installed --overwrite
+enigma drive health
+enigma status
 enigma remember --text-file ./memory.txt
-enigma search --query "..."
-enigma context --query "..." --optimize
+enigma search --query "project context"
+enigma context --query "project context" --optimize
 enigma verify --export ./.enigma/export.json
-enigma connect claude-desktop --dry-run
 ```
 
-`enigma setup --overwrite` writes local Enigma artifacts under the workspace `.enigma` path and emits deterministic, public-safe JSON without printing raw memory plaintext. It does not write third-party app configs unless you explicitly run `enigma connect <client>` without `--dry-run`. Treat provider-native memory as non-canonical cache only; the local Enigma vault is canonical.
+`enigma init` creates the local `.enigma` workspace, bundle, and proof artifacts with no provider or cloud credentials. `enigma setup --client auto --connect-installed --overwrite` configures the drive and writes the `mcpServers.enigma` entry into every installed/config-present client it detects, skipping clients that are not installed; preview with `--dry-run` first. `enigma drive health` reports a SMART-style memory-drive health packet (freshness, duplicate rate, tombstone backlog, stale derived artifacts, receipt coverage, connector health) from local metadata only; it is part of the Memory Drive surface in this release, and `enigma status` plus `enigma doctor` cover local passport counts, roots, and connector readiness in every build. Neither setup command prints raw memory plaintext. Treat provider-native memory as non-canonical cache only; the local Enigma vault is canonical.
 
 Optional public test-drive loop:
 

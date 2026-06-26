@@ -23,6 +23,7 @@ const SHA256_PREFIX = 'sha256:';
 const PUBLIC_REF_RE = /^[a-z0-9][a-z0-9._:/@+-]{2,191}$/u;
 const SCORE_KEY_RE = /^[a-z][a-z0-9_.:-]{1,63}$/u;
 const PRIVATE_REPORT_KEY_RE = /(?:^|_)(?:raw_memory|memory_plaintext|plaintext|plain_text|prompt|prompts|conversation|conversations|message|messages|content|body|payload|payloads|document|documents|transcript|transcripts|completion|completions|embedding|embeddings|provider_response|provider_responses|response_body|credential|credentials|api_key|secret|password|private_key|seed|seed_phrase|mnemonic|tenant_name|customer_name|organization_name|org_name|account_id)(?:$|_)/iu;
+const RAW_ANSWER_REPORT_KEY_RE = /(?:^|_)(?:raw_answer|raw_answers|answer_text|answer_texts|answer_body|answer_content|generated_answer|generated_answers|final_answer|final_answers|model_answer|model_answers|llm_answer|llm_answers|provider_answer|provider_answers)(?:$|_)/iu;
 const ALLOWED_FALSE_REPORT_KEYS = new Set([
   'raw_private_memory_plaintext_included',
   'raw_question_text_included',
@@ -55,6 +56,9 @@ const ALLOWED_PUBLIC_REPORT_KEYS = new Set([
   'estimated_prompt_tokens',
   'baseline_prompt_tokens',
   'optimized_prompt_tokens',
+  'prompt_refs',
+  'same_prompts_for_all_rows',
+  'prompts_fixed',
 ]);
 const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|(?:seed phrase|mnemonic phrase|raw memory|private prompt|full transcript|provider response|embedding vector))/iu;
 const ABSOLUTE_LOCAL_PATH_RE = /^(?:[A-Za-z]:[\\/]|\\\\|\/(?:Users|home|tmp|var|etc|mnt|Volumes)\b)/u;
@@ -62,6 +66,7 @@ const CLAIM_SCORE_KEY_RE = /(?:provider|competitor|roi|profit|savings|solana|tra
 const PROOF_COMPATIBLE_REPORT_SCHEMAS = new Set([
   'enigma.memory_benchmark_suite.v1',
   'enigma.standard_memory_benchmark_suite.v1',
+  'enigma.standard_memory_benchmark_protocol_plan.v1',
 ]);
 const REQUIRED_FALSE_BOUNDARY_KEYS = Object.freeze([
   'external_provider_calls',
@@ -172,7 +177,7 @@ export function parseArgs(argv = process.argv.slice(2)) {
 export function usage() {
   return `Usage: node scripts/build-benchmark-proof-release.mjs --report <path> --dataset-ref <ref> --runner-ref <ref> --package-ref <ref> [--score key=value ...] [--out-dir <dir>]
 
-Builds a dependency-free, local benchmark proof release from an existing public-safe benchmark report. The report must use a compatible benchmark schema and explicit offline benchmark boundaries. The report file is parsed for public-safety checks and hashed, but its body and local path are never copied into the attestation or proof packet. The generated artifacts are local benchmark attestation/proof only: no API calls, provider answer-accuracy claims, Mem0 or competitor performance claims, Solana submissions, hosted SaaS claims, ROI/profit/savings claims, raw memory, prompts, transcripts, embeddings, credentials, account ids, private keys, or provider responses are written.
+Builds a dependency-free, local benchmark proof release from an existing public-safe benchmark report. The report must use a compatible benchmark schema (a scored retrieval proxy report such as enigma.standard_memory_benchmark_suite.v1, or a full-answer protocol plan such as enigma.standard_memory_benchmark_protocol_plan.v1) and explicit offline benchmark boundaries. The report file is parsed for public-safety checks and hashed, but its body and local path are never copied into the attestation or proof packet. The generated artifacts are local benchmark attestation/proof only: no API calls, provider answer-accuracy claims, Mem0 or competitor performance claims, Solana submissions, hosted SaaS claims, ROI/profit/savings claims, raw memory, prompts, transcripts, embeddings, credentials, account ids, private keys, or provider responses are written. A protocol-plan report is accepted as protocol-readiness evidence only and is rejected if it contains raw answers, prompts, provider responses, or competitor scores.
 `;
 }
 
@@ -205,7 +210,7 @@ function assertPublicReportPayload(value, path = 'report') {
   }
   if (!isPlainObject(value)) return;
   for (const [key, child] of Object.entries(value)) {
-    if (PRIVATE_REPORT_KEY_RE.test(key) && !ALLOWED_PUBLIC_REPORT_KEYS.has(key)) {
+    if ((PRIVATE_REPORT_KEY_RE.test(key) || RAW_ANSWER_REPORT_KEY_RE.test(key)) && !ALLOWED_PUBLIC_REPORT_KEYS.has(key)) {
       if (!ALLOWED_FALSE_REPORT_KEYS.has(key) || child !== false) throw new UsageError(`${path}.${key} is not allowed in public benchmark proof artifacts`);
     }
     assertPublicReportPayload(child, `${path}.${key}`);
@@ -274,6 +279,13 @@ function assertProofCompatibleBenchmarkBoundaries(report) {
   }
   if (report.schema === 'enigma.memory_benchmark_suite.v1') {
     if (boundaries.local_only !== true) throw new UsageError('local memory benchmark report must set benchmark_boundaries.local_only true');
+  }
+  if (report.schema === 'enigma.standard_memory_benchmark_protocol_plan.v1') {
+    const protocolBoundaries = report.protocol_boundaries;
+    if (!isPlainObject(protocolBoundaries)) throw new UsageError('protocol plan report must include protocol_boundaries');
+    for (const key of ['network_required', 'provider_calls_made', 'answers_generated', 'judged']) {
+      requireFalseField(protocolBoundaries, key, 'report.protocol_boundaries');
+    }
   }
   assertCommandBoundaries(report);
   assertExternalAdaptersUnscored(report);
@@ -404,7 +416,7 @@ export async function buildBenchmarkProofRelease(args, options = {}) {
   const schema = reportSchema(report);
   const sampleCount = sampleCountFromReport(report);
   const datasetCount = Array.isArray(report.datasets) ? report.datasets.length : 0;
-  const commitments = scoreCommitments(args.scores, reportHash);
+  const commitments = scoreCommitments(Array.isArray(args.scores) ? args.scores : [], reportHash);
   const metricRoots = commitments.map((score) => score.score_hash);
 
   const attestation = createBenchmarkAttestation({

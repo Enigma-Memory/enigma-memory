@@ -16,15 +16,19 @@ Supported connector IDs:
 
 ```sh
 npm install -g enigma-memory
-enigma setup --overwrite
+enigma init
+enigma setup --client auto --connect-installed --overwrite
+enigma drive health
+enigma status
 enigma remember --text-file ./memory.txt
-enigma search --query "..."
-enigma context --query "..." --optimize
+enigma search --query "project context"
+enigma context --query "project context" --optimize
 enigma verify --export ./.enigma/export.json
-enigma connect claude-desktop --dry-run
 ```
 
-`enigma setup --overwrite` writes local Enigma artifacts under the workspace `.enigma` path and emits deterministic, public-safe JSON without printing raw memory plaintext. It does not write Claude, Cursor, Kimi, VS Code, Roo, OpenCode, or generic MCP client configs. Client config writes happen only when you explicitly run `enigma connect <client>` without `--dry-run`.
+One command connects every installed client: `enigma setup --client auto --connect-installed --overwrite` writes the `mcpServers.enigma` entry into every installed/config-present client it detects (Claude Desktop, Cursor, Kimi Code, VS Code/Cline, Roo, OpenCode, generic MCP). It skips clients that are not installed and never creates configs from scratch; preview with `--dry-run` first. `enigma drive health` reports a SMART-style memory-drive health packet (freshness, tombstone backlog, stale derived artifacts, receipt coverage, connector health) from local metadata only — it is part of the Memory Drive surface in this release, and `enigma status` plus `enigma doctor` cover local passport counts, roots, and connector readiness in every build. No setup command prints raw memory plaintext.
+
+For a single client, or to preview before writing, use `enigma connect <client> --dry-run` and then drop `--dry-run`.
 
 Provider-native memory is non-canonical cache only in this architecture. The Enigma vault remains canonical, and Enigma receipts prove Enigma-controlled lifecycle events; they do not prove that a hosted provider deleted hidden copies or that a model forgot anything.
 

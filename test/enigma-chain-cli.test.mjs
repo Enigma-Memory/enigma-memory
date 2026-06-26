@@ -199,7 +199,7 @@ test('chain attest creates and verifies a benchmark attestation from public refs
     '--runner-ref',
     'runner://enigma/local-standard-runner-v1',
     '--package-ref',
-    'npm://enigma-memory@0.1.16',
+    'npm://enigma-memory@0.1.17',
     '--score',
     'relevance=0.91',
     '--score',
@@ -268,7 +268,7 @@ test('chain commands fail closed for private payload examples without echoing se
     '--runner-ref',
     'runner://enigma/local-standard-runner-v1',
     '--package-ref',
-    'npm://enigma-memory@0.1.16',
+    'npm://enigma-memory@0.1.17',
     '--out',
     join(dir, 'bad-attestation.json'),
   ]);

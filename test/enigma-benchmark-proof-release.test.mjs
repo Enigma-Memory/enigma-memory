@@ -19,7 +19,7 @@ import {
 const GENERATED_AT = '2026-06-25T00:00:00.000Z';
 const DATASET_REF = `sha256:${'a'.repeat(64)}`;
 const RUNNER_REF = 'runner:run-standard-memory-benchmarks.mjs@reviewed-2026-06-25';
-const PACKAGE_REF = 'enigma-memory@0.1.16';
+const PACKAGE_REF = 'enigma-memory@0.1.17';
 
 async function withTempDir(fn) {
   const dir = await mkdtemp(join(tmpdir(), 'enigma-benchmark-proof-release-'));

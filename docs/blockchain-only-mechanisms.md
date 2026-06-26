@@ -166,6 +166,8 @@ Keep private:
 
 The registry should answer, "Which public key attested to which digest under which schema?" It should not answer, "What private data produced that digest?" Disclosure of the underlying report is a separate permissioned review action.
 
+The local Enigma artifacts that prepare this registry are `enigma.proof_network.registry_entry.v1` and `enigma.proof_network.registry_batch.v1`. A registry entry binds one already-created artifact (anchor batch, benchmark attestation, connector conformance attestation, health report, operator receipt, or settlement job ref) to a public-safe `registry_ref`, the artifact schema ref, digest refs, signer refs, an entry type, and a count — never the artifact body. A registry batch sorts entry hashes into a single registry root. Both are local planning artifacts: they carry `transaction_submitted:false` and `raw_memory_on_chain:false`, and they do not prove that any marketplace, registry program, or live chain has adopted the index. What the chain would uniquely add is shared discovery (any verifier can resolve an indexed digest by package, dataset, runner, or operator key without trusting one private API) and signer accountability (the public key that attested to a digest is recorded alongside it); neither requires revealing the private report behind the digest.
+
 ## Mechanism 5: USDC escrow and settlement
 
 ### Blockchain-native value
@@ -292,6 +294,7 @@ The public rail should be modeled as a small state machine over commitments, not
 | Grant record | program id, `grant`, issuer key, subject key, scope digest, capability | grant id, capability, scope digest, expiry, revocation ref | Was this public subject granted this scoped capability at this time? |
 | Nullifier record | program id, `nullifier`, nullifier digest | nullifier digest, issuer key, effective slot, optional safe reason ref | Should verifiers reject the matching grant, scope, or one-time proof? |
 | Attestation record | program id, `attestation`, attestor key, report or packet digest | digest, attestation type, public-safe refs, slot, signature | Which public key attested to this digest under which schema? |
+| Registry index record | program id, `registry`, registry namespace ref, artifact digest, attestor key | artifact digest, artifact schema ref, entry type, public-safe digest/signer refs, count, slot, signature | Which public key indexed which digest under which schema and registry namespace? |
 | Escrow record | program id, `escrow`, payer key, operator key, job ref | token mint, amount, proof refs, release rule, timeout, state | Are funds locked, releasable, refundable, or disputed against public-safe refs? |
 | Reputation index | program id, `operator`, operator key | counters, correction refs, challenge refs, signer rotation refs | What public-key history can be checked without private customer facts? |
 
@@ -341,6 +344,15 @@ The chain contributes shared permission and revocation state. It does not expose
 4. Reviewers with access to the report can recompute the digest; public observers can see only that the attestation exists.
 
 The chain contributes shared discovery and signer accountability. It does not publish raw benchmark examples or private results.
+
+### Marketplace registry index
+
+1. Enigma creates one or more proof artifacts (anchor, attestation, health report, operator receipt, or settlement job ref) and keeps their bodies private.
+2. Enigma emits a registry entry per artifact that records only the artifact hash, schema ref, digest refs, signer refs, entry type, and a registry namespace ref.
+3. Enigma aggregates entries into a registry batch whose root commits to the whole index.
+4. A reviewer resolves individual artifact hashes through approved private channels; a public observer can see only that a digest was indexed under a schema by named signers.
+
+The chain would contribute shared discovery and signer accountability. The local registry artifacts do not broadcast to a marketplace, register on a live chain, or prove third-party adoption.
 
 ### Escrow for proof-backed operator work
 

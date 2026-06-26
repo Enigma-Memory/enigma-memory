@@ -14,7 +14,7 @@ import {
   verifyCheckpoint,
 } from '../packages/core/src/index.js';
 import { createVault, remember, recall, updateMemory, deleteMemory, exportBundle, importBundle } from '../packages/vault/src/index.js';
-import { createPassport, compileContextPack, verifyContextPack } from '../packages/passport/src/index.js';
+import { createPassport, compileContextPack, verifyContextPack, createMemoryDriveHealthReport } from '../packages/passport/src/index.js';
 import { boundaryClassifications, classifyBoundaryPath, createBoundaryManifest, runBoundarySimulation } from '../packages/boundary/src/index.js';
 import { verifyBundle } from '../apps/verifier/bin/enigma-verify.mjs';
 
@@ -794,4 +794,84 @@ test('boundary harness honesty text rejects provider deletion and model forgetti
   assert.match(report.honesty_text, /does not prove provider deletion/);
   assert.match(report.honesty_text, /model forgetting/);
   assert.match(report.honesty_text, /semantic forgetting/);
+});
+test('createMemoryDriveHealthReport scores a fresh healthy vault at 90+ with no raw memory', async () => {
+  const vault = createVault({ subjectId: 'subject-drive-health' });
+  await remember({ vault, text: 'drive health private sentinel alpha', purpose: 'fixture', now: '2026-06-23T10:00:00.000Z' });
+  await remember({ vault, text: 'drive health private sentinel beta', purpose: 'fixture', now: '2026-06-23T10:01:00.000Z' });
+  const report = createMemoryDriveHealthReport({ vault, now: '2026-06-23T11:00:00.000Z' });
+
+  assert.equal(report.schema, 'enigma.memory_drive_health_report.v1');
+  assert.ok(report.overall_score >= 90, `expected overall_score >= 90, got ${report.overall_score}`);
+  assert.equal(report.overall_status, 'healthy');
+  assert.equal(report.transaction_submitted, false);
+  assert.equal(report.raw_memory_on_chain, false);
+  assert.equal(report.privacy_boundaries.private_payloads_included, false);
+  assert.ok(report.roots.active_set_root.startsWith('sha256:'));
+  assert.equal(report.source_root, `memory_root_${report.roots.active_set_root}`);
+  assert.ok(report.report_ref.startsWith('health_report_sha256:'));
+  assert.doesNotMatch(JSON.stringify(report), /drive health private sentinel/);
+  const expectedMetrics = ['freshness', 'duplicate_rate', 'tombstone_risk', 'stale_derived_artifacts', 'retrieval_hit_rate', 'token_reduction', 'leakage_scan', 'receipt_coverage', 'connector_health', 'sync_fork_risk'];
+  for (const name of expectedMetrics) {
+    const metric = report.metrics[name];
+    assert.ok(metric, `metric ${name} present`);
+    assert.ok(['healthy', 'watch', 'degraded', 'critical'].includes(metric.status), `${name} has a valid status`);
+    assert.ok(Number.isInteger(metric.score) && metric.score >= 0 && metric.score <= 100, `${name} score bounded integer`);
+    assert.ok(Array.isArray(metric.evidence_refs) && metric.evidence_refs.length > 0, `${name} has public-safe evidence refs`);
+    assert.ok(Array.isArray(metric.recommended_actions), `${name} has recommended actions`);
+  }
+});
+
+test('createMemoryDriveHealthReport flags tombstones with stale derived refs as degraded or critical', async () => {
+  const vault = createVault({ subjectId: 'subject-drive-decay' });
+  const deleted = await remember({ vault, text: 'drive decay deleted sentinel gamma', purpose: 'fixture', now: '2026-06-23T10:00:00.000Z' });
+  await remember({ vault, text: 'drive decay keeper sentinel delta', purpose: 'fixture', now: '2026-06-23T10:01:00.000Z' });
+  const passport = createPassport({ vault, now: '2026-06-23T10:00:00.000Z' });
+  const pack = await compileContextPack({ vault, passport, memory_addresses: [deleted.memory_addr], query: 'gamma', limit: 1, now: '2026-06-23T10:02:00.000Z' });
+  await deleteMemory({ vault, memory_addr: deleted.memory_addr, reason: 'fixture-delete', now: '2026-06-23T10:05:00.000Z' });
+  const report = createMemoryDriveHealthReport({ vault, contextPacks: [pack], now: '2026-06-23T11:00:00.000Z' });
+
+  assert.ok(['degraded', 'critical'].includes(report.metrics.tombstone_risk.status), `tombstone_risk status was ${report.metrics.tombstone_risk.status}`);
+  assert.ok(report.metrics.tombstone_risk.observed.derived_artifacts_referencing_tombstones >= 1, 'derived artifact references tombstoned ref');
+  assert.ok(['degraded', 'critical'].includes(report.metrics.stale_derived_artifacts.status), `stale_derived_artifacts status was ${report.metrics.stale_derived_artifacts.status}`);
+  assert.ok(report.metrics.stale_derived_artifacts.observed.stale_artifact_count >= 1, 'stale artifact counted');
+  assert.ok(['degraded', 'critical'].includes(report.overall_status), `overall status was ${report.overall_status}`);
+  assert.equal(report.proof_network_ready.eligible_for_anchor_batch, false);
+  assert.ok(report.proof_network_ready.blocking_reasons.length > 0, 'anchor batch is blocked');
+  assert.doesNotMatch(JSON.stringify(report), /drive decay.*sentinel/);
+});
+
+test('createMemoryDriveHealthReport never leaks raw memory text even when a raw context pack is supplied', async () => {
+  const vault = createVault({ subjectId: 'subject-drive-leak' });
+  const memory = await remember({ vault, text: 'never leak this raw memory body sentinel epsilon', purpose: 'fixture', now: '2026-06-23T10:00:00.000Z' });
+  const passport = createPassport({ vault, now: '2026-06-23T10:00:00.000Z' });
+  const pack = await compileContextPack({ vault, passport, memory_addresses: [memory.memory_addr], query: 'epsilon', limit: 1, now: '2026-06-23T10:02:00.000Z' });
+  const report = createMemoryDriveHealthReport({
+    vault,
+    contextPacks: [pack],
+    benchmarkSummary: { probe_count: 5, top_k: 3, hit_at_k: 0.9, exact_coverage: 0.9, abstention_correctness: 0.95 },
+    connectorSummary: { connector_count: 1, healthy_connector_count: 1, lagging_connector_count: 0, error_rate_24h: 0, cursor_gap_count: 0 },
+    now: '2026-06-23T11:00:00.000Z',
+  });
+
+  const serialized = JSON.stringify(report);
+  assert.doesNotMatch(serialized, /never leak this raw memory body sentinel epsilon/);
+  assert.doesNotMatch(serialized, /content_ciphertext/);
+  assert.equal(report.metrics.leakage_scan.status, 'healthy');
+  assert.equal(report.metrics.leakage_scan.observed.forbidden_payload_key_hits, 0);
+  assert.equal(report.metrics.leakage_scan.observed.secret_value_hits, 0);
+});
+
+test('createMemoryDriveHealthReport defaults gracefully when benchmark and connector inputs are missing', async () => {
+  const vault = createVault({ subjectId: 'subject-drive-defaults' });
+  await remember({ vault, text: 'defaults sentinel zeta', purpose: 'fixture', now: '2026-06-23T10:00:00.000Z' });
+  const report = createMemoryDriveHealthReport({ vault, now: '2026-06-23T11:00:00.000Z' });
+
+  assert.equal(report.metrics.retrieval_hit_rate.status, 'healthy');
+  assert.equal(report.metrics.retrieval_hit_rate.observed.measured, false);
+  assert.equal(report.metrics.connector_health.status, 'healthy');
+  assert.equal(report.metrics.connector_health.observed.measured, false);
+  assert.equal(report.metrics.sync_fork_risk.status, 'healthy');
+  assert.equal(report.metrics.token_reduction.status, 'healthy');
+  assert.ok(report.overall_score >= 90, `expected overall_score >= 90, got ${report.overall_score}`);
 });

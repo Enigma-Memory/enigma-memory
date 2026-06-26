@@ -7,6 +7,8 @@ import {
   HOSTED_CLOUD_BACKUP_DRILL_SCHEMA,
   HOSTED_CLOUD_CUSTOMER_LIFECYCLE_PACKET_SCHEMA,
   HOSTED_CLOUD_CUSTOMER_LIFECYCLE_PHASES,
+  HOSTED_CLOUD_READINESS_PACKET_SCHEMA,
+  HOSTED_CLOUD_READINESS_SURFACES,
   HOSTED_CLOUD_DASHBOARD_SCHEMA,
   HOSTED_CLOUD_EXTERNAL_BLOCKERS,
   HOSTED_CLOUD_INCIDENT_SLA_SCHEMA,
@@ -20,6 +22,7 @@ import {
   buildCustomerLifecyclePacket,
   buildDashboardSummary,
   buildHostedVaultContract,
+  buildHostedCloudReadinessPacket,
   buildIncidentSlaRefs,
   buildTenantContract,
   buildUsageBillingRecord,
@@ -30,6 +33,7 @@ import {
   validateCustomerLifecyclePacket,
   validateDashboardSummary,
   validateHostedVaultContract,
+  validateHostedCloudReadinessPacket,
   validateIncidentSlaRefs,
   validateTenantContract,
   validateUsageBillingRecord,
@@ -637,4 +641,207 @@ test('hosted API key lifecycle packet rejects malformed operation surfaces', () 
     status: 'ready',
   };
   assert.throws(() => validateApiKeyLifecyclePacket(malformedEvidence), /required_evidence_refs\.rotation_policy|status/);
+});
+
+function isPlainObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function readinessEvidenceRefs(status = 'blocked_external_dependency') {
+  return Object.fromEntries(HOSTED_CLOUD_READINESS_SURFACES.map((surface) => [
+    surface,
+    {
+      ref: status === 'provided' ? `evidence:readiness:${surface}:2026-06-25` : `blocked:readiness:${surface}:2026-06-25`,
+      status,
+      blocker: status === 'provided' ? undefined : `${surface} readiness remains externally blocked`,
+    },
+  ]));
+}
+
+function sellableCustomerLifecyclePacket() {
+  return buildCustomerLifecyclePacket({
+    tenant_id: 'tenant_alpha',
+    domain: 'cloud.enigmamemory.example',
+    environment: 'production',
+    generated_at: generatedAt,
+    contracts: lifecycleContracts('provided'),
+    required_evidence_refs: lifecycleEvidenceRefs('provided'),
+    operator_go_live_ref: 'approval:hosted-cloud-go-live:2026-06-25',
+  });
+}
+
+test('hosted cloud readiness packet is schema-versioned and blocked by default', () => {
+  const packet = buildHostedCloudReadinessPacket({
+    generated_at: generatedAt,
+  });
+
+  assert.equal(packet.schema, HOSTED_CLOUD_READINESS_PACKET_SCHEMA);
+  assert.equal(packet.hosted_cloud_sellable, false);
+  assert.equal(packet.readiness.hosted_cloud_sellable, false);
+  assert.match(packet.readiness.status, /blocked/);
+  assert.equal(packet.customer_lifecycle_packet, null);
+  assert.equal(packet.api_key_lifecycle_packet, null);
+  assert.ok(packet.propagated_lifecycle_blockers.length >= 2);
+  assert.ok(packet.missing_evidence_refs.length >= HOSTED_CLOUD_READINESS_SURFACES.length);
+  assert.equal(packet.readiness.lifecycle_packet_sellable, false);
+  assert.equal(packet.readiness.lifecycle_packet_embedded, false);
+  assert.equal(packet.readiness.api_key_lifecycle_operator_approved, false);
+  assert.equal(packet.readiness.api_key_lifecycle_packet_embedded, false);
+  assert.equal(validateHostedCloudReadinessPacket(packet), true);
+});
+
+test('hosted cloud readiness packet becomes sellable with complete evidence, lifecycle packets, and operator go-live', () => {
+  const lifecyclePacket = sellableCustomerLifecyclePacket();
+  const apiKeyPacket = completeApiKeyLifecyclePacket('rotate');
+  const packet = buildHostedCloudReadinessPacket({
+    generated_at: generatedAt,
+    operator_go_live_ref: 'approval:hosted-cloud-go-live:2026-06-25',
+    customer_lifecycle_packet: lifecyclePacket,
+    api_key_lifecycle_packet: apiKeyPacket,
+  });
+
+  assert.equal(packet.schema, HOSTED_CLOUD_READINESS_PACKET_SCHEMA);
+  assert.equal(packet.hosted_cloud_sellable, true);
+  assert.equal(packet.readiness.hosted_cloud_sellable, true);
+  assert.equal(packet.readiness.status, 'operator_approved_readiness_packet');
+  assert.equal(packet.readiness.lifecycle_packet_sellable, true);
+  assert.equal(packet.readiness.api_key_lifecycle_operator_approved, true);
+  assert.deepEqual(packet.missing_evidence_refs, []);
+  assert.deepEqual(packet.propagated_lifecycle_blockers, []);
+  assert.deepEqual(packet.external_blockers, []);
+  assert.equal(packet.customer_lifecycle_packet.hosted_cloud_sellable, true);
+  assert.equal(packet.api_key_lifecycle_packet.operator_approval_ref, 'approval:hosted-api-key-lifecycle:2026-06-25');
+  assert.equal(validateHostedCloudReadinessPacket(packet), true);
+});
+
+test('hosted cloud readiness packet stays blocked when embedded lifecycle packet is not sellable', () => {
+  const blockedLifecycle = buildCustomerLifecyclePacket({
+    tenant_id: 'tenant_alpha',
+    generated_at: generatedAt,
+  });
+  const packet = buildHostedCloudReadinessPacket({
+    generated_at: generatedAt,
+    required_evidence_refs: readinessEvidenceRefs('provided'),
+    operator_go_live_ref: 'approval:hosted-cloud-go-live:2026-06-25',
+    customer_lifecycle_packet: blockedLifecycle,
+  });
+
+  assert.equal(packet.hosted_cloud_sellable, false);
+  assert.ok(packet.propagated_lifecycle_blockers.length > 0);
+  assert.ok(packet.propagated_lifecycle_blockers.some((b) => b.key === 'customer_lifecycle_packet'));
+  assert.equal(packet.readiness.lifecycle_packet_sellable, false);
+  assert.ok(packet.readiness.lifecycle_packet_embedded);
+  assert.equal(validateHostedCloudReadinessPacket(packet), true);
+});
+
+test('hosted cloud readiness packet stays blocked without operator go-live approval', () => {
+  const lifecyclePacket = sellableCustomerLifecyclePacket();
+  const apiKeyPacket = completeApiKeyLifecyclePacket('rotate');
+  const packet = buildHostedCloudReadinessPacket({
+    generated_at: generatedAt,
+    customer_lifecycle_packet: lifecyclePacket,
+    api_key_lifecycle_packet: apiKeyPacket,
+  });
+
+  assert.equal(packet.hosted_cloud_sellable, false);
+  assert.equal(packet.operator_go_live_ref, null);
+  assert.ok(packet.external_blockers.some((b) => b.key === 'operator_go_live'));
+  assert.equal(validateHostedCloudReadinessPacket(packet), true);
+});
+
+test('hosted cloud readiness packet rejects raw key, token, memory, and provider payloads', () => {
+  const packet = buildHostedCloudReadinessPacket({ generated_at: generatedAt });
+
+  for (const [key, value, pattern] of [
+    ['raw_key', 'sk-proj-abcdef1234567890', /not allowed|credential-looking/],
+    ['raw_token', 'eyJhbGciOiJIUzI1.eyJzdWIiOiIxMjM0NTY3O.Dkp4hr2sJ95qFh', /not allowed|credential-looking/],
+    ['raw_memory', 'customer plaintext memory', /not allowed/],
+    ['plaintext_prompt', 'private prompt content', /not allowed/],
+    ['provider_response', { id: 'resp_1', body: 'response' }, /not allowed/],
+    ['api_key_value', 'not-key-material', /not allowed|credential-looking/],
+    ['credential_note', 'credential material here', /not allowed|credential-looking/],
+    ['secret_material', 'api key secret material', /not allowed|credential-looking/],
+    ['financial_claim', 'token ROI is guaranteed', /forbidden hosted-cloud claim/],
+    ['provider_deletion_claim', 'provider deletion is proven', /not allowed|forbidden hosted-cloud claim/],
+    ['model_forgetting_claim', 'model forgetting is proven', /not allowed|forbidden hosted-cloud claim/],
+  ]) {
+    assert.throws(() => validateHostedCloudReadinessPacket({ ...packet, [key]: value }), pattern);
+  }
+});
+
+test('hosted cloud readiness packet does not print secrets when sellable', () => {
+  const lifecyclePacket = sellableCustomerLifecyclePacket();
+  const apiKeyPacket = completeApiKeyLifecyclePacket('rotate');
+  const packet = buildHostedCloudReadinessPacket({
+    generated_at: generatedAt,
+    operator_go_live_ref: 'approval:hosted-cloud-go-live:2026-06-25',
+    customer_lifecycle_packet: lifecyclePacket,
+    api_key_lifecycle_packet: apiKeyPacket,
+  });
+
+  const json = JSON.stringify(packet);
+  assert.ok(!json.includes('sk-'));
+  assert.ok(!json.includes('Bearer '));
+  assert.ok(!json.toLowerCase().includes('password'));
+  assert.ok(!json.includes('BEGIN PRIVATE KEY'));
+  assert.ok(!json.includes('customer plaintext'));
+});
+
+test('hosted cloud readiness packet dashboard has useful shape', () => {
+  const packet = buildHostedCloudReadinessPacket({ generated_at: generatedAt });
+
+  assert.ok(isPlainObject(packet.dashboard));
+  assert.ok(isPlainObject(packet.dashboard.counts));
+  assert.ok(isPlainObject(packet.dashboard.status_refs));
+  assert.ok(Array.isArray(packet.dashboard.blocker_refs));
+  assert.ok(Array.isArray(packet.dashboard.next_actions));
+  assert.ok(isPlainObject(packet.dashboard.safety_summary));
+  assert.equal(packet.dashboard.counts.readiness_surface_count, HOSTED_CLOUD_READINESS_SURFACES.length + 1);
+  assert.equal(packet.dashboard.safety_summary.key_material_absent, true);
+  assert.equal(packet.dashboard.safety_summary.token_material_absent, true);
+  assert.ok(packet.dashboard.next_actions.length > 0);
+});
+
+test('hosted customer lifecycle packet dashboard has counts, status refs, blocker refs, next actions, and safety summary', () => {
+  const packet = buildCustomerLifecyclePacket({
+    tenant_id: 'tenant_alpha',
+    domain: 'cloud.enigmamemory.example',
+    environment: 'production',
+    generated_at: generatedAt,
+  });
+
+  assert.ok(isPlainObject(packet.dashboard));
+  assert.ok(isPlainObject(packet.dashboard.counts));
+  assert.ok(isPlainObject(packet.dashboard.status_refs));
+  assert.ok(Array.isArray(packet.dashboard.blocker_refs));
+  assert.ok(Array.isArray(packet.dashboard.next_actions));
+  assert.ok(isPlainObject(packet.dashboard.safety_summary));
+  assert.equal(packet.dashboard.counts.lifecycle_phase_count, HOSTED_CLOUD_CUSTOMER_LIFECYCLE_PHASES.length);
+  assert.equal(packet.dashboard.counts.missing_evidence_count, packet.missing_evidence_refs.length);
+  assert.equal(packet.dashboard.counts.external_blocker_count, packet.external_blockers.length);
+  assert.equal(packet.dashboard.safety_summary.evidence_validation_only, true);
+  assert.equal(packet.dashboard.safety_summary.key_material_absent, true);
+  assert.equal(packet.dashboard.safety_summary.token_material_absent, true);
+  assert.equal(validateCustomerLifecyclePacket(packet), true);
+});
+
+test('hosted customer lifecycle packet dashboard shows ready state when sellable', () => {
+  const packet = buildCustomerLifecyclePacket({
+    tenant_id: 'tenant_alpha',
+    domain: 'cloud.enigmamemory.example',
+    environment: 'production',
+    generated_at: generatedAt,
+    contracts: lifecycleContracts('provided'),
+    required_evidence_refs: lifecycleEvidenceRefs('provided'),
+    operator_go_live_ref: 'approval:hosted-cloud-go-live:2026-06-25',
+  });
+
+  assert.deepEqual(packet.dashboard.blocker_refs, []);
+  assert.equal(packet.dashboard.counts.missing_evidence_count, 0);
+  assert.equal(packet.dashboard.counts.external_blocker_count, 0);
+  assert.equal(packet.dashboard.counts.provided_evidence_count, HOSTED_CLOUD_CUSTOMER_LIFECYCLE_PHASES.length - 1);
+  assert.ok(packet.dashboard.next_actions.length > 0);
+  assert.equal(packet.dashboard.next_actions[0].action, 'lifecycle_complete_review_before_selling');
+  assert.equal(packet.dashboard.status_refs.operator_go_live_ref, 'approval:hosted-cloud-go-live:2026-06-25');
+  assert.equal(validateCustomerLifecyclePacket(packet), true);
 });

@@ -25,10 +25,13 @@ import {
   buildUserAccountContract,
   buildCustomerLifecyclePacket,
   validateCustomerLifecyclePacket,
+  buildHostedCloudReadinessPacket,
+  HOSTED_CLOUD_READINESS_PACKET_SCHEMA,
 } from 'enigma-memory/hosted-cloud';
 
 export const HOSTED_CUSTOMER_LIFECYCLE_PACKET_SCHEMA = HOSTED_CLOUD_CUSTOMER_LIFECYCLE_PACKET_SCHEMA;
-export const HOSTED_CUSTOMER_LIFECYCLE_RELEASE_TARGET = '0.1.16';
+export const HOSTED_CUSTOMER_LIFECYCLE_RELEASE_TARGET = '0.1.17';
+export const HOSTED_CLOUD_READINESS_RELEASE_SCHEMA = HOSTED_CLOUD_READINESS_PACKET_SCHEMA;
 
 const PROVIDED = 'provided';
 const BLOCKED_MISSING = 'blocked_missing_evidence';
@@ -379,6 +382,16 @@ export function buildHostedCustomerLifecyclePacket(options = {}) {
   };
 }
 
+export function buildHostedCloudReadinessPacketFromArgs(options = {}) {
+  const generatedAt = options.generatedAt ?? new Date().toISOString();
+  const lifecyclePacket = buildHostedCustomerLifecyclePacket({ ...options, generatedAt });
+  return buildHostedCloudReadinessPacket({
+    generated_at: generatedAt,
+    customer_lifecycle_packet: lifecyclePacket,
+    operator_go_live_ref: options.operatorGoLiveRef ?? null,
+  });
+}
+
 export function parseArgs(argv) {
   const args = {
     tenant: undefined,
@@ -386,6 +399,7 @@ export function parseArgs(argv) {
     environment: undefined,
     operatorGoLiveRef: undefined,
     evidenceRefs: [],
+    readiness: false,
     out: undefined,
     help: false,
   };
@@ -395,6 +409,7 @@ export function parseArgs(argv) {
       args.help = true;
       continue;
     }
+    if (arg === '--readiness') { args.readiness = true; continue; }
     const readValue = (name) => {
       index += 1;
       if (index >= argv.length || argv[index].startsWith('--')) throw new Error(`${name} requires a value`);
@@ -414,7 +429,7 @@ export function parseArgs(argv) {
 export function usage() {
   return `Usage: node scripts/build-hosted-customer-lifecycle.mjs [options]
 
-Build a public-safe hosted customer lifecycle packet. This script validates local contract fragments only; it does not deploy, create accounts, call providers, or write secrets.
+Build a public-safe hosted customer lifecycle packet, or with --readiness a hosted cloud readiness aggregator packet. This script validates local contract fragments only; it does not deploy, create accounts, call providers, or write secrets.
 
 Options:
   --tenant <id>                    Tenant id. Defaults to blocked:tenant.
@@ -424,6 +439,9 @@ Options:
   --evidence-ref <key=status:ref>  Repeatable evidence ref. key=<ref> implies provided.
                                    Status: provided, blocked_missing_evidence, blocked_external_dependency.
                                    Keys: ${HOSTED_CUSTOMER_LIFECYCLE_EVIDENCE_KEYS.join(', ')}
+  --readiness                      Emit a hosted cloud readiness aggregator packet (enigma.hosted_cloud.readiness_packet.v1)
+                                   that wraps the lifecycle packet and rolls all readiness surfaces plus
+                                   propagated lifecycle blockers into one public-safe readiness assessment.
   --out <file>                     Also write the packet JSON to a file.
   --help                           Show this help.
 `;
@@ -435,7 +453,9 @@ export async function main(argv = process.argv.slice(2)) {
     process.stdout.write(usage());
     return 0;
   }
-  const packet = buildHostedCustomerLifecyclePacket(args);
+  const packet = args.readiness
+    ? buildHostedCloudReadinessPacketFromArgs(args)
+    : buildHostedCustomerLifecyclePacket(args);
   const json = `${JSON.stringify(packet, null, 2)}\n`;
   if (args.out) {
     try {

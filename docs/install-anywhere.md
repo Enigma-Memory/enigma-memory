@@ -1,6 +1,6 @@
 # Install Enigma anywhere
 
-Start with the published npm package path for `enigma-memory`: install once, run `enigma setup --overwrite` once, then use memory/search/context/verify/connect from the same local AI Memory Passport. Use a source checkout only when you need source-only docs, Docker assets, browser-extension scaffolding, package development, or release scripts.
+Start with the published npm package path for `enigma-memory`: install once, connect your installed AI clients, then inspect Memory Drive health and passport status. Use a source checkout only when you need source-only docs, Docker assets, browser-extension scaffolding, package development, or release scripts.
 
 Hosted cloud and BYOC operation require real deployment credentials, domains, TLS, durable storage, KMS/secrets, monitoring, backups, and operator/customer infrastructure; they are not activated by installing the package, running setup, or running the test drive.
 
@@ -18,15 +18,19 @@ Use the published package as the primary path:
 
 ```sh
 npm install -g enigma-memory
-enigma setup --overwrite
+enigma init
+enigma setup --client auto --connect-installed --overwrite
+enigma drive health
+enigma status
 enigma remember --text-file ./memory.txt
-enigma search --query "..."
-enigma context --query "..." --optimize
+enigma search --query "project context"
+enigma context --query "project context" --optimize
 enigma verify --export ./.enigma/export.json
-enigma connect claude-desktop --dry-run
 ```
 
-`enigma setup --overwrite` writes local Enigma artifacts under the workspace `.enigma` path and emits deterministic, public-safe JSON without printing raw memory plaintext. It does not write Claude, Cursor, Kimi, or other third-party app configs. Client config writes happen only when you explicitly run `enigma connect <client>` without `--dry-run`.
+`enigma init` is the credential-free first run that creates the local `.enigma` workspace, bundle, and proof artifacts. `enigma setup --client auto --connect-installed --overwrite` then configures the drive and writes the `mcpServers.enigma` entry into every installed/config-present client it detects; it skips clients that are not installed and never creates configs from scratch. Preview with `--dry-run` first to see which clients will be written. Both commands emit deterministic, public-safe JSON without printing raw memory plaintext, and both run on Windows PowerShell via the `enigma.cmd` shim the npm global install adds.
+
+`enigma drive health` reports a SMART-style memory-drive health packet — freshness, duplicate rate, tombstone backlog, stale derived artifacts, receipt coverage, and connector health — from local metadata only, with no network calls or private payloads. It is part of the Memory Drive surface in this release; `enigma status` and `enigma doctor` cover local passport counts, roots, and connector readiness in every build.
 
 The local Enigma vault is the canonical memory passport. Provider-native memory is non-canonical cache only. Enigma proof covers Enigma-controlled vault state, receipts, checkpoints, committed roots, and exported bundle shape; it does not prove provider deletion, model forgetting, provider-native memory removal, hosted/BYOC availability, legal approval, ROI/savings, or compliance certification.
 
@@ -173,15 +177,14 @@ MCP resource and prompt:
 
 Use `docs/client-connectors.md` from a source checkout for Claude Desktop, Cursor, Kimi Code, VS Code/Cline, Roo Code, OpenCode, and generic MCP JSON. Connector entries default to command `enigma-mcp` and env key `ENIGMA_BUNDLE`.
 
-Npm-first connector flow:
+Npm-first connector flow — one command connects every installed/config-present client:
 
 ```sh
 npm install -g enigma-memory
-enigma setup --overwrite
-enigma connect claude-desktop --dry-run
+enigma setup --client auto --connect-installed --overwrite
 ```
 
-Run `enigma setup --overwrite` for a regular local workspace. It writes local Enigma artifacts only. Use `enigma connect <client> --dry-run` when you want to preview one client config without writing it; remove `--dry-run` only when you explicitly want Enigma to merge that MCP entry while preserving unrelated client settings.
+`--connect-installed` detects installed/config-present clients (Claude Desktop, Cursor, Kimi Code, VS Code/Cline, Roo, OpenCode, generic MCP) and writes only those existing client configs; missing client configs are reported and skipped. To preview a single client without writing, or to connect just one client later, use `enigma connect <client> --dry-run` and then drop `--dry-run`.
 
 Copy-paste MCP snippets:
 

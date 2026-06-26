@@ -74,6 +74,21 @@ Because `enigma_relevance` can match normalized variants, session/role cues, tem
 
 The standard runner reports retrieval/evidence proxy metrics: LoCoMo evidence-hit@k and exact evidence coverage; LongMemEval turn evidence-hit@k, session evidence-hit@k, exact coverage, and abstention correctness; plus estimated prompt tokens, selected memory counts, and local latency. These are not LLM-generated answer-accuracy scores and must not be described as provider, competitor, or benchmark-leadership results.
 
+## Full-answer benchmark protocol plan
+
+A true apples-to-apples full-answer benchmark (same category set, same `--top-k`, same frozen answerer and judge, same prompts, same competitor adapters) is a separate credentialed run that this package does not execute. `--protocol-plan` is the readiness layer: it emits a public-safe plan of that future protocol with no provider calls, no answer generation, no judging, and no competitor adapters.
+
+```sh
+cd enigma
+node scripts/run-standard-memory-benchmarks.mjs --locomo .enigma/benchmarks/datasets/locomo10.json --longmemeval .enigma/benchmarks/datasets/longmemeval_s_cleaned.json --top-k 5 --protocol-plan --out .enigma/standard-memory-benchmark-protocol-plan.json
+```
+
+The emitted schema is `enigma.standard_memory_benchmark_protocol_plan.v1`. It records the planned category set, `--top-k`, the answerer model ref, the judge model ref, the prompt refs, the protocol ref, requirements-only competitor adapter refs, and cost-estimate inputs. Refs can be pinned with `--answerer-ref`, `--judge-ref`, `--answer-prompt-ref`, `--judge-prompt-ref`, and `--protocol-ref`; unpinned refs read `not-selected`/`not-pinned`.
+
+The plan carries explicit boundaries that must be `false`: `protocol_boundaries.network_required`, `provider_calls_made`, `answers_generated`, `judged`, and `competitor_adapters_run`, plus `benchmark_boundaries.llm_answer_accuracy_scored: false` and `retrieval_evidence_proxy_scored: false`. It contains no raw questions, answers, prompts, provider responses, credentials, or scores.
+
+The protocol plan is accepted by the benchmark proof-release builder alongside a scored retrieval proxy report, producing an `enigma.proof_network.benchmark_attestation.v1` that binds the plan's report hash. A protocol-plan proof release is evidence of protocol readiness only: it is not evidence that answers were generated or judged, that any provider or competitor ran or was outperformed, or that benchmark leadership, ROI, provider deletion, model forgetting, or compliance was achieved. Competitor adapter refs are references, not scores; a reference is never a superiority claim.
+
 ## Local baseline comparison
 
 `local_baseline_comparisons` (also mirrored at `metrics.local_baseline_comparisons`) compares Enigma against deterministic local baselines only. Every row scores the same private fixture questions and keeps raw memory, question text, and answer text out of the report.

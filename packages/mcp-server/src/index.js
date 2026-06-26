@@ -17,7 +17,7 @@ import {
 const DEFAULT_BUNDLE = '.enigma/bundle.json';
 const JSONRPC_VERSION = '2.0';
 const MCP_PROTOCOL_VERSION = '2024-11-05';
-const SERVER_INFO = Object.freeze({ name: 'enigma-mcp-server', version: '0.1.16' });
+const SERVER_INFO = Object.freeze({ name: 'enigma-mcp-server', version: '0.1.17' });
 const JSON_RPC_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
 const JSON_RPC_ERROR = Object.freeze({
   INVALID_REQUEST: -32600,
