@@ -1,0 +1,10 @@
+{
+  "framework": "Next.js 14, React 18.3.1, Tailwind CSS",
+  "output": "static export to dist/",
+  "routes": ["/", "/memories", "/earnings"],
+  "components": ["WalletButton"],
+  "wallet": "placeholder; embedded-wallet integration planned (Privy/Dynamic)",
+  "pwa": ["manifest.json", "sw.js"],
+  "build_status": "passes",
+  "typecheck_status": "passes"
+}

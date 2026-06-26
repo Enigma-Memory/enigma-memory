@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { buildOperatorAcceptancePacket } from '../scripts/build-operator-acceptance-packet.mjs';
 import https from 'node:https';
 import { createServer } from 'node:net';
@@ -24,6 +28,14 @@ const PROJECT_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const COMPOSE_FILE = 'deploy/docker-compose.local-production-simulation.yml';
 const SIM_REFS_PATH = '.enigma/sim-hosted-refs.json';
 const SIM_OPERATOR_ACCEPTANCE_PATH = '.enigma/sim-operator-acceptance.json';
+function sha256Hex(value) {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function gatewayBearerSha256(secretsDir, name) {
+  const token = fs.readFileSync(path.join(secretsDir, name));
+  return `sha256:${sha256Hex(token)}`;
+}
 const SIMULATION_HOST = 'sim.enigmamemory.com';
 const SIMULATION_COMPOSE_PROJECT_PREFIX = 'enigma-go-live-sim-';
 const SIMULATION_COMPOSE_PROJECT = `${SIMULATION_COMPOSE_PROJECT_PREFIX}${process.pid}-${Date.now().toString(36)}`;
@@ -118,11 +130,12 @@ function composeArgs(projectName, ...args) {
   return ['compose', '-p', projectName, '-f', COMPOSE_FILE, ...args];
 }
 
-async function downSimulationCompose(projectName = SIMULATION_COMPOSE_PROJECT, timeout = 120000) {
+async function downSimulationCompose(projectName = SIMULATION_COMPOSE_PROJECT, timeout = 120000, env = process.env) {
   await execFileAsync('docker', composeArgs(projectName, 'down', '-v', '--remove-orphans'), {
     cwd: PROJECT_ROOT,
     timeout,
     windowsHide: true,
+    env,
   });
 }
 
@@ -194,10 +207,12 @@ test('hosted/BYOC go-live simulation produces accepted live evidence', { timeout
   const relayPort = await reserveLoopbackPort();
   let gatewayPort = await reserveLoopbackPort();
   if (gatewayPort === relayPort) gatewayPort = await reserveLoopbackPort();
+  const simSecretsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'enigma-sim-secrets-'));
   const composeEnv = {
     ...process.env,
     ENIGMA_SIM_RELAY_PORT: String(relayPort),
     ENIGMA_SIM_GATEWAY_PORT: String(gatewayPort),
+    ENIGMA_SIM_SECRETS_DIR: simSecretsDir,
   };
   const relayUrl = `https://${SIMULATION_HOST}:${relayPort}`;
   const gatewayUrl = `https://${SIMULATION_HOST}:${gatewayPort}`;
@@ -205,13 +220,15 @@ test('hosted/BYOC go-live simulation produces accepted live evidence', { timeout
   try {
     await cleanupLegacySimulationCompose();
     await cleanupStaleSimulationComposeResources();
-    await downSimulationCompose();
+    await downSimulationCompose(undefined, undefined, composeEnv);
 
-    await execFileAsync(process.execPath, ['scripts/simulate-production-env.mjs'], {
+    await execFileAsync(process.execPath, ['scripts/simulate-production-env.mjs', '--secrets-dir', simSecretsDir], {
       cwd: PROJECT_ROOT,
       timeout: 60000,
       windowsHide: true,
     });
+    composeEnv.ENIGMA_GATEWAY_ADMIN_AUTH_BEARER_SHA256 = gatewayBearerSha256(simSecretsDir, 'gateway-admin-auth-bearer');
+    composeEnv.ENIGMA_GATEWAY_DATA_PLANE_AUTH_BEARER_SHA256 = gatewayBearerSha256(simSecretsDir, 'gateway-data-plane-auth-bearer');
     await execFileAsync('docker', composeArgs(SIMULATION_COMPOSE_PROJECT, 'up', '--build', '-d'), {
       cwd: PROJECT_ROOT,
       env: composeEnv,
@@ -275,9 +292,14 @@ test('hosted/BYOC go-live simulation produces accepted live evidence', { timeout
     assert.doesNotMatch(JSON.stringify(collection), /PRIVATE KEY|sk-[A-Za-z0-9_-]{16}/i);
   } finally {
     try {
-      await downSimulationCompose();
+      await downSimulationCompose(undefined, undefined, composeEnv);
     } catch {
       // Best-effort cleanup; do not mask the original failure.
+    }
+    try {
+      fs.rmSync(simSecretsDir, { recursive: true, force: true });
+    } catch {
+      // Best-effort cleanup of the temporary secrets directory.
     }
   }
 

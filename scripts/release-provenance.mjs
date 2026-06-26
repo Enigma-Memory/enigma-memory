@@ -19,6 +19,10 @@ const PUBLIC_SITE_MANIFEST_CANDIDATES = Object.freeze([
   'site/public/public-site-manifest.json',
   'site/public/manifest.json'
 ]);
+const KNOWN_SAFE_PATHS = new Set([
+  'scripts/scan-secrets.mjs',
+]);
+
 
 function normalizeRel(rel) {
   return String(rel).replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+/g, '/');
@@ -37,12 +41,12 @@ function safeProjectPath(rel) {
 }
 
 function assertSafeEvidencePath(rel) {
-  const normalized = normalizeRel(rel);
+  const normalized = normalizeRel(rel).replace(/^!+/, '');
+  if (KNOWN_SAFE_PATHS.has(normalized)) return;
   if (SECRET_OR_LOCAL_BUNDLE_PATH.test(normalized) || SECRET_EXTENSION.test(normalized) || PRIVATE_PUBLIC_SITE_COLLATERAL.test(normalized)) {
     throw new Error(`Refusing release provenance over sensitive or private path: ${normalized}`);
   }
 }
-
 function sortedObject(value) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return value;
   return Object.fromEntries(Object.keys(value).sort().map((key) => [key, sortedObject(value[key])]));

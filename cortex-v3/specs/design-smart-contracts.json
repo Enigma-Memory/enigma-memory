@@ -1,0 +1,13 @@
+{
+  "programs": ["memory_registry", "budget_escrow", "capability_registry", "royalty_router", "cortex_treasury"],
+  "language": "Rust/Anchor",
+  "accounts": {
+    "Memory": ["owner: Pubkey", "content_hash: [u8;32]", "created_at: i64", "updated_at: i64", "shareable: bool", "royalty_bps: u16", "bump: u8"],
+    "Budget": ["owner: Pubkey", "balance: u64", "spent: u64", "created_at: i64", "bump: u8"],
+    "Capability": ["owner: Pubkey", "granted_to: Pubkey", "scope: String", "expires_at: i64", "created_at: i64", "bump: u8"],
+    "Receipt": ["payer: Pubkey", "payee: Pubkey", "amount: u64", "content_hash: [u8;32]", "created_at: i64", "bump: u8"],
+    "Treasury": ["authority: Pubkey", "balance: u64", "created_at: i64", "bump: u8"]
+  },
+  "features": ["init-if-needed", "seeds", "bumps"],
+  "blocker": "Anchor CLI unavailable on Windows; needs Linux/macOS build/test"
+}

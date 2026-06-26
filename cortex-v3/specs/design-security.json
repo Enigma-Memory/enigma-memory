@@ -1,0 +1,12 @@
+{
+  "threats": {
+    "node compromise": "Encrypt memory blobs; plan TEE/STARK migration.",
+    "prompt injection": "Filter in immunology layer before ingestion.",
+    "unauthorized retrieval": "Capability registry with expiring scopes.",
+    "front-running": "Use Jito bundles or commit-reveal for sensitive ops.",
+    "key loss": "Embedded-wallet recovery + social recovery.",
+    "poisoning": "Contradiction markets + sentinel vaccination."
+  },
+  "practices": ["Encrypt at rest/transit", "Capability NFTs", "On-chain receipts", "Audit before mainnet"],
+  "compliance": "Requires external audit and legal review before public launch or token issuance."
+}

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-
+import { scanForSecrets } from './scan-secrets.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const packageJsonPath = process.env.ENIGMA_CHECK_PACKAGE_JSON_OVERRIDE
   ? path.resolve(process.env.ENIGMA_CHECK_PACKAGE_JSON_OVERRIDE)
@@ -416,6 +416,13 @@ for (const name of fs.readdirSync(specsDir)) {
     requireFailClosedObjectSchema(name, parsed);
   }
   validateSchemaNode(name, parsed, parsed);
+}
+const secretFindings = scanForSecrets(root);
+if (secretFindings.length > 0) {
+  throw new Error(
+    `secret-scan detected ${secretFindings.length} unapproved secret-like value(s):\n` +
+      secretFindings.map((f) => `${f.file}:${f.line} ${f.type}`).join('\n')
+  );
 }
 
 console.log('enigma check ok');

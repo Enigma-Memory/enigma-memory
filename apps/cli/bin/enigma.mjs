@@ -5,7 +5,7 @@ import { constants as fsConstants, realpathSync } from 'node:fs';
 import { access, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { createVault, remember, recall, updateMemory, deleteMemory, exportBundle } from '../../../packages/vault/src/index.js';
+import { createVault, remember, recall, updateMemory, deleteMemory, exportBundle, decryptKeyring, KEYRING_ENCRYPTED_TYPE } from '../../../packages/vault/src/index.js';
 import { createPassport, compileContextPack, createMemoryDriveHealthReport } from '../../../packages/passport/src/index.js';
 import { runBoundarySimulation } from '../../../packages/boundary/src/index.js';
 import { startStdioServer } from '../../../packages/mcp-server/src/index.js';
@@ -206,14 +206,14 @@ async function readJson(path) {
 }
 
 async function memoryTextFromFlags(flags) {
-  const inlineText = getFlag(flags, ['text', 'memory']);
+  const inlineText = getFlag(flags, ['text', 'memory', 'memory-text', 'memoryText']);
   const textFile = getFlag(flags, ['text-file', 'textFile', 'memory-file', 'memoryFile']);
-  if (inlineText !== undefined && textFile !== undefined) throw new Error('Use either --text or --text-file, not both.');
+  if (inlineText !== undefined && textFile !== undefined) throw new Error('Use either --text/--memory-text or --text-file, not both.');
   if (textFile !== undefined) {
     if (textFile === true || textFile === '') throw new Error('Missing required --text-file.');
     return readFile(resolve(String(textFile)), 'utf8');
   }
-  return requireFlag(flags, ['text', 'memory'], 'text');
+  return requireFlag(flags, ['text', 'memory', 'memory-text', 'memoryText'], 'text');
 }
 
 async function writeJson(path, value) {
@@ -304,10 +304,11 @@ async function buildQuickstartArtifacts(flags, { bundleInput = DEFAULT_BUNDLE, o
   ensureDistinctOutputPaths(paths.outputs.map((output) => output.path));
   if (checkExisting) await assertCanWriteQuickstartOutputs(paths.outputs, overwrite);
 
+  const passphrase = getFlag(flags, ['passphrase']);
   const vault = createVault({
     subjectId: String(getFlag(flags, ['subject', 'subject-id'], 'local-user')),
     displayName: String(getFlag(flags, ['display-name', 'name'], 'Local user')),
-    passphrase: String(getFlag(flags, ['passphrase'], 'local-development-passphrase')),
+    passphrase,
   });
   const passport = createPassport({
     vault,
@@ -329,7 +330,7 @@ async function buildQuickstartArtifacts(flags, { bundleInput = DEFAULT_BUNDLE, o
     purpose: 'quickstart_local_context',
     limit: 8,
   });
-  const exported = exportBundle({ vault, includePlaintext: false });
+  const exported = exportBundle({ vault, includePlaintext: false, passphrase });
   const bundle = exported.bundle ?? exported;
   const verifyReport = verifyBundle(bundle);
 
@@ -521,7 +522,7 @@ function publicAccessReceiptRef(receipt) {
   };
 }
 
-function searchCandidates(vault, queryTokens) {
+function searchCandidates(vault, queryTokens, includeUnrelated = false) {
   const candidates = [];
   const byAddress = new Map();
   for (const memoryAddr of [...vault.activeAddresses].sort()) {
@@ -529,7 +530,7 @@ function searchCandidates(vault, queryTokens) {
     if (!record || record.state !== 'active') continue;
     const content = vault.__getPlaintext(memoryAddr);
     const score = searchScore(queryTokens, recordSearchTokens(record, content));
-    if (queryTokens.size > 0 && score === 0) continue;
+    if (!includeUnrelated && queryTokens.size > 0 && score === 0) continue;
     const candidate = {
       address: memoryAddr,
       content,
@@ -687,12 +688,13 @@ function publicCapsuleImportResult(result) {
 async function ensureBundle(bundlePath, flags = {}) {
   const existed = await fileExists(bundlePath);
   if (existed) return { created: false, bundle: await readJson(bundlePath) };
+  const passphrase = getFlag(flags, ['passphrase']);
   const vault = createVault({
     subjectId: String(getFlag(flags, ['subject', 'subject-id'], 'local-user')),
     displayName: String(getFlag(flags, ['display-name', 'name'], 'Local user')),
-    passphrase: String(getFlag(flags, ['passphrase'], 'local-development-passphrase')),
+    passphrase,
   });
-  const bundle = await persistState(bundlePath, vault);
+  const bundle = await persistState(bundlePath, vault, { passphrase });
   return { created: true, bundle };
 }
 
@@ -798,13 +800,28 @@ async function serveHttpCommand({ flags, io, service, createServer, defaultPort 
   return 0;
 }
 
-function reviveVault(stored) {
+function reviveVault(stored, options = {}) {
   if (stored.schema !== 'enigma.vault_bundle.v1') {
     if (stored.vault?.schema === 'enigma.vault.local.v1') return stored.vault;
     throw new Error(`Unsupported Enigma bundle schema: ${stored.schema ?? '<missing>'}`);
   }
-  const signingKeyPair = stored.keyring?.privateKey
-    ? { key_id: stored.keyring.signer?.key_id, publicKey: stored.keyring.publicKey, privateKey: stored.keyring.privateKey }
+  const keyring = stored.keyring;
+  let vaultKey;
+  let addressKey;
+  let privateKey;
+  if (keyring?.type === KEYRING_ENCRYPTED_TYPE) {
+    if (!options.passphrase) throw new Error('Encrypted keyring requires passphrase');
+    const decrypted = decryptKeyring(keyring, options.passphrase);
+    vaultKey = decrypted.vault_key_b64;
+    addressKey = decrypted.address_key_b64;
+    privateKey = decrypted.privateKey;
+  } else {
+    vaultKey = keyring?.vault_key_b64;
+    addressKey = keyring?.address_key_b64;
+    privateKey = keyring?.privateKey;
+  }
+  const signingKeyPair = privateKey
+    ? { key_id: keyring?.signer?.key_id, publicKey: keyring?.publicKey, privateKey }
     : undefined;
   const vault = createVault({
     vault_id: stored.vault?.vault_id,
@@ -812,12 +829,12 @@ function reviveVault(stored) {
     subject_id: stored.vault?.subject_id,
     actor_id: stored.vault?.actor_id,
     policy_id: stored.vault?.policy_id,
-    vault_key: stored.keyring?.vault_key_b64,
-    address_key: stored.keyring?.address_key_b64,
+    vault_key: vaultKey,
+    address_key: addressKey,
     signingKeyPair,
     now: stored.vault?.created_at,
   });
-  if (stored.keyring?.signer) vault.signer = stored.keyring.signer;
+  if (keyring?.signer) vault.signer = keyring.signer;
   vault.created_at = stored.vault?.created_at ?? vault.created_at;
   vault.updated_at = stored.vault?.updated_at ?? vault.updated_at;
   vault.sequence = Number.isInteger(stored.vault?.sequence) ? stored.vault.sequence : 0;
@@ -832,18 +849,19 @@ function reviveVault(stored) {
   return vault;
 }
 
-async function loadState(bundlePath) {
+async function loadState(bundlePath, options = {}) {
   const stored = await readJson(bundlePath);
-  const vault = reviveVault(stored);
+  const vault = reviveVault(stored, options);
   return { stored, vault, passport: createPassport({ vault }) };
 }
 
-async function persistState(bundlePath, vault) {
-  const exported = exportBundle({ vault, includePlaintext: false });
+async function persistState(bundlePath, vault, options = {}) {
+  const exported = exportBundle({ vault, includePlaintext: false, passphrase: options.passphrase });
   const bundle = exported.bundle ?? exported;
   await writeJson(bundlePath, bundle);
   return bundle;
 }
+
 
 async function initCommand(flags, io) {
   const bundleInput = pathFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE);
@@ -1422,11 +1440,12 @@ export async function crossModelDemoCommand(flags, io) {
   let passport;
   let demoMemoryAddr;
 
+  const passphrase = getFlag(flags, ['passphrase']);
   if (!bundleWasSupplied) {
     vault = createVault({
       subjectId: 'cross-model-demo-user',
       displayName: 'Cross-model demo user',
-      passphrase: 'local-cross-model-demo-passphrase',
+      passphrase,
     });
     passport = createPassport({ vault, subjectId: vault.subject_id, displayName: 'Cross-model demo user' });
     const remembered = remember({
@@ -1445,7 +1464,7 @@ export async function crossModelDemoCommand(flags, io) {
       await ensureBundle(bundlePath, flags);
       bundleCreated = true;
     }
-    ({ vault, passport } = await loadState(bundlePath));
+    ({ vault, passport } = await loadState(bundlePath, { passphrase }));
     const remembered = remember({
       vault,
       passport,
@@ -1463,7 +1482,7 @@ export async function crossModelDemoCommand(flags, io) {
   const receiptCountBeforeProfiles = Array.isArray(vault.receipts) ? vault.receipts.length : 0;
   const profiles = buildCrossModelProfileSummaries({ vault, passport, demoMemoryAddr, limit });
 
-  const bundle = await persistState(bundlePath, vault);
+  const bundle = await persistState(bundlePath, vault, { passphrase: getFlag(flags, ['passphrase']) });
   const report = {
     ok: true,
     schema: 'enigma.cross_model_demo.v1',
@@ -1492,37 +1511,25 @@ export async function crossModelDemoCommand(flags, io) {
 
 async function rememberCommand(flags, io) {
   const bundlePath = resolve(String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE)));
-  const { vault, passport } = await loadState(bundlePath);
+  const { vault, passport } = await loadState(bundlePath, { passphrase: getFlag(flags, ['passphrase']) });
+  const importance = parseImportanceFlag(flags);
   const result = remember({
     vault,
     passport,
     text: await memoryTextFromFlags(flags),
+    importance,
     purpose: getFlag(flags, ['purpose'], 'user_memory'),
     purpose_tags: parseList(getFlag(flags, ['tags'])),
     metadata: parseJson(getFlag(flags, ['metadata']), {}),
   });
-  await persistState(bundlePath, vault);
+  await persistState(bundlePath, vault, { passphrase: getFlag(flags, ['passphrase']) });
   print({ ok: true, memory_addr: result.memory_addr, receipt_id: result.receipt?.receipt_id }, io);
-  return 0;
-}
-
-async function recallCommand(flags, io) {
-  const bundlePath = resolve(String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE)));
-  const { vault, passport } = await loadState(bundlePath);
-  const result = recall({
-    vault,
-    passport,
-    memory_addr: requireFlag(flags, ['id', 'memory-addr'], 'id'),
-    purpose: getFlag(flags, ['purpose'], 'local_recall'),
-  });
-  await persistState(bundlePath, vault);
-  print(result, io);
   return 0;
 }
 
 async function updateCommand(flags, io) {
   const bundlePath = resolve(String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE)));
-  const { vault, passport } = await loadState(bundlePath);
+  const { vault, passport } = await loadState(bundlePath, { passphrase: getFlag(flags, ['passphrase']) });
   const result = updateMemory({
     vault,
     passport,
@@ -1530,32 +1537,34 @@ async function updateCommand(flags, io) {
     text: requireFlag(flags, ['text', 'memory'], 'text'),
     metadata: parseJson(getFlag(flags, ['metadata']), {}),
   });
-  await persistState(bundlePath, vault);
+  await persistState(bundlePath, vault, { passphrase: getFlag(flags, ['passphrase']) });
   print({ ok: true, old_memory_addr: result.old_memory_addr, memory_addr: result.memory_addr, receipt_id: result.receipt?.receipt_id }, io);
   return 0;
 }
 
 async function deleteCommand(flags, io) {
   const bundlePath = resolve(String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE)));
-  const { vault, passport } = await loadState(bundlePath);
+  const { vault, passport } = await loadState(bundlePath, { passphrase: getFlag(flags, ['passphrase']) });
   const result = deleteMemory({
     vault,
     passport,
     memory_addr: requireFlag(flags, ['id', 'memory-addr'], 'id'),
     reason: getFlag(flags, ['reason'], 'user_delete'),
   });
-  await persistState(bundlePath, vault);
+  await persistState(bundlePath, vault, { passphrase: getFlag(flags, ['passphrase']) });
   print({ ok: true, memory_addr: result.memory_addr, receipt_id: result.receipt?.receipt_id }, io);
   return 0;
 }
 
 async function contextCommand(flags, io) {
   const bundlePath = resolve(String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE)));
-  const { vault, passport } = await loadState(bundlePath);
+  const { vault, passport } = await loadState(bundlePath, { passphrase: getFlag(flags, ['passphrase']) });
   const query = getFlag(flags, ['query', 'q'], '');
   const optimize = getFlag(flags, ['optimize']) === true
     || getFlag(flags, ['optimize']) === 'true'
     || String(query).trim().length > 0;
+  const includeUnrelated = booleanFlag(flags, ['include-unrelated', 'includeUnrelated', 'no-strict-relevance', 'noStrictRelevance'], false);
+  const strictRelevance = String(query).trim().length > 0 && !includeUnrelated;
   const pack = compileContextPack({
     vault,
     passport,
@@ -1563,11 +1572,12 @@ async function contextCommand(flags, io) {
     purpose: getFlag(flags, ['purpose'], 'local_context'),
     limit: Number(getFlag(flags, ['limit'], 8)),
     optimize,
+    strict_relevance: strictRelevance,
     max_estimated_tokens: parseOptionalNumber(getFlag(flags, ['max-estimated-tokens', 'maxEstimatedTokens'])),
     price_per_million_tokens: parseOptionalNumber(getFlag(flags, ['price-per-million-tokens', 'pricePerMillionTokens'])),
     currency: getFlag(flags, ['currency']),
   });
-  await persistState(bundlePath, vault);
+  await persistState(bundlePath, vault, { passphrase: getFlag(flags, ['passphrase']) });
   const out = getFlag(flags, ['out']);
   if (out && out !== true) await writeJson(resolve(String(out)), pack);
   print(pack, io);
@@ -1575,10 +1585,10 @@ async function contextCommand(flags, io) {
 }
 
 
-function memorySearchReport({ bundlePath, vault, query, limit, includeContent = false, now = '2026-01-01T00:00:00.000Z' }) {
+function memorySearchReport({ bundlePath, vault, query, limit, includeContent = false, includeUnrelated = false, now = '2026-01-01T00:00:00.000Z' }) {
   const roots = vault.__computeRoots();
   const queryTokens = searchTokensFrom(query);
-  const { candidates, byAddress } = searchCandidates(vault, queryTokens);
+  const { candidates, byAddress } = searchCandidates(vault, queryTokens, includeUnrelated);
   const plan = createMemoryOptimizationPlan({
     candidates,
     prompt: query,
@@ -1628,6 +1638,7 @@ function memorySearchReport({ bundlePath, vault, query, limit, includeContent = 
     schema: 'enigma.memory_search.v1',
     bundle: bundlePath,
     query_redacted: true,
+    strict_relevance: !includeUnrelated,
     limit,
     result_count: results.length,
     results,
@@ -1646,13 +1657,15 @@ async function searchCommand(flags, io) {
   const limit = integerFlag(flags, ['limit'], 'limit', 8);
   if (limit < 0) throw new Error('--limit must be non-negative.');
   const includeContent = getFlag(flags, ['include-content', 'includeContent']) === true || getFlag(flags, ['include-content', 'includeContent']) === 'true';
-  const { vault } = await loadState(bundlePath);
+  const includeUnrelated = booleanFlag(flags, ['include-unrelated', 'includeUnrelated', 'no-strict-relevance', 'noStrictRelevance'], false);
+  const { vault } = await loadState(bundlePath, { passphrase: getFlag(flags, ['passphrase']) });
   print(memorySearchReport({
     bundlePath,
     vault,
     query,
     limit,
     includeContent,
+    includeUnrelated,
     now: getFlag(flags, ['now'], '2026-01-01T00:00:00.000Z'),
   }), io);
   return 0;
@@ -1696,7 +1709,7 @@ function passportStatusReport({ bundlePath, stored = {}, vault, passport }) {
 
 async function statusCommand(flags, io) {
   const bundlePath = resolve(String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE)));
-  const { stored, vault, passport } = await loadState(bundlePath);
+  const { stored, vault, passport } = await loadState(bundlePath, { passphrase: getFlag(flags, ['passphrase']) });
   print(passportStatusReport({ bundlePath, stored, vault, passport }), io);
   return 0;
 }
@@ -1709,7 +1722,7 @@ async function readOptionalJsonInput(flags, names) {
 
 async function driveHealthCommand(flags, io) {
   const bundlePath = resolve(String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE)));
-  const { vault, passport } = await loadState(bundlePath);
+  const { vault, passport } = await loadState(bundlePath, { passphrase: getFlag(flags, ['passphrase']) });
   const benchmarkSummary = await readOptionalJsonInput(flags, ['benchmark-summary', 'benchmarkSummary']);
   const connectorSummary = await readOptionalJsonInput(flags, ['connector-summary', 'connectorSummary']);
   const replicas = await readOptionalJsonInput(flags, ['replicas']);
@@ -1986,7 +1999,7 @@ export async function testDriveCommand(flags, io) {
     out_dir: outDirInput,
     bundle: bundleInput,
     install_command: `npm install -g ${packageJson.name ?? 'enigma-memory'}`,
-    release_target: '0.1.17',
+    release_target: '0.1.18',
     artifacts_written: !dryRun,
     client_configs_written: false,
     client_config_write_required: false,
@@ -2027,8 +2040,8 @@ export async function testDriveCommand(flags, io) {
 
 async function exportCommand(flags, io) {
   const bundlePath = resolve(String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE)));
-  const { vault } = await loadState(bundlePath);
-  const exported = exportBundle({ vault, includePlaintext: false });
+  const { vault } = await loadState(bundlePath, { passphrase: getFlag(flags, ['passphrase']) });
+  const exported = exportBundle({ vault, includePlaintext: false, passphrase: getFlag(flags, ['passphrase']) });
   const bundle = exported.bundle ?? exported;
   await writeJson(bundlePath, bundle);
   const out = resolve(String(getFlag(flags, ['out'], 'enigma-export.json')));
@@ -2203,11 +2216,11 @@ export async function importCommand(source, flags, io, positionalFile = undefine
   let vault;
   if (getFlag(flags, ['write-vault'], false) === true) {
     await ensureBundle(bundlePath, flags);
-    ({ vault } = await loadState(bundlePath));
+    ({ vault } = await loadState(bundlePath, { passphrase: getFlag(flags, ['passphrase']) }));
     options.vault = vault;
   }
   const report = importer(input, options);
-  if (vault) await persistState(bundlePath, vault);
+  if (vault) await persistState(bundlePath, vault, { passphrase: getFlag(flags, ['passphrase']) });
   const out = getFlag(flags, ['out']);
   if (out && out !== true) await writeJson(resolve(String(out)), report);
   print({ ...report, source_file: file, bundle: vault ? bundlePath : undefined, out: out && out !== true ? resolve(String(out)) : undefined }, io);
@@ -2246,11 +2259,11 @@ export async function capsuleImportCommand(flags, io, positionalFile = undefined
   if (now && now !== true) options.now = String(now);
   if (getFlag(flags, ['write-vault'], false) === true) {
     await ensureBundle(bundlePath, flags);
-    ({ vault } = await loadState(bundlePath));
+    ({ vault } = await loadState(bundlePath, { passphrase: getFlag(flags, ['passphrase']) }));
     options.vault = vault;
   }
   const result = importEnigmaCapsule(capsule, options);
-  if (vault) await persistState(bundlePath, vault);
+  if (vault) await persistState(bundlePath, vault, { passphrase: getFlag(flags, ['passphrase']) });
   print({ ...publicCapsuleImportResult(result), source_file: file, bundle: vault ? bundlePath : undefined }, io);
   return result.ok ? 0 : 1;
 }
@@ -2357,6 +2370,15 @@ function integerFlag(flags, names, label = names[0], fallback = undefined) {
   if (!Number.isSafeInteger(number)) throw new Error(`--${label} must be an integer.`);
   return number;
 }
+function parseImportanceFlag(flags) {
+  const raw = getFlag(flags, ['importance', 'priority']);
+  if (raw === undefined || raw === null || raw === '') return undefined;
+  const value = Number(raw);
+  if (!Number.isFinite(value)) throw new Error('--importance must be a number between 0 and 1.');
+  if (value < 0 || value > 1) throw new Error('--importance must be between 0 and 1.');
+  return value;
+}
+
 
 function flagValues(flags, names) {
   const values = [];
@@ -2966,6 +2988,41 @@ export async function settlementBatchCommand(flags, io, positionalFile) {
   return 0;
 }
 
+function humanUsage() {
+  return `Enigma Memory CLI — local-first AI Memory Passport
+
+Usage: enigma <command> [options]
+
+Quick start:
+  npm install -g enigma-memory
+  enigma setup --bundle "$HOME/.enigma/bundle.json" --client auto --connect-installed --overwrite
+  echo "Your memory text" > memory.txt
+  enigma remember --bundle "$HOME/.enigma/bundle.json" --text-file memory.txt
+  enigma search  --bundle "$HOME/.enigma/bundle.json" --query "your topic"
+  enigma context --bundle "$HOME/.enigma/bundle.json" --query "your topic" --out "$HOME/.enigma/context-pack.json"
+  enigma verify --export "$HOME/.enigma/export.json"
+
+Windows CMD uses %USERPROFILE% instead of $HOME:
+  enigma remember --bundle "%USERPROFILE%\\.enigma\\bundle.json" --text-file memory.txt
+
+Common commands:
+  init, setup, quickstart, test-drive      First-run / demo paths
+  remember, recall, update, delete         Memory operations
+  search, context                          Retrieval / context packs
+  status, drive health, doctor             Health and diagnostics
+  connect <client>, disconnect <client>    MCP client connectors
+  export, import <source>, capsule ...     Migration and packaging
+  verify                                   Verify an exported bundle
+  mcp serve, relay demo|serve,             Local service demos
+    gateway demo|serve
+
+If no AI clients are installed, setup still creates the local bundle and
+skips connector writes. Connect later with enigma connect <client> or the
+copy-paste MCP snippets in docs/client-connectors.md.
+
+Run 'enigma --help' for JSON usage with all commands and options.`;
+}
+
 function usage() {
   return {
     usage: 'enigma <command> [options]',
@@ -3028,8 +3085,19 @@ function usage() {
       '--dry-run': 'Print planned config without writing.',
     },
     remember_options: {
-      '--text <text>': 'Inline local memory text. Avoid for private content because argv can be logged by process tooling.',
+      '--text <text>': 'Inline local memory text. Avoid for private content because argv can be logged by process tooling. Alias: --memory-text.',
       '--text-file <path>': 'Read local memory text from a file so private smoke input is not exposed in shell argv. Aliases: --memory-file, --textFile, --memoryFile.',
+      '--importance <0-1>': 'Optional numeric importance/priority in [0,1]; higher values rank the memory higher in optimized context. Alias: --priority.',
+    },
+    context_options: {
+      '--query <text>': 'Local query. When non-empty, only query-relevant active memories are returned by default. Alias: --q.',
+      '--bundle <path>': 'Bundle JSON to compile context from. Defaults to .enigma/bundle.json.',
+      '--limit <n>': 'Maximum active memories to return. Defaults to 8.',
+      '--include-unrelated': 'Escape hatch: include memories with no query token overlap. Alias: --no-strict-relevance.',
+      '--optimize': 'Force the query-aware optimizer; enabled automatically when a non-empty query is present.',
+      '--max-estimated-tokens <n>': 'Token budget for the optimized context pack.',
+      '--price-per-million-tokens <n>': 'Pricing input for cost estimates.',
+      '--currency <code>': 'Currency for cost estimates. Defaults to USD.',
     },
     search_options: {
       '--query <text>': 'Required local query. Output redacts the query and memory plaintext by default. Alias: --q.',
@@ -3037,6 +3105,7 @@ function usage() {
       '--limit <n>': 'Maximum ranked active memories to return. Defaults to 8.',
       '--json': 'Reserved for explicit JSON output; CLI output is JSON by default.',
       '--include-content': 'Opt in to returning plaintext local memory content in the JSON result.',
+      '--include-unrelated': 'Escape hatch: include memories with no query token overlap. Alias: --no-strict-relevance.',
     },
     status_options: {
       'enigma status --bundle <path>': 'Show local Memory Passport counts, roots, owner display fields, connector readiness, and next commands.',
@@ -3175,19 +3244,28 @@ function usage() {
     import_sources: Object.keys(IMPORTERS),
     clients: supportedClients,
     bundle: DEFAULT_BUNDLE,
+    human: humanUsage(),
   };
 }
 
 export async function main(argv = process.argv.slice(2), io = { stdout: process.stdout, stderr: process.stderr }) {
   const command = argv[0];
   const subcommand = argv[1];
-  if (!command || command === '--help' || command === '-h') {
-    print(usage(), io);
+  if (!command || command === '--help' || command === '-h' || command === '--help-human') {
+    if (command === '--help-human') {
+      io.stdout.write(`${humanUsage()}\n`);
+    } else {
+      print(usage(), io);
+    }
     return 0;
   }
   const twoPartCommands = ['boundary', 'mcp', 'mesh', 'enterprise', 'capsule', 'relay', 'gateway', 'connect', 'disconnect', 'import', 'native-host', 'meter', 'settlement', 'chain', 'demo', 'passport', 'drive'];
   const flags = parseArgs(twoPartCommands.includes(command) ? argv.slice(2) : argv.slice(1));
   const positionalFile = optionalPositional(argv[2]);
+  if (command === 'help') {
+    io.stdout.write(`${humanUsage()}\n`);
+    return 0;
+  }
   if ((command === 'chain' && (!subcommand || subcommand === '--help' || subcommand === '-h' || flags.has('help'))) || ((flags.has('help') || argv.includes('-h')) && (command === 'init' || command === 'setup' || command === 'test-drive' || command === 'search' || command === 'status' || (command === 'passport' && subcommand === 'status') || ((command === 'relay' || command === 'gateway') && (subcommand === 'serve' || subcommand === 'demo')) || (command === 'native-host' && (subcommand === 'manifest' || subcommand === 'install-plan')) || (command === 'demo' && subcommand === 'cross-model') || (command === 'drive' && subcommand === 'health')))) {
     print(usage(), io);
     return 0;
