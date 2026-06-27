@@ -1,0 +1,32 @@
+# Dependencies
+node_modules
+npm-debug.log*
+
+# Source control
+.git
+.gitignore
+
+# Secrets / local env
+.env
+.env.*
+!.env.example
+
+# Tests
+test
+tests
+*.test.mjs
+*.test.js
+*.test.ts
+
+# Editor / OS
+.vscode
+.idea
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# CI / docs
+docs
+.github
+*.md

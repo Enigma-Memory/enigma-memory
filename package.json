@@ -249,6 +249,11 @@
   "optionalDependencies": {
     "@solana/web3.js": "^1.98.2"
   },
+  "overrides": {
+    "jayson": {
+      "uuid": "^11.1.1"
+    }
+  },
   "engines": {
     "node": ">=24"
   },
