@@ -9,10 +9,27 @@
   "instructions": [
     {
       "name": "createBudget",
-      "discriminator": [235, 230, 179, 201, 233, 58, 158, 72],
+      "discriminator": [
+        235,
+        230,
+        179,
+        201,
+        233,
+        58,
+        158,
+        72
+      ],
       "accounts": [
-        { "name": "owner", "writable": true, "signer": true },
-        { "name": "budget", "writable": true, "signer": false },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "budget",
+          "writable": true,
+          "signer": false
+        },
         {
           "name": "systemProgram",
           "writable": false,
@@ -20,35 +37,113 @@
           "address": "11111111111111111111111111111111"
         }
       ],
-      "args": [{ "name": "amount", "type": "u64" }]
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
     },
     {
       "name": "deposit",
-      "discriminator": [242, 35, 198, 137, 82, 225, 242, 182],
-      "accounts": [
-        { "name": "owner", "writable": true, "signer": true },
-        { "name": "budget", "writable": true, "signer": false }
+      "discriminator": [
+        242,
+        35,
+        198,
+        137,
+        82,
+        225,
+        242,
+        182
       ],
-      "args": [{ "name": "amount", "type": "u64" }]
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "budget",
+          "writable": true,
+          "signer": false
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
     },
     {
       "name": "spend",
-      "discriminator": [242, 205, 255, 87, 101, 217, 245, 57],
-      "accounts": [
-        { "name": "owner", "writable": true, "signer": true },
-        { "name": "budget", "writable": true, "signer": false }
+      "discriminator": [
+        242,
+        205,
+        255,
+        87,
+        101,
+        217,
+        245,
+        57
       ],
-      "args": [{ "name": "amount", "type": "u64" }]
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "budget",
+          "writable": true,
+          "signer": false
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
     },
     {
       "name": "createTokenBudget",
-      "discriminator": [143, 183, 136, 253, 227, 160, 65, 132],
+      "discriminator": [
+        143,
+        183,
+        136,
+        253,
+        227,
+        160,
+        65,
+        132
+      ],
       "accounts": [
-        { "name": "owner", "writable": true, "signer": true },
-        { "name": "mint", "writable": false, "signer": false },
-        { "name": "tokenBudget", "writable": true, "signer": false },
-        { "name": "vault", "writable": true, "signer": false },
-        { "name": "tokenProgram", "writable": false, "signer": false },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "mint",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "tokenBudget",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "tokenProgram",
+          "writable": false,
+          "signer": false
+        },
         {
           "name": "associatedTokenProgram",
           "writable": false,
@@ -66,14 +161,47 @@
     },
     {
       "name": "depositToken",
-      "discriminator": [11, 156, 96, 218, 39, 163, 180, 19],
+      "discriminator": [
+        11,
+        156,
+        96,
+        218,
+        39,
+        163,
+        180,
+        19
+      ],
       "accounts": [
-        { "name": "owner", "writable": true, "signer": true },
-        { "name": "mint", "writable": false, "signer": false },
-        { "name": "tokenBudget", "writable": true, "signer": false },
-        { "name": "ownerAta", "writable": true, "signer": false },
-        { "name": "vault", "writable": true, "signer": false },
-        { "name": "tokenProgram", "writable": false, "signer": false },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "mint",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "tokenBudget",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "ownerAta",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "tokenProgram",
+          "writable": false,
+          "signer": false
+        },
         {
           "name": "associatedTokenProgram",
           "writable": false,
@@ -87,18 +215,56 @@
           "address": "11111111111111111111111111111111"
         }
       ],
-      "args": [{ "name": "amount", "type": "u64" }]
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
     },
     {
       "name": "spendToken",
-      "discriminator": [214, 109, 255, 231, 85, 10, 34, 198],
+      "discriminator": [
+        214,
+        109,
+        255,
+        231,
+        85,
+        10,
+        34,
+        198
+      ],
       "accounts": [
-        { "name": "owner", "writable": true, "signer": true },
-        { "name": "mint", "writable": false, "signer": false },
-        { "name": "tokenBudget", "writable": true, "signer": false },
-        { "name": "ownerAta", "writable": true, "signer": false },
-        { "name": "vault", "writable": true, "signer": false },
-        { "name": "tokenProgram", "writable": false, "signer": false },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "mint",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "tokenBudget",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "ownerAta",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "tokenProgram",
+          "writable": false,
+          "signer": false
+        },
         {
           "name": "associatedTokenProgram",
           "writable": false,
@@ -112,35 +278,116 @@
           "address": "11111111111111111111111111111111"
         }
       ],
-      "args": [{ "name": "amount", "type": "u64" }]
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
     },
     {
       "name": "spendWithSession",
-      "discriminator": [234, 22, 102, 188, 240, 56, 36, 1],
+      "discriminator": [
+        234,
+        22,
+        102,
+        188,
+        240,
+        56,
+        36,
+        1
+      ],
       "accounts": [
-        { "name": "sessionKey", "writable": true, "signer": true },
-        { "name": "owner", "writable": false, "signer": false },
-        { "name": "session", "writable": true, "signer": false },
-        { "name": "ownerNonce", "writable": false, "signer": false },
-        { "name": "budget", "writable": true, "signer": false }
+        {
+          "name": "sessionKey",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "owner",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "session",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "ownerNonce",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "budget",
+          "writable": true,
+          "signer": false
+        }
       ],
       "args": [
-        { "name": "amount", "type": "u64" },
-        { "name": "nonce", "type": "u64" }
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "nonce",
+          "type": "u64"
+        }
       ]
     },
     {
       "name": "depositTokenWithSession",
-      "discriminator": [38, 182, 43, 105, 136, 166, 151, 210],
+      "discriminator": [
+        38,
+        182,
+        43,
+        105,
+        136,
+        166,
+        151,
+        210
+      ],
       "accounts": [
-        { "name": "sessionKey", "writable": true, "signer": true },
-        { "name": "owner", "writable": false, "signer": false },
-        { "name": "session", "writable": true, "signer": false },
-        { "name": "ownerNonce", "writable": false, "signer": false },
-        { "name": "mint", "writable": false, "signer": false },
-        { "name": "tokenBudget", "writable": true, "signer": false },
-        { "name": "from", "writable": true, "signer": false },
-        { "name": "vault", "writable": true, "signer": false },
+        {
+          "name": "sessionKey",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "owner",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "session",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "ownerNonce",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "mint",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "tokenBudget",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "from",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "signer": false
+        },
         {
           "name": "tokenProgram",
           "writable": false,
@@ -161,52 +408,183 @@
         }
       ],
       "args": [
-        { "name": "amount", "type": "u64" },
-        { "name": "nonce", "type": "u64" }
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "nonce",
+          "type": "u64"
+        }
       ]
     }
   ],
   "accounts": [
     {
       "name": "Budget",
-      "discriminator": [35, 151, 58, 65, 187, 148, 119, 218],
+      "discriminator": [
+        35,
+        151,
+        58,
+        65,
+        187,
+        148,
+        119,
+        218
+      ],
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "owner", "type": "pubkey" },
-          { "name": "balance", "type": "u64" },
-          { "name": "spent", "type": "u64" },
-          { "name": "createdAt", "type": "i64" },
-          { "name": "bump", "type": "u8" }
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "balance",
+            "type": "u64"
+          },
+          {
+            "name": "spent",
+            "type": "u64"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
         ]
       }
     },
     {
       "name": "TokenBudget",
-      "discriminator": [123, 59, 46, 153, 135, 46, 24, 234],
+      "discriminator": [
+        123,
+        59,
+        46,
+        153,
+        135,
+        46,
+        24,
+        234
+      ],
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "owner", "type": "pubkey" },
-          { "name": "mint", "type": "pubkey" },
-          { "name": "balance", "type": "u64" },
-          { "name": "spent", "type": "u64" },
-          { "name": "bump", "type": "u8" }
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "balance",
+            "type": "u64"
+          },
+          {
+            "name": "spent",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
         ]
       }
     }
   ],
   "errors": [
-    { "code": 6000, "name": "InsufficientFunds", "msg": "Insufficient funds" },
-    { "code": 6001, "name": "InvalidOwner", "msg": "Invalid owner" },
-    { "code": 6002, "name": "InvalidMint", "msg": "Invalid mint" },
-    { "code": 6003, "name": "InvalidAmount", "msg": "Invalid amount" },
-    { "code": 6004, "name": "MathOverflow", "msg": "Math overflow" },
+    {
+      "code": 6000,
+      "name": "InsufficientFunds",
+      "msg": "Insufficient funds"
+    },
+    {
+      "code": 6001,
+      "name": "InvalidOwner",
+      "msg": "Invalid owner"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidMint",
+      "msg": "Invalid mint"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidAmount",
+      "msg": "Invalid amount"
+    },
+    {
+      "code": 6004,
+      "name": "MathOverflow",
+      "msg": "Math overflow"
+    },
     {
       "code": 6005,
       "name": "AlreadyInitialized",
       "msg": "Token budget already initialized"
     }
   ],
-  "types": []
+  "types": [
+    {
+      "name": "Budget",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "balance",
+            "type": "u64"
+          },
+          {
+            "name": "spent",
+            "type": "u64"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenBudget",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "balance",
+            "type": "u64"
+          },
+          {
+            "name": "spent",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
 }
