@@ -46,6 +46,10 @@ Run setup or quickstart before treating `enigma doctor` as a fully green install
 
 For the no-global-install path, run `npx --yes --package enigma-memory enigma quickstart --bundle ./.enigma/bundle.json --overwrite` before `npx --yes --package enigma-memory enigma doctor --bundle ./.enigma/bundle.json`; running npx doctor first can surface the same expected red generic-MCP missing-bundle state.
 
+## General public launch buildout
+
+The consumer-ready target is a signed desktop app with bundled runtime, one-button local vault setup, one-click client connections, health/fix-it UI, signed updates, public-safe diagnostics, and desktop-first docs. The implementation goal and phase plan are in [`docs/GENERAL_PUBLIC_LAUNCH_GOAL.md`](docs/GENERAL_PUBLIC_LAUNCH_GOAL.md) and [`docs/GENERAL_PUBLIC_LAUNCH_WORKPLAN.md`](docs/GENERAL_PUBLIC_LAUNCH_WORKPLAN.md).
+
 ## Enigma Proof Network
 
 Enigma Proof Network is the public proof layer for AI memory: local tools can package privacy-preserving roots, refs, counts, signatures, scoped capability grants, revocations, and benchmark attestations without exposing raw memory, prompts, transcripts, completions, embeddings, tenant names, private keys, provider responses, or provider credentials.

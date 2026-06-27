@@ -100,3 +100,7 @@ Verification recorded for this slice:
 - `npm test`
 - `npm run secret-scan`
 - `npm pack --dry-run`
+
+## General public launch handoff
+
+The consumer launch goal is a signed desktop app and one-click setup flow that uses this memory-boundary transaction layer without exposing technical setup in the default path. See `docs/GENERAL_PUBLIC_LAUNCH_GOAL.md` and `docs/GENERAL_PUBLIC_LAUNCH_WORKPLAN.md`.
