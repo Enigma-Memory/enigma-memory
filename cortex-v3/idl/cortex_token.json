@@ -22,23 +22,17 @@
       "accounts": [
         {
           "name": "mint",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
           "name": "treasury",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
-          "name": "mintAuthority",
-          "isMut": false,
-          "isSigner": false
+          "name": "mintAuthority"
         },
         {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "tokenProgram"
         }
       ],
       "args": [
@@ -63,33 +57,25 @@
       "accounts": [
         {
           "name": "from",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
           "name": "fromAta",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
           "name": "toAta",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
-          "name": "to",
-          "isMut": false,
-          "isSigner": false
+          "name": "to"
         },
         {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
+          "name": "mint"
         },
         {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "tokenProgram"
         }
       ],
       "args": [
@@ -114,48 +100,35 @@
       "accounts": [
         {
           "name": "owner",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
+          "name": "mint"
         },
         {
           "name": "stake",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
           "name": "ownerAta",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
           "name": "stakeVault",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
-          "name": "stakeVaultAuthority",
-          "isMut": false,
-          "isSigner": false
+          "name": "stakeVaultAuthority"
         },
         {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "tokenProgram"
         },
         {
-          "name": "associatedTokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "associatedTokenProgram"
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "systemProgram"
         }
       ],
       "args": [
@@ -184,23 +157,19 @@
       "accounts": [
         {
           "name": "owner",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
           "name": "stake",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
           "name": "vesal",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "systemProgram"
         }
       ],
       "args": [
@@ -225,18 +194,15 @@
       "accounts": [
         {
           "name": "proposer",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
           "name": "proposal",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "systemProgram"
         }
       ],
       "args": [
@@ -261,33 +227,26 @@
       "accounts": [
         {
           "name": "voter",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
           "name": "stake",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
-          "name": "vesal",
-          "isMut": false,
-          "isSigner": false
+          "name": "vesal"
         },
         {
           "name": "proposal",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
           "name": "voteReceipt",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "systemProgram"
         }
       ],
       "args": [
