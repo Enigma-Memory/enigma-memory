@@ -74,7 +74,7 @@ jobs:
         run: anchor --version
 
       - name: Install workspace dependencies
-        run: yarn install
+        run: npm install
 
       - name: Cargo Check (Rust compilation)
         run: cargo check --workspace
