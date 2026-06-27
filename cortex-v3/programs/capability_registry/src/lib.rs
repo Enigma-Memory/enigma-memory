@@ -44,9 +44,8 @@ pub mod capability_registry {
 
         session.owner = ctx.accounts.owner.key();
         session.session_key = ctx.accounts.session_key.key();
-        session.nonce = owner_nonce.nonce;
+        session.nonce = 0;
         session.owner_nonce = owner_nonce.nonce;
-        owner_nonce.nonce = owner_nonce.nonce.checked_add(1).unwrap();
         session.scope = scope;
         session.categories_hash = categories_hash;
         session.max_spend_per_tx = max_spend_per_tx;
@@ -140,8 +139,9 @@ pub mod session {
         if scope != 0 {
             require!(session.scope & scope != 0, CapError::ScopeNotGranted);
         }
-        require!(
-            session.owner_nonce < owner_nonce.nonce,
+        require_eq!(
+            session.owner_nonce,
+            owner_nonce.nonce,
             CapError::OwnerNonceMismatch
         );
         Ok(())

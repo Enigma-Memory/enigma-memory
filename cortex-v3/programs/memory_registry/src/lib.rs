@@ -219,7 +219,7 @@ pub struct UpdateMemoryWithSession<'info> {
     )]
     pub owner_nonce: Account<'info, capability_registry::OwnerNonce>,
     pub capability_registry_program: Program<'info, capability_registry::program::CapabilityRegistry>,
-    #[account(mut, seeds = [b"memory", owner.key().as_ref(), &memory.content_hash[..8]], bump = memory.bump)]
+    #[account(mut, has_one = owner)]
     pub memory: Account<'info, Memory>,
 }
 
@@ -246,7 +246,7 @@ pub struct DeleteMemoryWithSession<'info> {
     )]
     pub owner_nonce: Account<'info, capability_registry::OwnerNonce>,
     pub capability_registry_program: Program<'info, capability_registry::program::CapabilityRegistry>,
-    #[account(mut, close = owner, seeds = [b"memory", owner.key().as_ref(), &memory.content_hash[..8]], bump = memory.bump)]
+    #[account(mut, close = owner, has_one = owner)]
     pub memory: Account<'info, Memory>,
 }
 
