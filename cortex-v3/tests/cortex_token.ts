@@ -26,33 +26,25 @@ describe("cortex_token", () => {
     program.programId
   )[0];
 
-  const mintKeypair = Keypair.generate();
+  const mint = PublicKey.findProgramAddressSync(
+    [Buffer.from("sal_mint")],
+    program.programId
+  )[0];
   let treasury: PublicKey;
-
   const user = Keypair.generate();
   let payerAta: PublicKey;
   let userAta: PublicKey;
 
   before(async () => {
-    treasury = getAssociatedTokenAddressSync(
-      mintKeypair.publicKey,
-      treasuryAuthority,
-      true
-    );
-    payerAta = getAssociatedTokenAddressSync(
-      mintKeypair.publicKey,
-      payer.publicKey
-    );
-    userAta = getAssociatedTokenAddressSync(
-      mintKeypair.publicKey,
-      user.publicKey
-    );
+    treasury = getAssociatedTokenAddressSync(mint, treasuryAuthority, true);
+    payerAta = getAssociatedTokenAddressSync(mint, payer.publicKey);
+    userAta = getAssociatedTokenAddressSync(mint, user.publicKey);
 
     await program.methods
       .initializeMint()
       .accounts({
         payer: payer.publicKey,
-        mint: mintKeypair.publicKey,
+        mint,
         mintAuthority,
         treasury,
         treasuryAuthority,
@@ -60,26 +52,52 @@ describe("cortex_token", () => {
         associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
       })
-      .signers([mintKeypair])
       .rpc();
 
     await createAssociatedTokenAccount(
       provider.connection,
       payer.payer,
-      mintKeypair.publicKey,
+      mint,
       payer.publicKey
     );
     await createAssociatedTokenAccount(
       provider.connection,
       payer.payer,
-      mintKeypair.publicKey,
+      mint,
+      user.publicKey
+    );
+
+    await program.methods
+      .initializeMint()
+      .accounts({
+        payer: payer.publicKey,
+        mint: mint,
+        mintAuthority,
+        treasury,
+        treasuryAuthority,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+
+    await createAssociatedTokenAccount(
+      provider.connection,
+      payer.payer,
+      mint,
+      payer.publicKey
+    );
+    await createAssociatedTokenAccount(
+      provider.connection,
+      payer.payer,
+      mint,
       user.publicKey
     );
 
     await program.methods
       .mintToTreasury(new BN(10_000))
       .accounts({
-        mint: mintKeypair.publicKey,
+        mint: mint,
         treasury: payerAta,
         mintAuthority,
         tokenProgram: TOKEN_PROGRAM_ID,
@@ -88,7 +106,7 @@ describe("cortex_token", () => {
   });
 
   it("Initializes the SAL mint", async () => {
-    const mintAccount = await program.account.mint.fetch(mintKeypair.publicKey);
+    const mintAccount = await program.account.mint.fetch(mint);
     assert.equal(mintAccount.decimals, 9);
   });
 
@@ -96,7 +114,7 @@ describe("cortex_token", () => {
     await program.methods
       .mintToTreasury(new BN(1_000_000_000))
       .accounts({
-        mint: mintKeypair.publicKey,
+        mint: mint,
         treasury,
         mintAuthority,
         tokenProgram: TOKEN_PROGRAM_ID,
@@ -112,7 +130,7 @@ describe("cortex_token", () => {
         fromAta: payerAta,
         toAta: userAta,
         to: user.publicKey,
-        mint: mintKeypair.publicKey,
+        mint: mint,
         tokenProgram: TOKEN_PROGRAM_ID,
       })
       .rpc();
@@ -134,7 +152,7 @@ describe("cortex_token", () => {
       program.programId
     )[0];
     const stakeVault = getAssociatedTokenAddressSync(
-      mintKeypair.publicKey,
+      mint,
       stakeVaultAuthority,
       true
     );
@@ -143,7 +161,7 @@ describe("cortex_token", () => {
       .stakeForVesal(nonce, new BN(500))
       .accounts({
         owner: user.publicKey,
-        mint: mintKeypair.publicKey,
+        mint: mint,
         stake: stakePda,
         ownerAta: userAta,
         stakeVault,
