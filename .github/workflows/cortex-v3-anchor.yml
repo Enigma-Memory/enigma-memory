@@ -77,25 +77,12 @@ jobs:
         run: cargo check --workspace
 
       - name: Anchor Build
-        id: anchor-build
-        continue-on-error: true
         run: anchor build
 
-      - name: Anchor Build status
-        run: |
-          if [ "${{ steps.anchor-build.outcome }}" == "success" ]; then
-            echo "Anchor build succeeded"
-          else
-            echo "Anchor build failed: SBF toolchain dependency resolution issue. cargo check passes."
-          fi
-
-      - name: Fund devnet wallet
-        if: steps.anchor-build.outcome == 'success'
-        run: solana airdrop 2 $(solana address) --url devnet
-        continue-on-error: true
-
       - name: Anchor Test
-        if: steps.anchor-build.outcome == 'success'
         run: anchor test --skip-build
         timeout-minutes: 15
+
+      - name: Fund devnet wallet
+        run: solana airdrop 2 $(solana address) --url devnet
         continue-on-error: true
