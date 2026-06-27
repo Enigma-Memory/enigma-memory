@@ -145,6 +145,7 @@ pub struct InitializeMint<'info> {
         associated_token::authority = treasury_authority
     )]
     pub treasury: Account<'info, TokenAccount>,
+    #[account(
         seeds = [b"treasury_authority"],
         bump
     )]
