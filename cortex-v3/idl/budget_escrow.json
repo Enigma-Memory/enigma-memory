@@ -319,6 +319,11 @@
           "signer": false
         },
         {
+          "name": "capabilityRegistryProgram",
+          "writable": false,
+          "signer": false
+        },
+        {
           "name": "budget",
           "writable": true,
           "signer": false
@@ -365,6 +370,11 @@
         },
         {
           "name": "ownerNonce",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "capabilityRegistryProgram",
           "writable": false,
           "signer": false
         },

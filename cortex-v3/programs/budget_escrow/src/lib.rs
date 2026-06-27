@@ -382,14 +382,17 @@ pub struct DepositTokenWithSession<'info> {
         mut,
         seeds = [b"session", owner.key().as_ref(), session_key.key().as_ref(), nonce.to_le_bytes().as_ref()],
         bump = session.bump,
+        seeds::program = capability_registry_program.key(),
         constraint = session.nonce == nonce
     )]
     pub session: Account<'info, capability_registry::Session>,
     #[account(
         seeds = [b"owner_nonce", owner.key().as_ref()],
-        bump = owner_nonce.bump
+        bump = owner_nonce.bump,
+        seeds::program = capability_registry_program.key()
     )]
     pub owner_nonce: Account<'info, capability_registry::OwnerNonce>,
+    pub capability_registry_program: Program<'info, capability_registry::program::CapabilityRegistry>,
     pub mint: Account<'info, Mint>,
     #[account(
         init_if_needed,
