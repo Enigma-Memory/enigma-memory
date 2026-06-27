@@ -4,32 +4,78 @@
     "name": "memory_registry",
     "version": "0.1.0",
     "spec": "0.1.0",
-    "description": "Placeholder IDL for memory_registry"
+    "description": "Memory registry with session-key delegation"
   },
   "instructions": [
     {
       "name": "registerMemory",
-      "discriminator": [
-        125,
-        93,
-        36,
-        52,
-        192,
-        94,
-        86,
-        216
-      ],
+      "discriminator": [76, 186, 130, 224, 108, 156, 185, 253],
       "accounts": [
+        { "name": "owner", "writable": true, "signer": true },
+        { "name": "memory", "writable": true, "signer": false },
         {
-          "name": "owner",
-          "writable": true,
-          "signer": true
-        },
+          "name": "systemProgram",
+          "writable": false,
+          "signer": false,
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [{ "name": "contentHash", "type": { "array": ["u8", 32] } }]
+    },
+    {
+      "name": "createMemory",
+      "discriminator": [249, 172, 48, 217, 19, 116, 124, 54],
+      "accounts": [
+        { "name": "owner", "writable": true, "signer": true },
+        { "name": "memory", "writable": true, "signer": false },
         {
-          "name": "memory",
-          "writable": true,
-          "signer": false
-        },
+          "name": "systemProgram",
+          "writable": false,
+          "signer": false,
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [{ "name": "contentHash", "type": { "array": ["u8", 32] } }]
+    },
+    {
+      "name": "updateMemory",
+      "discriminator": [147, 159, 103, 157, 254, 1, 246, 224],
+      "accounts": [
+        { "name": "owner", "writable": true, "signer": true },
+        { "name": "memory", "writable": true, "signer": false }
+      ],
+      "args": [{ "name": "newHash", "type": { "array": ["u8", 32] } }]
+    },
+    {
+      "name": "setShareable",
+      "discriminator": [64, 98, 49, 79, 150, 20, 80, 133],
+      "accounts": [
+        { "name": "owner", "writable": true, "signer": true },
+        { "name": "memory", "writable": true, "signer": false }
+      ],
+      "args": [
+        { "name": "shareable", "type": "bool" },
+        { "name": "royaltyBps", "type": "u16" }
+      ]
+    },
+    {
+      "name": "deleteMemory",
+      "discriminator": [197, 189, 203, 106, 20, 99, 209, 134],
+      "accounts": [
+        { "name": "owner", "writable": true, "signer": true },
+        { "name": "memory", "writable": true, "signer": false }
+      ],
+      "args": []
+    },
+    {
+      "name": "createMemoryWithSession",
+      "discriminator": [175, 6, 139, 191, 23, 140, 38, 228],
+      "accounts": [
+        { "name": "sessionKey", "writable": true, "signer": true },
+        { "name": "owner", "writable": true, "signer": false },
+        { "name": "session", "writable": true, "signer": false },
+        { "name": "ownerNonce", "writable": false, "signer": false },
+        { "name": "memory", "writable": true, "signer": false },
         {
           "name": "systemProgram",
           "writable": false,
@@ -38,216 +84,58 @@
         }
       ],
       "args": [
-        {
-          "name": "contentHash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        }
+        { "name": "contentHash", "type": { "array": ["u8", 32] } },
+        { "name": "nonce", "type": "u64" }
       ]
     },
     {
-      "name": "updateMemory",
-      "discriminator": [
-        245,
-        25,
-        27,
-        198,
-        218,
-        227,
-        136,
-        225
-      ],
+      "name": "updateMemoryWithSession",
+      "discriminator": [234, 32, 109, 145, 154, 75, 217, 1],
       "accounts": [
-        {
-          "name": "owner",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "memory",
-          "writable": true,
-          "signer": false
-        }
+        { "name": "sessionKey", "writable": true, "signer": true },
+        { "name": "owner", "writable": false, "signer": false },
+        { "name": "session", "writable": true, "signer": false },
+        { "name": "ownerNonce", "writable": false, "signer": false },
+        { "name": "memory", "writable": true, "signer": false }
       ],
       "args": [
-        {
-          "name": "newHash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        }
+        { "name": "newHash", "type": { "array": ["u8", 32] } },
+        { "name": "nonce", "type": "u64" }
       ]
     },
     {
-      "name": "setShareable",
-      "discriminator": [
-        254,
-        249,
-        27,
-        244,
-        212,
-        173,
-        208,
-        35
-      ],
+      "name": "deleteMemoryWithSession",
+      "discriminator": [17, 236, 143, 113, 23, 20, 236, 155],
       "accounts": [
-        {
-          "name": "owner",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "memory",
-          "writable": true,
-          "signer": false
-        }
+        { "name": "sessionKey", "writable": true, "signer": true },
+        { "name": "owner", "writable": true, "signer": false },
+        { "name": "session", "writable": true, "signer": false },
+        { "name": "ownerNonce", "writable": false, "signer": false },
+        { "name": "memory", "writable": true, "signer": false }
       ],
-      "args": [
-        {
-          "name": "shareable",
-          "type": "bool"
-        },
-        {
-          "name": "royaltyBps",
-          "type": "u16"
-        }
-      ]
-    },
-    {
-      "name": "deleteMemory",
-      "discriminator": [
-        10,
-        99,
-        127,
-        81,
-        18,
-        57,
-        33,
-        11
-      ],
-      "accounts": [
-        {
-          "name": "owner",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "memory",
-          "writable": true,
-          "signer": false
-        }
-      ],
-      "args": []
+      "args": [{ "name": "nonce", "type": "u64" }]
     }
   ],
   "accounts": [
     {
       "name": "Memory",
-      "discriminator": [
-        14,
-        198,
-        85,
-        183,
-        235,
-        32,
-        242,
-        208
-      ],
+      "discriminator": [14, 198, 85, 183, 235, 32, 242, 208],
       "type": {
         "kind": "struct",
         "fields": [
-          {
-            "name": "owner",
-            "type": "pubkey"
-          },
-          {
-            "name": "contentHash",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "createdAt",
-            "type": "i64"
-          },
-          {
-            "name": "updatedAt",
-            "type": "i64"
-          },
-          {
-            "name": "shareable",
-            "type": "bool"
-          },
-          {
-            "name": "royaltyBps",
-            "type": "u16"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
+          { "name": "owner", "type": "pubkey" },
+          { "name": "contentHash", "type": { "array": ["u8", 32] } },
+          { "name": "createdAt", "type": "i64" },
+          { "name": "updatedAt", "type": "i64" },
+          { "name": "shareable", "type": "bool" },
+          { "name": "royaltyBps", "type": "u16" },
+          { "name": "bump", "type": "u8" }
         ]
       }
     }
   ],
   "errors": [
-    {
-      "code": 6000,
-      "name": "RoyaltyTooHigh",
-      "msg": "Royalty too high"
-    }
+    { "code": 6000, "name": "RoyaltyTooHigh", "msg": "Royalty too high" }
   ],
-  "types": [
-    {
-      "name": "Memory",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "owner",
-            "type": "pubkey"
-          },
-          {
-            "name": "contentHash",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "createdAt",
-            "type": "i64"
-          },
-          {
-            "name": "updatedAt",
-            "type": "i64"
-          },
-          {
-            "name": "shareable",
-            "type": "bool"
-          },
-          {
-            "name": "royaltyBps",
-            "type": "u16"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
-    }
-  ]
+  "types": []
 }

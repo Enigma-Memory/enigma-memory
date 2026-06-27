@@ -27,13 +27,13 @@ User input
 
 ## Program responsibilities
 
-| Program | PDA | Function |
-|---|---|---|
-| memory_registry | Memory | Hash, owner, shareable flag, royalty bps. |
-| budget_escrow | Budget | USDC/SOL balance for memory ops. |
+| Program             | PDA        | Function                                    |
+| ------------------- | ---------- | ------------------------------------------- |
+| memory_registry     | Memory     | Hash, owner, shareable flag, royalty bps.   |
+| budget_escrow       | Budget     | USDC/SOL balance for memory ops.            |
 | capability_registry | Capability | Scoped, expiring grants to retrieve memory. |
-| royalty_router | Receipt | Anchored royalty payment record. |
-| cortex_treasury | Treasury | Protocol fee vault. |
+| royalty_router      | Receipt    | Anchored royalty payment record.            |
+| cortex_treasury     | Treasury   | Protocol fee vault.                         |
 
 ## Node modules
 
@@ -58,4 +58,4 @@ User input
 
 ---
 
-*Architecture spec — v3 — 2026-06-25*
+_Architecture spec — v3 — 2026-06-25_
