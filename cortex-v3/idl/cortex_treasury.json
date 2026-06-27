@@ -145,5 +145,30 @@
       "msg": "Insufficient funds"
     }
   ],
-  "types": []
+  "types": [
+    {
+      "name": "Treasury",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "balance",
+            "type": "u64"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
 }

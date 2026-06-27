@@ -131,5 +131,38 @@
       "msg": "Scope too long"
     }
   ],
-  "types": []
+  "types": [
+    {
+      "name": "Capability",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "grantedTo",
+            "type": "pubkey"
+          },
+          {
+            "name": "scope",
+            "type": "string"
+          },
+          {
+            "name": "expiresAt",
+            "type": "i64"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
 }

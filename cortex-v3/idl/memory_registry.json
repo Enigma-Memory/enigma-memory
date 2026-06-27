@@ -207,5 +207,47 @@
       "msg": "Royalty too high"
     }
   ],
-  "types": []
+  "types": [
+    {
+      "name": "Memory",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "contentHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "updatedAt",
+            "type": "i64"
+          },
+          {
+            "name": "shareable",
+            "type": "bool"
+          },
+          {
+            "name": "royaltyBps",
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
 }
