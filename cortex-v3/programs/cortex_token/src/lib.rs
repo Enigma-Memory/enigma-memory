@@ -133,7 +133,6 @@ pub mod cortex_token {
 
 #[derive(Accounts)]
 pub struct InitializeMint<'info> {
-    #[account(mut)]
     pub payer: Signer<'info>,
     pub mint: Account<'info, Mint>,
     #[account(
@@ -142,12 +141,10 @@ pub struct InitializeMint<'info> {
     )]
     pub mint_authority: UncheckedAccount<'info>,
     #[account(
-        mut,
         associated_token::mint = mint,
         associated_token::authority = treasury_authority
     )]
     pub treasury: Account<'info, TokenAccount>,
-    #[account(
         seeds = [b"treasury_authority"],
         bump
     )]
