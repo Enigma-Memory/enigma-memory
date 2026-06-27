@@ -1,6 +1,11 @@
 {
-  "version": "0.1.0",
-  "name": "cortex_token",
+  "address": "EqV3aLfvqNycQzofXVLxsry8WMMfZX8WmomYNUBskZSb",
+  "metadata": {
+    "name": "cortex_token",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "IDL for cortex_token"
+  },
   "instructions": [
     {
       "name": "initializeMint",
@@ -368,276 +373,54 @@
     {
       "name": "StakeEntry",
       "discriminator": [
+        187,
+        127,
+        9,
         35,
-        141,
-        6,
-        89,
-        43,
-        7,
-        196,
-        158
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "owner",
-            "type": "publicKey"
-          },
-          {
-            "name": "mint",
-            "type": "publicKey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "nonce",
-            "type": "u64"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
+        155,
+        68,
+        86,
+        40
+      ]
     },
     {
       "name": "VeSal",
       "discriminator": [
+        68,
+        216,
+        82,
+        250,
+        81,
         252,
-        152,
-        14,
+        93,
+        239
+      ]
+    },
+    {
+      "name": "Proposal",
+      "discriminator": [
+        26,
         94,
-        196,
-        151,
-        255,
-        6
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "owner",
-            "type": "publicKey"
-          },
-          {
-            "name": "stake",
-            "type": "publicKey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "lockStart",
-            "type": "i64"
-          },
-          {
-            "name": "lockEnd",
-            "type": "i64"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
+        189,
+        187,
+        116,
+        136,
+        53,
+        33
+      ]
     },
     {
-      "name": "Proposal",
+      "name": "VoteReceipt",
       "discriminator": [
-        6,
-        35,
-        22,
-        25,
-        30,
-        214,
+        104,
         20,
-        188
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "proposer",
-            "type": "publicKey"
-          },
-          {
-            "name": "id",
-            "type": "u64"
-          },
-          {
-            "name": "yesVotes",
-            "type": "u64"
-          },
-          {
-            "name": "noVotes",
-            "type": "u64"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "VoteReceipt",
-      "discriminator": [
-        113,
-        239,
-        71,
-        240,
-        208,
-        215,
-        113,
-        119
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "voter",
-            "type": "publicKey"
-          },
-          {
-            "name": "proposal",
-            "type": "publicKey"
-          },
-          {
-            "name": "weight",
-            "type": "u64"
-          },
-          {
-            "name": "side",
-            "type": "u8"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
-    }
-  ],
-  "types": [
-    {
-      "name": "StakeEntry",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "owner",
-            "type": "publicKey"
-          },
-          {
-            "name": "mint",
-            "type": "publicKey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "nonce",
-            "type": "u64"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "VeSal",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "owner",
-            "type": "publicKey"
-          },
-          {
-            "name": "stake",
-            "type": "publicKey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "lockStart",
-            "type": "i64"
-          },
-          {
-            "name": "lockEnd",
-            "type": "i64"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Proposal",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "proposer",
-            "type": "publicKey"
-          },
-          {
-            "name": "id",
-            "type": "u64"
-          },
-          {
-            "name": "yesVotes",
-            "type": "u64"
-          },
-          {
-            "name": "noVotes",
-            "type": "u64"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "VoteReceipt",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "voter",
-            "type": "publicKey"
-          },
-          {
-            "name": "proposal",
-            "type": "publicKey"
-          },
-          {
-            "name": "weight",
-            "type": "u64"
-          },
-          {
-            "name": "side",
-            "type": "u8"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
+        204,
+        252,
+        45,
+        84,
+        37,
+        195
+      ]
     }
   ],
   "errors": [
@@ -662,7 +445,122 @@
       "msg": "Arithmetic overflow"
     }
   ],
-  "metadata": {
-    "address": "EqV3aLfvqNycQzofXVLxsry8WMMfZX8WmomYNUBskZSb"
-  }
+  "types": [
+    {
+      "name": "StakeEntry",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "nonce",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VeSal",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "stake",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "lockStart",
+            "type": "i64"
+          },
+          {
+            "name": "lockEnd",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Proposal",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "proposer",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "yesVotes",
+            "type": "u64"
+          },
+          {
+            "name": "noVotes",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VoteReceipt",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "voter",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "weight",
+            "type": "u64"
+          },
+          {
+            "name": "side",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
 }
