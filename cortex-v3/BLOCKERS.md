@@ -6,7 +6,7 @@
   - Solana CLI installed from GitHub release tarball.
   - Anchor CLI installed via npm.
   - Rust pinned to 1.75.0 for Solana 1.18.26 SBF toolchain compatibility.
-  - `cargo check --workspace`, `anchor build --no-idl`, and `anchor test --skip-build` pass in CI.
+  - `cargo check --workspace`, `anchor build --no-idl`, and `anchor test --skip-build` pass in CI (all 28 Anchor tests green on Run #175).
 - ✅ **Solana credentials configured** — devnet wallet stored as GitHub secret `SOLANA_DEVNET_WALLET`.
   - Public key: `FasTsgodYjJwiiZ1eAxHmocVCvKcKNiXZYVJUZiZ3rh7`
 - ✅ **Local Windows development path documented** — WSL2 setup script and GitHub Codespaces devcontainer available.
