@@ -12,10 +12,6 @@ import { assert } from "chai";
 
 describe("cortex_token", () => {
   const program = anchor.workspace.CortexToken;
-  console.log("program id", program.programId.toBase58());
-  const mintToTreasuryIx = (program.idl as any).instructions.find((ix: any) => ix.name === 'mintToTreasury');
-  console.log("mintToTreasury IDL accounts", JSON.stringify(mintToTreasuryIx?.accounts));
-
   const payer = provider.wallet as anchor.Wallet;
 
   const mintAuthority = PublicKey.findProgramAddressSync(
