@@ -11,6 +11,8 @@ import {
 import { assert } from "chai";
 
 describe("cortex_token", () => {
+  const provider = anchor.AnchorProvider.env();
+  anchor.setProvider(provider);
   const program = anchor.workspace.CortexToken;
   const payer = provider.wallet as anchor.Wallet;
 
