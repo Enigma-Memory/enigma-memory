@@ -8,10 +8,6 @@ declare_id!("EqV3aLfvqNycQzofXVLxsry8WMMfZX8WmomYNUBskZSb");
 pub mod cortex_token {
     use super::*;
 
-    /// Initialize the SAL mint and treasury ATA. On-chain metadata is deferred.
-    pub fn initialize_mint(_ctx: Context<InitializeMint>) -> Result<()> {
-        Ok(())
-    }
 
     /// Mint SAL into the program treasury.
     pub fn mint_to_treasury(ctx: Context<MintToTreasury>, amount: u64) -> Result<()> {
@@ -129,29 +125,6 @@ pub mod cortex_token {
         receipt.bump = ctx.bumps.vote_receipt;
         Ok(())
     }
-}
-
-#[derive(Accounts)]
-pub struct InitializeMint<'info> {
-    pub payer: Signer<'info>,
-    /// CHECK: validated indirectly via treasury.has_one = mint
-    pub mint: UncheckedAccount<'info>,
-    #[account(
-        seeds = [b"mint_authority"],
-        bump
-    )]
-    pub mint_authority: UncheckedAccount<'info>,
-    #[account(
-        has_one = mint,
-        constraint = treasury.owner == treasury_authority.key()
-    )]
-    pub treasury: Account<'info, TokenAccount>,
-    #[account(
-        seeds = [b"treasury_authority"],
-        bump
-    )]
-    pub treasury_authority: UncheckedAccount<'info>,
-    pub token_program: Program<'info, Token>,
 }
 
 #[derive(Accounts)]
