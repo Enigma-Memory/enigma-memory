@@ -129,7 +129,12 @@ pub struct RouteRoyalty<'info> {
         bump
     )]
     pub receipt: Account<'info, Receipt>,
-    #[account(mut, seeds = [b"budget", payer.key().as_ref()], bump = budget.bump)]
+    #[account(
+        mut,
+        seeds = [b"budget", payer.key().as_ref()],
+        bump = budget.bump,
+        seeds::program = budget_escrow_program.key()
+    )]
     pub budget: Account<'info, budget_escrow::Budget>,
     pub budget_escrow_program: Program<'info, budget_escrow::program::BudgetEscrow>,
     pub system_program: Program<'info, System>,
@@ -167,7 +172,12 @@ pub struct RouteRoyaltyWithSession<'info> {
         bump
     )]
     pub receipt: Account<'info, Receipt>,
-    #[account(mut, seeds = [b"budget", owner.key().as_ref()], bump = budget.bump)]
+    #[account(
+        mut,
+        seeds = [b"budget", owner.key().as_ref()],
+        bump = budget.bump,
+        seeds::program = budget_escrow_program.key()
+    )]
     pub budget: Account<'info, budget_escrow::Budget>,
     pub budget_escrow_program: Program<'info, budget_escrow::program::BudgetEscrow>,
     pub system_program: Program<'info, System>,

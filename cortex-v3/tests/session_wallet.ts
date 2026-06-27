@@ -130,6 +130,7 @@ describe("session-wallet delegation", () => {
     newHash[0] = 2;
 
     await memoryRegistry.methods
+      .updateMemoryWithSession(newHash, new BN(0))
       .accounts({
         sessionKey: sessionKey.publicKey,
         owner: owner.publicKey,

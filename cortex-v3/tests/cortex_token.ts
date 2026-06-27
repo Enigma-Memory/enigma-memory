@@ -5,12 +5,9 @@ import {
   TOKEN_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,
   getAssociatedTokenAddressSync,
+  createAssociatedTokenAccount,
 } from "@solana/spl-token";
 import { assert } from "chai";
-
-const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
-  "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
-);
 
 describe("cortex_token", () => {
   const provider = anchor.AnchorProvider.env();
@@ -29,46 +26,69 @@ describe("cortex_token", () => {
     program.programId
   )[0];
 
-  let mint: PublicKey;
+  const mintKeypair = Keypair.generate();
   let treasury: PublicKey;
-  let metadata: PublicKey;
 
   const user = Keypair.generate();
+  let payerAta: PublicKey;
   let userAta: PublicKey;
 
   before(async () => {
-    mint = Keypair.generate().publicKey;
-    treasury = getAssociatedTokenAddressSync(mint, treasuryAuthority, true);
-    metadata = PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("metadata"),
-        TOKEN_METADATA_PROGRAM_ID.toBuffer(),
-        mint.toBuffer(),
-      ],
-      TOKEN_METADATA_PROGRAM_ID
-    )[0];
-    userAta = getAssociatedTokenAddressSync(mint, user.publicKey);
-  });
+    treasury = getAssociatedTokenAddressSync(
+      mintKeypair.publicKey,
+      treasuryAuthority,
+      true
+    );
+    payerAta = getAssociatedTokenAddressSync(
+      mintKeypair.publicKey,
+      payer.publicKey
+    );
+    userAta = getAssociatedTokenAddressSync(
+      mintKeypair.publicKey,
+      user.publicKey
+    );
 
-  it("Initializes the SAL mint with metadata", async () => {
     await program.methods
       .initializeMint()
       .accounts({
         payer: payer.publicKey,
-        mint,
+        mint: mintKeypair.publicKey,
         mintAuthority,
         treasury,
         treasuryAuthority,
-        metadata,
-        tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
         tokenProgram: TOKEN_PROGRAM_ID,
         associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
-        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
       })
+      .signers([mintKeypair])
       .rpc();
 
-    const mintAccount = await program.account.mint.fetch(mint);
+    await createAssociatedTokenAccount(
+      provider.connection,
+      payer.payer,
+      mintKeypair.publicKey,
+      payer.publicKey
+    );
+    await createAssociatedTokenAccount(
+      provider.connection,
+      payer.payer,
+      mintKeypair.publicKey,
+      user.publicKey
+    );
+
+    await program.methods
+      .mintToTreasury(new BN(10_000))
+      .accounts({
+        mint: mintKeypair.publicKey,
+        treasury: payerAta,
+        mintAuthority,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
+  });
+
+  it("Initializes the SAL mint", async () => {
+    const mintAccount = await program.account.mint.fetch(mintKeypair.publicKey);
     assert.equal(mintAccount.decimals, 9);
   });
 
@@ -76,7 +96,7 @@ describe("cortex_token", () => {
     await program.methods
       .mintToTreasury(new BN(1_000_000_000))
       .accounts({
-        mint,
+        mint: mintKeypair.publicKey,
         treasury,
         mintAuthority,
         tokenProgram: TOKEN_PROGRAM_ID,
@@ -89,10 +109,10 @@ describe("cortex_token", () => {
       .transfer(new BN(100))
       .accounts({
         from: payer.publicKey,
-        fromAta: getAssociatedTokenAddressSync(mint, payer.publicKey),
+        fromAta: payerAta,
         toAta: userAta,
         to: user.publicKey,
-        mint,
+        mint: mintKeypair.publicKey,
         tokenProgram: TOKEN_PROGRAM_ID,
       })
       .rpc();
@@ -114,7 +134,7 @@ describe("cortex_token", () => {
       program.programId
     )[0];
     const stakeVault = getAssociatedTokenAddressSync(
-      mint,
+      mintKeypair.publicKey,
       stakeVaultAuthority,
       true
     );
@@ -123,7 +143,7 @@ describe("cortex_token", () => {
       .stakeForVesal(nonce, new BN(500))
       .accounts({
         owner: user.publicKey,
-        mint,
+        mint: mintKeypair.publicKey,
         stake: stakePda,
         ownerAta: userAta,
         stakeVault,
@@ -150,7 +170,11 @@ describe("cortex_token", () => {
       program.programId
     )[0];
     const vesalPda = PublicKey.findProgramAddressSync(
-      [Buffer.from("vesal"), user.publicKey.toBuffer(), stakePda.toBuffer()],
+      [
+        Buffer.from("vesal"),
+        user.publicKey.toBuffer(),
+        stakePda.toBuffer(),
+      ],
       program.programId
     )[0];
 
@@ -177,7 +201,11 @@ describe("cortex_token", () => {
       program.programId
     )[0];
     const vesalPda = PublicKey.findProgramAddressSync(
-      [Buffer.from("vesal"), user.publicKey.toBuffer(), stakePda.toBuffer()],
+      [
+        Buffer.from("vesal"),
+        user.publicKey.toBuffer(),
+        stakePda.toBuffer(),
+      ],
       program.programId
     )[0];
     const proposalId = new BN(1);
@@ -190,7 +218,11 @@ describe("cortex_token", () => {
       program.programId
     )[0];
     const voteReceiptPda = PublicKey.findProgramAddressSync(
-      [Buffer.from("vote"), proposalPda.toBuffer(), user.publicKey.toBuffer()],
+      [
+        Buffer.from("vote"),
+        proposalPda.toBuffer(),
+        user.publicKey.toBuffer(),
+      ],
       program.programId
     )[0];
 

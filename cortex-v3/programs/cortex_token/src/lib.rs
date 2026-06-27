@@ -1,8 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::metadata::{self, CreateMetadataAccountsV3, Metadata};
 use anchor_spl::token::{self, Mint, MintTo, Token, TokenAccount, Transfer};
-use mpl_token_metadata::types::DataV2;
 
 declare_id!("EqV3aLfvqNycQzofXVLxsry8WMMfZX8WmomYNUBskZSb");
 
@@ -10,38 +8,8 @@ declare_id!("EqV3aLfvqNycQzofXVLxsry8WMMfZX8WmomYNUBskZSb");
 pub mod cortex_token {
     use super::*;
 
-    /// Initialize the SAL mint, on-chain metadata, and treasury ATA.
-    pub fn initialize_mint(ctx: Context<InitializeMint>) -> Result<()> {
-        let data = DataV2 {
-            name: "SAL".to_string(),
-            symbol: "SAL".to_string(),
-            uri: "".to_string(),
-            seller_fee_basis_points: 0,
-            creators: None,
-            collection: None,
-            uses: None,
-        };
-
-        let bump = ctx.bumps.mint_authority;
-        let binding = [bump];
-        let seeds: &[&[u8]] = &[b"mint_authority".as_ref(), binding.as_slice()];
-        let signer: &[&[&[u8]]] = &[seeds];
-
-        let cpi_ctx = CpiContext::new_with_signer(
-            ctx.accounts.token_metadata_program.to_account_info(),
-            CreateMetadataAccountsV3 {
-                metadata: ctx.accounts.metadata.to_account_info(),
-                mint: ctx.accounts.mint.to_account_info(),
-                mint_authority: ctx.accounts.mint_authority.to_account_info(),
-                payer: ctx.accounts.payer.to_account_info(),
-                update_authority: ctx.accounts.mint_authority.to_account_info(),
-                system_program: ctx.accounts.system_program.to_account_info(),
-                rent: ctx.accounts.rent.to_account_info(),
-            },
-            signer,
-        );
-
-        metadata::create_metadata_accounts_v3(cpi_ctx, data, true, true, None)?;
+    /// Initialize the SAL mint and treasury ATA. On-chain metadata is deferred.
+    pub fn initialize_mint(_ctx: Context<InitializeMint>) -> Result<()> {
         Ok(())
     }
 
@@ -97,7 +65,6 @@ pub mod cortex_token {
         );
 
         token::transfer(cpi_ctx, amount)?;
-
 
         let stake = &mut ctx.accounts.stake;
         stake.owner = ctx.accounts.owner.key();
@@ -193,22 +160,9 @@ pub struct InitializeMint<'info> {
         bump
     )]
     pub treasury_authority: UncheckedAccount<'info>,
-    #[account(
-        mut,
-        seeds = [
-            b"metadata",
-            token_metadata_program.key().as_ref(),
-            mint.key().as_ref(),
-        ],
-        bump,
-        seeds::program = token_metadata_program.key()
-    )]
-    pub metadata: UncheckedAccount<'info>,
-    pub token_metadata_program: Program<'info, Metadata>,
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
-    pub rent: Sysvar<'info, Rent>,
 }
 
 #[derive(Accounts)]
