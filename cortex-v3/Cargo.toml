@@ -6,7 +6,7 @@ resolver = "2"
 
 [workspace.dependencies]
 anchor-lang = { version = "0.30.1", features = ["init-if-needed"] }
-# Pin transitive crypto deps to versions compatible with Rust 1.75 / Solana 1.18.26 SBF toolchain
+# Pin transitive deps to versions compatible with Rust 1.75 / Solana 1.18.26 SBF toolchain
 blake3 = "=1.5.1"
 digest = "=0.10.7"
 block-buffer = "=0.10.4"
