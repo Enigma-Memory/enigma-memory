@@ -272,7 +272,8 @@ pub struct CreateTokenBudget<'info> {
         init_if_needed,
         payer = owner,
         associated_token::mint = mint,
-        associated_token::authority = token_budget
+        associated_token::authority = token_budget,
+        associated_token::token_program = token_program
     )]
     pub vault: InterfaceAccount<'info, InterfaceTokenAccount>,
     pub token_program: Interface<'info, TokenInterface>,
@@ -297,14 +298,16 @@ pub struct DepositToken<'info> {
     #[account(
         mut,
         associated_token::mint = mint,
-        associated_token::authority = owner
+        associated_token::authority = owner,
+        associated_token::token_program = token_program
     )]
     pub owner_ata: InterfaceAccount<'info, InterfaceTokenAccount>,
     #[account(
         init_if_needed,
         payer = owner,
         associated_token::mint = mint,
-        associated_token::authority = token_budget
+        associated_token::authority = token_budget,
+        associated_token::token_program = token_program
     )]
     pub vault: InterfaceAccount<'info, InterfaceTokenAccount>,
     pub token_program: Interface<'info, TokenInterface>,
@@ -326,13 +329,15 @@ pub struct SpendToken<'info> {
     #[account(
         mut,
         associated_token::mint = mint,
-        associated_token::authority = owner
+        associated_token::authority = owner,
+        associated_token::token_program = token_program
     )]
     pub owner_ata: InterfaceAccount<'info, InterfaceTokenAccount>,
     #[account(
         mut,
         associated_token::mint = mint,
-        associated_token::authority = token_budget
+        associated_token::authority = token_budget,
+        associated_token::token_program = token_program
     )]
     pub vault: InterfaceAccount<'info, InterfaceTokenAccount>,
     pub token_program: Interface<'info, TokenInterface>,
@@ -351,14 +356,17 @@ pub struct SpendWithSession<'info> {
         mut,
         seeds = [b"session", owner.key().as_ref(), session_key.key().as_ref(), nonce.to_le_bytes().as_ref()],
         bump = session.bump,
+        seeds::program = capability_registry_program.key(),
         constraint = session.nonce == nonce
     )]
     pub session: Account<'info, capability_registry::Session>,
     #[account(
         seeds = [b"owner_nonce", owner.key().as_ref()],
-        bump = owner_nonce.bump
+        bump = owner_nonce.bump,
+        seeds::program = capability_registry_program.key()
     )]
     pub owner_nonce: Account<'info, capability_registry::OwnerNonce>,
+    pub capability_registry_program: Program<'info, capability_registry::program::CapabilityRegistry>,
     #[account(mut, seeds = [b"budget", owner.key().as_ref()], bump = budget.bump)]
     pub budget: Account<'info, Budget>,
 }
