@@ -437,7 +437,7 @@
         "fields": [
           {
             "name": "owner",
-            "type": "pubkey"
+            "type": "publicKey"
           },
           {
             "name": "balance",
@@ -475,11 +475,11 @@
         "fields": [
           {
             "name": "owner",
-            "type": "pubkey"
+            "type": "publicKey"
           },
           {
             "name": "mint",
-            "type": "pubkey"
+            "type": "publicKey"
           },
           {
             "name": "balance",
@@ -537,7 +537,7 @@
         "fields": [
           {
             "name": "owner",
-            "type": "pubkey"
+            "type": "publicKey"
           },
           {
             "name": "balance",
@@ -565,11 +565,11 @@
         "fields": [
           {
             "name": "owner",
-            "type": "pubkey"
+            "type": "publicKey"
           },
           {
             "name": "mint",
-            "type": "pubkey"
+            "type": "publicKey"
           },
           {
             "name": "balance",

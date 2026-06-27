@@ -218,11 +218,11 @@
         "fields": [
           {
             "name": "payer",
-            "type": "pubkey"
+            "type": "publicKey"
           },
           {
             "name": "payee",
-            "type": "pubkey"
+            "type": "publicKey"
           },
           {
             "name": "amount",
@@ -258,11 +258,11 @@
         "fields": [
           {
             "name": "payer",
-            "type": "pubkey"
+            "type": "publicKey"
           },
           {
             "name": "payee",
-            "type": "pubkey"
+            "type": "publicKey"
           },
           {
             "name": "amount",
