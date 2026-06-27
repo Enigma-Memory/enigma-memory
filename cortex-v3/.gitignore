@@ -1,0 +1,28 @@
+# Rust
+/target
+/Cargo.lock
+
+# Node
+node_modules/
+node/node_modules/
+webapp/node_modules/
+package-lock.json
+node/package-lock.json
+webapp/package-lock.json
+
+# Next.js
+.next/
+out/
+dist/
+
+# Env
+.env
+.env*.local
+
+# TypeScript
+*.tsbuildinfo
+webapp/next-env.d.ts
+
+# Secrets
+deploy/devnet-wallet.json
+*.key
