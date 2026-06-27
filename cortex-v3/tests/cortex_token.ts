@@ -45,6 +45,25 @@ describe("cortex_token", () => {
     payerAta = getAssociatedTokenAddressSync(mint, payer.publicKey);
     userAta = getAssociatedTokenAddressSync(mint, user.publicKey);
 
+    await createAssociatedTokenAccount(
+      provider.connection,
+      payer.payer,
+      mint,
+      treasuryAuthority
+    );
+    await createAssociatedTokenAccount(
+      provider.connection,
+      payer.payer,
+      mint,
+      payer.publicKey
+    );
+    await createAssociatedTokenAccount(
+      provider.connection,
+      payer.payer,
+      mint,
+      user.publicKey
+    );
+
     await program.methods
       .initializeMint()
       .accounts({
@@ -59,51 +78,11 @@ describe("cortex_token", () => {
       })
       .rpc();
 
-    await createAssociatedTokenAccount(
-      provider.connection,
-      payer.payer,
-      mint,
-      payer.publicKey
-    );
-    await createAssociatedTokenAccount(
-      provider.connection,
-      payer.payer,
-      mint,
-      user.publicKey
-    );
-
-    await program.methods
-      .initializeMint()
-      .accounts({
-        payer: payer.publicKey,
-        mint: mint,
-        mintAuthority,
-        treasury,
-        treasuryAuthority,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-        systemProgram: SystemProgram.programId,
-      })
-      .rpc();
-
-    await createAssociatedTokenAccount(
-      provider.connection,
-      payer.payer,
-      mint,
-      payer.publicKey
-    );
-    await createAssociatedTokenAccount(
-      provider.connection,
-      payer.payer,
-      mint,
-      user.publicKey
-    );
-
     await program.methods
       .mintToTreasury(new BN(10_000))
       .accounts({
-        mint: mint,
-        treasury: payerAta,
+        mint,
+        treasury,
         mintAuthority,
         tokenProgram: TOKEN_PROGRAM_ID,
       })
