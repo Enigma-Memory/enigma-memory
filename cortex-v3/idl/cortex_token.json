@@ -8,52 +8,6 @@
   },
   "instructions": [
     {
-      "name": "initializeMint",
-      "discriminator": [
-        209,
-        42,
-        195,
-        4,
-        129,
-        85,
-        209,
-        44
-      ],
-      "accounts": [
-        {
-          "name": "payer",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "mintAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "treasury",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "treasuryAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": []
-    },
-    {
       "name": "mintToTreasury",
       "discriminator": [
         11,
