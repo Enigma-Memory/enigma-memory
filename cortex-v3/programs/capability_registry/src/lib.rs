@@ -44,7 +44,9 @@ pub mod capability_registry {
 
         session.owner = ctx.accounts.owner.key();
         session.session_key = ctx.accounts.session_key.key();
-        session.nonce = owner_nonce.nonce;
+        let nonce = owner_nonce.nonce;
+        owner_nonce.nonce = owner_nonce.nonce.checked_add(1).unwrap();
+        session.nonce = nonce;
         session.owner_nonce = owner_nonce.nonce;
         session.scope = scope;
         session.categories_hash = categories_hash;
@@ -60,7 +62,6 @@ pub mod capability_registry {
 
         owner_nonce.owner = ctx.accounts.owner.key();
         owner_nonce.bump = ctx.bumps.owner_nonce;
-        owner_nonce.nonce = owner_nonce.nonce.checked_add(1).unwrap();
         Ok(())
     }
 
