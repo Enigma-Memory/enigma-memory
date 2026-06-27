@@ -1,8 +1,9 @@
 import { createInterface } from 'node:readline';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { statSync } from 'node:fs';
+import { createStore } from './store.mjs';
 
-const memories = new Map();
+const store = createStore();
 
 const TOOLS = [
   {
@@ -27,6 +28,17 @@ const TOOLS = [
         id: { type: 'string' }
       },
       required: ['id']
+    }
+  },
+  {
+    name: 'search_memory',
+    description: 'Search memories by key prefix',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prefix: { type: 'string' }
+      },
+      required: ['prefix']
     }
   }
 ];
@@ -53,12 +65,16 @@ async function handle(request) {
     const { name, arguments: args } = request.params;
     if (name === 'store_memory') {
       const { id, text, owner } = args;
-      memories.set(id, { id, text, owner, createdAt: Date.now() });
+      store.put(id, { id, text, owner, createdAt: Date.now() });
       return { content: [{ type: 'text', text: JSON.stringify({ ok: true, id }) }] };
     }
     if (name === 'retrieve_memory') {
-      const memory = memories.get(args.id);
+      const memory = store.get(args.id);
       return { content: [{ type: 'text', text: memory ? JSON.stringify(memory) : 'null' }] };
+    }
+    if (name === 'search_memory') {
+      const matches = store.search(args.prefix);
+      return { content: [{ type: 'text', text: JSON.stringify(matches) }] };
     }
     throw new Error(`Unknown tool: ${name}`);
   }

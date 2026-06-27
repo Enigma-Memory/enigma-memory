@@ -21,6 +21,20 @@ pub mod capability_registry {
         require_eq!(ctx.accounts.capability.owner, ctx.accounts.owner.key());
         Ok(())
     }
+
+    pub fn create_memory(ctx: Context<CreateMemory>, content_hash: [u8; 32]) -> Result<()> {
+        let cpi_accounts = memory_registry::cpi::accounts::RegisterMemory {
+            owner: ctx.accounts.owner.to_account_info(),
+            memory: ctx.accounts.memory.to_account_info(),
+            system_program: ctx.accounts.system_program.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(
+            ctx.accounts.memory_registry_program.to_account_info(),
+            cpi_accounts,
+        );
+        memory_registry::cpi::create_memory(cpi_ctx, content_hash)?;
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -68,3 +82,16 @@ pub enum CapError {
     #[msg("Scope too long")]
     ScopeTooLong,
 }
+
+#[derive(Accounts)]
+#[instruction(content_hash: [u8; 32])]
+pub struct CreateMemory<'info> {
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    /// CHECK: memory account is initialized by the memory_registry CPI
+    #[account(mut)]
+    pub memory: AccountInfo<'info>,
+    pub memory_registry_program: Program<'info, memory_registry::program::MemoryRegistry>,
+    pub system_program: Program<'info, System>,
+}
+
