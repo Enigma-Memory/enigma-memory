@@ -68,11 +68,21 @@ describe("cortex_token", () => {
       .mintToTreasury(new BN(10_000))
       .accounts({
         mint,
-        treasury,
+        treasury: payerAta,
         mintAuthority,
         tokenProgram: TOKEN_PROGRAM_ID,
       })
       .rpc();
+    await program.methods
+      .mintToTreasury(new BN(10_000))
+      .accounts({
+        mint,
+        treasury: userAta,
+        mintAuthority,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
+    await provider.connection.requestAirdrop(user.publicKey, 1_000_000_000);
   });
 
   it("Mints SAL to the treasury", async () => {
