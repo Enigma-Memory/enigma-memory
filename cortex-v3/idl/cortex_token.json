@@ -28,7 +28,7 @@
         {
           "name": "mint",
           "isMut": true,
-          "isSigner": true
+          "isSigner": false
         },
         {
           "name": "mintAuthority",

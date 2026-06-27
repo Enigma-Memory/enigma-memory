@@ -140,7 +140,9 @@ pub struct InitializeMint<'info> {
         payer = payer,
         mint::decimals = 9,
         mint::authority = mint_authority,
-        mint::freeze_authority = mint_authority
+        mint::freeze_authority = mint_authority,
+        seeds = [b"sal_mint"],
+        bump
     )]
     pub mint: Account<'info, Mint>,
     #[account(
