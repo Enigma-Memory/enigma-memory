@@ -4,7 +4,7 @@
     "name": "cortex_treasury",
     "version": "0.1.0",
     "spec": "0.1.0",
-    "description": "Placeholder IDL for cortex_treasury"
+    "description": "IDL for cortex_treasury"
   },
   "instructions": [
     {
@@ -114,28 +114,7 @@
         1,
         168,
         253
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "authority",
-            "type": "publicKey"
-          },
-          {
-            "name": "balance",
-            "type": "u64"
-          },
-          {
-            "name": "createdAt",
-            "type": "i64"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
+      ]
     }
   ],
   "errors": [
@@ -153,7 +132,7 @@
         "fields": [
           {
             "name": "authority",
-            "type": "publicKey"
+            "type": "pubkey"
           },
           {
             "name": "balance",

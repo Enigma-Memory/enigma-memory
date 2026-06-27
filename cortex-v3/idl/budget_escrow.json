@@ -4,7 +4,7 @@
     "name": "budget_escrow",
     "version": "0.1.0",
     "spec": "0.1.0",
-    "description": "Budget escrow with session-key delegation"
+    "description": "IDL for budget_escrow"
   },
   "instructions": [
     {
@@ -431,32 +431,7 @@
         148,
         119,
         218
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "owner",
-            "type": "publicKey"
-          },
-          {
-            "name": "balance",
-            "type": "u64"
-          },
-          {
-            "name": "spent",
-            "type": "u64"
-          },
-          {
-            "name": "createdAt",
-            "type": "i64"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
+      ]
     },
     {
       "name": "TokenBudget",
@@ -469,32 +444,7 @@
         46,
         24,
         234
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "owner",
-            "type": "publicKey"
-          },
-          {
-            "name": "mint",
-            "type": "publicKey"
-          },
-          {
-            "name": "balance",
-            "type": "u64"
-          },
-          {
-            "name": "spent",
-            "type": "u64"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
+      ]
     }
   ],
   "errors": [
@@ -537,7 +487,7 @@
         "fields": [
           {
             "name": "owner",
-            "type": "publicKey"
+            "type": "pubkey"
           },
           {
             "name": "balance",
@@ -565,11 +515,11 @@
         "fields": [
           {
             "name": "owner",
-            "type": "publicKey"
+            "type": "pubkey"
           },
           {
             "name": "mint",
-            "type": "publicKey"
+            "type": "pubkey"
           },
           {
             "name": "balance",

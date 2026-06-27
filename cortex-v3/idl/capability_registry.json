@@ -4,7 +4,7 @@
     "name": "capability_registry",
     "version": "0.1.0",
     "spec": "0.1.0",
-    "description": "Capability registry with Session PDA delegation"
+    "description": "IDL for capability_registry"
   },
   "instructions": [
     {
@@ -282,36 +282,7 @@
         64,
         181,
         99
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "owner",
-            "type": "publicKey"
-          },
-          {
-            "name": "grantedTo",
-            "type": "publicKey"
-          },
-          {
-            "name": "scope",
-            "type": "string"
-          },
-          {
-            "name": "expiresAt",
-            "type": "i64"
-          },
-          {
-            "name": "createdAt",
-            "type": "i64"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
+      ]
     },
     {
       "name": "Session",
@@ -324,77 +295,7 @@
         188,
         72,
         144
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "owner",
-            "type": "publicKey"
-          },
-          {
-            "name": "sessionKey",
-            "type": "publicKey"
-          },
-          {
-            "name": "nonce",
-            "type": "u64"
-          },
-          {
-            "name": "ownerNonce",
-            "type": "u64"
-          },
-          {
-            "name": "scope",
-            "type": "u32"
-          },
-          {
-            "name": "categoriesHash",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "maxSpendPerTx",
-            "type": "u64"
-          },
-          {
-            "name": "maxSpendPerDay",
-            "type": "u64"
-          },
-          {
-            "name": "spentToday",
-            "type": "u64"
-          },
-          {
-            "name": "maxOpsPerDay",
-            "type": "u32"
-          },
-          {
-            "name": "opsToday",
-            "type": "u32"
-          },
-          {
-            "name": "windowStart",
-            "type": "i64"
-          },
-          {
-            "name": "expiresAt",
-            "type": "i64"
-          },
-          {
-            "name": "revoked",
-            "type": "bool"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
+      ]
     },
     {
       "name": "OwnerNonce",
@@ -407,24 +308,7 @@
         200,
         29,
         163
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "owner",
-            "type": "publicKey"
-          },
-          {
-            "name": "nonce",
-            "type": "u64"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
+      ]
     }
   ],
   "errors": [
@@ -487,11 +371,11 @@
         "fields": [
           {
             "name": "owner",
-            "type": "publicKey"
+            "type": "pubkey"
           },
           {
             "name": "grantedTo",
-            "type": "publicKey"
+            "type": "pubkey"
           },
           {
             "name": "scope",
@@ -519,11 +403,11 @@
         "fields": [
           {
             "name": "owner",
-            "type": "publicKey"
+            "type": "pubkey"
           },
           {
             "name": "sessionKey",
-            "type": "publicKey"
+            "type": "pubkey"
           },
           {
             "name": "nonce",
@@ -592,7 +476,7 @@
         "fields": [
           {
             "name": "owner",
-            "type": "publicKey"
+            "type": "pubkey"
           },
           {
             "name": "nonce",
