@@ -83,7 +83,7 @@ jobs:
         run: anchor build --no-idl
 
       - name: Anchor Test
-        run: anchor test --skip-build --no-idl
+        run: anchor test --skip-build
         timeout-minutes: 15
 
       - name: Fund devnet wallet
