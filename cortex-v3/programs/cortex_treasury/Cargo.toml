@@ -19,3 +19,8 @@ anchor-lang = { workspace = true }
 blake3 = { workspace = true }
 digest = { workspace = true }
 block-buffer = { workspace = true }
+indexmap = { workspace = true }
+proc-macro-crate = { workspace = true }
+jobserver = { workspace = true }
+zeroize_derive = { workspace = true }
+budget_escrow = { path = "../budget_escrow", features = ["cpi"] }

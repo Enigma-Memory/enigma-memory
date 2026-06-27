@@ -1,16 +1,22 @@
 'use client'
 
-import { useState } from 'react'
+import { useWallet } from '@solana/wallet-adapter-react'
+import { useWalletModal } from '@solana/wallet-adapter-react-ui'
 
 export function WalletButton() {
-  const [connected, setConnected] = useState(false)
+  const { connected, disconnect, publicKey } = useWallet()
+  const { setVisible } = useWalletModal()
+
+  const label = connected
+    ? `${publicKey?.toBase58().slice(0, 4)}...${publicKey?.toBase58().slice(-4)}`
+    : 'Connect browser wallet'
 
   return (
     <button
-      onClick={() => setConnected(!connected)}
+      onClick={connected ? disconnect : () => setVisible(true)}
       className="rounded-full bg-slate-900 px-6 py-3 text-white font-medium hover:bg-slate-800 transition"
     >
-      {connected ? 'Wallet connected' : 'Connect wallet'}
+      {label}
     </button>
   )
 }

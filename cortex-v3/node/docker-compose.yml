@@ -1,0 +1,40 @@
+# Enigma Cortex v3 — Off-Chain Memory Node
+# Run: docker compose up --build -d
+# Stop: docker compose down
+
+services:
+  cortex-node:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cortex-node:latest
+    container_name: cortex-node
+    restart: unless-stopped
+    ports:
+      - "${CORTEX_NODE_PORT:-8787}:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      CORTEX_NODE_PORT: 3000
+      CORTEX_NODE_ENV: production
+      CORTEX_LOG_LEVEL: ${CORTEX_LOG_LEVEL:-info}
+      CORTEX_STORE_PATH: /app/data/cortex-store.sqlite
+      CORTEX_STORE_KEY: ${CORTEX_STORE_KEY:-}
+      CORTEX_SOLANA_RPC_URL: ${CORTEX_SOLANA_RPC_URL:-https://api.devnet.solana.com}
+      CORTEX_SOLANA_PROGRAM_ID: ${CORTEX_SOLANA_PROGRAM_ID:-}
+      CORTEX_SOLANA_TREASURY: ${CORTEX_SOLANA_TREASURY:-}
+      CORTEX_MCP_ENABLED: ${CORTEX_MCP_ENABLED:-true}
+      CORTEX_RATE_LIMIT_RPS: ${CORTEX_RATE_LIMIT_RPS:-100}
+    env_file:
+      - .env
+    volumes:
+      - cortex-node-data:/app/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+
+volumes:
+  cortex-node-data:

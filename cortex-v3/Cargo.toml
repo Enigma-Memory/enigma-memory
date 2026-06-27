@@ -6,10 +6,15 @@ resolver = "2"
 
 [workspace.dependencies]
 anchor-lang = { version = "0.30.1", features = ["init-if-needed"] }
+anchor-spl = { version = "0.30.1" }
 # Pin transitive deps to versions compatible with Rust 1.75 / Solana 1.18.26 SBF toolchain
 blake3 = "=1.5.1"
 digest = "=0.10.7"
 block-buffer = "=0.10.4"
+indexmap = "=2.11.4"
+proc-macro-crate = "=3.3.0"
+jobserver = "=0.1.32"
+zeroize_derive = "=1.4.2"
 
 [profile.release]
 overflow-checks = true

@@ -30,6 +30,7 @@ const SKIP_DIRS = new Set([
   'tmp',
   '.vscode',
   '.idea',
+  '.next',
 ])
 
 const SKIP_EXTENSIONS = new Set([

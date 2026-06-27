@@ -25,6 +25,19 @@ pub mod cortex_treasury {
         ctx.accounts.treasury.balance -= amount;
         Ok(())
     }
+
+    pub fn deposit_to_budget(ctx: Context<DepositToBudget>, amount: u64) -> Result<()> {
+        let cpi_accounts = budget_escrow::cpi::accounts::MutBudget {
+            owner: ctx.accounts.authority.to_account_info(),
+            budget: ctx.accounts.budget.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(
+            ctx.accounts.budget_escrow_program.to_account_info(),
+            cpi_accounts,
+        );
+        budget_escrow::cpi::deposit(cpi_ctx, amount)?;
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -48,6 +61,15 @@ pub struct MutTreasury<'info> {
     pub authority: Signer<'info>,
     #[account(mut, seeds = [b"treasury", authority.key().as_ref()], bump = treasury.bump)]
     pub treasury: Account<'info, Treasury>,
+}
+
+#[derive(Accounts)]
+pub struct DepositToBudget<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    #[account(mut, seeds = [b"budget", authority.key().as_ref()], bump = budget.bump)]
+    pub budget: Account<'info, budget_escrow::Budget>,
+    pub budget_escrow_program: Program<'info, budget_escrow::program::BudgetEscrow>,
 }
 
 #[account]

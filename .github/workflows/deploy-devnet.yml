@@ -1,0 +1,93 @@
+name: Deploy Cortex v3 to Devnet
+
+'on':
+  workflow_dispatch:
+    inputs:
+      solana_cli_version:
+        description: 'Solana CLI version'
+        required: true
+        default: '1.18.26'
+      anchor_version:
+        description: 'Anchor CLI version'
+        required: true
+        default: '0.30.1'
+
+env:
+  SOLANA_CLI_VERSION: ${{ github.event.inputs.solana_cli_version || '1.18.26' }}
+  ANCHOR_VERSION: ${{ github.event.inputs.anchor_version || '0.30.1' }}
+  NODE_VERSION: 20
+  SOLANA_CLUSTER: devnet
+
+jobs:
+  deploy-devnet:
+    name: Build and deploy to devnet
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cortex-v3
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Solana CLI
+        id: cache-solana
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/solana
+          key: solana-${{ runner.os }}-${{ env.SOLANA_CLI_VERSION }}
+
+      - name: Install Solana CLI
+        if: steps.cache-solana.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/.local/share/solana
+          cd ~/.local/share/solana
+          curl -fsSL -o solana-release.tar.bz2 \
+            "https://github.com/solana-labs/solana/releases/download/v${SOLANA_CLI_VERSION}/solana-release-x86_64-unknown-linux-gnu.tar.bz2"
+          tar -xjf solana-release.tar.bz2
+          mv solana-release solana-${SOLANA_CLI_VERSION}
+          rm solana-release.tar.bz2
+          echo "$HOME/.local/share/solana/solana-${SOLANA_CLI_VERSION}/bin" >> $GITHUB_PATH
+
+      - name: Add Solana to PATH
+        run: echo "$HOME/.local/share/solana/solana-${SOLANA_CLI_VERSION}/bin" >> $GITHUB_PATH
+
+      - name: Install Anchor CLI
+        run: npm install -g @coral-xyz/anchor-cli@${ANCHOR_VERSION}
+
+      - name: Install workspace dependencies
+        run: npm install
+
+      - name: Configure devnet wallet
+        run: |
+          mkdir -p ~/.config/solana
+          echo '${{ secrets.SOLANA_DEVNET_WALLET }}' > ~/.config/solana/id.json
+          solana config set --keypair ~/.config/solana/id.json --url ${{ env.SOLANA_CLUSTER }}
+          echo "Deployer pubkey: $(solana address)"
+
+      - name: Run deploy-devnet.sh
+        run: |
+          chmod +x deploy/deploy-devnet.sh
+          SKIP_INSTALL=1 ./deploy/deploy-devnet.sh
+
+      - name: Upload devnet IDLs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: devnet-idls
+          path: cortex-v3/deploy/devnet-idls/*.json
+
+      - name: Upload deployment keypairs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: devnet-deployment-keypairs
+          path: cortex-v3/target/deploy/*-keypair.json

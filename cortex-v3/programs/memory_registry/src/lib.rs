@@ -7,14 +7,11 @@ pub mod memory_registry {
     use super::*;
 
     pub fn register_memory(ctx: Context<RegisterMemory>, content_hash: [u8; 32]) -> Result<()> {
-        let memory = &mut ctx.accounts.memory;
-        memory.owner = ctx.accounts.owner.key();
-        memory.content_hash = content_hash;
-        memory.created_at = Clock::get()?.unix_timestamp;
-        memory.updated_at = memory.created_at;
-        memory.shareable = false;
-        memory.royalty_bps = 0;
-        Ok(())
+        init_memory(&mut ctx.accounts.memory, &ctx.accounts.owner, content_hash)
+    }
+
+    pub fn create_memory(ctx: Context<RegisterMemory>, content_hash: [u8; 32]) -> Result<()> {
+        init_memory(&mut ctx.accounts.memory, &ctx.accounts.owner, content_hash)
     }
 
     pub fn update_memory(ctx: Context<UpdateMemory>, new_hash: [u8; 32]) -> Result<()> {
@@ -36,6 +33,16 @@ pub mod memory_registry {
         require_eq!(ctx.accounts.memory.owner, ctx.accounts.owner.key());
         Ok(())
     }
+}
+
+fn init_memory(memory: &mut Account<'_, Memory>, owner: &Signer, content_hash: [u8; 32]) -> Result<()> {
+    memory.owner = owner.key();
+    memory.content_hash = content_hash;
+    memory.created_at = Clock::get()?.unix_timestamp;
+    memory.updated_at = memory.created_at;
+    memory.shareable = false;
+    memory.royalty_bps = 0;
+    Ok(())
 }
 
 #[derive(Accounts)]
@@ -90,3 +97,4 @@ pub enum MemoryError {
     #[msg("Royalty too high")]
     RoyaltyTooHigh,
 }
+

@@ -1,0 +1,39 @@
+name: Auto Request Review
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - ready_for_review
+    branches:
+      - main
+
+jobs:
+  request-review:
+    name: Request reviewer
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Request pull request review
+        uses: actions/github-script@v7
+        env:
+          REVIEWER_LOGIN: ${{ vars.AUTO_REVIEWER_LOGIN || 'Enigma-Memory' }}
+        with:
+          script: |
+            const reviewer = process.env.REVIEWER_LOGIN || 'Enigma-Memory';
+
+            if (!reviewer || reviewer.trim().length === 0) {
+              core.info('No reviewer configured; skipping review request.');
+              return;
+            }
+
+            core.info(`Requesting review from ${reviewer} for PR #${context.issue.number}`);
+
+            await github.rest.pulls.requestReviewers({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              reviewers: [reviewer],
+            });
