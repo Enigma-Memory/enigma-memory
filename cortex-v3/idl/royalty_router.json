@@ -9,11 +9,32 @@
   "instructions": [
     {
       "name": "registerReceipt",
-      "discriminator": [148, 28, 116, 13, 121, 206, 37, 129],
+      "discriminator": [
+        148,
+        28,
+        116,
+        13,
+        121,
+        206,
+        37,
+        129
+      ],
       "accounts": [
-        { "name": "payer", "writable": true, "signer": true },
-        { "name": "payee", "writable": false, "signer": false },
-        { "name": "receipt", "writable": true, "signer": false },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "payee",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "receipt",
+          "writable": true,
+          "signer": false
+        },
         {
           "name": "systemProgram",
           "writable": false,
@@ -22,19 +43,59 @@
         }
       ],
       "args": [
-        { "name": "amount", "type": "u64" },
-        { "name": "contentHash", "type": { "array": ["u8", 32] } }
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "contentHash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
       ]
     },
     {
       "name": "routeRoyalty",
-      "discriminator": [218, 234, 104, 61, 20, 62, 110, 89],
+      "discriminator": [
+        218,
+        234,
+        104,
+        61,
+        20,
+        62,
+        110,
+        89
+      ],
       "accounts": [
-        { "name": "payer", "writable": true, "signer": true },
-        { "name": "payee", "writable": false, "signer": false },
-        { "name": "receipt", "writable": true, "signer": false },
-        { "name": "budget", "writable": true, "signer": false },
-        { "name": "budgetEscrowProgram", "writable": false, "signer": false },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "payee",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "receipt",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "budget",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "budgetEscrowProgram",
+          "writable": false,
+          "signer": false
+        },
         {
           "name": "systemProgram",
           "writable": false,
@@ -43,22 +104,74 @@
         }
       ],
       "args": [
-        { "name": "amount", "type": "u64" },
-        { "name": "contentHash", "type": { "array": ["u8", 32] } }
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "contentHash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
       ]
     },
     {
       "name": "routeRoyaltyWithSession",
-      "discriminator": [36, 143, 140, 164, 215, 167, 131, 185],
+      "discriminator": [
+        36,
+        143,
+        140,
+        164,
+        215,
+        167,
+        131,
+        185
+      ],
       "accounts": [
-        { "name": "sessionKey", "writable": true, "signer": true },
-        { "name": "owner", "writable": false, "signer": false },
-        { "name": "payee", "writable": false, "signer": false },
-        { "name": "session", "writable": true, "signer": false },
-        { "name": "ownerNonce", "writable": false, "signer": false },
-        { "name": "receipt", "writable": true, "signer": false },
-        { "name": "budget", "writable": true, "signer": false },
-        { "name": "budgetEscrowProgram", "writable": false, "signer": false },
+        {
+          "name": "sessionKey",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "owner",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "payee",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "session",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "ownerNonce",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "receipt",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "budget",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "budgetEscrowProgram",
+          "writable": false,
+          "signer": false
+        },
         {
           "name": "systemProgram",
           "writable": false,
@@ -67,29 +180,113 @@
         }
       ],
       "args": [
-        { "name": "amount", "type": "u64" },
-        { "name": "contentHash", "type": { "array": ["u8", 32] } },
-        { "name": "nonce", "type": "u64" }
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "contentHash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "nonce",
+          "type": "u64"
+        }
       ]
     }
   ],
   "accounts": [
     {
       "name": "Receipt",
-      "discriminator": [39, 154, 73, 106, 80, 102, 145, 153],
+      "discriminator": [
+        39,
+        154,
+        73,
+        106,
+        80,
+        102,
+        145,
+        153
+      ],
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "payer", "type": "pubkey" },
-          { "name": "payee", "type": "pubkey" },
-          { "name": "amount", "type": "u64" },
-          { "name": "contentHash", "type": { "array": ["u8", 32] } },
-          { "name": "createdAt", "type": "i64" },
-          { "name": "bump", "type": "u8" }
+          {
+            "name": "payer",
+            "type": "pubkey"
+          },
+          {
+            "name": "payee",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "contentHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
         ]
       }
     }
   ],
   "errors": [],
-  "types": []
+  "types": [
+    {
+      "name": "Receipt",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "payer",
+            "type": "pubkey"
+          },
+          {
+            "name": "payee",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "contentHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
 }
