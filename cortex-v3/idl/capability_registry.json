@@ -9,11 +9,32 @@
   "instructions": [
     {
       "name": "grant",
-      "discriminator": [145, 189, 68, 153, 161, 231, 76, 107],
+      "discriminator": [
+        145,
+        189,
+        68,
+        153,
+        161,
+        231,
+        76,
+        107
+      ],
       "accounts": [
-        { "name": "owner", "writable": true, "signer": true },
-        { "name": "grantedTo", "writable": false, "signer": false },
-        { "name": "capability", "writable": true, "signer": false },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "grantedTo",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "capability",
+          "writable": true,
+          "signer": false
+        },
         {
           "name": "systemProgram",
           "writable": false,
@@ -22,27 +43,75 @@
         }
       ],
       "args": [
-        { "name": "scope", "type": "string" },
-        { "name": "expiresAt", "type": "i64" }
+        {
+          "name": "scope",
+          "type": "string"
+        },
+        {
+          "name": "expiresAt",
+          "type": "i64"
+        }
       ]
     },
     {
       "name": "revoke",
-      "discriminator": [170, 23, 31, 34, 133, 173, 93, 242],
+      "discriminator": [
+        170,
+        23,
+        31,
+        34,
+        133,
+        173,
+        93,
+        242
+      ],
       "accounts": [
-        { "name": "owner", "writable": true, "signer": true },
-        { "name": "capability", "writable": true, "signer": false }
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "capability",
+          "writable": true,
+          "signer": false
+        }
       ],
       "args": []
     },
     {
       "name": "createSession",
-      "discriminator": [242, 193, 143, 179, 150, 25, 122, 227],
+      "discriminator": [
+        242,
+        193,
+        143,
+        179,
+        150,
+        25,
+        122,
+        227
+      ],
       "accounts": [
-        { "name": "owner", "writable": true, "signer": true },
-        { "name": "sessionKey", "writable": false, "signer": false },
-        { "name": "ownerNonce", "writable": true, "signer": false },
-        { "name": "session", "writable": true, "signer": false },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "sessionKey",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "ownerNonce",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "session",
+          "writable": true,
+          "signer": false
+        },
         {
           "name": "systemProgram",
           "writable": false,
@@ -51,48 +120,152 @@
         }
       ],
       "args": [
-        { "name": "scope", "type": "u32" },
-        { "name": "categoriesHash", "type": { "array": ["u8", 32] } },
-        { "name": "maxSpendPerTx", "type": "u64" },
-        { "name": "maxSpendPerDay", "type": "u64" },
-        { "name": "maxOpsPerDay", "type": "u32" },
-        { "name": "expiresAt", "type": "i64" }
+        {
+          "name": "scope",
+          "type": "u32"
+        },
+        {
+          "name": "categoriesHash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "maxSpendPerTx",
+          "type": "u64"
+        },
+        {
+          "name": "maxSpendPerDay",
+          "type": "u64"
+        },
+        {
+          "name": "maxOpsPerDay",
+          "type": "u32"
+        },
+        {
+          "name": "expiresAt",
+          "type": "i64"
+        }
       ]
     },
     {
       "name": "extendSession",
-      "discriminator": [201, 215, 202, 21, 222, 73, 18, 96],
+      "discriminator": [
+        201,
+        215,
+        202,
+        21,
+        222,
+        73,
+        18,
+        96
+      ],
       "accounts": [
-        { "name": "owner", "writable": true, "signer": true },
-        { "name": "session", "writable": true, "signer": false }
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "session",
+          "writable": true,
+          "signer": false
+        }
       ],
       "args": [
-        { "name": "scope", "type": { "option": "u32" } },
+        {
+          "name": "scope",
+          "type": {
+            "option": "u32"
+          }
+        },
         {
           "name": "categoriesHash",
-          "type": { "option": { "array": ["u8", 32] } }
+          "type": {
+            "option": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
         },
-        { "name": "maxSpendPerTx", "type": { "option": "u64" } },
-        { "name": "maxSpendPerDay", "type": { "option": "u64" } },
-        { "name": "maxOpsPerDay", "type": { "option": "u32" } },
-        { "name": "expiresAt", "type": "i64" }
+        {
+          "name": "maxSpendPerTx",
+          "type": {
+            "option": "u64"
+          }
+        },
+        {
+          "name": "maxSpendPerDay",
+          "type": {
+            "option": "u64"
+          }
+        },
+        {
+          "name": "maxOpsPerDay",
+          "type": {
+            "option": "u32"
+          }
+        },
+        {
+          "name": "expiresAt",
+          "type": "i64"
+        }
       ]
     },
     {
       "name": "revokeSession",
-      "discriminator": [86, 92, 198, 120, 144, 2, 7, 194],
+      "discriminator": [
+        86,
+        92,
+        198,
+        120,
+        144,
+        2,
+        7,
+        194
+      ],
       "accounts": [
-        { "name": "owner", "writable": true, "signer": true },
-        { "name": "session", "writable": true, "signer": false }
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "session",
+          "writable": true,
+          "signer": false
+        }
       ],
       "args": []
     },
     {
       "name": "pauseAllSessions",
-      "discriminator": [119, 39, 49, 206, 251, 215, 215, 146],
+      "discriminator": [
+        119,
+        39,
+        49,
+        206,
+        251,
+        215,
+        215,
+        146
+      ],
       "accounts": [
-        { "name": "owner", "writable": true, "signer": true },
-        { "name": "ownerNonce", "writable": true, "signer": false }
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "ownerNonce",
+          "writable": true,
+          "signer": false
+        }
       ],
       "args": []
     }
@@ -100,58 +273,166 @@
   "accounts": [
     {
       "name": "Capability",
-      "discriminator": [192, 140, 41, 92, 236, 64, 181, 99],
+      "discriminator": [
+        192,
+        140,
+        41,
+        92,
+        236,
+        64,
+        181,
+        99
+      ],
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "owner", "type": "pubkey" },
-          { "name": "grantedTo", "type": "pubkey" },
-          { "name": "scope", "type": "string" },
-          { "name": "expiresAt", "type": "i64" },
-          { "name": "createdAt", "type": "i64" },
-          { "name": "bump", "type": "u8" }
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "grantedTo",
+            "type": "pubkey"
+          },
+          {
+            "name": "scope",
+            "type": "string"
+          },
+          {
+            "name": "expiresAt",
+            "type": "i64"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
         ]
       }
     },
     {
       "name": "Session",
-      "discriminator": [243, 81, 72, 115, 214, 188, 72, 144],
+      "discriminator": [
+        243,
+        81,
+        72,
+        115,
+        214,
+        188,
+        72,
+        144
+      ],
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "owner", "type": "pubkey" },
-          { "name": "sessionKey", "type": "pubkey" },
-          { "name": "nonce", "type": "u64" },
-          { "name": "ownerNonce", "type": "u64" },
-          { "name": "scope", "type": "u32" },
-          { "name": "categoriesHash", "type": { "array": ["u8", 32] } },
-          { "name": "maxSpendPerTx", "type": "u64" },
-          { "name": "maxSpendPerDay", "type": "u64" },
-          { "name": "spentToday", "type": "u64" },
-          { "name": "maxOpsPerDay", "type": "u32" },
-          { "name": "opsToday", "type": "u32" },
-          { "name": "windowStart", "type": "i64" },
-          { "name": "expiresAt", "type": "i64" },
-          { "name": "revoked", "type": "bool" },
-          { "name": "bump", "type": "u8" }
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "sessionKey",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u64"
+          },
+          {
+            "name": "ownerNonce",
+            "type": "u64"
+          },
+          {
+            "name": "scope",
+            "type": "u32"
+          },
+          {
+            "name": "categoriesHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "maxSpendPerTx",
+            "type": "u64"
+          },
+          {
+            "name": "maxSpendPerDay",
+            "type": "u64"
+          },
+          {
+            "name": "spentToday",
+            "type": "u64"
+          },
+          {
+            "name": "maxOpsPerDay",
+            "type": "u32"
+          },
+          {
+            "name": "opsToday",
+            "type": "u32"
+          },
+          {
+            "name": "windowStart",
+            "type": "i64"
+          },
+          {
+            "name": "expiresAt",
+            "type": "i64"
+          },
+          {
+            "name": "revoked",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
         ]
       }
     },
     {
       "name": "OwnerNonce",
-      "discriminator": [44, 80, 115, 195, 32, 200, 29, 163],
+      "discriminator": [
+        44,
+        80,
+        115,
+        195,
+        32,
+        200,
+        29,
+        163
+      ],
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "owner", "type": "pubkey" },
-          { "name": "nonce", "type": "u64" },
-          { "name": "bump", "type": "u8" }
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
         ]
       }
     }
   ],
   "errors": [
-    { "code": 6000, "name": "ScopeTooLong", "msg": "Scope too long" },
+    {
+      "code": 6000,
+      "name": "ScopeTooLong",
+      "msg": "Scope too long"
+    },
     {
       "code": 6001,
       "name": "SessionOwnerMismatch",
@@ -162,9 +443,21 @@
       "name": "SessionKeyMismatch",
       "msg": "Session key mismatch"
     },
-    { "code": 6003, "name": "SessionRevoked", "msg": "Session revoked" },
-    { "code": 6004, "name": "SessionExpired", "msg": "Session expired" },
-    { "code": 6005, "name": "ScopeNotGranted", "msg": "Scope not granted" },
+    {
+      "code": 6003,
+      "name": "SessionRevoked",
+      "msg": "Session revoked"
+    },
+    {
+      "code": 6004,
+      "name": "SessionExpired",
+      "msg": "Session expired"
+    },
+    {
+      "code": 6005,
+      "name": "ScopeNotGranted",
+      "msg": "Scope not granted"
+    },
     {
       "code": 6006,
       "name": "OwnerNonceMismatch",
@@ -186,5 +479,131 @@
       "msg": "Session spend per day exceeded"
     }
   ],
-  "types": []
+  "types": [
+    {
+      "name": "Capability",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "grantedTo",
+            "type": "pubkey"
+          },
+          {
+            "name": "scope",
+            "type": "string"
+          },
+          {
+            "name": "expiresAt",
+            "type": "i64"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Session",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "sessionKey",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u64"
+          },
+          {
+            "name": "ownerNonce",
+            "type": "u64"
+          },
+          {
+            "name": "scope",
+            "type": "u32"
+          },
+          {
+            "name": "categoriesHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "maxSpendPerTx",
+            "type": "u64"
+          },
+          {
+            "name": "maxSpendPerDay",
+            "type": "u64"
+          },
+          {
+            "name": "spentToday",
+            "type": "u64"
+          },
+          {
+            "name": "maxOpsPerDay",
+            "type": "u32"
+          },
+          {
+            "name": "opsToday",
+            "type": "u32"
+          },
+          {
+            "name": "windowStart",
+            "type": "i64"
+          },
+          {
+            "name": "expiresAt",
+            "type": "i64"
+          },
+          {
+            "name": "revoked",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OwnerNonce",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
 }
