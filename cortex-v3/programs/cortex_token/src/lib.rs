@@ -135,7 +135,6 @@ pub mod cortex_token {
 pub struct InitializeMint<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(mut)]
     pub mint: Account<'info, Mint>,
     #[account(
         seeds = [b"mint_authority"],
