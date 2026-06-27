@@ -1,15 +1,15 @@
-'use client'
+"use client";
 
-import { usePrivy } from '@privy-io/react-auth'
+import { usePrivy } from "@privy-io/react-auth";
 
-const RAW_PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID
+const RAW_PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
 const PRIVY_APP_ID =
   RAW_PRIVY_APP_ID && /^cl[a-zA-Z0-9]{10,}$/.test(RAW_PRIVY_APP_ID)
     ? RAW_PRIVY_APP_ID
-    : undefined
+    : undefined;
 
 function LoginButtonInner() {
-  const { ready, authenticated, login, logout } = usePrivy()
+  const { ready, authenticated, login, logout } = usePrivy();
 
   return (
     <button
@@ -17,9 +17,9 @@ function LoginButtonInner() {
       disabled={!ready}
       className="rounded-full bg-indigo-600 px-6 py-3 text-white font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
     >
-      {authenticated ? 'Log out' : 'Log in / Sign up'}
+      {authenticated ? "Log out" : "Log in / Sign up"}
     </button>
-  )
+  );
 }
 
 export function LoginButton() {
@@ -32,8 +32,8 @@ export function LoginButton() {
       >
         Wallet login unavailable
       </button>
-    )
+    );
   }
 
-  return <LoginButtonInner />
+  return <LoginButtonInner />;
 }

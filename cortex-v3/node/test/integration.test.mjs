@@ -1,16 +1,16 @@
-import { describe, it, before, after } from 'node:test';
-import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { startServer } from '../src/server.mjs';
-import { createStore } from '../src/store.mjs';
+import { describe, it, before, after } from "node:test";
+import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { startServer } from "../src/server.mjs";
+import { createStore } from "../src/store.mjs";
 
-const TEST_KEY = 'a'.repeat(64);
-const tmpDir = mkdtempSync(join(tmpdir(), 'cortex-http-'));
-const storePath = join(tmpDir, 'http-store.sqlite');
+const TEST_KEY = "a".repeat(64);
+const tmpDir = mkdtempSync(join(tmpdir(), "cortex-http-"));
+const storePath = join(tmpDir, "http-store.sqlite");
 
-describe('HTTP node integration', () => {
+describe("HTTP node integration", () => {
   let server;
   let port;
   let store;
@@ -19,56 +19,56 @@ describe('HTTP node integration', () => {
     return createStore({ path: storePath, key: TEST_KEY });
   }
 
-  it('starts and reports health', async () => {
+  it("starts and reports health", async () => {
     store = freshStore();
     server = await startServer(0, store);
     port = server.address().port;
     const res = await fetch(`http://127.0.0.1:${port}/health`);
     assert.equal(res.status, 200);
     const body = await res.json();
-    assert.equal(body.status, 'ok');
+    assert.equal(body.status, "ok");
   });
 
-  it('ingests and retrieves a memory', async () => {
-    const memory = { id: 'mem-1', text: 'hello world', owner: 'alice' };
+  it("ingests and retrieves a memory", async () => {
+    const memory = { id: "mem-1", text: "hello world", owner: "alice" };
     const post = await fetch(`http://127.0.0.1:${port}/ingest`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(memory)
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(memory),
     });
     assert.equal(post.status, 201);
 
     const get = await fetch(`http://127.0.0.1:${port}/retrieve/mem-1`);
     assert.equal(get.status, 200);
     const got = await get.json();
-    assert.equal(got.text, 'hello world');
-    assert.equal(got.owner, 'alice');
+    assert.equal(got.text, "hello world");
+    assert.equal(got.owner, "alice");
   });
 
-  it('returns 404 for missing memory', async () => {
+  it("returns 404 for missing memory", async () => {
     const res = await fetch(`http://127.0.0.1:${port}/retrieve/nope`);
     assert.equal(res.status, 404);
   });
 
-  it('rejects ingest without required fields', async () => {
+  it("rejects ingest without required fields", async () => {
     const res = await fetch(`http://127.0.0.1:${port}/ingest`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: 'x' })
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: "x" }),
     });
     assert.equal(res.status, 400);
   });
 
-  it('searches memories by prefix', async () => {
+  it("searches memories by prefix", async () => {
     await fetch(`http://127.0.0.1:${port}/ingest`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: 'search/a', text: 'alpha', owner: 'alice' })
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: "search/a", text: "alpha", owner: "alice" }),
     });
     await fetch(`http://127.0.0.1:${port}/ingest`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: 'search/b', text: 'beta', owner: 'bob' })
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: "search/b", text: "beta", owner: "bob" }),
     });
     const res = await fetch(`http://127.0.0.1:${port}/search/search/`);
     assert.equal(res.status, 200);
@@ -76,7 +76,7 @@ describe('HTTP node integration', () => {
     assert.equal(matches.length, 2);
   });
 
-  it('survives a server restart', async () => {
+  it("survives a server restart", async () => {
     server.close();
     store.close();
     store = freshStore();
@@ -86,7 +86,7 @@ describe('HTTP node integration', () => {
     const res = await fetch(`http://127.0.0.1:${port}/retrieve/mem-1`);
     assert.equal(res.status, 200);
     const got = await res.json();
-    assert.equal(got.text, 'hello world');
+    assert.equal(got.text, "hello world");
   });
 
   after(() => {
@@ -99,11 +99,14 @@ describe('HTTP node integration', () => {
 function makeTestEmbedder(dimensions = 128) {
   return async function embed(text) {
     const vec = new Float32Array(dimensions);
-    const words = String(text).toLowerCase().match(/\b[a-z]+\b/g) || [];
+    const words =
+      String(text)
+        .toLowerCase()
+        .match(/\b[a-z]+\b/g) || [];
     for (const word of words) {
       let hash = 5381;
       for (const ch of word) {
-        hash = ((hash << 5) + hash) + ch.charCodeAt(0);
+        hash = (hash << 5) + hash + ch.charCodeAt(0);
       }
       const idx = Math.abs(hash) % dimensions;
       vec[idx] += 1;
@@ -120,7 +123,7 @@ function makeTestEmbedder(dimensions = 128) {
   };
 }
 
-describe('semantic search', () => {
+describe("semantic search", () => {
   let server;
   let port;
   let store;
@@ -128,13 +131,17 @@ describe('semantic search', () => {
   let tmpDir2;
 
   before(() => {
-    tmpDir2 = mkdtempSync(join(tmpdir(), 'cortex-semantic-'));
-    semanticStorePath = join(tmpDir2, 'semantic-store.sqlite');
+    tmpDir2 = mkdtempSync(join(tmpdir(), "cortex-semantic-"));
+    semanticStorePath = join(tmpDir2, "semantic-store.sqlite");
     store = createStore({ path: semanticStorePath, key: TEST_KEY });
   });
 
-  it('starts with an injected embedder', async () => {
-    server = await startServer(0, { store, embedder: makeTestEmbedder(), topK: 3 });
+  it("starts with an injected embedder", async () => {
+    server = await startServer(0, {
+      store,
+      embedder: makeTestEmbedder(),
+      topK: 3,
+    });
     port = server.address().port;
     const health = await fetch(`http://127.0.0.1:${port}/health`);
     assert.equal(health.status, 200);
@@ -142,48 +149,114 @@ describe('semantic search', () => {
 
   async function ingest(id, text, owner) {
     const res = await fetch(`http://127.0.0.1:${port}/ingest`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, text, owner })
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, text, owner }),
     });
     assert.equal(res.status, 201);
   }
 
-  it('finds similar memories via POST /search', async () => {
-    await ingest('sem-apple', 'apple pie recipe', 'alice');
-    await ingest('sem-car', 'how to drive a car', 'bob');
-    await ingest('sem-fruit', 'fresh fruit salad', 'carol');
+  it("finds similar memories via POST /search", async () => {
+    await ingest("sem-apple", "apple pie recipe", "alice");
+    await ingest("sem-car", "how to drive a car", "bob");
+    await ingest("sem-fruit", "fresh fruit salad", "carol");
 
     const res = await fetch(`http://127.0.0.1:${port}/search`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: 'baking apple tart' })
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: "baking apple tart" }),
     });
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.ok(Array.isArray(body.results));
-    assert.equal(body.results[0].memory.id, 'sem-apple');
+    assert.equal(body.results[0].memory.id, "sem-apple");
   });
 
-  it('finds similar memories via GET /search?query=...', async () => {
-    const res = await fetch(`http://127.0.0.1:${port}/search?query=car%20repair`);
+  it("finds similar memories via GET /search?query=...", async () => {
+    const res = await fetch(
+      `http://127.0.0.1:${port}/search?query=car%20repair`
+    );
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.ok(Array.isArray(body.results));
-    assert.equal(body.results[0].memory.id, 'sem-car');
+    assert.equal(body.results[0].memory.id, "sem-car");
   });
 
-  it('does not break prefix search', async () => {
+  it("does not break prefix search", async () => {
     const res = await fetch(`http://127.0.0.1:${port}/search/sem-c`);
     assert.equal(res.status, 200);
     const matches = await res.json();
-    const keys = matches.map(m => m.key).sort();
-    assert.deepEqual(keys, ['sem-car']);
+    const keys = matches.map((m) => m.key).sort();
+    assert.deepEqual(keys, ["sem-car"]);
   });
 
   after(() => {
     server?.close();
     store?.close();
     rmSync(tmpDir2, { recursive: true, force: true });
+  });
+});
+
+describe("auto-save endpoint", () => {
+  let server;
+  let port;
+  let store;
+  let autoSaveTmpDir;
+  let autoSaveStorePath;
+
+  before(async () => {
+    autoSaveTmpDir = mkdtempSync(join(tmpdir(), "cortex-autosave-http-"));
+    autoSaveStorePath = join(autoSaveTmpDir, "autosave-http-store.sqlite");
+    store = createStore({ path: autoSaveStorePath, key: TEST_KEY });
+    server = await startServer(0, { store, embedder: makeTestEmbedder(8) });
+    port = server.address().port;
+  });
+
+  it("auto-saves calendar facts", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/auto-save`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        owner: "alice",
+        text: "I'm flying to Berlin on July 10 for a conference.",
+        turnId: "http-turn-1",
+      }),
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.saved.length, 1);
+    assert.equal(body.saved[0].category, "calendar");
+  });
+
+  it("blocks medical facts by default", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/auto-save`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        owner: "bob",
+        text: "My doctor prescribed lisinopril for blood pressure.",
+        turnId: "http-turn-2",
+      }),
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.saved.length, 0);
+    assert.ok(body.blocked.length >= 1);
+    assert.ok(body.blocked.some((b) => b.category === "medical"));
+  });
+
+  it("rejects auto-save without required fields", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/auto-save`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: "no owner" }),
+    });
+    assert.equal(res.status, 400);
+  });
+
+  after(() => {
+    server?.close();
+    store?.close();
+    rmSync(autoSaveTmpDir, { recursive: true, force: true });
   });
 });

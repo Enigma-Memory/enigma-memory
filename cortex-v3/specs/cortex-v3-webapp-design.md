@@ -3,7 +3,7 @@
 ## 1. Product identity
 
 **App name:** Cortex Wallet  
-**Tagline:** *Your memories. Your wallet. Every AI.*  
+**Tagline:** _Your memories. Your wallet. Every AI._  
 **Mental model:** a secure notes / memory wallet app, not a crypto dashboard. Blockchain exists only as plumbing.
 
 ---
@@ -170,19 +170,19 @@ cortex-v3/webapp/
 
 ## 3. Stack recommendation
 
-| Layer | Choice | Rationale |
-|---|---|---|
-| Framework | **Next.js 15** (App Router) | Server data fetching, static export option, strong mobile PWA support. |
-| Language | **TypeScript 5** | Type safety across wallet + program interactions. |
-| Styling | **Tailwind CSS 4** + **CSS variables** | Token-first theming, mobile-first breakpoints. |
-| Primitives | **Radix UI** | Accessible sheets, dialogs, switches, tabs. |
-| State | **Zustand** + **TanStack Query (React Query)** | Wallet/session state; server-state sync with optimistic updates. |
-| Wallet / auth | **Privy** (`@privy-io/react-auth`) | Passkey / Face ID / Google / Apple login + embedded Solana wallet + delegated server sessions. |
-| Session signing | **Privy server sessions** (`@privy-io/server-auth`) | Headless delegated actions scoped to Enigma programs, spend cap, expiry. |
-| Solana client | **@solana/web3.js** + **Anchor** | Matches existing monorepo dependency; program IDL integration. |
-| Icons | **Lucide React** | Clean, consistent iconography. |
-| Charts | **Recharts** or **Tremor** | Lightweight earnings/budget visualizations. |
-| Testing | **Vitest** + **@testing-library/react** + **Playwright** | Unit, component, and E2E mobile-first tests. |
+| Layer           | Choice                                                   | Rationale                                                                                      |
+| --------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Framework       | **Next.js 15** (App Router)                              | Server data fetching, static export option, strong mobile PWA support.                         |
+| Language        | **TypeScript 5**                                         | Type safety across wallet + program interactions.                                              |
+| Styling         | **Tailwind CSS 4** + **CSS variables**                   | Token-first theming, mobile-first breakpoints.                                                 |
+| Primitives      | **Radix UI**                                             | Accessible sheets, dialogs, switches, tabs.                                                    |
+| State           | **Zustand** + **TanStack Query (React Query)**           | Wallet/session state; server-state sync with optimistic updates.                               |
+| Wallet / auth   | **Privy** (`@privy-io/react-auth`)                       | Passkey / Face ID / Google / Apple login + embedded Solana wallet + delegated server sessions. |
+| Session signing | **Privy server sessions** (`@privy-io/server-auth`)      | Headless delegated actions scoped to Enigma programs, spend cap, expiry.                       |
+| Solana client   | **@solana/web3.js** + **Anchor**                         | Matches existing monorepo dependency; program IDL integration.                                 |
+| Icons           | **Lucide React**                                         | Clean, consistent iconography.                                                                 |
+| Charts          | **Recharts** or **Tremor**                               | Lightweight earnings/budget visualizations.                                                    |
+| Testing         | **Vitest** + **@testing-library/react** + **Playwright** | Unit, component, and E2E mobile-first tests.                                                   |
 
 > **Why not Svelte / React Native?**  
 > Svelte is great but the monorepo already uses React patterns and React Native would slow the Phase 1 devnet MVP. Next.js gives us a mobile-first PWA today and a path to native via Capacitor later.
@@ -191,22 +191,23 @@ cortex-v3/webapp/
 
 ## 4. Route map
 
-| Route | Screen | Auth | Key actions |
-|---|---|---|---|
-| `/` | Landing / redirect to onboarding or feed | None | Explain value, CTA to create wallet |
-| `/onboarding` | Embedded wallet creation + delegation consent | None | Passkey / Google / Apple signup, one-tap allow |
-| `/feed` | Memory feed | Required | Search, filter, scroll memories, manual add |
-| `/memory/[id]` | Memory detail | Required | View content, provenance, receipts, delete |
-| `/share` | Sharing & permissions | Required | Issue/revoke Capability NFTs, view grants |
-| `/earnings` | Earnings dashboard | Required | Royalty feed, budget, top-up |
-| `/inheritance` | Inheritance setup | Required | Add/remove heirs, set unlock delay |
-| `/settings` | Settings, connected models, budget | Required | Recovery, top-up, model toggles, panic pause |
+| Route          | Screen                                        | Auth     | Key actions                                    |
+| -------------- | --------------------------------------------- | -------- | ---------------------------------------------- |
+| `/`            | Landing / redirect to onboarding or feed      | None     | Explain value, CTA to create wallet            |
+| `/onboarding`  | Embedded wallet creation + delegation consent | None     | Passkey / Google / Apple signup, one-tap allow |
+| `/feed`        | Memory feed                                   | Required | Search, filter, scroll memories, manual add    |
+| `/memory/[id]` | Memory detail                                 | Required | View content, provenance, receipts, delete     |
+| `/share`       | Sharing & permissions                         | Required | Issue/revoke Capability NFTs, view grants      |
+| `/earnings`    | Earnings dashboard                            | Required | Royalty feed, budget, top-up                   |
+| `/inheritance` | Inheritance setup                             | Required | Add/remove heirs, set unlock delay             |
+| `/settings`    | Settings, connected models, budget            | Required | Recovery, top-up, model toggles, panic pause   |
 
 ---
 
 ## 5. Component list
 
 ### Primitives
+
 - `Button` — primary, secondary, ghost, danger, loading states.
 - `Input` — search, text, number, with inline validation.
 - `Card` — memory card, stat card, setting row.
@@ -217,6 +218,7 @@ cortex-v3/webapp/
 - `Skeleton` — loading placeholders.
 
 ### Memory domain
+
 - `MemoryList` — virtualized list of memory cards.
 - `MemoryCard` — preview, date, source AI, sharing status, immunology badge.
 - `MemoryDetail` — full content + metadata.
@@ -226,35 +228,41 @@ cortex-v3/webapp/
 - `DeleteMemorySheet` — confirmation + cryptographic deletion receipt.
 
 ### Wallet domain
+
 - `WalletButton` — shows wallet status, opens sheet.
 - `EmbeddedWalletGate` — blocks routes until authenticated.
 - `WalletSheet` — balance, backup status, sign-out.
 - `GaslessNotice` — small pill explaining memory budget covers fees.
 
 ### Sharing domain
+
 - `CapabilityCard` — who has access, to what, until when.
 - `ShareSheet` — issue a new Capability NFT.
 - `RevokeCapabilitySheet` — revoke access.
 - `PermissionTag` — read / summarize / monetize scopes.
 
 ### Earnings domain
+
 - `EarningsSummary` — total earned, pending, this period.
 - `RoyaltyList` — per-memory royalty feed.
 - `WithdrawSheet` — withdraw SOL (USDC deferred).
 - `BudgetChart` — spend vs budget over time.
 
 ### Inheritance domain
+
 - `HeirCard` — heir wallet, unlock conditions.
 - `AddHeirSheet` — add heir + waiting period.
 - `InheritanceStatus` — active / paused / not set.
 
 ### Onboarding domain
+
 - `OnboardingPager` — value props.
 - `DelegationConsentSheet` — one-tap server-session consent.
 - `ModelConnectorGrid` — ChatGPT / Claude / Gemini one-tap OAuth cards.
 - `ValuePropCard` — plain-language benefit card.
 
 ### Navigation
+
 - `BottomNav` — Feed / Share / Earnings / Inheritance / Settings.
 - `TopBar` — screen title, context action.
 - `SearchHeader` — sticky search with filter chip.
@@ -265,19 +273,24 @@ cortex-v3/webapp/
 ## 6. Wallet integration approach
 
 ### Goal
+
 Sign-up should feel like Apple Wallet or a password manager: **passkeys / Face ID / Google / Apple**, no seed phrase, no gas token purchase.
 
 ### Primary provider: Privy
+
 Use **Privy** (`@privy-io/react-auth`) for embedded Solana wallet creation and authentication, and `@privy-io/server-auth` for headless delegated server sessions.
 
 ### Authentication priority
+
 1. Passkey (Face ID / Touch ID / Windows Hello)
 2. Google One Tap
 3. Sign in with Apple
 4. Email magic link (fallback only)
 
 ### Session delegation
+
 After login, the user sees a single **"Allow"** consent screen. Tapping it triggers Privy `useHeadlessDelegatedActions` / server delegation with policy:
+
 - `contractWhitelist`: Enigma program IDs only (`memory_registry`, `capability_registry`, `budget_escrow`).
 - `maxSpend`: daily SOL cap (e.g., 0.01 SOL).
 - `expiry`: 30 days, auto-refresh if user is active.
@@ -286,15 +299,18 @@ After login, the user sees a single **"Allow"** consent screen. Tapping it trigg
 The delegated session signer lives in the Cortex off-chain node, enabling automatic memory anchors while the user is away.
 
 ### Capability and budget
+
 - **Capability PDA** per model, seeds: `["capability", owner_wallet, audience, granted_to]`.
 - Default scope: `memory:read`, `memory:write:low-sensitivity`, `budget:spend`.
 - **Budget escrow**: node-sponsored SOL on devnet; session signer spends against it.
 - **Revocation**: instant on-chain via `revoke_capability` or `pause_all`.
 
 ### Cross-model connection
+
 Each model (ChatGPT, Claude, Gemini) connects via OAuth 2.1 + PKCE through the Enigma auth service, backed by the same Privy identity. One tap per model mints a model-specific Capability PDA.
 
 ### Implementation
+
 1. `src/lib/privy/provider.tsx` wraps the app with `PrivyProvider`.
 2. `src/lib/privy/session.ts` requests and refreshes delegated sessions.
 3. `src/lib/oauth/connectors.ts` configures model OAuth clients.
@@ -357,6 +373,7 @@ Each model (ChatGPT, Claude, Gemini) connects via OAuth 2.1 + PKCE through the E
 ## 9. Key screens (wireframe intent)
 
 ### Onboarding
+
 - Full-screen pager: "One memory across ChatGPT, Claude, Gemini."
 - Large buttons: **Continue with Google**, **Continue with Apple**, **Continue with Passkey**.
 - Brief spinner: "Creating your memory wallet…"
@@ -365,34 +382,40 @@ Each model (ChatGPT, Claude, Gemini) connects via OAuth 2.1 + PKCE through the E
 - Model connector grid: ChatGPT / Claude / Gemini cards, each one tap to OAuth connect.
 
 ### Memory feed
+
 - Sticky search bar + segmented filter.
 - Infinite scroll of memory cards.
 - Each card: source AI avatar, date, snippet, privacy badge, earning indicator.
 - Floating "+" to manually commit a memory note.
 
 ### Memory detail
+
 - Header with source, date, memory type.
 - Content body.
 - Provenance / receipts section.
 - Actions: share (issue Capability), delete with receipt.
 
 ### Sharing / permissions
+
 - List of active Capability grants.
 - "Share memory" flow: pick memory → choose recipient / scope / expiry → confirm.
 - Revoke any grant with swipe or menu.
 
 ### Earnings dashboard
+
 - Top summary cards: earned, pending, budget remaining.
 - Bar chart of earnings by memory / week.
 - Royalty feed with memory names and amounts.
 - Top-up button (Apple Pay / Google Pay / Privy on-ramp on mainnet).
 
 ### Inheritance
+
 - Status banner: not set / active.
 - Heir list with wallet addresses and unlock dates.
 - "Add heir" sheet: paste wallet / scan QR, choose delay, confirm.
 
 ### Settings
+
 - Wallet recovery / backup status.
 - Memory budget: add funds, view spend breakdown.
 - Connected Models list with toggles; "Pause All Models" panic button.
@@ -451,4 +474,4 @@ cortex-v3/webapp/tests/
 
 ---
 
-*Design updated to align with the locked frictionless-first architecture: Privy embedded wallet, server session delegation, Capability PDA, OAuth MCP connectors, SOL default on devnet.*
+_Design updated to align with the locked frictionless-first architecture: Privy embedded wallet, server session delegation, Capability PDA, OAuth MCP connectors, SOL default on devnet._

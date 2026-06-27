@@ -3,6 +3,7 @@
 This guide describes how to create and secure a Solana mainnet wallet, store it as the `SOLANA_MAINNET_WALLET` GitHub secret, and switch the deployment cluster to `mainnet-beta`.
 
 > ⚠️ **Safety warning**
+>
 > - Do **not** generate mainnet keys on shared or CI machines unless absolutely necessary.
 > - For production, prefer a hardware wallet (Ledger) or a multisig (Squads).
 > - Never commit a keypair file. Never print the secret array in logs.
@@ -130,13 +131,13 @@ cortex_treasury = "<DEPLOYED_CORTEX_TREASURY_ID>"
 Update `.github/workflows/cortex-v3-anchor.yml` to use the mainnet secret and cluster where appropriate:
 
 ```yaml
-      - name: Configure Solana
-        run: |
-          mkdir -p ~/.config/solana
-          echo '${{ secrets.SOLANA_MAINNET_WALLET }}' > ~/.config/solana/id.json
-          solana config set --url mainnet-beta
-          solana config get
-          echo "Public key: $(solana address)"
+- name: Configure Solana
+  run: |
+    mkdir -p ~/.config/solana
+    echo '${{ secrets.SOLANA_MAINNET_WALLET }}' > ~/.config/solana/id.json
+    solana config set --url mainnet-beta
+    solana config get
+    echo "Public key: $(solana address)"
 ```
 
 > Keep a separate workflow or job for devnet; do not run mainnet deploys on every push.
@@ -179,4 +180,4 @@ Send only enough SOL to the deployer wallet to cover deployment and a small oper
 
 ---
 
-*Mainnet setup guide — v3 — 2026-06-27*
+_Mainnet setup guide — v3 — 2026-06-27_

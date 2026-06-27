@@ -17,6 +17,8 @@ idl-build = ["anchor-lang/idl-build"]
 
 [dependencies]
 anchor-lang = { workspace = true }
+capability_registry = { path = "../capability_registry", features = ["cpi"] }
+budget_escrow = { path = "../budget_escrow", features = ["cpi"] }
 proc-macro2 = { workspace = true }
 blake3 = { workspace = true }
 digest = { workspace = true }
@@ -25,4 +27,3 @@ indexmap = { workspace = true }
 proc-macro-crate = { workspace = true }
 jobserver = { workspace = true }
 zeroize_derive = { workspace = true }
-budget_escrow = { path = "../budget_escrow", features = ["cpi"] }

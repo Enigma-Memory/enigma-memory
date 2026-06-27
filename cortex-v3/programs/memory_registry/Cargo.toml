@@ -17,6 +17,7 @@ idl-build = ["anchor-lang/idl-build"]
 
 [dependencies]
 anchor-lang = { workspace = true }
+capability_registry = { path = "../capability_registry", features = ["cpi"] }
 proc-macro2 = { workspace = true }
 blake3 = { workspace = true }
 digest = { workspace = true }

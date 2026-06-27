@@ -1,6 +1,7 @@
 [workspace]
 members = [
-    "programs/*"
+    "programs/*",
+    "programs/cortex_token"
 ]
 resolver = "2"
 
