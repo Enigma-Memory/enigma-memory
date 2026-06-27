@@ -143,8 +143,7 @@ pub struct InitializeMint<'info> {
     )]
     pub mint_authority: UncheckedAccount<'info>,
     #[account(
-        init,
-        payer = payer,
+        mut,
         associated_token::mint = mint,
         associated_token::authority = treasury_authority
     )]
