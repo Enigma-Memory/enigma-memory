@@ -80,7 +80,10 @@ jobs:
         run: cargo check --workspace
 
       - name: Anchor Build
-        run: anchor build --no-idl
+        run: |
+          anchor build --no-idl
+          mkdir -p target/idl
+          cp idl/*.json target/idl/
 
       - name: Anchor Test
         run: anchor test --skip-build

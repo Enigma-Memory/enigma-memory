@@ -1,0 +1,113 @@
+{
+  "address": "GcdayuLaLyrdmUu324nahyv33G5poQdLUEZ1nEytDeP",
+  "metadata": {
+    "name": "royalty_router",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Placeholder IDL for royalty_router"
+  },
+  "instructions": [
+    {
+      "name": "registerReceipt",
+      "discriminator": [
+        126,
+        27,
+        147,
+        119,
+        254,
+        31,
+        237,
+        118
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "payee",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "receipt",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "systemProgram",
+          "writable": false,
+          "signer": false,
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "contentHash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Receipt",
+      "discriminator": [
+        39,
+        154,
+        73,
+        106,
+        80,
+        102,
+        145,
+        153
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "payer",
+            "type": "pubkey"
+          },
+          {
+            "name": "payee",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "contentHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ],
+  "errors": [],
+  "types": []
+}
