@@ -175,14 +175,17 @@ pub struct CreateMemoryWithSession<'info> {
         mut,
         seeds = [b"session", owner.key().as_ref(), session_key.key().as_ref(), nonce.to_le_bytes().as_ref()],
         bump = session.bump,
+        seeds::program = capability_registry_program.key(),
         constraint = session.nonce == nonce
     )]
     pub session: Account<'info, capability_registry::Session>,
     #[account(
         seeds = [b"owner_nonce", owner.key().as_ref()],
-        bump = owner_nonce.bump
+        bump = owner_nonce.bump,
+        seeds::program = capability_registry_program.key()
     )]
     pub owner_nonce: Account<'info, capability_registry::OwnerNonce>,
+    pub capability_registry_program: Program<'info, capability_registry::program::CapabilityRegistry>,
     #[account(
         init_if_needed,
         payer = session_key,
@@ -205,14 +208,17 @@ pub struct UpdateMemoryWithSession<'info> {
         mut,
         seeds = [b"session", owner.key().as_ref(), session_key.key().as_ref(), nonce.to_le_bytes().as_ref()],
         bump = session.bump,
+        seeds::program = capability_registry_program.key(),
         constraint = session.nonce == nonce
     )]
     pub session: Account<'info, capability_registry::Session>,
     #[account(
         seeds = [b"owner_nonce", owner.key().as_ref()],
-        bump = owner_nonce.bump
+        bump = owner_nonce.bump,
+        seeds::program = capability_registry_program.key()
     )]
     pub owner_nonce: Account<'info, capability_registry::OwnerNonce>,
+    pub capability_registry_program: Program<'info, capability_registry::program::CapabilityRegistry>,
     #[account(mut, seeds = [b"memory", owner.key().as_ref(), &memory.content_hash[..8]], bump = memory.bump)]
     pub memory: Account<'info, Memory>,
 }
@@ -229,14 +235,17 @@ pub struct DeleteMemoryWithSession<'info> {
         mut,
         seeds = [b"session", owner.key().as_ref(), session_key.key().as_ref(), nonce.to_le_bytes().as_ref()],
         bump = session.bump,
+        seeds::program = capability_registry_program.key(),
         constraint = session.nonce == nonce
     )]
     pub session: Account<'info, capability_registry::Session>,
     #[account(
         seeds = [b"owner_nonce", owner.key().as_ref()],
-        bump = owner_nonce.bump
+        bump = owner_nonce.bump,
+        seeds::program = capability_registry_program.key()
     )]
     pub owner_nonce: Account<'info, capability_registry::OwnerNonce>,
+    pub capability_registry_program: Program<'info, capability_registry::program::CapabilityRegistry>,
     #[account(mut, close = owner, seeds = [b"memory", owner.key().as_ref(), &memory.content_hash[..8]], bump = memory.bump)]
     pub memory: Account<'info, Memory>,
 }
