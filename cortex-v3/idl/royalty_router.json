@@ -158,6 +158,11 @@
           "signer": false
         },
         {
+          "name": "capabilityRegistryProgram",
+          "writable": false,
+          "signer": false
+        },
+        {
           "name": "receipt",
           "writable": true,
           "signer": false
