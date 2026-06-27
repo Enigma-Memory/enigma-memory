@@ -5,7 +5,7 @@ import {
   TOKEN_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,
   getAssociatedTokenAddressSync,
-  createAssociatedTokenAccount,
+  getOrCreateAssociatedTokenAccount,
   createMint,
 } from "@solana/spl-token";
 import { assert } from "chai";
@@ -45,25 +45,25 @@ describe("cortex_token", () => {
     payerAta = getAssociatedTokenAddressSync(mint, payer.publicKey);
     userAta = getAssociatedTokenAddressSync(mint, user.publicKey);
 
-    await createAssociatedTokenAccount(
+    await getOrCreateAssociatedTokenAccount(
       provider.connection,
       payer.payer,
       mint,
-      treasuryAuthority
+      treasuryAuthority,
+      true
     );
-    await createAssociatedTokenAccount(
+    await getOrCreateAssociatedTokenAccount(
       provider.connection,
       payer.payer,
       mint,
       payer.publicKey
     );
-    await createAssociatedTokenAccount(
+    await getOrCreateAssociatedTokenAccount(
       provider.connection,
       payer.payer,
       mint,
       user.publicKey
     );
-
     await program.methods
       .initializeMint()
       .accounts({
