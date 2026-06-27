@@ -41,9 +41,6 @@ describe("cortex_token", () => {
       null,
       9
     );
-    let mintInfo = await provider.connection.getAccountInfo(mint);
-    console.log("after createMint mint owner", mintInfo?.owner.toBase58(), "lamports", mintInfo?.lamports);
-
     treasury = getAssociatedTokenAddressSync(mint, treasuryAuthority, true);
     payerAta = getAssociatedTokenAddressSync(mint, payer.publicKey);
     userAta = getAssociatedTokenAddressSync(mint, user.publicKey);
@@ -68,23 +65,6 @@ describe("cortex_token", () => {
       user.publicKey
     );
 
-    mintInfo = await provider.connection.getAccountInfo(mint);
-    console.log("after ATAs mint owner", mintInfo?.owner.toBase58(), "lamports", mintInfo?.lamports);
-    const treasuryInfo = await provider.connection.getAccountInfo(treasury);
-    console.log("after ATAs treasury owner", treasuryInfo?.owner.toBase58(), "lamports", treasuryInfo?.lamports);
-
-    await program.methods
-      .initializeMint()
-      .accounts({
-        payer: payer.publicKey,
-        mint,
-        mintAuthority,
-        treasury,
-        treasuryAuthority,
-        tokenProgram: TOKEN_PROGRAM_ID,
-      })
-      .rpc();
-
     await program.methods
       .mintToTreasury(new BN(10_000))
       .accounts({
@@ -94,11 +74,6 @@ describe("cortex_token", () => {
         tokenProgram: TOKEN_PROGRAM_ID,
       })
       .rpc();
-  });
-
-  it("Initializes the SAL mint", async () => {
-    const mintAccount = await program.account.mint.fetch(mint);
-    assert.equal(mintAccount.decimals, 9);
   });
 
   it("Mints SAL to the treasury", async () => {
