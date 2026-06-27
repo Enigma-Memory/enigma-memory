@@ -17,6 +17,7 @@ idl-build = ["anchor-lang/idl-build"]
 
 [dependencies]
 anchor-lang = { workspace = true }
+proc-macro2 = { workspace = true }
 anchor-spl = { workspace = true }
 blake3 = { workspace = true }
 digest = { workspace = true }

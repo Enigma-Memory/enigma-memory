@@ -642,6 +642,7 @@ dependencies = [
  "indexmap",
  "jobserver",
  "proc-macro-crate 3.3.0",
+ "proc-macro2",
  "zeroize_derive",
 ]
 
@@ -699,6 +700,7 @@ dependencies = [
  "jobserver",
  "memory_registry",
  "proc-macro-crate 3.3.0",
+ "proc-macro2",
  "zeroize_derive",
 ]
 
@@ -792,6 +794,7 @@ dependencies = [
  "indexmap",
  "jobserver",
  "proc-macro-crate 3.3.0",
+ "proc-macro2",
  "zeroize_derive",
 ]
 
@@ -1339,6 +1342,7 @@ dependencies = [
  "indexmap",
  "jobserver",
  "proc-macro-crate 3.3.0",
+ "proc-macro2",
  "zeroize_derive",
 ]
 
@@ -1707,6 +1711,7 @@ dependencies = [
  "indexmap",
  "jobserver",
  "proc-macro-crate 3.3.0",
+ "proc-macro2",
  "zeroize_derive",
 ]
 

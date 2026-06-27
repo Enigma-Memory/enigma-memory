@@ -26,6 +26,7 @@ wasm-bindgen-backend = "=0.2.90"
 wasm-bindgen-macro-support = "=0.2.90"
 js-sys = "=0.3.67"
 web-sys = "=0.3.67"
+proc-macro2 = { version = "=1.0.106", features = ["span-locations"] }
 
 [profile.release]
 overflow-checks = true
