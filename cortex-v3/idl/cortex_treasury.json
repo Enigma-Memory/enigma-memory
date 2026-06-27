@@ -9,16 +9,7 @@
   "instructions": [
     {
       "name": "initialize",
-      "discriminator": [
-        175,
-        175,
-        109,
-        31,
-        13,
-        152,
-        155,
-        237
-      ],
+      "discriminator": [175, 175, 109, 31, 13, 152, 155, 237],
       "accounts": [
         {
           "name": "authority",
@@ -41,16 +32,7 @@
     },
     {
       "name": "deposit",
-      "discriminator": [
-        242,
-        35,
-        198,
-        137,
-        82,
-        225,
-        242,
-        182
-      ],
+      "discriminator": [242, 35, 198, 137, 82, 225, 242, 182],
       "accounts": [
         {
           "name": "authority",
@@ -72,16 +54,7 @@
     },
     {
       "name": "withdraw",
-      "discriminator": [
-        183,
-        18,
-        70,
-        156,
-        148,
-        109,
-        161,
-        34
-      ],
+      "discriminator": [183, 18, 70, 156, 148, 109, 161, 34],
       "accounts": [
         {
           "name": "authority",
@@ -105,16 +78,7 @@
   "accounts": [
     {
       "name": "Treasury",
-      "discriminator": [
-        238,
-        239,
-        123,
-        238,
-        89,
-        1,
-        168,
-        253
-      ],
+      "discriminator": [238, 239, 123, 238, 89, 1, 168, 253],
       "type": {
         "kind": "struct",
         "fields": [
@@ -145,30 +109,5 @@
       "msg": "Insufficient funds"
     }
   ],
-  "types": [
-    {
-      "name": "Treasury",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "authority",
-            "type": "pubkey"
-          },
-          {
-            "name": "balance",
-            "type": "u64"
-          },
-          {
-            "name": "createdAt",
-            "type": "i64"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
-    }
-  ]
+  "types": []
 }

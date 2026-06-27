@@ -3,7 +3,11 @@
   "entrypoints": ["src/server.mjs", "src/mcp-server.mjs"],
   "modules": {
     "HTTP API": ["/health", "POST /ingest", "GET /retrieve/:id"],
-    "MCP server": ["tools/list", "tools/call store_memory", "tools/call retrieve_memory"],
+    "MCP server": [
+      "tools/list",
+      "tools/call store_memory",
+      "tools/call retrieve_memory"
+    ],
     "Encryption": "AES-256-GCM placeholder",
     "Immunology": "contradiction + prompt-injection detection (stub)",
     "Replay": "scheduled consolidation (stub)",

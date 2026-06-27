@@ -7,6 +7,11 @@
     "key loss": "Embedded-wallet recovery + social recovery.",
     "poisoning": "Contradiction markets + sentinel vaccination."
   },
-  "practices": ["Encrypt at rest/transit", "Capability NFTs", "On-chain receipts", "Audit before mainnet"],
+  "practices": [
+    "Encrypt at rest/transit",
+    "Capability NFTs",
+    "On-chain receipts",
+    "Audit before mainnet"
+  ],
   "compliance": "Requires external audit and legal review before public launch or token issuance."
 }

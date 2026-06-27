@@ -4,26 +4,39 @@ Consumer-first AI memory wallet on Solana.
 
 ## Status
 
-Production-in-progress scaffold. Research specs are committed in `docs/`.
+Production-in-progress scaffold with frictionless-first UX implemented.
 
-**Verified on 2026-06-26:**
+**Verified on 2026-06-27:**
 
-- `cargo +1.75.0 check --workspace` passes locally and in GitHub Actions (warnings only).
+- `cargo +1.75.0 check --workspace` passes locally and in GitHub Actions.
 - `anchor build --no-idl` and `anchor test --skip-build` pass in GitHub Actions.
-- GitHub Actions workflow installs Solana CLI, Anchor CLI, and configures a devnet wallet.
-- `npm test` in `node/` passes **22/22** tests.
+- `npm test` in `node/` passes **68/68** tests.
 - `npm run build` and `npm run typecheck` in `webapp/` pass.
 - `npm run check` in `enigma/` passes.
 
 ## What's here
 
-- `programs/` — 5 Anchor programs with `cargo check` and `anchor build` passing; `budget_escrow` supports native SOL and SPL-token settlement; cross-program CPI composition across programs.
-- `node/` — Off-chain memory node (HTTP API, MCP server, AES-256-GCM encrypted SQLite persistence, OpenAI embedding semantic search, Docker packaging).
-- `webapp/` — Next.js consumer web app with Solana wallet adapters + Privy embedded wallet scaffold, memory vault, PWA.
-- `idl/` — Committed Anchor IDL JSONs used for tests and webapp program clients.
-- `specs/` — Architecture, design JSONs, security audit checklist.
-- `deploy/` — Devnet deployment script, mainnet setup guide, and devnet wallet utilities.
-- `.github/workflows/cortex-v3-anchor.yml` — CI for Anchor/Solana on Ubuntu.
+- `programs/` — 6 Anchor programs:
+  - `memory_registry`, `budget_escrow`, `capability_registry`, `royalty_router`, `cortex_treasury`
+  - `cortex_token` — SAL governance/utility token with staking, veSAL, voting
+  - Session PDA support for invisible delegated signing
+  - Native SOL and SPL Token/Token-2022 settlement
+- `node/` — Off-chain memory node:
+  - HTTP API, MCP stdio + HTTP/SSE server
+  - OAuth 2.1 + PKCE authorization server
+  - AES-256-GCM encrypted SQLite persistence
+  - OpenAI embedding semantic search
+  - Auto-save policy engine
+  - Merkle-based verifiable memory prototype
+- `webapp/` — Next.js consumer PWA:
+  - Privy embedded wallet (passkey/social)
+  - One-tap model connection UI (ChatGPT/Claude/Gemini)
+  - Session authorization screen
+  - Memory vault dashboard
+- `idl/` — Committed Anchor IDL JSONs.
+- `specs/` — Architecture, frictionless-first design, bottleneck solutions.
+- `deploy/` — Devnet deployment script, mainnet setup guide.
+- `.devcontainer/` + `scripts/windows-setup.ps1` — Windows/WSL2/Codespaces dev tools.
 
 ## Quick start
 
@@ -43,6 +56,14 @@ npm run build
 cd ..
 cargo +1.75.0 check --workspace
 ```
+
+## Frictionless user flow
+
+1. Open the PWA.
+2. Log in with Face ID / passkey / Google / Apple — a Solana wallet is created automatically.
+3. Tap "Connect ChatGPT", "Connect Claude", or "Connect Gemini".
+4. Authorize auto-save once on the `/session` screen.
+5. Talk normally across models. Memories save and recall automatically.
 
 ## CI / Deployment
 

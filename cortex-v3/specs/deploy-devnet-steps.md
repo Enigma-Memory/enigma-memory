@@ -48,13 +48,13 @@ After the run finishes, the workflow uploads two artifacts:
 
 ## Programs Deployed
 
-| Program | Localnet ID (Anchor.toml) |
-|---|---|
-| `memory_registry` | `4uQeVj5tqViQh7yWWGStvkEG1Zmhx6uasJtWCJziofM` |
-| `budget_escrow` | `8opHzTAnfzRpPEx21XtnrVTX28YQuCpAjcn1PczScKh` |
+| Program               | Localnet ID (Anchor.toml)                     |
+| --------------------- | --------------------------------------------- |
+| `memory_registry`     | `4uQeVj5tqViQh7yWWGStvkEG1Zmhx6uasJtWCJziofM` |
+| `budget_escrow`       | `8opHzTAnfzRpPEx21XtnrVTX28YQuCpAjcn1PczScKh` |
 | `capability_registry` | `CiDwVBFgWV9E5MvXWoLgnEgn2hK7rJikbvfWavzAQz3` |
-| `royalty_router` | `GcdayuLaLyrdmUu324nahyv33G5poQdLUEZ1nEytDeP` |
-| `cortex_treasury` | `LX3EUdRUBUa3TbsYXLEUdj9J3prXkWXvLYSWyYyc2Jj` |
+| `royalty_router`      | `GcdayuLaLyrdmUu324nahyv33G5poQdLUEZ1nEytDeP` |
+| `cortex_treasury`     | `LX3EUdRUBUa3TbsYXLEUdj9J3prXkWXvLYSWyYyc2Jj` |
 
 After devnet deployment, Anchor.toml is updated with the devnet program IDs and should be committed.
 

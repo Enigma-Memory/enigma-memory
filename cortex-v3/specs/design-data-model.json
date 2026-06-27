@@ -1,8 +1,21 @@
 {
   "entities": {
     "Memory": {
-      "on_chain": ["owner", "content_hash", "created_at", "updated_at", "shareable", "royalty_bps", "bump"],
-      "off_chain": ["encrypted blob", "embedding vector", "affect tags", "source metadata"]
+      "on_chain": [
+        "owner",
+        "content_hash",
+        "created_at",
+        "updated_at",
+        "shareable",
+        "royalty_bps",
+        "bump"
+      ],
+      "off_chain": [
+        "encrypted blob",
+        "embedding vector",
+        "affect tags",
+        "source metadata"
+      ]
     },
     "User": {
       "on_chain": ["wallet pubkey", "budget PDA", "treasury PDA"],
@@ -15,5 +28,9 @@
       "on_chain": ["payer", "payee", "amount", "content_hash", "created_at"]
     }
   },
-  "principles": ["Off-chain encrypted payloads, on-chain hashes/receipts", "Content-addressed blobs", "Capability-based access"]
+  "principles": [
+    "Off-chain encrypted payloads, on-chain hashes/receipts",
+    "Content-addressed blobs",
+    "Capability-based access"
+  ]
 }

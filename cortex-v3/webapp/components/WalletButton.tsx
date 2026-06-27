@@ -1,15 +1,17 @@
-'use client'
+"use client";
 
-import { useWallet } from '@solana/wallet-adapter-react'
-import { useWalletModal } from '@solana/wallet-adapter-react-ui'
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 
 export function WalletButton() {
-  const { connected, disconnect, publicKey } = useWallet()
-  const { setVisible } = useWalletModal()
+  const { connected, disconnect, publicKey } = useWallet();
+  const { setVisible } = useWalletModal();
 
   const label = connected
-    ? `${publicKey?.toBase58().slice(0, 4)}...${publicKey?.toBase58().slice(-4)}`
-    : 'Connect browser wallet'
+    ? `${publicKey?.toBase58().slice(0, 4)}...${publicKey
+        ?.toBase58()
+        .slice(-4)}`
+    : "Connect browser wallet";
 
   return (
     <button
@@ -18,5 +20,5 @@ export function WalletButton() {
     >
       {label}
     </button>
-  )
+  );
 }

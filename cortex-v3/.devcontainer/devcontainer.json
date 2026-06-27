@@ -1,0 +1,31 @@
+{
+  "name": "Enigma Cortex v3",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint",
+        "bradlc.vscode-tailwindcss",
+        "yzhang.markdown-all-in-one"
+      ],
+      "settings": {
+        "rust-analyzer.cargo.features": "all",
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  },
+  "forwardPorts": [3000, 8899, 8900, 8901, 8902],
+  "postCreateCommand": "solana --version && anchor --version && rustc --version && node --version",
+  "postStartCommand": "git config --global --add safe.directory /workspaces/cortex-v3 || true",
+  "remoteUser": "node",
+  "mounts": [
+    "source=${localWorkspaceFolder}/../,target=/workspaces,type=bind,consistency=cached"
+  ]
+}

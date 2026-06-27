@@ -25,4 +25,3 @@ indexmap = { workspace = true }
 proc-macro-crate = { workspace = true }
 jobserver = { workspace = true }
 zeroize_derive = { workspace = true }
-memory_registry = { path = "../memory_registry", features = ["cpi"] }
