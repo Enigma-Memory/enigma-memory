@@ -73,8 +73,6 @@ describe("cortex_token", () => {
         treasury,
         treasuryAuthority,
         tokenProgram: TOKEN_PROGRAM_ID,
-        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-        systemProgram: SystemProgram.programId,
       })
       .rpc();
 

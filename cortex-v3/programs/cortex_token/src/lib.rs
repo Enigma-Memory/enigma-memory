@@ -141,8 +141,8 @@ pub struct InitializeMint<'info> {
     )]
     pub mint_authority: UncheckedAccount<'info>,
     #[account(
-        associated_token::mint = mint,
-        associated_token::authority = treasury_authority
+        has_one = mint,
+        constraint = treasury.owner == treasury_authority.key()
     )]
     pub treasury: Account<'info, TokenAccount>,
     #[account(
@@ -151,8 +151,6 @@ pub struct InitializeMint<'info> {
     )]
     pub treasury_authority: UncheckedAccount<'info>,
     pub token_program: Program<'info, Token>,
-    pub associated_token_program: Program<'info, AssociatedToken>,
-    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
