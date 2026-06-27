@@ -288,11 +288,11 @@
         "fields": [
           {
             "name": "owner",
-            "type": "pubkey"
+            "type": "publicKey"
           },
           {
             "name": "grantedTo",
-            "type": "pubkey"
+            "type": "publicKey"
           },
           {
             "name": "scope",
@@ -330,11 +330,11 @@
         "fields": [
           {
             "name": "owner",
-            "type": "pubkey"
+            "type": "publicKey"
           },
           {
             "name": "sessionKey",
-            "type": "pubkey"
+            "type": "publicKey"
           },
           {
             "name": "nonce",
@@ -413,7 +413,7 @@
         "fields": [
           {
             "name": "owner",
-            "type": "pubkey"
+            "type": "publicKey"
           },
           {
             "name": "nonce",
@@ -487,11 +487,11 @@
         "fields": [
           {
             "name": "owner",
-            "type": "pubkey"
+            "type": "publicKey"
           },
           {
             "name": "grantedTo",
-            "type": "pubkey"
+            "type": "publicKey"
           },
           {
             "name": "scope",
@@ -519,11 +519,11 @@
         "fields": [
           {
             "name": "owner",
-            "type": "pubkey"
+            "type": "publicKey"
           },
           {
             "name": "sessionKey",
-            "type": "pubkey"
+            "type": "publicKey"
           },
           {
             "name": "nonce",
@@ -592,7 +592,7 @@
         "fields": [
           {
             "name": "owner",
-            "type": "pubkey"
+            "type": "publicKey"
           },
           {
             "name": "nonce",
