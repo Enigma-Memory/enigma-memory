@@ -134,8 +134,8 @@ pub mod cortex_token {
 #[derive(Accounts)]
 pub struct InitializeMint<'info> {
     pub payer: Signer<'info>,
-    #[account(mut)]
-    pub mint: Account<'info, Mint>,
+    /// CHECK: validated indirectly via treasury.has_one = mint
+    pub mint: UncheckedAccount<'info>,
     #[account(
         seeds = [b"mint_authority"],
         bump
