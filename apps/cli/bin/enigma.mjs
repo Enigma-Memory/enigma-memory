@@ -6,7 +6,7 @@ import { access, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promi
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createVault, remember, recall, updateMemory, deleteMemory, exportBundle, decryptKeyring, KEYRING_ENCRYPTED_TYPE } from '../../../packages/vault/src/index.js';
-import { createPassport, compileContextPack, createMemoryDriveHealthReport } from '../../../packages/passport/src/index.js';
+import { createPassport, compileContextPack, createContextPassport, createProofOfNonUse, createMemoryDriveHealthReport } from '../../../packages/passport/src/index.js';
 import { runBoundarySimulation } from '../../../packages/boundary/src/index.js';
 import { startStdioServer } from '../../../packages/mcp-server/src/index.js';
 import { runMeshDemo } from '../../../packages/mesh/src/index.js';
@@ -659,6 +659,41 @@ async function writableVaultPathCheck(bundleInput, displayInput = bundleInput) {
   };
 }
 
+async function bundleInitializedCheck(bundlePath, vaultPath) {
+  if (vaultPath.target_exists !== true) {
+    return {
+      ok: false,
+      bundle: vaultPath.path,
+      target_exists: false,
+      schema: null,
+      reason: 'bundle_missing',
+      hint: 'Run quickstart or setup before using doctor as the final green check.',
+    };
+  }
+  try {
+    const bundle = await readJson(bundlePath);
+    const schema = typeof bundle?.schema === 'string' ? bundle.schema : null;
+    const schemaOk = schema === 'enigma.vault_bundle.v1';
+    return {
+      ok: schemaOk,
+      bundle: vaultPath.path,
+      target_exists: true,
+      schema: schemaOk ? schema : null,
+      reason: schemaOk ? null : 'bundle_schema_mismatch',
+      hint: schemaOk ? null : 'Run quickstart or setup with --overwrite to recreate the local Enigma bundle.',
+    };
+  } catch {
+    return {
+      ok: false,
+      bundle: vaultPath.path,
+      target_exists: true,
+      schema: null,
+      reason: 'bundle_json_invalid',
+      hint: 'Run quickstart or setup with --overwrite to recreate the local Enigma bundle.',
+    };
+  }
+}
+
 async function schemaFiles() {
   return (await readdir(SPECS_URL)).filter((name) => name.endsWith('.schema.json')).sort();
 }
@@ -1113,12 +1148,26 @@ function doctorNextCommands(bundleDisplay, client) {
   const clientId = client ?? DEFAULT_SETUP_CLIENTS[0];
   const bundle = commandPath(bundleDisplay);
   return [
+    `enigma quickstart --bundle ${bundle} --overwrite`,
+    `enigma setup --bundle ${bundle} --overwrite`,
+    `enigma doctor --bundle ${bundle} --client ${clientId}`,
     `enigma status --bundle ${bundle}`,
     `enigma drive health --bundle ${bundle}`,
-    `enigma setup --bundle ${bundle}`,
-    `enigma doctor --bundle ${bundle} --client ${clientId}`,
     `enigma connect ${clientId} --bundle ${bundle}`,
   ];
+}
+
+function doctorFirstRunHint(_bundleDisplay, client) {
+  const clientId = client ?? DEFAULT_SETUP_CLIENTS[0];
+  const bundle = commandPath('<bundle-path>');
+  return {
+    bundle: '<bundle-path>',
+    commands: [
+      `enigma quickstart --bundle ${bundle} --overwrite`,
+      `enigma setup --bundle ${bundle} --overwrite`,
+      `enigma doctor --bundle ${bundle} --client ${clientId}`,
+    ],
+  };
 }
 
 async function setupDoctorChecks(flags, artifacts, clients, displays) {
@@ -1578,9 +1627,26 @@ async function contextCommand(flags, io) {
     currency: getFlag(flags, ['currency']),
   });
   await persistState(bundlePath, vault, { passphrase: getFlag(flags, ['passphrase']) });
+  const withProof = booleanFlag(flags, ['proof', 'with-proof', 'withProof'], false);
+  const output = withProof
+    ? {
+      ok: true,
+      schema: 'enigma.context_proof_bundle.v1',
+      context_pack_ref: contextPackPublicDigest(pack),
+      context_pack_summary: publicContextPackSummary(pack),
+      context_passport: createContextPassport({ contextPack: pack, passport, vault, query, now: getFlag(flags, ['now']) }),
+      proof_of_non_use: createProofOfNonUse({ contextPack: pack, passport, vault, query, now: getFlag(flags, ['now']) }),
+      claim_boundaries: {
+        local_enigma_vault_only: true,
+        provider_deletion_claim: false,
+        model_forgetting_claim: false,
+        raw_memory_printed: false,
+      },
+    }
+    : pack;
   const out = getFlag(flags, ['out']);
-  if (out && out !== true) await writeJson(resolve(String(out)), pack);
-  print(pack, io);
+  if (out && out !== true) await writeJson(resolve(String(out)), output);
+  print(output, io);
   return 0;
 }
 
@@ -2106,6 +2172,9 @@ export async function doctorCommand(flags, io) {
   }));
   const schemas = await schemaFiles();
   const bundleInput = pathFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE);
+  const resolvedBundlePath = resolve(bundleInput);
+  const publicBundlePath = publicPathDisplay(bundleInput, 'bundle-path');
+  const vaultPath = await writableVaultPathCheck(resolvedBundlePath, publicBundlePath);
   const selectedClient = getFlag(flags, ['client']);
   const doctorOptions = selectedClient && selectedClient !== true
     ? { ...connectorOptions(flags), clientId: String(selectedClient), redactPaths: true }
@@ -2129,9 +2198,10 @@ export async function doctorCommand(flags, io) {
     bundle_default_path: {
       ok: DEFAULT_BUNDLE === '.enigma/bundle.json',
       path: DEFAULT_BUNDLE,
-      resolved: publicPathDisplay(resolve(bundleInput), 'bundle-path'),
+      resolved: publicPathDisplay(resolvedBundlePath, 'bundle-path'),
     },
-    vault_path: await writableVaultPathCheck(resolve(bundleInput), publicPathDisplay(bundleInput, 'bundle-path')),
+    vault_path: vaultPath,
+    bundle_initialized: await bundleInitializedCheck(resolvedBundlePath, vaultPath),
     schemas: {
       ok: schemas.length > 0,
       count: schemas.length,
@@ -2145,18 +2215,23 @@ export async function doctorCommand(flags, io) {
     connectors: connectorDoctor,
   };
   const ok = Object.values(checks).every((check) => check.ok !== false);
+  const doctorClient = String(selectedClient && selectedClient !== true ? selectedClient : 'generic-mcp');
+  const firstRunHint = doctorFirstRunHint(checks.vault_path.path, doctorClient);
   print({
     ok,
     node: checks.node,
     package_bins: checks.package_bins,
     npm: checks.npm,
     vault_path: checks.vault_path,
+    bundle_initialized: checks.bundle_initialized,
     bundle_default_path: checks.bundle_default_path,
     schema_count: checks.schemas.count,
     schemas: checks.schemas,
     mcp_command_name: checks.mcp_command_name.command,
     connectors: checks.connectors,
-    next_commands: doctorNextCommands(checks.vault_path.path, String(selectedClient && selectedClient !== true ? selectedClient : 'generic-mcp')),
+    first_run_hint: firstRunHint,
+    fresh_install_hint: firstRunHint,
+    next_commands: doctorNextCommands(checks.vault_path.path, doctorClient),
     checks,
   }, io);
   return ok ? 0 : 1;
@@ -3006,7 +3081,7 @@ Windows CMD uses %USERPROFILE% instead of $HOME:
   enigma remember --bundle "%USERPROFILE%\\.enigma\\bundle.json" --text-file memory.txt
 
 Common commands:
-  init, setup, quickstart, test-drive      First-run / demo paths
+  init, setup, start, quickstart, test-drive First-run / demo paths
   remember, recall, update, delete         Memory operations
   search, context                          Retrieval / context packs
   status, drive health, doctor             Health and diagnostics
@@ -3030,6 +3105,7 @@ function usage() {
       'init',
       'setup',
       'quickstart',
+      'start',
       'test-drive',
       'demo cross-model',
       'doctor',
@@ -3266,7 +3342,7 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     io.stdout.write(`${humanUsage()}\n`);
     return 0;
   }
-  if ((command === 'chain' && (!subcommand || subcommand === '--help' || subcommand === '-h' || flags.has('help'))) || ((flags.has('help') || argv.includes('-h')) && (command === 'init' || command === 'setup' || command === 'test-drive' || command === 'search' || command === 'status' || (command === 'passport' && subcommand === 'status') || ((command === 'relay' || command === 'gateway') && (subcommand === 'serve' || subcommand === 'demo')) || (command === 'native-host' && (subcommand === 'manifest' || subcommand === 'install-plan')) || (command === 'demo' && subcommand === 'cross-model') || (command === 'drive' && subcommand === 'health')))) {
+  if ((command === 'chain' && (!subcommand || subcommand === '--help' || subcommand === '-h' || flags.has('help'))) || ((flags.has('help') || argv.includes('-h')) && (command === 'init' || command === 'setup' || command === 'start' || command === 'quickstart' || command === 'test-drive' || command === 'search' || command === 'status' || (command === 'passport' && subcommand === 'status') || ((command === 'relay' || command === 'gateway') && (subcommand === 'serve' || subcommand === 'demo')) || (command === 'native-host' && (subcommand === 'manifest' || subcommand === 'install-plan')) || (command === 'demo' && subcommand === 'cross-model') || (command === 'drive' && subcommand === 'health')))) {
     print(usage(), io);
     return 0;
   }
@@ -3274,6 +3350,7 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     if (command === 'init') return await initCommand(flags, io);
     if (command === 'setup') return await setupCommand(flags, io);
     if (command === 'quickstart') return await quickstartCommand(flags, io);
+    if (command === 'start') return await quickstartCommand(flags, io);
     if (command === 'test-drive') return await testDriveCommand(flags, io);
     if (command === 'demo' && subcommand === 'cross-model') return await crossModelDemoCommand(flags, io);
     if (command === 'doctor') return await doctorCommand(flags, io);

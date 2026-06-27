@@ -13,6 +13,10 @@ import {
   createSettlementBatch,
   verifyServiceSettlementReceipt,
 } from '../../settlement/src/index.js';
+import {
+  assertImmuneIngressPublicSafe,
+  createImmuneIngressReport,
+} from '../../importers/src/index.js';
 
 const DEFAULT_BUNDLE = '.enigma/bundle.json';
 const JSONRPC_VERSION = '2.0';
@@ -181,6 +185,14 @@ function validateToolArguments(name, args) {
       optionalString(args, 'bundlePath', name);
       optionalPlainObject(args, 'bundle', name);
       return args;
+    case 'enigma_immune_ingress':
+      rejectAdditionalProperties(args, new Set(['candidate', 'candidates', 'generated_at', 'now']), name);
+      optionalPlainObject(args, 'candidate', name);
+      optionalObjectArray(args, 'candidates', name);
+      optionalString(args, 'generated_at', name);
+      optionalString(args, 'now', name);
+      if (args.candidate === undefined && args.candidates === undefined) throw invalidParams(`${name} requires candidate or candidates.`);
+      return args;
     case 'enigma_meter_usage':
       rejectAdditionalProperties(args, new Set([
         'events',
@@ -313,6 +325,31 @@ function sanitizeOperationalError(error) {
   };
 }
 
+function mcpImmuneIngressCandidates(input) {
+  if (!isPlainObject(input)) return input;
+  if (Object.prototype.hasOwnProperty.call(input, 'candidates')) return input.candidates;
+  if (Object.prototype.hasOwnProperty.call(input, 'candidate')) return input.candidate;
+  if (Object.prototype.hasOwnProperty.call(input, 'memory_candidates')) return input.memory_candidates;
+  if (Object.prototype.hasOwnProperty.call(input, 'memoryCandidates')) return input.memoryCandidates;
+  return input;
+}
+
+function mcpImmuneIngressOptions(input, options = {}) {
+  return {
+    ...options,
+    now: options.now ?? input?.now ?? input?.generated_at ?? input?.generatedAt,
+    source_type: options.source_type ?? options.sourceType ?? 'mcp_candidate_ingress',
+  };
+}
+
+export function createMcpImmuneIngressReport(input = {}, options = {}) {
+  return createImmuneIngressReport(mcpImmuneIngressCandidates(input), mcpImmuneIngressOptions(input, options));
+}
+
+export function assertMcpImmuneIngressPublicSafe(input = {}, options = {}) {
+  return assertImmuneIngressPublicSafe(mcpImmuneIngressCandidates(input), mcpImmuneIngressOptions(input, options));
+}
+
 
 export const toolDescriptors = [
   {
@@ -402,6 +439,20 @@ export const toolDescriptors = [
       properties: {
         bundlePath: { type: 'string' },
         bundle: { type: 'object' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'enigma_immune_ingress',
+    description: 'Scan MCP-supplied memory candidate objects and return a public-safe immune quarantine report with opaque refs only.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        candidate: { type: 'object' },
+        candidates: { type: 'array', items: { type: 'object' } },
+        generated_at: { type: 'string' },
+        now: { type: 'string' },
       },
       additionalProperties: false,
     },
@@ -883,6 +934,11 @@ export async function enigma_verify_receipts(input = {}) {
   return verifyBundle(bundle);
 }
 
+export async function enigma_immune_ingress(input = {}) {
+  input = validateToolArguments('enigma_immune_ingress', input);
+  return createMcpImmuneIngressReport(input);
+}
+
 export async function enigma_meter_usage(input = {}) {
   input = validateToolArguments('enigma_meter_usage', input);
   if (Array.isArray(input.events)) {
@@ -950,6 +1006,7 @@ export const handlers = Object.freeze({
   enigma_context_pack,
   enigma_delete,
   enigma_verify_receipts,
+  enigma_immune_ingress,
   enigma_meter_usage,
   enigma_settlement_job,
   enigma_settlement_capacity,
@@ -1171,6 +1228,7 @@ export default {
   enigma_context_pack,
   enigma_delete,
   enigma_verify_receipts,
+  enigma_immune_ingress,
   enigma_meter_usage,
   enigma_settlement_job,
   enigma_settlement_capacity,
@@ -1180,6 +1238,8 @@ export default {
   enigma_settlement_batch,
   enigma_passport_summary_resource,
   enigma_standard_memory_prompt,
+  createMcpImmuneIngressReport,
+  assertMcpImmuneIngressPublicSafe,
   handleJsonRpcRequest,
   startStdioServer,
 };

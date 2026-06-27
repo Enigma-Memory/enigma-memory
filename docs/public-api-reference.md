@@ -28,13 +28,13 @@ Use package subpath exports for public module imports:
 | Package subpath | `package.json` export key | Target | Status | Public exports |
 | --- | --- | --- | --- | --- |
 | `enigma-memory` | `.` | `packages/core/src/index.js` | stable local/package | Same as `./core`. |
-| `enigma-memory/core` | `./core` | `packages/core/src/index.js` | stable local/package | `SHA256_PREFIX`, `EMPTY_MERKLE_ROOT`, `canonicalize`, `sha256Hex`, `hmacSha256Hex`, `generateSigningKeyPair`, `signPayload`, `verifySignature`, `receiptHash`, `createReceipt`, `verifyReceipt`, `verifyReceiptChain`, `MerkleSet`, `createCheckpoint`, `verifyCheckpoint`, `createMemoryAddress`. |
-| `enigma-memory/vault` | `./vault` | `packages/vault/src/index.js` | stable local/package | `createVault`, `remember`, `recall`, `updateMemory`, `deleteMemory`, `exportBundle`, `importBundle`. |
-| `enigma-memory/passport` | `./passport` | `packages/passport/src/index.js` | stable local/package | `createPassport`, `compileContextPack`, `verifyContextPack`. |
+| `enigma-memory/core` | `./core` | `packages/core/src/index.js` | stable local/package | `SHA256_PREFIX`, `EMPTY_MERKLE_ROOT`, `canonicalize`, `sha256Hex`, `sha256Root`, `publicSafeHash`, `deriveNullifier`, Merkle proof helpers, public-safe verifier helpers, signing helpers, receipt/checkpoint helpers, `MerkleSet`, `createMemoryAddress`. |
+| `enigma-memory/vault` | `./vault` | `packages/vault/src/index.js` | stable local/package | `createVault`, `remember`, `recall`, `updateMemory`, `deleteMemory`, `exportBundle`, `importBundle`, `buildLifecycleRootSummary`, `buildMemoryBoundaryTransactionSummary`, `buildPublicLifecycleReceiptLog`. |
+| `enigma-memory/passport` | `./passport` | `packages/passport/src/index.js` | stable local/package | `createPassport`, `compileContextPack`, `verifyContextPack`, `createContextPassport`, `verifyContextPassport`, `createProofOfNonUse`, `verifyProofOfNonUse`, `createMemoryDriveHealthReport`. |
 | `enigma-memory/boundary` | `./boundary` | `packages/boundary/src/index.js` | stable local/package | `createBoundaryManifest`, `verifyBoundaryManifest`, `classifyBoundaryPath`, `runBoundarySimulation`, `boundarySurfaces`, `boundaryClassifications`. |
-| `enigma-memory/mcp-server` | `./mcp-server` | `packages/mcp-server/src/index.js` | stable local/package | `toolDescriptors`, `resourceDescriptors`, `promptDescriptors`, `handlers`, memory tools, `enigma_meter_usage`, settlement tools, `enigma_passport_summary_resource`, `enigma_standard_memory_prompt`, `handleJsonRpcRequest`, `startStdioServer`, `default`. |
-| `enigma-memory/connectors` | `./connectors` | `packages/connectors/src/index.js` | stable local/package | `supportedClients`, `platformDefaultConfigPath`, `getClientProfile`, `renderMcpConfig`, `connectClient`, `disconnectClient`, `detectClientConnector`, `detectConnectors`, `doctorConnectors`, `planConnectWizard`, `runConnectorDemo`. |
-| `enigma-memory/importers` | `./importers` | `packages/importers/src/index.js` | stable local/package | `importChatGptExport`, `importClaudeMemory`, `importMem0Export`, `importLettaAgentFile`, `importLangGraphStore`, `importZepGraphitiExport`, `exportEnigmaCapsule`, `importEnigmaCapsule`, `runImporterDemo`, `default`. |
+| `enigma-memory/mcp-server` | `./mcp-server` | `packages/mcp-server/src/index.js` | stable local/package | `toolDescriptors`, `resourceDescriptors`, `promptDescriptors`, `handlers`, memory tools, `enigma_immune_ingress`, `enigma_meter_usage`, settlement tools, `enigma_passport_summary_resource`, `enigma_standard_memory_prompt`, `createMcpImmuneIngressReport`, `assertMcpImmuneIngressPublicSafe`, `handleJsonRpcRequest`, `startStdioServer`, `default`. |
+| `enigma-memory/connectors` | `./connectors` | `packages/connectors/src/index.js` | stable local/package | `supportedClients`, `platformDefaultConfigPath`, `getClientProfile`, `renderMcpConfig`, `connectClient`, `disconnectClient`, `detectClientConnector`, `detectConnectors`, `doctorConnectors`, `planConnectWizard`, `createConnectorTrustCard`, `createConnectorTrustCards`, `runConnectorDemo`. |
+| `enigma-memory/importers` | `./importers` | `packages/importers/src/index.js` | stable local/package | `importChatGptExport`, `importClaudeMemory`, `importMem0Export`, `importLettaAgentFile`, `importLangGraphStore`, `importZepGraphitiExport`, `createImmuneIngressReport`, `quarantineImmuneIngressCandidates`, `assertImmuneIngressPublicSafe`, `exportEnigmaCapsule`, `importEnigmaCapsule`, `runImporterDemo`, `default`. |
 | `enigma-memory/mesh` | `./mesh` | `packages/mesh/src/index.js` | stable local/package | `createMeshNode`, `createCapsuleManifest`, `verifyCapsuleManifest`, `createWitnessCheckpoint`, `verifyWitnessCheckpoint`, `createRelayStore`, `pushRelayRecord`, `pullRelayRecord`, `createFederationGrant`, `verifyFederationGrant`, `runMeshDemo`, `default`. |
 | `enigma-memory/enterprise` | `./enterprise` | `packages/enterprise/src/index.js` | stable local/package | `createEnterprisePolicy`, `evaluateEnterprisePolicy`, `minimizeEnterpriseEvaluation`, `minimizeEnterprisePolicy`, `createGatewayDecision`, `verifyGatewayDecision`, `exportSiemEvent`, `runEnterpriseDemo`, `default`. |
 | `enigma-memory/optimizer` | `./optimizer` | `packages/optimizer/src/index.js` | stable local/package | `MEMORY_OPTIMIZATION_PRODUCT_THESIS`, `MEMORY_OPTIMIZATION_PLAN_SCHEMA`, `MEMORY_ACCESS_RECEIPT_SCHEMA`, `estimateTextTokens`, `estimateTokenCost`, `createMemoryOptimizationPlan`, `createMemoryAccessReceipt`, `assertNoRawMemoryOutput`. |
@@ -184,7 +184,7 @@ Published-package quickstart:
 npm install -g enigma-memory
 enigma quickstart --bundle ./.enigma/bundle.json --overwrite
 enigma demo cross-model
-enigma doctor
+enigma doctor --bundle ./.enigma/bundle.json
 enigma-relay demo
 enigma-gateway demo
 ```
@@ -193,10 +193,13 @@ One-off quickstart without a global install:
 
 ```sh
 npx --yes --package enigma-memory enigma quickstart --bundle ./.enigma/bundle.json --overwrite
+npx --yes --package enigma-memory enigma doctor --bundle ./.enigma/bundle.json
 npx --yes --package enigma-memory enigma demo cross-model
 ```
 
 `enigma quickstart` creates a local vault bundle, context pack, export proof bundle, and verify report. The proof is local Enigma-controlled evidence only; it is not provider deletion proof, model forgetting proof, hosted/BYOC readiness evidence, token ROI evidence, or compliance certification.
+
+`enigma start` is a no-friction alias for the safe quickstart flow.
 
 `enigma demo cross-model` is a no-provider product demo for the “memory follows me across models” loop. It creates a generic demo memory in a demo-only vault or supplied bundle unless `--memory-file <path>` is explicitly supplied, generates public-safe context-pack references and receipt summaries for `chatgpt`, `claude`, `kimi`, `cursor`, and `local-llm`, and keeps `provider_native_memory_canonical:false`. The JSON report does not echo plaintext memory.
 
@@ -204,6 +207,7 @@ npx --yes --package enigma-memory enigma demo cross-model
 
 - `enigma init`
 - `enigma quickstart`
+- `enigma start`
 - `enigma demo cross-model`
 - `enigma doctor`
 - `enigma install`
@@ -248,7 +252,7 @@ Common local options and outputs:
 | `enigma recall --bundle <path> --id <memory_addr>` | `--purpose` | Reads from local vault and emits recall result plus receipt data. |
 | `enigma update --bundle <path> --id <memory_addr> --text <private local text>` | `--metadata` | Prints old/new memory address and receipt id. |
 | `enigma delete --bundle <path> --id <memory_addr>` | `--reason` | Tombstones the local Enigma memory address and prints receipt id; this is not provider deletion proof. |
-| `enigma context --bundle <path>` | `--query`/`--q`, `--purpose`, `--limit`, `--out`, optional `--optimize`, `--max-estimated-tokens`, `--price-per-million-tokens`, `--currency` | Emits `enigma.context_pack.v1` derived from active local memories and retrieval receipts; non-empty queries automatically use deterministic local relevance scoring before tiering/deduplication, explicit optimizer options attach plaintext-minimized plan/receipt evidence, and token/cost estimates come from explicit inputs only. |
+| `enigma context --bundle <path>` | `--query`/`--q`, `--purpose`, `--limit`, `--out`, optional `--optimize`, `--max-estimated-tokens`, `--price-per-million-tokens`, `--currency`, `--proof` | Emits `enigma.context_pack.v1` derived from active local memories and retrieval receipts. With `--proof`, emits `enigma.context_proof_bundle.v1` containing only a public context summary plus `enigma.context_passport.v1` and `enigma.proof_of_non_use.v1` roots/refs; it does not print selected memory text, provider deletion claims, or model-forgetting claims. |
 | `npm run production:storage` | optional `-- --out <file>`, `-- --format json|sql`, `-- --schema <identifier>`, `-- --migration-id <id>` | Builds local PostgreSQL production storage migration material for relay/gateway durable state. It does not connect to or mutate a database; operators run it through controlled database change management. |
 | `npm run production:backend-env` | required `-- --out-dir <dir>`, optional `-- --domain <host> --tenant <id> --environment <name>` | Writes `enigma.production_backend_env_kit.v1`: public-safe relay/gateway operator-env templates, an operator-secrets placeholder manifest, hosted-ref map, fail-closed production defaults, and next validation commands. It creates no secrets or cloud resources and stays `launch_ready:false` until real hosted refs, live probes, and operator acceptance exist. |
 | `npm run production:edge-backend` | required `-- --out-dir <dir>`, optional `-- --domain <host>` | Writes `enigma.edge_backend_worker_bundle.v1`: public-safe Cloudflare Worker source/config for `relay.<domain>` and `gateway.<domain>` custom domains. The Workers expose `/livez`, fail-closed `/readyz`, and closed private-route stubs for urgent edge bootstrap. They do not create storage, KMS, SIEM, backups, approvals, or production hosted-readiness evidence; `/readyz` remains blocked until real refs and operator `go` are configured. |
@@ -298,7 +302,7 @@ Common local options and outputs:
 | `npm run proof:packet` | required `-- --active-root <sha256> --receipt-root <sha256> --benchmark-report <file> --dataset-hash <sha256> --runner-hash <sha256> --operator-ref <ref>`, optional `--out <file>` | Secondary helper that emits an `enigma.proof_network.packet.v1` combining an anchor batch and benchmark attestation. It hashes the benchmark report file but never copies the report body/path into the packet, sets `transaction_submitted:false` and `raw_memory_on_chain:false`, and does not call a network, deploy contracts, create accounts, sign transactions, or write raw memory/prompts/transcripts/completions/embeddings/provider responses. |
 | `enigma export --bundle <path> --out <file>` | none beyond paths | Writes an exported bundle with encrypted/committed vault state and receipt metadata. |
 | `enigma verify --bundle <exported-bundle.json>` | `--file` or `--export` aliases | Prints `enigma.verification_report.v1`. |
-| `enigma doctor` | `--client`, connector options | Checks Node version, bins, schemas, MCP command name, and connector state. |
+| `enigma doctor` | `--bundle <path>`, `--client`, connector options | Checks Node version, bins, schemas, MCP command name, local bundle path readiness, and connector state. A fresh install can be `ok:false` until `enigma quickstart --bundle <path> --overwrite` or `enigma setup --bundle <path> --overwrite` creates the bundle and connector configs point to it. |
 | `enigma install` | `--bundle`, `--client`, `--out`, connector options | Creates bundle if needed and prints MCP config snippets. |
 | `enigma meter event` | `--tenant <id>`, `--provider <id>`, `--model <id>`, token-count flags, pricing flags, optional `--out <file>` | Emits `enigma.usage_event.v1` with counts, hashes, pricing inputs, settlement boundary, and no raw prompts/completions/provider responses. |
 | `enigma meter aggregate` | `--events <events.json>`, optional `--tenant <id>`, `--out <file>` | Emits `enigma.usage_aggregate.v1` over usage events, with deterministic totals and claim boundaries; not provider invoice or token ROI evidence. |
@@ -488,7 +492,7 @@ Gateway `--state-file` persistence stores only local demo state needed to resume
 
 Module: `enigma-memory/connectors`. CLI: `enigma install`, `enigma doctor`, `enigma connect <client>`, `enigma disconnect <client>`.
 
-Connector profiles render JSON under `mcpServers`, use server name `enigma`, command `enigma-mcp`, and require env key `ENIGMA_BUNDLE`.
+Connector profiles render JSON under `mcpServers`, use server name `enigma`, command `enigma-mcp`, and require env key `ENIGMA_BUNDLE`. `enigma doctor` validates those existing connector configs too; a red generic-MCP connector on first run usually means initialize the target bundle with quickstart/setup and rerun doctor against that same bundle.
 
 | Client id | Display name | Default config paths |
 | --- | --- | --- |
@@ -566,6 +570,12 @@ Schemas are package-included under `specs/` and are reviewable from a source che
 | `specs/gateway-request-v1.schema.json` | `https://schemas.enigma.ai/gateway-request-v1.schema.json` | `enigma.gateway_request.v1`; plaintext-free gateway request. |
 | `specs/mesh-node-v1.schema.json` | `https://schemas.enigma.ai/mesh-node-v1.schema.json` | `enigma.mesh_node.v1`, `enigma.capsule_manifest.v1`, `enigma.witness_checkpoint.v1`, `enigma.relay_record.v1`, `enigma.federation_grant.v1`; mesh artifacts. |
 | `specs/enterprise-policy-v1.schema.json` | `https://schemas.enigma.ai/enterprise-policy-v1.schema.json` | `enigma.enterprise_policy.v1`; default-deny hosted/BYOC/on-prem policy with `provider_native_memory: "cache_only"`. |
+| `specs/antigen-envelope-v1.schema.json` | `https://schemas.enigma.ai/antigen-envelope-v1.schema.json` | `enigma.antigen_envelope.v1`; public-safe content commitment, source refs, detector refs, and risk labels without payloads. |
+| `specs/immune-scan-report-v1.schema.json` | `https://schemas.enigma.ai/immune-scan-report-v1.schema.json` | `enigma.immune_scan_report.v1`; detector IDs, opaque finding refs, counts, quarantine refs, status, and roots. |
+| `specs/quarantine-record-v1.schema.json` | `https://schemas.enigma.ai/quarantine-record-v1.schema.json` | `enigma.quarantine_record.v1`; local isolation, reintegration, and tombstone transition receipts/roots. |
+| `specs/antibody-pack-v1.schema.json` | `https://schemas.enigma.ai/antibody-pack-v1.schema.json` | `enigma.antibody_pack.v1`; reusable detector policy fingerprints and signature refs without private detector inputs. |
+| `specs/trust-card-v1.schema.json` | `https://schemas.enigma.ai/trust-card-v1.schema.json` | `enigma.trust_card.v1`; connector/package posture with claim IDs, evidence refs, roots, and boundary booleans. |
+| `specs/evidence-packet-v1.schema.json` | `https://schemas.enigma.ai/evidence-packet-v1.schema.json` | `enigma.evidence_packet.v1`; public-safe connector/package posture summaries, claim IDs, evidence refs, artifact refs, roots, and boundary booleans only. |
 | `specs/proof-network-anchor-batch-v1.schema.json` | `https://schemas.enigma.ai/proof-network-anchor-batch-v1.schema.json` | `enigma.proof_network.anchor_batch.v1`; public-safe Solana-ready roots/refs anchor batch with no transaction submission. |
 | `specs/proof-network-capability-grant-v1.schema.json` | `https://schemas.enigma.ai/proof-network-capability-grant-v1.schema.json` | `enigma.proof_network.capability_grant.v1`; scoped capability grant with opaque refs only. |
 | `specs/proof-network-capability-revocation-v1.schema.json` | `https://schemas.enigma.ai/proof-network-capability-revocation-v1.schema.json` | `enigma.proof_network.capability_revocation.v1`; grant revocation/nullifier artifact. |

@@ -16,6 +16,37 @@ const ED25519 = 'Ed25519';
 const GENESIS = 'GENESIS';
 const ROOT_RE = /^sha256:[a-f0-9]{64}$/;
 const HASH_RE = /^[a-f0-9]{64}$/;
+const NULLIFIER_RE = /^nullifier:hmac-sha256:[a-f0-9]{64}$/;
+const SECRET_VALUE_RE = /(?:-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:sk|pk|rk)_(?:live|test|proj)_[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{20,}|bearer\s+[A-Za-z0-9._~+/=-]{20,})/i;
+const LOCAL_PATH_RE = /^(?:[A-Za-z]:[\\/]|\\\\|\/(?:Users|home|tmp|var|etc|private|Volumes)\/)/;
+const FORBIDDEN_PUBLIC_CLAIM_RE = /\b(?:provider(?:-native)?\s+(?:deletion|memory\s+control)|model\s+forgetting|compliance\s+certification|certif(?:y|ies|ied)\s+compliance|benchmark\s+superiority|hosted\s+(?:saas|cloud)\s+ready|byoc\s+ready|patent(?:ability|able)|legal\s+conclusion|raw\s+embeddings?\s+(?:are\s+)?safe|hardware\s+tamper[-\s]?proof|tamper[-\s]?proof\s+hardware)\b/i;
+const PUBLIC_FORBIDDEN_KEYS = new Set([
+  'api_key',
+  'authorization',
+  'body',
+  'content',
+  'cookie',
+  'credential',
+  'credentials',
+  'embedding',
+  'embeddings',
+  'file_path',
+  'local_path',
+  'password',
+  'plaintext',
+  'private_key',
+  'prompt',
+  'provider_response',
+  'raw',
+  'raw_memory',
+  'response',
+  'secret',
+  'text',
+  'token',
+  'transcript',
+  'vector',
+  'vectors'
+]);
 const RECEIPT_TOP_LEVEL_FIELDS = new Set([
   'schema',
   'receipt_id',
@@ -503,6 +534,132 @@ export function createMemoryAddress(args = {}, maybeValue, maybeOptions = {}) {
   return `${prefix}:hmac-sha256:${digest}`;
 }
 
+export function sha256Root(value) {
+  return prefixedSha256(value);
+}
+
+export function publicSafeHash(value, options = {}) {
+  assertPublicSafeFields(value, options);
+  return prefixedSha256(canonicalize(value));
+}
+
+export function merkleSetRoot(values = []) {
+  if (!Array.isArray(values)) throw new TypeError('merkleSetRoot requires an array');
+  return new MerkleSet(values).root();
+}
+
+export function createMerkleRoot(values = []) {
+  return merkleSetRoot(values);
+}
+
+export function createMerkleMembershipProof(valuesOrArgs, maybeValue) {
+  const args = Array.isArray(valuesOrArgs) ? { values: valuesOrArgs, value: maybeValue } : valuesOrArgs ?? {};
+  if (!Array.isArray(args.values)) throw new TypeError('createMerkleMembershipProof requires values');
+  return new MerkleSet(args.values).proveMembership(args.value);
+}
+
+export function verifyMerkleMembershipProof(proofOrArgs, maybeExpectedRoot) {
+  const args = isPlainRecord(proofOrArgs) && Object.prototype.hasOwnProperty.call(proofOrArgs, 'proof')
+    ? proofOrArgs
+    : { proof: proofOrArgs, expectedRoot: maybeExpectedRoot };
+  return MerkleSet.verifyMembership(args.proof, args.expectedRoot ?? args.expected_root ?? args.proof?.root);
+}
+
+export function createMerkleProof(valuesOrArgs, maybeValue) {
+  return createMerkleMembershipProof(valuesOrArgs, maybeValue);
+}
+
+export function verifyMerkleProof(proofOrArgs, maybeExpectedRoot) {
+  return verifyMerkleMembershipProof(proofOrArgs, maybeExpectedRoot);
+}
+
+export function createMerkleNonMembershipProof(valuesOrArgs, maybeValue) {
+  const args = Array.isArray(valuesOrArgs) ? { values: valuesOrArgs, value: maybeValue } : valuesOrArgs ?? {};
+  if (!Array.isArray(args.values)) throw new TypeError('createMerkleNonMembershipProof requires values');
+  return new MerkleSet(args.values).proveNonMembership(args.value);
+}
+
+export function verifyMerkleNonMembershipProof(proofOrArgs, maybeExpectedRoot) {
+  const args = isPlainRecord(proofOrArgs) && Object.prototype.hasOwnProperty.call(proofOrArgs, 'proof')
+    ? proofOrArgs
+    : { proof: proofOrArgs, expectedRoot: maybeExpectedRoot };
+  return MerkleSet.verifyNonMembership(args.proof, args.expectedRoot ?? args.expected_root ?? args.proof?.root);
+}
+
+export function deriveNullifier(args = {}, maybeValue, maybeOptions = {}) {
+  const options = isPlainRecord(args) && (Object.prototype.hasOwnProperty.call(args, 'secret') || Object.prototype.hasOwnProperty.call(args, 'key'))
+    ? args
+    : { secret: args, value: maybeValue, ...maybeOptions };
+  const secret = options.secret ?? options.key;
+  if (secret === undefined) throw new TypeError('deriveNullifier requires a secret key');
+  const payload = {
+    domain: 'enigma.nullifier.v1',
+    scope: options.scope ?? options.namespace ?? 'memory-boundary',
+    subject_ref: options.subject_ref ?? options.subjectRef ?? null,
+    capability_id: options.capability_id ?? options.capabilityId ?? null,
+    policy_id: options.policy_id ?? options.policyId ?? null,
+    value: options.value ?? options.claim ?? options.ref ?? options.components ?? null
+  };
+  return `nullifier:hmac-sha256:${hmacSha256Hex({ key: secret, value: payload })}`;
+}
+
+export function isSha256Root(value) {
+  return ROOT_RE.test(value ?? '');
+}
+
+export function isNullifier(value) {
+  return NULLIFIER_RE.test(value ?? '');
+}
+
+export function verifySha256Root(value, field = 'root') {
+  const ok = isSha256Root(value);
+  return verificationResult(ok, ok ? [] : [`${field} must be a sha256 root`]);
+}
+
+export function verifyNullifier(value, field = 'nullifier') {
+  const ok = isNullifier(value);
+  return verificationResult(ok, ok ? [] : [`${field} must be a nullifier`]);
+}
+
+export function scanPublicSafeFields(value, options = {}) {
+  const errors = [];
+  const forbidden_paths = [];
+  scanPublicSafeValue(value, '$', errors, forbidden_paths, new WeakSet(), options);
+  return verificationResult(errors.length === 0, errors, { forbidden_paths });
+}
+
+export function assertPublicSafeFields(value, options = {}) {
+  const result = scanPublicSafeFields(value, options);
+  if (!result.ok) throw new TypeError(`public-safe scan failed: ${result.errors.join('; ')}`);
+  return value;
+}
+
+export function verifyPublicSafeArtifact(value, options = {}) {
+  const result = scanPublicSafeFields(value, options);
+  return verificationResult(result.ok, result.errors, {
+    forbidden_paths: result.forbidden_paths,
+    public_hash: result.ok ? prefixedSha256(canonicalize(value)) : null
+  });
+}
+
+export function verifyPublicSafeHash(value, maybeExpectedHash, options = {}) {
+  const expected = options.expected_hash ?? options.expectedHash ?? options.hash ?? options.public_hash ?? options.publicHash ?? maybeExpectedHash;
+  const scan = scanPublicSafeFields(value, options);
+  if (!scan.ok) {
+    return verificationResult(false, scan.errors, { forbidden_paths: scan.forbidden_paths, public_hash: null });
+  }
+  const publicHash = prefixedSha256(canonicalize(value));
+  const errors = [];
+  if (expected !== undefined) {
+    try {
+      if (normalizeSha256Root(expected, 'expectedHash') !== publicHash) errors.push('public hash mismatch');
+    } catch {
+      errors.push('expectedHash must be a sha256 root');
+    }
+  }
+  return verificationResult(errors.length === 0, errors, { forbidden_paths: [], public_hash: publicHash });
+}
+
 function bytesForHash(value) {
   if (typeof value === 'string') return value;
   if (Buffer.isBuffer(value) || ArrayBuffer.isView(value) || value instanceof ArrayBuffer) return value;
@@ -759,6 +916,96 @@ function withoutUndefinedFields(record) {
     if (record[key] !== undefined) cleaned[key] = record[key];
   }
   return cleaned;
+}
+
+function scanPublicSafeValue(value, path, errors, forbiddenPaths, seen, options) {
+  if (value === null) return;
+  if (value === undefined) {
+    addPublicSafeError(errors, forbiddenPaths, path, 'undefined is not public-safe JSON');
+    return;
+  }
+  const type = typeof value;
+  if (type === 'string') {
+    scanPublicSafeString(value, path, errors, forbiddenPaths, options);
+    return;
+  }
+  if (type === 'number') {
+    if (!Number.isFinite(value)) addPublicSafeError(errors, forbiddenPaths, path, 'number must be finite');
+    return;
+  }
+  if (type === 'boolean') return;
+  if (type !== 'object') {
+    addPublicSafeError(errors, forbiddenPaths, path, `${type} is not public-safe JSON`);
+    return;
+  }
+  if (seen.has(value)) {
+    addPublicSafeError(errors, forbiddenPaths, path, 'value must not be circular');
+    return;
+  }
+  seen.add(value);
+  try {
+    if (Array.isArray(value)) {
+      if (looksLikeEmbeddingVector(value)) addPublicSafeError(errors, forbiddenPaths, path, 'numeric vector-like arrays are not public-safe');
+      for (let index = 0; index < value.length; index += 1) {
+        if (!Object.prototype.hasOwnProperty.call(value, index)) {
+          addPublicSafeError(errors, forbiddenPaths, `${path}[${index}]`, 'sparse arrays are not public-safe');
+          continue;
+        }
+        scanPublicSafeValue(value[index], `${path}[${index}]`, errors, forbiddenPaths, seen, options);
+      }
+      return;
+    }
+    if (!isPlainRecord(value)) {
+      addPublicSafeError(errors, forbiddenPaths, path, 'unsupported object is not public-safe JSON');
+      return;
+    }
+    for (const key of Object.keys(value)) {
+      const childPath = `${path}.${key}`;
+      if (isForbiddenPublicKey(key)) addPublicSafeError(errors, forbiddenPaths, childPath, 'field name is not public-safe');
+      scanPublicSafeValue(value[key], childPath, errors, forbiddenPaths, seen, options);
+    }
+  } finally {
+    seen.delete(value);
+  }
+}
+
+function scanPublicSafeString(value, path, errors, forbiddenPaths, options) {
+  if (SECRET_VALUE_RE.test(value)) addPublicSafeError(errors, forbiddenPaths, path, 'secret-shaped string is not public-safe');
+  if (LOCAL_PATH_RE.test(value)) addPublicSafeError(errors, forbiddenPaths, path, 'local absolute path is not public-safe');
+  if (FORBIDDEN_PUBLIC_CLAIM_RE.test(value)) addPublicSafeError(errors, forbiddenPaths, path, 'forbidden public claim is not allowed');
+  if (options.strictStrings === true && !isPublicSafeString(value)) {
+    addPublicSafeError(errors, forbiddenPaths, path, 'string is outside public artifact grammar');
+  }
+}
+
+function isForbiddenPublicKey(key) {
+  const normalized = key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+  if (PUBLIC_FORBIDDEN_KEYS.has(normalized)) return true;
+  return /(?:^|_)(?:plaintext|prompt|response|transcript|embedding|embeddings|vector|vectors|private_key|token|secret|password|api_key|credential|credentials|cookie|authorization)$/.test(normalized);
+}
+
+function looksLikeEmbeddingVector(value) {
+  if (value.length < 32) return false;
+  let numeric = 0;
+  for (const item of value) {
+    if (typeof item === 'number' && Number.isFinite(item)) numeric += 1;
+    else return false;
+  }
+  return numeric === value.length;
+}
+
+function isPublicSafeString(value) {
+  if (value.length === 0) return true;
+  if (ROOT_RE.test(value) || HASH_RE.test(value) || NULLIFIER_RE.test(value)) return true;
+  if (/^[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)*\.v\d+$/u.test(value)) return true;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u.test(value)) return true;
+  if (/^(?:ok|valid|invalid|active|quarantine|quarantined|tombstone|tombstoned|revoked|granted|omitted|selected|provided|missing|blocked|pass|fail|unknown)$/u.test(value)) return true;
+  return /^[a-z][a-z0-9+.-]*:[A-Za-z0-9._~:@/+?#[\]!$&'()*%,;=-]{1,256}$/u.test(value);
+}
+
+function addPublicSafeError(errors, forbiddenPaths, path, message) {
+  errors.push(`${path}: ${message}`);
+  forbiddenPaths.push(path);
 }
 
 function isPlainRecord(value) {

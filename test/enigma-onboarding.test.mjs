@@ -385,7 +385,7 @@ test('doctor reports first-run diagnostics without echoing local paths', async (
   process.env.npm_config_user_agent = 'npm/10.9.0 node/v24.0.0 win32 x64 workspaces/false';
   try {
     const io = makeIo();
-    assert.equal(await main(['doctor', '--bundle', bundlePath, '--client', 'generic-mcp', '--config', configPath], io.io), 0, io.stderr());
+    assert.equal(await main(['doctor', '--bundle', bundlePath, '--client', 'generic-mcp', '--config', configPath], io.io), 1);
     const stdout = io.stdout();
     const summary = io.json();
 
@@ -396,10 +396,27 @@ test('doctor reports first-run diagnostics without echoing local paths', async (
     assert.equal(summary.vault_path.path, '<bundle-path>');
     assert.equal(summary.vault_path.parent, '<bundle-dir>');
     assert.equal(summary.vault_path.writable, true);
+    assert.equal(summary.ok, false);
+    assert.deepEqual(summary.bundle_initialized, {
+      ok: false,
+      bundle: '<bundle-path>',
+      target_exists: false,
+      schema: null,
+      reason: 'bundle_missing',
+      hint: 'Run quickstart or setup before using doctor as the final green check.',
+    });
     assert.equal(summary.bundle_default_path.resolved, '<bundle-path>');
     assert.deepEqual(summary.connectors.clients.map((client) => client.config_path), ['[redacted:config_path]']);
     assert.ok(summary.next_commands.some((command) => command.startsWith('enigma setup ')));
     assert.ok(summary.next_commands.some((command) => command.startsWith('enigma connect generic-mcp ')));
+    assert.equal(summary.first_run_hint.bundle, '<bundle-path>');
+    assert.deepEqual(summary.first_run_hint.commands, [
+      'enigma quickstart --bundle "<bundle-path>" --overwrite',
+      'enigma setup --bundle "<bundle-path>" --overwrite',
+      'enigma doctor --bundle "<bundle-path>" --client generic-mcp',
+    ]);
+    assert.deepEqual(summary.fresh_install_hint, summary.first_run_hint);
+    assert.equal(summary.next_commands[0], 'enigma quickstart --bundle "<bundle-path>" --overwrite');
   } finally {
     if (previousUserAgent === undefined) {
       delete process.env.npm_config_user_agent;
@@ -407,4 +424,69 @@ test('doctor reports first-run diagnostics without echoing local paths', async (
       process.env.npm_config_user_agent = previousUserAgent;
     }
   }
+});
+
+test('doctor is green after bundle initialization when connector config is absent', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-doctor-initialized-'));
+  const bundlePath = join(dir, 'bundle.json');
+  const configPath = join(dir, 'missing-client-config.json');
+
+  const setupIo = makeIo();
+  assert.equal(await main(['setup', '--bundle', bundlePath, '--out-dir', dir, '--overwrite'], setupIo.io), 0, setupIo.stderr());
+
+  const io = makeIo();
+  assert.equal(await main(['doctor', '--bundle', bundlePath, '--client', 'generic-mcp', '--config', configPath], io.io), 0, io.stderr());
+  const stdout = io.stdout();
+  const summary = io.json();
+
+  assert.equal(stdout.includes(dir), false);
+  assert.equal(summary.ok, true);
+  assert.deepEqual(summary.bundle_initialized, {
+    ok: true,
+    bundle: '<bundle-path>',
+    target_exists: true,
+    schema: 'enigma.vault_bundle.v1',
+    reason: null,
+    hint: null,
+  });
+  assert.deepEqual(summary.connectors.clients.map((client) => client.config_path), ['[redacted:config_path]']);
+});
+
+test('doctor explains connector bundle mismatch as first-run state without local paths', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-doctor-first-run-'));
+  const bundlePath = join(dir, 'bundle.json');
+  const configPath = join(dir, 'generic-mcp.json');
+  const staleBundlePath = join(dir, 'not-initialized', 'bundle.json');
+  await writeFile(configPath, `${JSON.stringify({
+    mcpServers: {
+      enigma: {
+        command: 'enigma-mcp',
+        args: [],
+        env: {
+          ENIGMA_BUNDLE: staleBundlePath,
+        },
+      },
+    },
+  }, null, 2)}\n`, 'utf8');
+
+  const io = makeIo();
+  assert.equal(await main(['doctor', '--bundle', bundlePath, '--client', 'generic-mcp', '--config', configPath], io.io), 1);
+  const stdout = io.stdout();
+  const summary = io.json();
+
+  assert.equal(stdout.includes(dir), false);
+  assert.equal(stdout.includes(staleBundlePath), false);
+  assert.equal(summary.ok, false);
+  assert.equal(summary.vault_path.path, '<bundle-path>');
+  assert.equal(summary.bundle_initialized.ok, false);
+  assert.equal(summary.bundle_initialized.reason, 'bundle_missing');
+  assert.deepEqual(summary.connectors.clients.map((client) => client.config_path), ['[redacted:config_path]']);
+  assert.deepEqual(summary.connectors.clients[0].repair_reasons, ['bundle_env_mismatch']);
+  assert.equal(summary.first_run_hint.bundle, '<bundle-path>');
+  assert.deepEqual(summary.first_run_hint.commands, [
+    'enigma quickstart --bundle "<bundle-path>" --overwrite',
+    'enigma setup --bundle "<bundle-path>" --overwrite',
+    'enigma doctor --bundle "<bundle-path>" --client generic-mcp',
+  ]);
+  assert.equal(JSON.stringify(summary.first_run_hint).includes(dir), false);
 });

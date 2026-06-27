@@ -6,6 +6,8 @@ const REPORT_SCHEMA = 'enigma.import_report.v1';
 const CAPSULE_SCHEMA = 'enigma.import_capsule.v1';
 const CAPSULE_PAYLOAD_SCHEMA = 'enigma.import_capsule_payload.v1';
 const VERIFIER_METADATA_SCHEMA = 'enigma.import_capsule_verifier_metadata.v1';
+const IMMUNE_INGRESS_SCHEMA = 'enigma.immune_scan_report.v1';
+const IMMUNE_INGRESS_DEFAULT_SOURCE = 'importer_candidate_ingress';
 const DEFAULT_NOW = '1970-01-01T00:00:00.000Z';
 const DEFAULT_EXPIRY = '2100-01-01T00:00:00.000Z';
 const CONFIDENCE_ORDER = new Map([
@@ -282,6 +284,257 @@ function normalizeMetadata(value, extra = {}) {
   if (!isRecord(value)) return metadata;
   for (const [key, item] of Object.entries(value)) assignMetadataValue(metadata, key, item);
   return metadata;
+}
+
+const IMMUNE_DETECTOR_IDS = Object.freeze({
+  rawPublicField: 'enigma.detector.forbidden_field.raw_public_payload.v1',
+  secretField: 'enigma.detector.forbidden_field.secret_or_credential.v1',
+  providerResponseField: 'enigma.detector.forbidden_field.provider_response.v1',
+  embeddingField: 'enigma.detector.forbidden_field.embedding.v1',
+  secretValue: 'enigma.detector.secret_value.v1',
+  localPathValue: 'enigma.detector.local_path_value.v1',
+  forbiddenClaimValue: 'enigma.detector.forbidden_claim_value.v1',
+  rawStringCandidate: 'enigma.detector.raw_string_candidate.v1',
+  cyclicCandidate: 'enigma.detector.cyclic_candidate.v1'
+});
+
+const RAW_PUBLIC_FIELD_KEYS = new Set([
+  'body',
+  'completion',
+  'completions',
+  'content',
+  'conversation',
+  'conversations',
+  'memory',
+  'memories',
+  'message',
+  'messages',
+  'plaintext',
+  'plainmemory',
+  'prompt',
+  'prompts',
+  'rawmemory',
+  'response',
+  'responses',
+  'summary',
+  'text',
+  'transcript',
+  'transcripts',
+  'value'
+]);
+
+const SECRET_FIELD_KEYS = new Set([
+  'accesstoken',
+  'apikey',
+  'apisecret',
+  'bearer',
+  'clientsecret',
+  'credential',
+  'credentials',
+  'password',
+  'privatekey',
+  'refreshtoken',
+  'secret',
+  'seedphrase',
+  'token'
+]);
+
+const PROVIDER_RESPONSE_FIELD_KEYS = new Set([
+  'providerresponse',
+  'providerresponses',
+  'providerresponsebody',
+  'responsebody'
+]);
+
+const EMBEDDING_FIELD_KEYS = new Set([
+  'embedding',
+  'embeddings',
+  'embeddingvector',
+  'embeddingvectors',
+  'vector',
+  'vectors'
+]);
+
+const PUBLIC_COMMITMENT_FIELD_RE = /(?:hash|root|ref|refs|id|ids|count|counts|schema|status|decision|policy|capability|signature|signer|nullifier|timestamp|generatedat|issuedat|expiresat)$/u;
+const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{16,}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}|(?:seed phrase|mnemonic phrase|api key secret|access token|refresh token|private key))/iu;
+const RAW_PUBLIC_VALUE_RE = /(?:raw memory|private prompt|plaintext prompt|plain text prompt|full transcript|decrypted memory|decrypted capsule|provider response|embedding vector|launch-code phrase)/iu;
+const LOCAL_PATH_VALUE_RE = /(?:^|[\s"'`(])(?:[A-Za-z]:[\\/][^\s"'`<>]+|\\\\[^\\/]+[\\/][^\s"'`<>]+|\/(?:Users|home)\/[^\s"'`<>]+)/u;
+const FORBIDDEN_CLAIM_VALUE_RE = /(?:provider(?:-native|-side|\s+native|\s+side)?\s+(?:deletion|erasure|memory control|forgetting)|model\s+(?:forgetting|forgot|erasure)|makes?\s+models?\s+forget|deleted\s+from\s+every\s+provider|compliance\s+certification|certified\s+compliant|hosted\s+saas\s+ready|byoc\s+ready|benchmark\s+(?:superiority|leader)|raw\s+embeddings?\s+(?:safe|public)|hardware\s+tamper[-\s]?proof|patent(?:able|ability)|legal\s+conclusion)/iu;
+const RAW_PUBLIC_FIELD_RE = /(?:(?:raw|plain|plaintext|cleartext|decrypted).*(?:memory|prompt|text|content|message|transcript|conversation|response|body)|(?:memory|prompt|text|content|message|transcript|conversation|response|body).*(?:raw|plain|plaintext|cleartext|decrypted)|(?:prompt|message|transcript|conversation|memory|content|text)(?:body|value))$/u;
+const SECRET_FIELD_RE = /(?:apikey|apisecret|accesstoken|refreshtoken|tokenvalue|credential|password|privatekey|clientsecret|secretkey|seedphrase|mnemonic|bearertoken)/u;
+const PROVIDER_RESPONSE_FIELD_RE = /(?:provider.*responses?|responses?.*body)$/u;
+const EMBEDDING_FIELD_RE = /(?:embedding|embeddings|embeddingvector|embeddingvectors|vector|vectors)$/u;
+
+function normalizePublicToken(value, fallback) {
+  const token = String(value ?? '').toLowerCase().replace(/[^a-z0-9_.:-]+/gu, '_').replace(/^_+|_+$/gu, '');
+  return token.length > 0 && token.length <= 96 ? token : fallback;
+}
+
+function hasMeaningfulForbiddenValue(value) {
+  if (value === undefined || value === null || value === false) return false;
+  if (typeof value === 'string') return value.length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  if (isRecord(value)) return Object.keys(value).length > 0;
+  return true;
+}
+
+function detectorIdsForField(key, value) {
+  if (!hasMeaningfulForbiddenValue(value)) return [];
+  const normalized = normalizedMetadataKey(key);
+  if (PUBLIC_COMMITMENT_FIELD_RE.test(normalized)) return [];
+  const detectors = [];
+  if (PROVIDER_RESPONSE_FIELD_KEYS.has(normalized) || PROVIDER_RESPONSE_FIELD_RE.test(normalized)) detectors.push(IMMUNE_DETECTOR_IDS.providerResponseField);
+  if (EMBEDDING_FIELD_KEYS.has(normalized) || EMBEDDING_FIELD_RE.test(normalized)) detectors.push(IMMUNE_DETECTOR_IDS.embeddingField);
+  if (SECRET_FIELD_KEYS.has(normalized) || SECRET_FIELD_RE.test(normalized)) detectors.push(IMMUNE_DETECTOR_IDS.secretField);
+  if (RAW_PUBLIC_FIELD_KEYS.has(normalized) || RAW_PUBLIC_FIELD_RE.test(normalized)) detectors.push(IMMUNE_DETECTOR_IDS.rawPublicField);
+  return detectors;
+}
+
+function detectorIdsForString(value) {
+  const detectors = [];
+  if (SECRET_VALUE_RE.test(value)) detectors.push(IMMUNE_DETECTOR_IDS.secretValue);
+  if (RAW_PUBLIC_VALUE_RE.test(value)) detectors.push(IMMUNE_DETECTOR_IDS.rawPublicField);
+  if (LOCAL_PATH_VALUE_RE.test(value)) detectors.push(IMMUNE_DETECTOR_IDS.localPathValue);
+  if (FORBIDDEN_CLAIM_VALUE_RE.test(value)) detectors.push(IMMUNE_DETECTOR_IDS.forbiddenClaimValue);
+  return detectors;
+}
+
+function addAntigen(antigens, detector_id, candidate_ref, path_ref) {
+  antigens.push({
+    detector_id,
+    antigen_ref: `antigen_${shortHash({ detector_id, candidate_ref, path_ref })}`
+  });
+}
+
+function candidateOpaqueRef(candidate, index) {
+  try {
+    return `candidate_${shortHash({ index, root: rootOf(candidate) })}`;
+  } catch {
+    return `candidate_${shortHash({ index, uncanonicalizable: true, type: Object.prototype.toString.call(candidate) })}`;
+  }
+}
+
+function scanImmuneIngressValue(value, candidate_ref, antigens, path_ref, seen) {
+  if (typeof value === 'string') {
+    for (const detector of detectorIdsForString(value)) addAntigen(antigens, detector, candidate_ref, path_ref);
+    return;
+  }
+  if (value === null || typeof value !== 'object') return;
+  if (seen.has(value)) {
+    addAntigen(antigens, IMMUNE_DETECTOR_IDS.cyclicCandidate, candidate_ref, path_ref);
+    return;
+  }
+  seen.add(value);
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => scanImmuneIngressValue(item, candidate_ref, antigens, `${path_ref}.${index}`, seen));
+    seen.delete(value);
+    return;
+  }
+  for (const [key, child] of Object.entries(value)) {
+    const childPathRef = `${path_ref}.${shortHash(key)}`;
+    for (const detector of detectorIdsForField(key, child)) addAntigen(antigens, detector, candidate_ref, childPathRef);
+    scanImmuneIngressValue(child, candidate_ref, antigens, childPathRef, seen);
+  }
+  seen.delete(value);
+}
+
+function immuneIngressCandidates(input, options = {}) {
+  const candidatesKey = options.candidates_key ?? options.candidatesKey;
+  if (candidatesKey !== undefined && isRecord(input) && Array.isArray(input[candidatesKey])) return input[candidatesKey];
+  if (Array.isArray(input)) return input;
+  if (!isRecord(input)) return input === undefined || input === null ? [] : [input];
+  for (const key of ['memory_candidates', 'memoryCandidates', 'candidates', 'candidate_objects', 'candidateObjects', 'items']) {
+    if (Array.isArray(input[key])) return input[key];
+  }
+  if (Object.prototype.hasOwnProperty.call(input, 'candidate')) return [input.candidate];
+  return [input];
+}
+
+function immuneIngressReportFromCandidates(candidates, options = {}) {
+  const source_type = normalizePublicToken(options.source_type ?? options.sourceType, IMMUNE_INGRESS_DEFAULT_SOURCE);
+  const generated_at = nowFrom(options);
+  const allAntigenRefs = [];
+  const candidateReports = candidates.map((candidate, index) => {
+    const candidate_ref = candidateOpaqueRef(candidate, index);
+    const antigens = [];
+    if (typeof candidate === 'string') addAntigen(antigens, IMMUNE_DETECTOR_IDS.rawStringCandidate, candidate_ref, 'candidate');
+    scanImmuneIngressValue(candidate, candidate_ref, antigens, 'candidate', new WeakSet());
+    const detector_ids = uniqueStrings(antigens.map((antigen) => antigen.detector_id));
+    const antigenRefs = antigens.map((antigen) => antigen.antigen_ref);
+    allAntigenRefs.push(...antigenRefs);
+    return {
+      candidate_ref,
+      quarantine_decision: antigens.length > 0 ? 'quarantine' : 'accept',
+      antigen_count: antigens.length,
+      detector_ids,
+      antigen_refs: antigenRefs,
+      antigen_root: new MerkleSet(antigenRefs).root()
+    };
+  });
+  const quarantined = candidateReports.filter((candidate) => candidate.quarantine_decision === 'quarantine');
+  const accepted = candidateReports.filter((candidate) => candidate.quarantine_decision === 'accept');
+  const detector_ids = uniqueStrings(candidateReports.flatMap((candidate) => candidate.detector_ids));
+  const antigenRefs = allAntigenRefs;
+  const candidateRefs = candidateReports.map((candidate) => candidate.candidate_ref);
+  const quarantineRefs = quarantined.map((candidate) => candidate.candidate_ref);
+  const roots = {
+    candidate_root: new MerkleSet(candidateRefs).root(),
+    accepted_root: new MerkleSet(accepted.map((candidate) => candidate.candidate_ref)).root(),
+    quarantine_root: new MerkleSet(quarantineRefs).root(),
+    antigen_root: new MerkleSet(antigenRefs).root()
+  };
+  const findings = quarantined.map((candidate) => ({
+    finding_ref: `finding_${shortHash({ candidate_ref: candidate.candidate_ref, antigen_root: candidate.antigen_root })}`,
+    subject_ref: candidate.candidate_ref,
+    detector_ids: candidate.detector_ids,
+    antigen_count: candidate.antigen_count,
+    status: 'quarantined',
+    risk: 'high',
+    antigen_refs: candidate.antigen_refs,
+    antigen_root: candidate.antigen_root
+  }));
+  return {
+    schema: IMMUNE_INGRESS_SCHEMA,
+    report_id: `immune_scan_${shortHash({ source_type, generated_at, findings, roots })}`,
+    generated_at,
+    scan_root: new MerkleSet([...candidateRefs, ...antigenRefs]).root(),
+    antigen_envelope_refs: antigenRefs,
+    detector_ids,
+    findings,
+    counts: {
+      candidate_count: candidateReports.length,
+      accepted_candidate_count: accepted.length,
+      quarantined_candidate_count: quarantined.length,
+      antigen_count: candidateReports.reduce((sum, candidate) => sum + candidate.antigen_count, 0)
+    },
+    status: {
+      ok: quarantined.length === 0,
+      quarantine_decision: quarantined.length === 0 ? 'accept' : 'quarantine'
+    },
+    quarantine_refs: quarantineRefs,
+    roots,
+    public_payload_only: true,
+    private_payload_detected: antigenRefs.length > 0
+  };
+}
+
+export function createImmuneIngressReport(input = [], options = {}) {
+  return immuneIngressReportFromCandidates(immuneIngressCandidates(input, options), options);
+}
+
+export function quarantineImmuneIngressCandidates(input = [], options = {}) {
+  return createImmuneIngressReport(input, options);
+}
+
+export function assertImmuneIngressPublicSafe(input = [], options = {}) {
+  const report = quarantineImmuneIngressCandidates(input, options);
+  if (!report.status.ok) {
+    const error = new Error(`Immune ingress quarantine required: ${report.counts.antigen_count} antigen(s) detected.`);
+    error.name = 'ImmuneIngressQuarantineError';
+    error.report = report;
+    throw error;
+  }
+  return report;
 }
 
 function makeCandidate({ importer, sourceType, content, source_refs, limitations, confidence, kind, metadata }) {
@@ -1077,6 +1330,9 @@ export default {
   importLettaAgentFile,
   importLangGraphStore,
   importZepGraphitiExport,
+  createImmuneIngressReport,
+  quarantineImmuneIngressCandidates,
+  assertImmuneIngressPublicSafe,
   exportEnigmaCapsule,
   importEnigmaCapsule,
   runImporterDemo

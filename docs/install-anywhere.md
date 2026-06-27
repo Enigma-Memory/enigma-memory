@@ -29,6 +29,10 @@ enigma verify --export ./.enigma/export.json
 
 `enigma init` is the credential-free first run that creates the local `.enigma` workspace, bundle, and proof artifacts. `enigma setup --client auto --connect-installed --overwrite` then configures the drive and writes the `mcpServers.enigma` entry into every installed/config-present client it detects; it skips clients that are not installed and never creates configs from scratch. Preview with `--dry-run` first to see which clients will be written. Both commands emit deterministic, public-safe JSON without printing raw memory plaintext, and both run on Windows PowerShell via the `enigma.cmd` shim the npm global install adds.
 
+Run setup or quickstart before treating `enigma doctor` as a fully green install check. Doctor checks Node/package state, local paths, schemas, MCP command naming, and connector configs. On a fresh install it can return `ok:false` when an existing MCP client config points at a bundle that has not been initialized yet, or at a different bundle than the one you are checking. That is expected first-run state, not a package install failure. The shortest repair path is `enigma quickstart --bundle ./.enigma/bundle.json --overwrite` or `enigma setup --bundle ./.enigma/bundle.json --overwrite`, then `enigma doctor --bundle ./.enigma/bundle.json`.
+
+For the one-off npm path, run `npx --yes --package enigma-memory enigma quickstart --bundle ./.enigma/bundle.json --overwrite` before `npx --yes --package enigma-memory enigma doctor --bundle ./.enigma/bundle.json`. Running the npx doctor first can report a red generic-MCP connector if an existing client config names a not-yet-created bundle.
+
 `enigma drive health` reports a SMART-style memory-drive health packet — freshness, duplicate rate, tombstone backlog, stale derived artifacts, receipt coverage, and connector health — from local metadata only, with no network calls or private payloads. It is part of the Memory Drive surface in this release; `enigma status` and `enigma doctor` cover local passport counts, roots, and connector readiness in every build.
 
 The local Enigma vault is the canonical memory passport. Provider-native memory is non-canonical cache only. Enigma proof covers Enigma-controlled vault state, receipts, checkpoints, committed roots, and exported bundle shape; it does not prove provider deletion, model forgetting, provider-native memory removal, hosted/BYOC availability, legal approval, ROI/savings, or compliance certification.
@@ -60,7 +64,7 @@ To perform the local global install from the checkout and initialize a local vau
 
 ```sh
 npm run install:local -- --execute --init-vault --bundle ./.enigma/bundle.json
-enigma doctor
+enigma doctor --bundle ./.enigma/bundle.json
 enigma --help
 enigma demo cross-model
 enigma-verify --help
@@ -73,7 +77,7 @@ Equivalent explicit source-checkout steps:
 ```sh
 npm install -g .
 enigma init --bundle ./.enigma/bundle.json --subject local-user --display-name "Local user"
-enigma doctor
+enigma doctor --bundle ./.enigma/bundle.json
 enigma --help
 enigma demo cross-model
 enigma-verify --help
@@ -517,7 +521,7 @@ printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion
 Connector/importer/relay/gateway checks:
 
 ```sh
-enigma doctor
+enigma doctor --bundle ./.enigma/bundle.json
 enigma import chatgpt --file ./chatgpt-export.json --out ./enigma-import-report.json
 enigma capsule export --file ./enigma-import-report.json --out ./enigma-capsule.json
 enigma capsule import --file ./enigma-capsule.json --bundle "$PWD/.enigma/bundle.json"

@@ -4,6 +4,8 @@ This is the mandatory claims guide for Enigma Proof Network launch copy, docs, s
 
 Use the exact boundary: Enigma Proof Network creates and verifies public-safe proof artifacts for AI memory operations. Public artifacts may contain hashes, Merkle roots, opaque refs, counts, timestamps, schemas, signatures, signer refs, nullifiers, capability scopes, package refs, dataset refs, runner refs, and explicit non-submission flags. They must not contain raw memory, prompts, transcripts, completions, embeddings, ACL bodies, tenant names, private keys, API keys, seed phrases, provider responses, or other private payloads.
 
+The implementation goal and ledger contract that operationalize this boundary are `docs/MEMORY_BOUNDARY_TRANSACTION_GOAL.md` and `specs/claim-ledger-v1.schema.json`.
+
 ## Mandatory proof boundary
 
 Every public Proof Network claim must satisfy all of these rules:

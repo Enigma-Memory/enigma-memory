@@ -40,7 +40,11 @@ enigma context --bundle "%USERPROFILE%\.enigma\bundle.json" --query "Q3 planning
 enigma verify --export "%USERPROFILE%\.enigma\export.json"
 ```
 
-`enigma setup` is the credential-free first run: it creates the local `.enigma` workspace, bundle, proof artifacts, and a demo memory, then connects every installed/config-present client it detects (Claude Desktop, Cursor, Kimi Code, VS Code/Cline, Roo, OpenCode, generic MCP). It skips clients that are not installed and never creates configs from scratch; preview with `--dry-run` first if you want to see which clients will be written. If no clients are installed, setup still succeeds and the local CLI path works; use the copy-paste MCP snippets below to connect a client later, or run `enigma connect generic-mcp --dry-run` to preview a standalone snippet. The same commands run on Windows PowerShell via the `enigma.cmd` shim the npm global install adds. Neither command prints raw memory plaintext.
+`enigma setup` is the credential-free first run: it creates the local `.enigma` workspace, bundle, proof artifacts, and a demo memory, then connects every installed/config-present client it detects (Claude Desktop, Cursor, Kimi Code, VS Code/Cline, Roo, OpenCode, generic MCP). `enigma start` is the shortest no-friction local demo path and aliases the safe quickstart flow. Setup skips clients that are not installed and never creates configs from scratch; preview with `--dry-run` first if you want to see which clients will be written.
+
+Run setup or quickstart before treating `enigma doctor` as a fully green install check. Doctor checks both the local package/runtime environment and existing connector configs; on a fresh install it can be red when an MCP client config already names an Enigma bundle that has not been initialized yet, or when clients still point somewhere else. That is expected first-run state, not evidence that the npm package failed to install. The no-friction path is `enigma quickstart --bundle ./.enigma/bundle.json --overwrite` or `enigma setup --bundle ./.enigma/bundle.json --overwrite`, then `enigma doctor --bundle ./.enigma/bundle.json`. If no clients are installed, setup still succeeds and the local CLI path works; use the copy-paste MCP snippets below to connect a client later, or run `enigma connect generic-mcp --dry-run` to preview a standalone snippet. The same commands run on Windows PowerShell via the `enigma.cmd` shim the npm global install adds. Neither command prints raw memory plaintext.
+
+For the no-global-install path, run `npx --yes --package enigma-memory enigma quickstart --bundle ./.enigma/bundle.json --overwrite` before `npx --yes --package enigma-memory enigma doctor --bundle ./.enigma/bundle.json`; running npx doctor first can surface the same expected red generic-MCP missing-bundle state.
 
 ## Enigma Proof Network
 
@@ -59,7 +63,7 @@ Use a source checkout only when you need source-only docs, Docker assets, browse
 git clone https://github.com/Enigma-Memory/enigma-memory.git
 cd enigma-memory
 npm run install:local -- --execute --init-vault --bundle ./.enigma/bundle.json
-enigma doctor
+enigma doctor --bundle ./.enigma/bundle.json
 enigma-relay demo
 enigma-gateway demo
 ```

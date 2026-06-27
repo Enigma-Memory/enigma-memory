@@ -1,12 +1,14 @@
 import { access, copyFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, posix, win32 } from 'node:path';
 import { homedir } from 'node:os';
+import { canonicalize, MerkleSet, sha256Hex } from '../../core/src/index.js';
 
 const PROFILE_SCHEMA = 'enigma.connector_profile.v1';
 const DEFAULT_SERVER_NAME = 'enigma';
 const MCP_COMMAND = 'enigma-mcp';
 const MCP_CONTAINER_PATH = Object.freeze(['mcpServers']);
 const SUPPORTED_PLATFORMS = Object.freeze(['win32', 'darwin', 'linux']);
+const TRUST_CARD_SCHEMA = 'enigma.trust_card.v1';
 
 const CLIENT_DEFINITIONS = Object.freeze({
   'claude-desktop': Object.freeze({
@@ -724,6 +726,110 @@ export async function detectConnectors(clientIdOrOptions = {}, maybeOptions = {}
 
 export async function doctorConnectors(clientIdOrOptions = {}, maybeOptions = {}) {
   return detectConnectors(clientIdOrOptions, maybeOptions);
+}
+
+function sha256Root(value) {
+  return `sha256:${sha256Hex(typeof value === 'string' ? value : canonicalize(value))}`;
+}
+
+function publicTrustRef(kind, value) {
+  return `ref:${kind}:${sha256Hex(typeof value === 'string' ? value : canonicalize(value)).slice(0, 32)}`;
+}
+
+function uniqueSortedStrings(values) {
+  return [...new Set(values.map(String).filter((value) => value.length > 0))].sort();
+}
+
+function connectorTrustBoundary() {
+  return {
+    public_payload_only: true,
+    raw_memory_included: false,
+    raw_prompt_included: false,
+    raw_transcript_included: false,
+    raw_embedding_included: false,
+    private_key_included: false,
+    credential_included: false,
+    local_path_included: false,
+    provider_deletion_claim: false,
+    model_forgetting_claim: false,
+    hosted_saas_ready_claim: false,
+  };
+}
+
+function connectorTrustEvidenceRefs(clientId, profile) {
+  return uniqueSortedStrings([
+    publicTrustRef('connector_profile', {
+      schema: PROFILE_SCHEMA,
+      client_id: clientId,
+      display_name: profile.display_name,
+      command: profile.command,
+      server_name: profile.server_name,
+      server_container_path: profile.server_container_path,
+    }),
+    publicTrustRef('mcp_command', {
+      command: profile.command,
+      server_name: profile.server_name,
+    }),
+  ]);
+}
+
+export function createConnectorTrustCard(clientIdOrOptions = 'generic-mcp', maybeOptions = {}) {
+  const options = normalizeOptions(clientIdOrOptions, maybeOptions);
+  const clientId = normalizeClientId(options.clientId ?? options.client_id ?? 'generic-mcp');
+  const profile = getClientProfile(clientId, options);
+  const generatedAt = String(options.generated_at ?? options.generatedAt ?? options.now ?? new Date().toISOString());
+  const evidenceRefs = connectorTrustEvidenceRefs(clientId, profile);
+  const claims = [
+    {
+      claim_id: 'claim:connector.local_mcp_profile',
+      claim_type: PROFILE_SCHEMA,
+      status: 'supported',
+      evidence_refs: [evidenceRefs[0]],
+    },
+    {
+      claim_id: 'claim:connector.public_payload_only',
+      claim_type: 'enigma.trust_boundary.v1',
+      status: 'supported',
+      evidence_refs: [evidenceRefs[1]],
+    },
+  ];
+  const claimIds = claims.map((claim) => claim.claim_id);
+  return {
+    schema: TRUST_CARD_SCHEMA,
+    trust_card_id: `trustcard:connector:${clientId}`,
+    generated_at: generatedAt,
+    subject: {
+      subject_type: 'connector',
+      subject_id: `connector:${clientId}`,
+      subject_ref: `ref:connector:${clientId}`,
+      subject_hash: sha256Root({
+        schema: 'enigma.connector_trust_subject.v1',
+        client_id: clientId,
+        command: profile.command,
+        server_name: profile.server_name,
+      }),
+    },
+    posture: options.posture ?? 'reviewed',
+    claim_ids: claimIds,
+    claims,
+    evidence_refs: evidenceRefs,
+    roots: {
+      claim_root: new MerkleSet(claimIds).root(),
+      evidence_root: new MerkleSet(evidenceRefs).root(),
+      receipt_chain_root: options.receipt_chain_root ?? options.receiptChainRoot ?? sha256Root({
+        schema: 'enigma.connector_trust_card.empty_receipt_chain.v1',
+        client_id: clientId,
+      }),
+    },
+    boundary: connectorTrustBoundary(),
+  };
+}
+
+export function createConnectorTrustCards(options = {}) {
+  const selected = options.clientId ?? options.client_id
+    ? [normalizeClientId(options.clientId ?? options.client_id)]
+    : supportedClients;
+  return selected.map((clientId) => createConnectorTrustCard({ ...options, clientId }));
 }
 
 export function runConnectorDemo(input = {}) {
