@@ -113,6 +113,7 @@ describe("session-wallet delegation", () => {
         owner: owner.publicKey,
         session: sessionPda,
         ownerNonce: ownerNoncePda,
+        capabilityRegistryProgram: capabilityRegistry.programId,
         memory: memoryPda,
         systemProgram: SystemProgram.programId,
       })
@@ -135,6 +136,7 @@ describe("session-wallet delegation", () => {
         owner: owner.publicKey,
         session: sessionPda,
         ownerNonce: ownerNoncePda,
+        capabilityRegistryProgram: capabilityRegistry.programId,
         memory: memoryPda,
       })
       .signers([sessionKey])
@@ -152,6 +154,7 @@ describe("session-wallet delegation", () => {
         owner: owner.publicKey,
         session: sessionPda,
         ownerNonce: ownerNoncePda,
+        capabilityRegistryProgram: capabilityRegistry.programId,
         memory: memoryPda,
       })
       .signers([sessionKey])
@@ -218,6 +221,7 @@ describe("session-wallet delegation", () => {
           owner: owner.publicKey,
           session: restrictedSession,
           ownerNonce: ownerNoncePda,
+          capabilityRegistryProgram: capabilityRegistry.programId,
           memory: badMemory,
           systemProgram: SystemProgram.programId,
         })
@@ -247,6 +251,7 @@ describe("session-wallet delegation", () => {
         owner: owner.publicKey,
         session: sessionPda,
         ownerNonce: ownerNoncePda,
+        capabilityRegistryProgram: capabilityRegistry.programId,
         budget: budgetPda,
       })
       .signers([sessionKey])
@@ -261,13 +266,14 @@ describe("session-wallet delegation", () => {
     try {
       await budgetEscrow.methods
         .spendWithSession(new BN(10_000_000), new BN(0))
-        .accounts({
-          sessionKey: sessionKey.publicKey,
-          owner: owner.publicKey,
-          session: sessionPda,
-          ownerNonce: ownerNoncePda,
-          budget: budgetPda,
-        })
+      .accounts({
+        sessionKey: sessionKey.publicKey,
+        owner: owner.publicKey,
+        session: sessionPda,
+        ownerNonce: ownerNoncePda,
+        capabilityRegistryProgram: capabilityRegistry.programId,
+        budget: budgetPda,
+      })
         .signers([sessionKey])
         .rpc();
       assert.fail("expected per-tx cap error");
@@ -316,6 +322,7 @@ describe("session-wallet delegation", () => {
         owner: owner.publicKey,
         session: sessionPda,
         ownerNonce: ownerNoncePda,
+        capabilityRegistryProgram: capabilityRegistry.programId,
         mint,
         tokenBudget: tokenBudgetPda,
         from: sessionKeyAta,
@@ -356,6 +363,7 @@ describe("session-wallet delegation", () => {
         payee: payee.publicKey,
         session: sessionPda,
         ownerNonce: ownerNoncePda,
+        capabilityRegistryProgram: capabilityRegistry.programId,
         receipt: receiptPda,
         budget: budgetPda,
         budgetEscrowProgram: budgetEscrow.programId,
@@ -388,6 +396,7 @@ describe("session-wallet delegation", () => {
           owner: owner.publicKey,
           session: sessionPda,
           ownerNonce: ownerNoncePda,
+          capabilityRegistryProgram: capabilityRegistry.programId,
           budget: budgetPda,
         })
         .signers([sessionKey])

@@ -59,6 +59,7 @@ pub mod royalty_router {
             owner: ctx.accounts.owner.to_account_info(),
             session: ctx.accounts.session.to_account_info(),
             owner_nonce: ctx.accounts.owner_nonce.to_account_info(),
+            capability_registry_program: ctx.accounts.capability_registry_program.to_account_info(),
             budget: ctx.accounts.budget.to_account_info(),
         };
         let cpi_ctx = CpiContext::new(
@@ -147,14 +148,17 @@ pub struct RouteRoyaltyWithSession<'info> {
         mut,
         seeds = [b"session", owner.key().as_ref(), session_key.key().as_ref(), nonce.to_le_bytes().as_ref()],
         bump = session.bump,
+        seeds::program = capability_registry_program.key(),
         constraint = session.nonce == nonce
     )]
     pub session: Account<'info, capability_registry::Session>,
     #[account(
         seeds = [b"owner_nonce", owner.key().as_ref()],
-        bump = owner_nonce.bump
+        bump = owner_nonce.bump,
+        seeds::program = capability_registry_program.key()
     )]
     pub owner_nonce: Account<'info, capability_registry::OwnerNonce>,
+    pub capability_registry_program: Program<'info, capability_registry::program::CapabilityRegistry>,
     #[account(
         init_if_needed,
         payer = session_key,

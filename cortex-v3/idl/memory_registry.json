@@ -222,6 +222,11 @@
           "signer": false
         },
         {
+          "name": "capabilityRegistryProgram",
+          "writable": false,
+          "signer": false
+        },
+        {
           "name": "memory",
           "writable": true,
           "signer": false
@@ -283,6 +288,11 @@
           "signer": false
         },
         {
+          "name": "capabilityRegistryProgram",
+          "writable": false,
+          "signer": false
+        },
+        {
           "name": "memory",
           "writable": true,
           "signer": false
@@ -334,6 +344,11 @@
         },
         {
           "name": "ownerNonce",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "capabilityRegistryProgram",
           "writable": false,
           "signer": false
         },
