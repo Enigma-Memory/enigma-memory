@@ -4,14 +4,24 @@ Consumer-first AI memory wallet on Solana.
 
 ## Status
 
-This is a production-in-progress scaffold. The research specs are committed in `docs/`. This directory contains the implementation.
+Production-in-progress scaffold. Research specs are committed in `docs/`.
+
+**Verified on 2026-06-26:**
+
+- `cargo check --workspace` passes locally and in GitHub Actions (warnings only).
+- GitHub Actions workflow installs Solana CLI, Anchor CLI, and configures a devnet wallet.
+- `npm test` in `node/` passes **13/13** tests.
+- `npm run build` and `npm run typecheck` in `webapp/` pass.
+- `npm run check` in `enigma/` passes.
 
 ## What's here
 
-- `programs/` — Anchor smart contract scaffold (needs Rust fixes and audit).
-- `node/` — Off-chain memory node (MCP server, ingestion, retrieval, encryption, immunology).
-- `webapp/` — Next.js consumer web app.
-- `specs/` — Architecture and design artifacts.
+- `programs/` — 5 Anchor programs with `cargo check` passing; `budget_escrow` now transfers SOL.
+- `node/` — Off-chain memory node (HTTP API, MCP server, AES-256-GCM, immunology, search).
+- `webapp/` — Next.js consumer web app with Solana wallet adapters, memory vault, PWA.
+- `specs/` — Architecture, design JSONs, security audit checklist.
+- `deploy/` — Deployment script scaffold and devnet wallet utilities.
+- `.github/workflows/cortex-v3-anchor.yml` — CI for Anchor/Solana on Ubuntu.
 
 ## Quick start
 
@@ -27,11 +37,18 @@ cd webapp
 npm install
 npm run build
 
-# Smart contracts (requires Linux/macOS with Anchor)
+# Smart contracts (cargo check works; full anchor build/test runs in GitHub Actions)
 cd ..
-anchor build
-anchor test
+cargo check --workspace
 ```
+
+## CI / Deployment
+
+The Anchor CLI environment is provided by GitHub Actions:
+
+- Workflow: `.github/workflows/cortex-v3-anchor.yml`
+- Solana devnet wallet secret: `SOLANA_DEVNET_WALLET`
+- Devnet wallet public key: `FasTsgodYjJwiiZ1eAxHmocVCvKcKNiXZYVJUZiZ3rh7`
 
 ## Blockers
 
