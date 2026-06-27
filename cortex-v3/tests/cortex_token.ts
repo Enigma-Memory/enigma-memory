@@ -41,6 +41,9 @@ describe("cortex_token", () => {
       null,
       9
     );
+    let mintInfo = await provider.connection.getAccountInfo(mint);
+    console.log("after createMint mint owner", mintInfo?.owner.toBase58(), "lamports", mintInfo?.lamports);
+
     treasury = getAssociatedTokenAddressSync(mint, treasuryAuthority, true);
     payerAta = getAssociatedTokenAddressSync(mint, payer.publicKey);
     userAta = getAssociatedTokenAddressSync(mint, user.publicKey);
@@ -64,6 +67,12 @@ describe("cortex_token", () => {
       mint,
       user.publicKey
     );
+
+    mintInfo = await provider.connection.getAccountInfo(mint);
+    console.log("after ATAs mint owner", mintInfo?.owner.toBase58(), "lamports", mintInfo?.lamports);
+    const treasuryInfo = await provider.connection.getAccountInfo(treasury);
+    console.log("after ATAs treasury owner", treasuryInfo?.owner.toBase58(), "lamports", treasuryInfo?.lamports);
+
     await program.methods
       .initializeMint()
       .accounts({
