@@ -1,0 +1,668 @@
+{
+  "version": "0.1.0",
+  "name": "cortex_token",
+  "instructions": [
+    {
+      "name": "initializeMint",
+      "discriminator": [
+        78,
+        156,
+        60,
+        228,
+        77,
+        109,
+        199,
+        213
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "mint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mintAuthority",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "treasury",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "treasuryAuthority",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "metadata",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenMetadataProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rent",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "mintToTreasury",
+      "discriminator": [
+        242,
+        98,
+        91,
+        107,
+        245,
+        85,
+        233,
+        173
+      ],
+      "accounts": [
+        {
+          "name": "mint",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "treasury",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mintAuthority",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "transfer",
+      "discriminator": [
+        163,
+        52,
+        200,
+        231,
+        140,
+        3,
+        69,
+        186
+      ],
+      "accounts": [
+        {
+          "name": "from",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "fromAta",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "toAta",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "to",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "stakeForVesal",
+      "discriminator": [
+        235,
+        85,
+        65,
+        16,
+        196,
+        199,
+        96,
+        180
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "stake",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "ownerAta",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "stakeVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "stakeVaultAuthority",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u64"
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "lockVesal",
+      "discriminator": [
+        92,
+        217,
+        70,
+        162,
+        43,
+        197,
+        251,
+        30
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "stake",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "vesal",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "durationSecs",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "createProposal",
+      "discriminator": [
+        188,
+        124,
+        130,
+        116,
+        106,
+        112,
+        186,
+        120
+      ],
+      "accounts": [
+        {
+          "name": "proposer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "proposal",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "vote",
+      "discriminator": [
+        227,
+        110,
+        155,
+        23,
+        136,
+        126,
+        172,
+        25
+      ],
+      "accounts": [
+        {
+          "name": "voter",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "stake",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "vesal",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "proposal",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "voteReceipt",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "side",
+          "type": "u8"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "StakeEntry",
+      "discriminator": [
+        35,
+        141,
+        6,
+        89,
+        43,
+        7,
+        196,
+        158
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "mint",
+            "type": "publicKey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "nonce",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VeSal",
+      "discriminator": [
+        252,
+        152,
+        14,
+        94,
+        196,
+        151,
+        255,
+        6
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "stake",
+            "type": "publicKey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "lockStart",
+            "type": "i64"
+          },
+          {
+            "name": "lockEnd",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Proposal",
+      "discriminator": [
+        6,
+        35,
+        22,
+        25,
+        30,
+        214,
+        20,
+        188
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "proposer",
+            "type": "publicKey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "yesVotes",
+            "type": "u64"
+          },
+          {
+            "name": "noVotes",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VoteReceipt",
+      "discriminator": [
+        113,
+        239,
+        71,
+        240,
+        208,
+        215,
+        113,
+        119
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "voter",
+            "type": "publicKey"
+          },
+          {
+            "name": "proposal",
+            "type": "publicKey"
+          },
+          {
+            "name": "weight",
+            "type": "u64"
+          },
+          {
+            "name": "side",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "StakeEntry",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "mint",
+            "type": "publicKey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "nonce",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VeSal",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "stake",
+            "type": "publicKey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "lockStart",
+            "type": "i64"
+          },
+          {
+            "name": "lockEnd",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Proposal",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "proposer",
+            "type": "publicKey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "yesVotes",
+            "type": "u64"
+          },
+          {
+            "name": "noVotes",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VoteReceipt",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "voter",
+            "type": "publicKey"
+          },
+          {
+            "name": "proposal",
+            "type": "publicKey"
+          },
+          {
+            "name": "weight",
+            "type": "u64"
+          },
+          {
+            "name": "side",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidVoteSide",
+      "msg": "Invalid vote side"
+    },
+    {
+      "code": 6001,
+      "name": "AlreadyVoted",
+      "msg": "Already voted"
+    },
+    {
+      "code": 6002,
+      "name": "LockupNotActive",
+      "msg": "Lockup not active"
+    },
+    {
+      "code": 6003,
+      "name": "Overflow",
+      "msg": "Arithmetic overflow"
+    }
+  ],
+  "metadata": {
+    "address": "EqV3aLfvqNycQzofXVLxsry8WMMfZX8WmomYNUBskZSb"
+  }
+}
