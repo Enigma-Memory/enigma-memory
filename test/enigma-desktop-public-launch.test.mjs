@@ -260,6 +260,11 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(wizard, /offlineReady = serviceRunning && health\.offline_ready === true/);
   assert.match(wizard, /dashboardNextAction\(\{ memoryDriveStatus, offlineReady, serviceRunning, updateAvailable \}\)/);
   assert.doesNotMatch(wizard.match(/case 'create-vault': \{[\s\S]*?return;\n    \}/)?.[0] || '', /call\('create_vault'\)/);
+  assert.match(wizard, /WIZARD_STORAGE_KEY/);
+  assert.match(wizard, /restoreWizardResumeState/);
+  assert.match(wizard, /persistWizardResumeState/);
+  assert.match(wizard, /safeWizardStep/);
+  assert.doesNotMatch(wizard.match(/function persistWizardResumeState\(\) \{[\s\S]*?\n\}/)?.[0] || '', /pendingText|local absolute|raw memory/i);
   assert.match(wizard, /No raw memory, local paths, provider responses, or outside-Enigma control claims/);
   assert.match(wizard, /Import Sandbox/);
   assert.match(wizard, /Paste plain text or Markdown/);

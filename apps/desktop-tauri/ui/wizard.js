@@ -33,6 +33,9 @@ const CLIENT_COPY = {
 const tauri = window.__TAURI__;
 const invoke = tauri?.core?.invoke;
 const isMock = typeof invoke !== 'function';
+const WIZARD_STORAGE_KEY = 'enigma.desktop.first_run_resume.v1';
+const MAX_WIZARD_STEP = 6;
+
 const PUBLIC_UNSAFE_TEXT_RE = /(?:prompt:|transcript:|provider[_\s-]*response|secret|token|password|private[_\s-]*key|[A-Za-z]:[\\/]|\/(?:Users|home|var|tmp|private|Volumes)\/|memory\.db|customer[_\s-]*(?:id|identifier)|account[_\s-]*id)/i;
 
 
@@ -68,6 +71,47 @@ function $(selector) {
 function setStatus(text) {
   const el = $('#status');
   if (el) el.textContent = text;
+}
+
+function safeWizardStep(value) {
+  const step = Number(value);
+  if (!Number.isInteger(step)) return 0;
+  return Math.min(MAX_WIZARD_STEP, Math.max(0, step));
+}
+
+function safeControllerUi(value = {}) {
+  const decision = ['ask', 'allow', 'deny'].includes(value.recallDecision) ? value.recallDecision : 'ask';
+  return {
+    grantsReviewed: value.grantsReviewed === true,
+    recallDecision: decision,
+    recallReviewOpen: value.recallReviewOpen === true,
+    privateBubbleOpen: value.privateBubbleOpen === true,
+    privateBubbleTouched: value.privateBubbleTouched === true,
+  };
+}
+
+function restoreWizardResumeState() {
+  try {
+    const raw = window.localStorage?.getItem(WIZARD_STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    currentStep = safeWizardStep(parsed.currentStep);
+    controllerUi = safeControllerUi(parsed.controllerUi);
+  } catch (_) {
+    currentStep = 0;
+    controllerUi = safeControllerUi();
+  }
+}
+
+function persistWizardResumeState() {
+  try {
+    window.localStorage?.setItem(WIZARD_STORAGE_KEY, JSON.stringify({
+      currentStep: safeWizardStep(currentStep),
+      controllerUi: safeControllerUi(controllerUi),
+    }));
+  } catch (_) {
+    // Resume state is best-effort and contains only public-safe UI state.
+  }
 }
 
 async function mockInvoke(cmd, args = {}) {
@@ -807,6 +851,7 @@ function render() {
   else if (currentStep === 6) html = renderDashboard();
   app.innerHTML = html;
   wireEvents();
+  persistWizardResumeState();
 }
 
 function wireEvents() {
@@ -1159,6 +1204,7 @@ async function handleAction(event) {
 }
 
 function init() {
+  restoreWizardResumeState();
   render();
 }
 
