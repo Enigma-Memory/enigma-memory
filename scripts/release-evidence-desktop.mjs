@@ -16,7 +16,7 @@ const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const ROOT = path.resolve(path.dirname(SCRIPT_PATH), '..');
 
 const SECRET_RE = /(?:bearer\s+[A-Za-z0-9._~+/=-]+|ghp_[A-Za-z0-9_]{16,}|npm_[A-Za-z0-9_-]{24,}|api[_-]?key\s*[=:]|password\s*[=:]|token\s*[=:])/iu;
-const WINDOWS_ABSOLUTE_RE = /[A-Za-z]:\\(?:Users|tmp|Temp|Windows|ProgramData|Program Files)\\/u;
+const WINDOWS_ABSOLUTE_RE = /[A-Za-z]:[\\/](?:Users|tmp|Temp|Windows|ProgramData|Program Files)[\\/]/u;
 const POSIX_ABSOLUTE_RE = /(?:^|[\s"'`=:(])\/(?:Users|home|tmp|var|private|mnt|Volumes)\//u;
 const CONTROL_RE = /[\0\r]/u;
 
@@ -126,6 +126,15 @@ function normalizeRel(rel) {
   return String(rel).replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+/g, '/');
 }
 
+function publicArtifactPath(full) {
+  const resolved = path.resolve(full);
+  const rel = path.relative(ROOT, resolved);
+  if (rel && !rel.startsWith('..') && !path.isAbsolute(rel)) {
+    return normalizeRel(rel);
+  }
+  return normalizeRel(path.basename(resolved));
+}
+
 function collectArtifacts(dir) {
   const fullDir = path.resolve(dir);
   if (!fs.existsSync(fullDir)) return [];
@@ -137,7 +146,7 @@ function collectArtifacts(dir) {
     if (stat.isDirectory()) continue;
     records.push({
       name: entry,
-      path: normalizeRel(path.relative(ROOT, full)),
+      path: publicArtifactPath(full),
       bytes: stat.size,
       sha256: sha256File(full),
     });
@@ -162,7 +171,7 @@ function readManifest(manifestPath) {
   const text = fs.readFileSync(full, 'utf8');
   const parsed = JSON.parse(text);
   return {
-    path: normalizeRel(path.relative(ROOT, full)),
+    path: publicArtifactPath(full),
     sha256: sha256Text(text),
     version: parsed.version ?? null,
     platforms: parsed.platforms ? Object.keys(parsed.platforms).sort() : [],
@@ -175,7 +184,7 @@ function readManifestSignature(manifestPath, explicitSigPath) {
   }
   const sigPath = explicitSigPath || `${manifestPath}.sig`;
   const full = path.resolve(sigPath);
-  const rel = normalizeRel(path.relative(ROOT, full));
+  const rel = publicArtifactPath(full);
   if (!fs.existsSync(full)) {
     return { signature_file: rel, signature_file_present: false, status: 'missing' };
   }
@@ -265,7 +274,7 @@ function recordInstaller(platform, filePath) {
     return {
       platform,
       present: false,
-      path: normalizeRel(path.relative(ROOT, full)),
+      path: publicArtifactPath(full),
       sha256: null,
       bytes: null,
       signature: { status: 'missing_artifact', method, configured },
@@ -276,7 +285,7 @@ function recordInstaller(platform, filePath) {
     return {
       platform,
       present: false,
-      path: normalizeRel(path.relative(ROOT, full)),
+      path: publicArtifactPath(full),
       sha256: null,
       bytes: null,
       signature: { status: 'not_a_file', method, configured },
@@ -285,7 +294,7 @@ function recordInstaller(platform, filePath) {
   return {
     platform,
     present: true,
-    path: normalizeRel(path.relative(ROOT, full)),
+    path: publicArtifactPath(full),
     sha256: sha256File(full),
     bytes: stat.size,
     signature: { status: 'file_present_unverified', method, configured },

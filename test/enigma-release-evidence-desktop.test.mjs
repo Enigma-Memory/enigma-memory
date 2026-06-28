@@ -14,7 +14,7 @@ const PROJECT_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const SCRIPT = resolve(PROJECT_ROOT, 'scripts', 'release-evidence-desktop.mjs');
 
 const SECRET_RE = /(?:bearer\s+[A-Za-z0-9._~+/=-]+|ghp_[A-Za-z0-9_]{16,}|npm_[A-Za-z0-9_-]{24,}|api[_-]?key\s*[=:]|password\s*[=:]|token\s*[=:])/iu;
-const WINDOWS_ABSOLUTE_RE = /[A-Za-z]:\\(?:Users|tmp|Temp|Windows|ProgramData|Program Files)\\/u;
+const WINDOWS_ABSOLUTE_RE = /[A-Za-z]:[\\/](?:Users|tmp|Temp|Windows|ProgramData|Program Files)[\\/]/u;
 const POSIX_ABSOLUTE_RE = /(?:^|[\s"'`=:(])\/(?:Users|home|tmp|var|private|mnt|Volumes)\//u;
 
 function withTempDir(fn) {
@@ -121,6 +121,10 @@ test('buildDesktopReleaseEvidence records SHA-256 checksums and signature status
     assert.ok(record.artifact_count >= 3);
 
     assertPublicSafe(record);
+    assert.equal(record.installers[0].path, 'Enigma-Setup.exe');
+    assert.equal(record.installers[1].path, 'Enigma-1.0.0.dmg');
+    assert.equal(record.manifest.path, 'manifest.json');
+    assert.equal(record.manifest.signature.signature_file, 'manifest.json.sig');
   });
 });
 
