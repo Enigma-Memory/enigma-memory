@@ -27,9 +27,11 @@
 - ✅ **Signed desktop app scaffold** created in `apps/desktop-tauri/` with Tauri v2, consumer onboarding wizard, and health dashboard UI.
 - ✅ **One-click connector engine** implemented for Claude Desktop (`.mcpb` + fallback), Cursor, Kimi Code, VS Code/Cline, Roo, OpenCode, and Generic MCP with backup/rollback/repair.
 - ✅ **Consumer docs and website** created: desktop-first README, `docs/install-anywhere.md` rewrite, and `website/` static pages.
-- ⚠️ **Bundled Enigma engine/sidecar bridge** — Tauri commands are scaffolded but not yet wired to a bundled runtime process.
+- ✅ **Bundled Enigma engine/sidecar bridge** implemented in Tauri commands: ServiceHandle spawns node engine, captures logs, bounded restart, clean shutdown; wizard actions wired to real sidecar.
+- ✅ **In-app help panel + public help articles** created under `website/help/` and `apps/desktop-tauri/ui/help.js`.
+- ✅ **QA smoke scenarios + support playbooks** added in `docs/public-launch/`.
+- ✅ **Release/build pipeline** added: Tauri bundle config, GitHub Actions `desktop-build.yml`, Ed25519 update-manifest signer, release evidence generator.
 - ⚠️ **Signed installers and code signing** require external Apple Developer / Microsoft signing identities.
-
 ## Notes
 
 Use this file to track progress against blockers.
