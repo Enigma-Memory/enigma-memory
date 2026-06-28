@@ -660,7 +660,7 @@ export const toolDescriptors = [
         reviewed: { type: 'boolean' },
         approval_token: { type: 'string' },
       },
-      required: ['approved'],
+      required: ['approved', 'approval_token'],
       additionalProperties: false,
     },
   },

@@ -483,6 +483,8 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
   assert.ok(names.includes('enigma_search'));
   assert.ok(names.includes('enigma_import_preview'));
   assert.ok(names.includes('enigma_import_approve'));
+  const importApproveTool = list.result.tools.find((tool) => tool.name === 'enigma_import_approve');
+  assert.deepEqual(importApproveTool.inputSchema.required, ['approved', 'approval_token']);
   assert.ok(names.includes('enigma_context_pack'));
   const contextPackTool = list.result.tools.find((tool) => tool.name === 'enigma_context_pack');
   assert.equal(contextPackTool.inputSchema.properties.revoked_grant_refs.items.pattern.startsWith('^ref:'), true);
