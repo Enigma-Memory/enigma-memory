@@ -649,6 +649,48 @@ function importPreviewCandidates(reports) {
   return previews;
 }
 
+function importPreviewDuplicateSummary(candidates) {
+  const groups = new Map();
+  for (const candidate of candidates) {
+    if (!groups.has(candidate.content_commitment)) groups.set(candidate.content_commitment, []);
+    groups.get(candidate.content_commitment).push(candidate);
+  }
+  const duplicateGroups = [];
+  for (const [contentCommitment, groupCandidates] of groups.entries()) {
+    if (groupCandidates.length < 2) continue;
+    duplicateGroups.push({
+      duplicate_group_ref: `ref:import-duplicate:${shortHash({ contentCommitment, candidate_refs: groupCandidates.map((candidate) => candidate.candidate_ref) })}`,
+      content_commitment: contentCommitment,
+      candidate_count: groupCandidates.length,
+      candidate_refs: groupCandidates.map((candidate) => candidate.candidate_ref),
+    });
+  }
+  const byCandidateRef = new Map();
+  for (const group of duplicateGroups) {
+    group.candidate_refs.forEach((candidateRef, index) => {
+      byCandidateRef.set(candidateRef, {
+        duplicate_group_ref: group.duplicate_group_ref,
+        duplicate_index: index,
+        duplicate_candidate_count: group.candidate_count,
+      });
+    });
+  }
+  const decoratedCandidates = candidates.map((candidate) => ({
+    ...candidate,
+    is_duplicate: byCandidateRef.has(candidate.candidate_ref),
+    ...(byCandidateRef.get(candidate.candidate_ref) ?? {}),
+  }));
+  return {
+    candidates: decoratedCandidates,
+    duplicate_groups: duplicateGroups,
+    counts: {
+      duplicate_group_count: duplicateGroups.length,
+      duplicate_candidate_count: [...byCandidateRef.keys()].length,
+      unique_content_count: groups.size,
+    },
+  };
+}
+
 function importPreviewCounts(candidates) {
   const confidence = { high: 0, medium: 0, low: 0 };
   const recommended_actions = { ready_for_import: 0, review_before_import: 0 };
@@ -659,8 +701,9 @@ function importPreviewCounts(candidates) {
   return { confidence, recommended_actions };
 }
 
-function importPreviewDecision(candidates, counts) {
+function importPreviewDecision(candidates, counts, duplicateCounts) {
   if (candidates.length === 0) return 'empty';
+  if (duplicateCounts.duplicate_group_count > 0) return 'needs_review';
   if (counts.recommended_actions.review_before_import > 0) return 'needs_review';
   return 'ready_for_import';
 }
@@ -693,14 +736,19 @@ function importPreviewPrimaryAction(decision) {
 
 export function createImportPreview(input, options = {}) {
   const reports = normalizeReportsForPreview(input);
-  const candidates = importPreviewCandidates(reports);
+  const rawCandidates = importPreviewCandidates(reports);
+  const duplicateSummary = importPreviewDuplicateSummary(rawCandidates);
+  const candidates = duplicateSummary.candidates;
   const reportRefs = reports.map((report, index) => `ref:import-report:${report.report_id ?? shortHash({ index, report })}`);
   const sourceTypes = uniqueStrings(reports.map((report) => report.source_type).filter(Boolean));
   const importers = uniqueStrings(reports.map((report) => report.importer).filter(Boolean));
   const limitations = uniqueStrings(reports.flatMap((report) => asArray(report.limitations).filter((item) => typeof item === 'string')));
   const candidateRefs = candidates.map((candidate) => candidate.candidate_ref);
-  const counts = importPreviewCounts(candidates);
-  const decision = importPreviewDecision(candidates, counts);
+  const counts = {
+    ...importPreviewCounts(candidates),
+    dedupe: duplicateSummary.counts,
+  };
+  const decision = importPreviewDecision(candidates, counts, duplicateSummary.counts);
   const generatedAt = nowFrom(options);
   const previewId = `preview_${shortHash({ reportRefs, candidateRefs, generated_at: generatedAt })}`;
   const preview = {
@@ -714,6 +762,7 @@ export function createImportPreview(input, options = {}) {
     candidates,
     counts,
     limitations,
+    duplicate_groups: duplicateSummary.duplicate_groups,
     roots: {
       report_root: new MerkleSet(reportRefs).root(),
       candidate_preview_root: new MerkleSet(candidateRefs).root(),
@@ -733,6 +782,8 @@ export function createImportPreview(input, options = {}) {
       candidate_count: candidates.length,
       ready_for_import_count: counts.recommended_actions.ready_for_import,
       review_before_import_count: counts.recommended_actions.review_before_import,
+      duplicate_group_count: duplicateSummary.counts.duplicate_group_count,
+      duplicate_candidate_count: duplicateSummary.counts.duplicate_candidate_count,
       explicit_import_required: true,
       raw_plaintext_returned: false,
       vault_write_performed: false,

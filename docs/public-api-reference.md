@@ -355,7 +355,7 @@ Importer source names accepted by `enigma import <source>`:
 - `langgraph`, `langgraph-store`, `langgraph_store`
 - `zep`, `graphiti`, `zep-graphiti`, `zep_graphiti`, `zep_graphiti_export`
 
-`enigma import <source>` requires `--file`/`--source-file`/`--path` or a positional file, accepts `--out`, `--now`, and for curated text `--complete`, and writes candidates into a local vault only when `--write-vault --bundle <path>` is supplied. Default output is a public-safe preview/receipt, not raw candidate text.
+`enigma import <source>` requires `--file`/`--source-file`/`--path` or a positional file, accepts `--out`, `--now`, and for curated text `--complete`, and writes candidates into a local vault only when `--write-vault --bundle <path>` is supplied. Default output is a public-safe preview/receipt with duplicate groups/counts and commitments, not raw candidate text.
 
 Capsule commands:
 

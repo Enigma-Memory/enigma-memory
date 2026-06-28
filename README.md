@@ -61,7 +61,7 @@ Optional instant-value import preview:
 enigma import text --file ./memories.md --complete
 ```
 
-This prints a public-safe preview/receipt only. Raw notes stay local and nothing is written to the vault unless an explicit import path is approved.
+This prints a public-safe preview/receipt only, including duplicate groups/counts. Raw notes stay local and nothing is written to the vault unless an explicit import path is approved.
 
 Preview a single client before writing:
 

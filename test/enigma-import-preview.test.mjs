@@ -99,6 +99,30 @@ test('import preview exposes approve action only when every candidate is ready',
   assert.equal(preview.preview_receipt.review_before_import_count, 0);
 });
 
+test('import preview groups duplicate candidate commitments without raw content', () => {
+  const report = importTextMemoryList('- Same memory\n- Same memory\n- Different memory', {
+    now: NOW,
+    complete: true,
+  });
+  const preview = createImportPreview(report, { now: NOW });
+  const serialized = JSON.stringify(preview);
+
+  assert.equal(preview.candidate_count, 3);
+  assert.equal(preview.import_decision, 'needs_review');
+  assert.equal(preview.primary_action.id, 'review_import_candidates');
+  assert.equal(preview.duplicate_groups.length, 1);
+  assert.equal(preview.duplicate_groups[0].candidate_count, 2);
+  assert.equal(preview.counts.dedupe.duplicate_group_count, 1);
+  assert.equal(preview.counts.dedupe.duplicate_candidate_count, 2);
+  assert.equal(preview.counts.dedupe.unique_content_count, 2);
+  assert.equal(preview.preview_receipt.duplicate_group_count, 1);
+  assert.equal(preview.candidates[0].is_duplicate, true);
+  assert.equal(preview.candidates[1].duplicate_group_ref, preview.candidates[0].duplicate_group_ref);
+  assert.equal(preview.candidates[2].is_duplicate, false);
+  assert.equal(serialized.includes('Same memory'), false);
+  assert.equal(serialized.includes('Different memory'), false);
+});
+
 test('text memory list importer supports curated txt and markdown without provider caveats', () => {
   const report = importTextMemoryList('- Prefers local-only memory\n2. Wants receipts before sharing\n# Project note', {
     now: NOW,
