@@ -20,3 +20,9 @@ npm install -g enigma-memory && enigma setup --client auto --connect-installed -
 ```
 
 The generated server entry uses command `enigma-mcp`, no args, and `ENIGMA_BUNDLE` pointing at the local bundle. Existing sibling MCP servers are preserved.
+
+## Grant-gated context
+
+`enigma_context_pack` can require a Memory Controller grant before returning local context. Pass `require_grant:true` with `grant` or `grants`; pass `revoked_grant_refs` to make stale active grants fail closed. Missing, expired, revoked, or mismatched grants return `enigma.context_pack_recall_blocked.v1` with `context_pack_returned:false` and no memory payload.
+
+This is an Enigma-local sharing decision. It does not prove provider deletion, provider non-use, model forgetting, hosted availability, or compliance status.

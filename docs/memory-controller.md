@@ -51,9 +51,9 @@ MCP-compatible clients can inspect tool annotations and schema descriptions duri
 | `enigma_recall_veto` | Decide whether a recall is approved, needs approval, or is not shared before context leaves Enigma. | Decision `allow`, `ask`, or `deny`; reason codes; candidate counts; `safe_to_share`; policy/proof/receipt refs. |
 | `enigma_private_bubble` | Open or close a temporary private memory bubble. | Bubble ref, status label, expiry bucket, item/promotion counts, close outcome, and receipt refs. |
 
-`enigma_context_pack` and the CLI `enigma context` command can require a matching consent grant before returning context. When `require_grant` / `--require-grant` is set and no active grant matches the app ref, purpose ref, operation, memory-zone ref, expiry, and policy boundary, Enigma returns `enigma.context_pack_recall_blocked.v1` with a recall veto and `context_pack_returned:false` instead of compiling or printing context.
+`enigma_context_pack` and the CLI `enigma context` command can require a matching consent grant before returning context. When `require_grant` / `--require-grant` is set and no active grant matches the app ref, purpose ref, operation, memory-zone ref, expiry checked against Enigma-controlled time, revocation refs, and policy boundary, Enigma returns `enigma.context_pack_recall_blocked.v1` with a recall veto and `context_pack_returned:false` instead of compiling or printing context.
 
-For CLI-only smoke tests, create a public-safe grant with `enigma controller grant --app-ref ref:app:<id> --purpose-ref ref:purpose:cli_context --memory-zone-ref ref:zone:default --out grant.json`, then pass it to `enigma context --require-grant --grant-file grant.json`. Revoke the same permission with `enigma controller revoke --grant-file grant.json --out grant.revoked.json`; the next gated context request fails closed with a recall veto. Grant files contain opaque refs and receipt/proof refs only; they are not proof that a provider deleted, forgot, or withheld anything outside Enigma.
+For CLI-only smoke tests, create a public-safe grant with `enigma controller grant --app-ref ref:app:cli --purpose-ref ref:purpose:cli_context --memory-zone-ref ref:zone:default --out grant.json`, then pass it to `enigma context --require-grant --grant-file grant.json`. Revoke the same permission with `enigma controller revoke --grant-file grant.json --out grant.revoked.json`; the next gated context request must supply `grant.revoked.json` or a revocation ref/index to fail closed with a recall veto. Grant files contain opaque refs and receipt/proof refs only; they are not proof that a provider deleted, forgot, or withheld anything outside Enigma.
 
 ## Frictionless launch behavior
 
@@ -63,7 +63,7 @@ Memory Controller should reduce launch friction, not add a permission wall.
 - Just-in-time prompts: a consent grant is requested at the point of use with one clear purpose, one primary action, and one safe escape hatch.
 - One action per state: Memory Weather shows the single next action for ready, blocked, needs-review, offline, revoked, expired, or unsafe-export states.
 - Advanced proof drawer: schema ids, receipt refs, roots, verifier status, and redaction details stay behind an advanced drawer and never block the default path.
-- Consent travels with data: every recall check reads current grant and bubble state; stale or revoked permission fails closed.
+- Consent travels with data: grant-gated Enigma-mediated recall checks read current grant and bubble state; stale or revoked permission fails closed when that revoked grant artifact or revocation ref/index is supplied.
 
 ## Claim boundary
 

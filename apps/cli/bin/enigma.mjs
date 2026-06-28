@@ -1667,7 +1667,7 @@ function contextRecallDecisionFromFlags(flags, grantInputs, candidateCount) {
     grants: grantInputs.grants,
     ...contextRecallScopeFromFlags(flags),
     candidate_count: candidateCount,
-    now: getFlag(flags, ['now']),
+    now: getFlag(flags, ['now'], new Date().toISOString()),
   });
 }
 
@@ -1699,7 +1699,7 @@ async function contextCommand(flags, io) {
   const strictRelevance = String(query).trim().length > 0 && !includeUnrelated;
   const grantInputs = await contextGrantInputsFromFlags(flags);
   const grantRequired = booleanFlag(flags, ['require-grant', 'requireGrant'], false);
-  if (grantRequired) {
+  if (grantRequired || grantInputs.grantProvided) {
     const preflightDecision = contextRecallDecisionFromFlags(flags, grantInputs, 0);
     if (preflightDecision.safe_to_share !== true) {
       print(blockedCliContextPack(preflightDecision), io);
@@ -1719,9 +1719,14 @@ async function contextCommand(flags, io) {
     currency: getFlag(flags, ['currency']),
   });
   if (grantRequired || grantInputs.grantProvided) {
+    const recallVeto = contextRecallDecisionFromFlags(flags, grantInputs, Array.isArray(pack.memories) ? pack.memories.length : 0);
+    if (recallVeto.safe_to_share !== true) {
+      print(blockedCliContextPack(recallVeto), io);
+      return 0;
+    }
     pack.memory_controller = {
       context_pack_returned: true,
-      recall_veto: contextRecallDecisionFromFlags(flags, grantInputs, Array.isArray(pack.memories) ? pack.memories.length : 0),
+      recall_veto: recallVeto,
     };
   }
   await persistState(bundlePath, vault, { passphrase: getFlag(flags, ['passphrase']) });
@@ -3191,7 +3196,7 @@ export async function controllerGrantCommand(flags, io) {
     operations: operations.length === 0 ? undefined : operations,
     memory_zone_ref: memoryZoneRefs.length === 0 ? getFlag(flags, ['memory-zone-ref', 'memoryZoneRef'], 'ref:zone:default') : undefined,
     memory_zone_refs: memoryZoneRefs.length === 0 ? undefined : memoryZoneRefs,
-    issued_at: getFlag(flags, ['issued-at', 'issuedAt', 'now']),
+    issued_at: getFlag(flags, ['issued-at', 'issuedAt', 'now'], new Date().toISOString()),
     expires_at: getFlag(flags, ['expires-at', 'expiresAt']),
     ttl_seconds: parseOptionalNumber(getFlag(flags, ['ttl-seconds', 'ttlSeconds'])),
     status: getFlag(flags, ['status']),
@@ -3344,10 +3349,15 @@ function usage() {
       '--max-estimated-tokens <n>': 'Token budget for the optimized context pack.',
       '--price-per-million-tokens <n>': 'Pricing input for cost estimates.',
       '--currency <code>': 'Currency for cost estimates. Defaults to USD.',
+      '--proof': 'Return public-safe context proof bundle instead of selected memory plaintext. Aliases: --with-proof, --withProof.',
+      '--out <path>': 'Write the context or proof JSON to a local file.',
       '--require-grant': 'Fail closed with enigma.context_pack_recall_blocked.v1 unless a matching Memory Controller grant is supplied.',
       '--grant-file <path>': 'Read a public-safe consent grant JSON file. Repeatable. Alias: --grantFile.',
       '--grant <json>': 'Inline public-safe consent grant JSON for non-private automation.',
+      '--grants-file <path>': 'Read a public-safe grant array or { grants } JSON object. Repeatable. Alias: --grantsFile.',
       '--app-ref/--purpose-ref/--memory-zone-ref <ref>': 'Opaque scope refs checked against supplied grants.',
+      '--policy-ref <ref>': 'Opaque policy ref checked against supplied grants. Defaults to ref:policy:cli-context.',
+      '--now <iso>': 'Trusted timestamp for deterministic tests; defaults to current local time.',
     },
     controller_options: {
       'controller grant': 'Create a public-safe Memory Controller consent grant for local context recall.',
@@ -3358,6 +3368,8 @@ function usage() {
       '--operation <id>': 'Grant operation. Defaults to recall_context.',
       '--memory-zone-ref <ref>': 'Opaque memory zone ref. Defaults to ref:zone:default.',
       '--ttl-seconds <n>': 'Grant lifetime in seconds when --expires-at is omitted.',
+      '--issued-at/--now <iso>': 'Grant issue timestamp. Defaults to current local time.',
+      '--expires-at <iso>': 'Explicit grant expiration timestamp. If omitted, ttl-seconds is applied.',
       '--out <path>': 'Write grant JSON for later enigma context --require-grant --grant-file use.',
     },
     search_options: {

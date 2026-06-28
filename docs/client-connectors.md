@@ -26,6 +26,15 @@ enigma context --query "project context" --optimize
 enigma verify --export ./.enigma/export.json
 ```
 
+Optional grant-gated local context check:
+
+```sh
+enigma controller grant --app-ref ref:app:cli --purpose-ref ref:purpose:cli_context --memory-zone-ref ref:zone:default --out ./.enigma/grant.json
+enigma context --query "project context" --require-grant --grant-file ./.enigma/grant.json --proof
+```
+
+This is an Enigma-local permission check. It does not prove provider deletion, provider non-use, or model forgetting.
+
 One command connects every installed client: `enigma setup --client auto --connect-installed --overwrite` writes the `mcpServers.enigma` entry into every installed/config-present client it detects (Claude Desktop, Cursor, Kimi Code, VS Code/Cline, Roo, OpenCode, generic MCP). It skips clients that are not installed and never creates configs from scratch; preview with `--dry-run` first. `enigma drive health` reports a SMART-style memory-drive health packet (freshness, tombstone backlog, stale derived artifacts, receipt coverage, connector health) from local metadata only — it is part of the Memory Drive surface in this release, and `enigma status` plus `enigma doctor` cover local passport counts, roots, and connector readiness in every build. No setup command prints raw memory plaintext.
 
 Run setup or quickstart before using `enigma doctor` as the final green check. Doctor reads existing client configs as well as the local environment, so an already-present `generic-mcp` or other MCP config can make doctor red on a fresh install if its `ENIGMA_BUNDLE` points to a bundle that does not exist yet, or to a different bundle than the one passed to doctor. That is expected first-run connector state, not an npm install failure. Use `enigma quickstart --bundle ./.enigma/bundle.json --overwrite` or `enigma setup --bundle ./.enigma/bundle.json --overwrite`, then rerun `enigma doctor --bundle ./.enigma/bundle.json`.
@@ -447,7 +456,7 @@ enigma connect generic-mcp
 printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"manual","version":"0"}}}\n{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}\n' | ENIGMA_BUNDLE="$HOME/.enigma/bundle.json" enigma-mcp
 ```
 
-Expected behavior: the response lists Enigma tools (`enigma_init`, `enigma_remember`, `enigma_search`, `enigma_context_pack`, `enigma_delete`, `enigma_verify_receipts`), the `enigma://passport/summary` resource, and the `enigma_standard_memory_prompt` prompt. This only verifies the local MCP process and bundle path. It does not prove that a hosted provider deleted memory or forgot anything.
+Expected behavior: the response lists Enigma tools (`enigma_init`, `enigma_remember`, `enigma_search`, `enigma_context_pack`, `enigma_delete`, `enigma_verify_receipts`, `enigma_memory_weather`, `enigma_consent_grant`, `enigma_recall_veto`, `enigma_private_bubble`), the `enigma://passport/summary` resource, and the `enigma_standard_memory_prompt` prompt. This only verifies the local MCP process and bundle path. It does not prove that a hosted provider deleted memory or forgot anything.
 
 ## Import/export commands for migrations
 

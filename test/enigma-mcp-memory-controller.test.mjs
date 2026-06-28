@@ -11,8 +11,8 @@ import mcpServer, {
   handleJsonRpcRequest,
 } from '../packages/mcp-server/src/index.js';
 
-const NOW = '2026-06-28T12:00:00.000Z';
-const LATER = '2026-06-28T12:05:00.000Z';
+const NOW = '2099-06-28T12:00:00.000Z';
+const LATER = '2099-06-28T12:05:00.000Z';
 const RAW_PRIVATE_MEMORY = 'private launch-code phrase stays local only';
 const RAW_MEMORY_FIELD = ['raw', 'memory'].join('_');
 
@@ -111,6 +111,8 @@ test('MCP Memory Controller tools are listed, handled, and exported with strict 
 
   assert.equal(descriptor('enigma_recall_veto').inputSchema.properties.grant.additionalProperties, false);
   assert.equal(descriptor('enigma_recall_veto').inputSchema.properties.grants.items.additionalProperties, false);
+  assert.equal(descriptor('enigma_recall_veto').inputSchema.properties.revoked_grant_refs.items.type, 'string');
+  assert.equal(descriptor('enigma_context_pack').inputSchema.properties.revoked_grant_refs.items.pattern, descriptor('enigma_recall_veto').inputSchema.properties.revoked_grant_refs.items.pattern);
   assert.equal(descriptor('enigma_private_bubble').inputSchema.properties.bubble.additionalProperties, false);
   assert.equal(descriptor('enigma_memory_weather').inputSchema.properties.tiles.items.additionalProperties, false);
 });
@@ -164,6 +166,24 @@ test('MCP Memory Controller handlers return public-safe controller artifacts onl
   });
   assert.equal(recallFromGrantArray.decision, 'allow');
   assertBoundary(recallFromGrantArray);
+
+  const revokedRecall = await enigma_recall_veto({
+    grants: [grant],
+    revoked_grant_refs: [grant.grant_ref],
+    app_ref: 'ref:app:notes',
+    purpose_ref: 'ref:purpose:briefing',
+    operation: 'recall_context',
+    memory_zone_ref: 'ref:zone:work',
+    candidate_count: 1,
+    policy_ref: 'ref:policy:jit',
+    proof_refs: ['ref:proof:recall-revoked'],
+    receipt_refs: ['ref:receipt:recall-revoked'],
+  });
+  assert.equal(revokedRecall.decision, 'deny');
+  assert.equal(revokedRecall.safe_to_share, false);
+  assert.deepEqual(revokedRecall.grant_refs, [grant.grant_ref]);
+  assert.ok(revokedRecall.reason_codes.includes('policy_denies_recall'));
+  assertBoundary(revokedRecall);
 
   const weather = await enigma_memory_weather({
     generated_at: NOW,
@@ -262,5 +282,27 @@ test('MCP Memory Controller tools reject raw public fields fail-closed', async (
 
   assert.equal(response.error.code, -32602);
   assert.match(response.error.message, /unsafe public fields/u);
+  assertNoRawPayload(response);
+});
+
+test('MCP Memory Controller revocation refs must be public refs', async () => {
+  const response = await handleJsonRpcRequest({
+    jsonrpc: '2.0',
+    id: 'recall-bad-revoked-ref',
+    method: 'tools/call',
+    params: {
+      name: 'enigma_recall_veto',
+      arguments: {
+        revoked_grant_refs: ['not-a-public-ref'],
+        app_ref: 'ref:app:notes',
+        purpose_ref: 'ref:purpose:briefing',
+        operation: 'recall_context',
+        memory_zone_ref: 'ref:zone:work',
+      },
+    },
+  });
+
+  assert.equal(response.error.code, -32602);
+  assert.match(response.error.message, /revoked_grant_refs must be an array of unique public refs/u);
   assertNoRawPayload(response);
 });

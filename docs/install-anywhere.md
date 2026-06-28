@@ -133,6 +133,22 @@ enigma verify --export .\.enigma\export.json
 
 The local bundle is the canonical state for this path. Provider-native memory is cache only. Exported proof and network artifacts should contain commitments, roots, addresses, receipt ids, and encrypted payloads, not raw memory plaintext.
 
+Optional grant-gated context smoke:
+
+```sh
+enigma controller grant --app-ref ref:app:cli --purpose-ref ref:purpose:cli_context --memory-zone-ref ref:zone:default --out ./.enigma/grant.json
+enigma context --bundle ./.enigma/bundle.json --query "local context" --require-grant --grant-file ./.enigma/grant.json --proof --out ./.enigma/context-proof.json
+```
+
+PowerShell path equivalent:
+
+```powershell
+enigma controller grant --app-ref ref:app:cli --purpose-ref ref:purpose:cli_context --memory-zone-ref ref:zone:default --out .\.enigma\grant.json
+enigma context --bundle .\.enigma\bundle.json --query "local context" --require-grant --grant-file .\.enigma\grant.json --proof --out .\.enigma\context-proof.json
+```
+
+This checks Enigma-local consent before context is returned. It does not prove provider deletion, provider non-use, or model forgetting.
+
 ## MCP server
 
 Run Enigma as an MCP stdio server:
@@ -178,6 +194,10 @@ MCP tools available through the server:
 - `enigma_context_pack`
 - `enigma_delete`
 - `enigma_verify_receipts`
+- `enigma_memory_weather`
+- `enigma_consent_grant`
+- `enigma_recall_veto`
+- `enigma_private_bubble`
 
 MCP resource and prompt:
 

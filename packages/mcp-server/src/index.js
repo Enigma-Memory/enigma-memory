@@ -104,6 +104,14 @@ function optionalStringArray(object, key, context) {
   }
 }
 
+function optionalPublicRefArray(object, key, context) {
+  optionalStringArray(object, key, context);
+  if (object[key] === undefined) return;
+  if (new Set(object[key]).size !== object[key].length || object[key].some((item) => !MEMORY_CONTROLLER_PUBLIC_REF_RE.test(item))) {
+    throw invalidParams(`${context} ${key} must be an array of unique public refs.`);
+  }
+}
+
 function optionalLimit(object, key, context) {
   if (object[key] === undefined) return;
   if (!Number.isInteger(object[key]) || object[key] < 1 || object[key] > 50) {
@@ -152,6 +160,8 @@ function optionalObjectArray(object, key, context) {
 }
 
 const CONSENT_GRANT_ARTIFACT_KEYS = new Set(Object.keys(CONSENT_GRANT_JSON_SCHEMA.properties));
+const MEMORY_CONTROLLER_PUBLIC_REF_SCHEMA = CONSENT_GRANT_JSON_SCHEMA.$defs.publicRef;
+const MEMORY_CONTROLLER_PUBLIC_REF_RE = new RegExp(MEMORY_CONTROLLER_PUBLIC_REF_SCHEMA.pattern, 'u');
 const PRIVATE_MEMORY_BUBBLE_ARTIFACT_KEYS = new Set(Object.keys(PRIVATE_MEMORY_BUBBLE_JSON_SCHEMA.properties));
 const WEATHER_TILE_KEYS = new Set(['tile_ref', 'status', 'metric', 'count', 'evidence_refs']);
 const MEMORY_CONTROLLER_PUBLIC_SAFE_INPUT_DESCRIPTION = 'Use opaque refs, counts, timestamps, and reason codes only; never send raw memory, prompts, transcripts, provider output, local paths, secrets, or account/customer identifiers.';
@@ -294,6 +304,7 @@ function validateToolArguments(name, args) {
         'memory_zone_ref',
         'policy_ref',
         'purpose_ref',
+        'revoked_grant_refs',
       ]), name);
       optionalString(args, 'bundlePath', name);
       optionalString(args, 'query', name);
@@ -307,6 +318,7 @@ function validateToolArguments(name, args) {
       optionalBoolean(args, 'require_grant', name);
       optionalStrictObject(args, 'grant', CONSENT_GRANT_ARTIFACT_KEYS, name);
       optionalStrictObjectArray(args, 'grants', CONSENT_GRANT_ARTIFACT_KEYS, name);
+      optionalPublicRefArray(args, 'revoked_grant_refs', name);
       optionalString(args, 'app_ref', name);
       optionalString(args, 'memory_zone_ref', name);
       optionalString(args, 'purpose_ref', name);
@@ -341,9 +353,10 @@ function validateToolArguments(name, args) {
       return args;
     case 'enigma_recall_veto':
       assertMcpMemoryControllerPublicSafeInput(args, name);
-      rejectAdditionalProperties(args, new Set(['grant', 'grants', 'app_ref', 'purpose_ref', 'operation', 'memory_zone_ref', 'candidate_count', 'sensitive_count', 'tombstone_count', 'policy_ref', 'proof_refs', 'receipt_refs']), name);
+      rejectAdditionalProperties(args, new Set(['grant', 'grants', 'revoked_grant_refs', 'app_ref', 'purpose_ref', 'operation', 'memory_zone_ref', 'candidate_count', 'sensitive_count', 'tombstone_count', 'policy_ref', 'proof_refs', 'receipt_refs']), name);
       optionalStrictObject(args, 'grant', CONSENT_GRANT_ARTIFACT_KEYS, name);
       optionalStrictObjectArray(args, 'grants', CONSENT_GRANT_ARTIFACT_KEYS, name);
+      optionalPublicRefArray(args, 'revoked_grant_refs', name);
       optionalString(args, 'app_ref', name);
       optionalString(args, 'purpose_ref', name);
       optionalString(args, 'operation', name);
@@ -614,6 +627,7 @@ export const toolDescriptors = [
         require_grant: { type: 'boolean' },
         grant: CONSENT_GRANT_JSON_SCHEMA,
         grants: { type: 'array', items: CONSENT_GRANT_JSON_SCHEMA },
+        revoked_grant_refs: { type: 'array', items: MEMORY_CONTROLLER_PUBLIC_REF_SCHEMA, uniqueItems: true },
         app_ref: { type: 'string' },
         memory_zone_ref: { type: 'string' },
         purpose_ref: { type: 'string' },
@@ -701,6 +715,7 @@ export const toolDescriptors = [
       properties: {
         grant: CONSENT_GRANT_JSON_SCHEMA,
         grants: { type: 'array', items: CONSENT_GRANT_JSON_SCHEMA },
+        revoked_grant_refs: { type: 'array', items: MEMORY_CONTROLLER_PUBLIC_REF_SCHEMA, uniqueItems: true },
         app_ref: { type: 'string' },
         purpose_ref: { type: 'string' },
         operation: { type: 'string' },
@@ -1221,6 +1236,8 @@ function contextRecallDecision(input, candidateCount) {
   return createRecallVetoDecision({
     grant: input.grant,
     grants: input.grants,
+    revoked_grant_refs: input.revoked_grant_refs,
+    now: new Date().toISOString(),
     ...contextRecallScope(input),
     candidate_count: candidateCount,
   });
@@ -1248,8 +1265,8 @@ export async function enigma_context_pack(input = {}) {
   const path = bundlePath(input);
   const { vault, passport } = await loadState(path);
   const grantRequired = input.require_grant === true;
-  const grantProvided = input.grant !== undefined || input.grants !== undefined;
-  if (grantRequired) {
+  const grantProvided = input.grant !== undefined || input.grants !== undefined || input.revoked_grant_refs !== undefined;
+  if (grantRequired || grantProvided) {
     const preflightDecision = contextRecallDecision(input, 0);
     if (preflightDecision.safe_to_share !== true) return blockedContextPack(preflightDecision);
   }
@@ -1307,12 +1324,12 @@ export async function enigma_memory_weather(input = {}) {
 
 export async function enigma_recall_veto(input = {}) {
   input = validateToolArguments('enigma_recall_veto', input);
-  return assertMemoryControllerPublicSafe(createRecallVetoDecision(input));
+  return assertMemoryControllerPublicSafe(createRecallVetoDecision({ now: new Date().toISOString(), ...input }));
 }
 
 export async function enigma_consent_grant(input = {}) {
   input = validateToolArguments('enigma_consent_grant', input);
-  return assertMemoryControllerPublicSafe(createConsentGrant(input));
+  return assertMemoryControllerPublicSafe(createConsentGrant({ now: new Date().toISOString(), ...input }));
 }
 
 export async function enigma_private_bubble(input = {}) {

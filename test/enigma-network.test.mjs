@@ -481,6 +481,8 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
   assert.ok(names.includes('enigma_remember'));
   assert.ok(names.includes('enigma_search'));
   assert.ok(names.includes('enigma_context_pack'));
+  const contextPackTool = list.result.tools.find((tool) => tool.name === 'enigma_context_pack');
+  assert.equal(contextPackTool.inputSchema.properties.revoked_grant_refs.items.pattern.startsWith('^ref:'), true);
   assert.ok(names.includes('enigma_delete'));
   assert.ok(names.includes('enigma_verify_receipts'));
   assert.ok(names.includes('enigma_meter_usage'));
@@ -550,8 +552,8 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
       purpose_ref: 'ref:purpose:integration-test',
       operation: 'recall_context',
       memory_zone_ref: 'ref:zone:default',
-      issued_at: '2026-06-28T12:00:00.000Z',
-      expires_at: '2026-06-28T12:05:00.000Z',
+      issued_at: '2099-06-28T12:00:00.000Z',
+      expires_at: '2099-06-28T12:05:00.000Z',
     });
     const gatedContext = await callTool('context-pack-allowed-by-grant', 'enigma_context_pack', {
       bundlePath,
@@ -569,6 +571,50 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
     assert.equal(gatedContext.result.memory_controller.context_pack_returned, true);
     assert.equal(gatedContext.result.memory_controller.recall_veto.safe_to_share, true);
     assert.deepEqual(gatedContext.result.memory_controller.recall_veto.grant_refs, [grant.result.grant_ref]);
+
+    const revokedGatedContext = await callTool('context-pack-revoked-grant-ref', 'enigma_context_pack', {
+      bundlePath,
+      query: 'plaintext sentinel',
+      purpose: 'integration_test',
+      limit: 1,
+      require_grant: true,
+      grant: grant.result,
+      revoked_grant_refs: [grant.result.grant_ref],
+      app_ref: 'ref:app:mcp-test',
+      purpose_ref: 'ref:purpose:integration-test',
+      memory_zone_ref: 'ref:zone:default',
+    });
+    assert.equal(revokedGatedContext.result.schema, 'enigma.context_pack_recall_blocked.v1');
+    assert.equal(revokedGatedContext.result.context_pack_returned, false);
+    assert.equal(revokedGatedContext.result.recall_veto.decision, 'deny');
+    assert.deepEqual(revokedGatedContext.result.recall_veto.grant_refs, [grant.result.grant_ref]);
+    assert.ok(revokedGatedContext.result.recall_veto.reason_codes.includes('policy_denies_recall'));
+    assert.doesNotMatch(JSON.stringify(revokedGatedContext.result), /network plaintext sentinel/);
+
+    const expiredGrant = await callTool('context-pack-expired-consent-grant', 'enigma_consent_grant', {
+      app_ref: 'ref:app:mcp-test',
+      purpose_ref: 'ref:purpose:integration-test',
+      operation: 'recall_context',
+      memory_zone_ref: 'ref:zone:default',
+      issued_at: '2026-01-01T00:00:00.000Z',
+      expires_at: '2026-01-01T00:00:01.000Z',
+    });
+    const expiredContext = await callTool('context-pack-expired-grant', 'enigma_context_pack', {
+      bundlePath,
+      query: 'plaintext sentinel',
+      purpose: 'integration_test',
+      limit: 1,
+      require_grant: true,
+      grant: expiredGrant.result,
+      app_ref: 'ref:app:mcp-test',
+      purpose_ref: 'ref:purpose:integration-test',
+      memory_zone_ref: 'ref:zone:default',
+    });
+    assert.equal(expiredContext.result.schema, 'enigma.context_pack_recall_blocked.v1');
+    assert.equal(expiredContext.result.context_pack_returned, false);
+    assert.equal(expiredContext.result.recall_veto.safe_to_share, false);
+    assert.ok(expiredContext.result.recall_veto.reason_codes.includes('grant_expired'));
+    assert.doesNotMatch(JSON.stringify(expiredContext.result), /network plaintext sentinel/);
 
     const optimizedContext = await callTool('optimized-context-pack', 'enigma_context_pack', {
       bundlePath,
@@ -808,6 +854,7 @@ test('MCP JSON-RPC hardening returns typed errors and preserves notification sem
     { jsonrpc: '2.0', id: 'bad-array', method: 'tools/call', params: { name: 'enigma_remember', arguments: { text: 'ok', tags: ['ok', 7] } } },
     { jsonrpc: '2.0', id: 'bad-search-limit', method: 'tools/call', params: { name: 'enigma_search', arguments: { limit: 0 } } },
     { jsonrpc: '2.0', id: 'bad-context-limit', method: 'tools/call', params: { name: 'enigma_context_pack', arguments: { limit: 51 } } },
+    { jsonrpc: '2.0', id: 'bad-context-revoked-ref', method: 'tools/call', params: { name: 'enigma_context_pack', arguments: { revoked_grant_refs: ['not-a-public-ref'] } } },
     { jsonrpc: '2.0', id: 'unknown-resource', method: 'resources/read', params: { uri: rawSentinel } },
     { jsonrpc: '2.0', id: 'extra-resource-param', method: 'resources/read', params: { uri: 'enigma://passport/summary', unexpected: rawSentinel } },
     { jsonrpc: '2.0', id: 'extra-prompt-argument', method: 'prompts/get', params: { name: 'enigma_standard_memory_prompt', arguments: { question: 'ok', unexpected: rawSentinel } } },
