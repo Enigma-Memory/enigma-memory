@@ -29,6 +29,8 @@ The generated server entry uses command `enigma-mcp`, no args, and `ENIGMA_BUNDL
 
 `enigma_import_preview` lets a client preview user-provided text or Markdown memory candidates without writing the vault. The response contains counts, duplicate groups, commitments, receipt/action metadata, and no raw memory text.
 
+`enigma_import_approve` is the explicit write step. It requires `approved:true`, blocks duplicate/low-confidence/incomplete previews until `reviewed:true`, writes only to the local Enigma vault, and returns `enigma.import_approved_batch.v1` plus `enigma.import_batch_receipt.v1` metadata. It does not return raw memory text.
+
 ## Grant-gated context
 
 `enigma_context_pack` can require a Memory Controller grant before returning local context. Pass `require_grant:true` with `grant` or `grants`; pass `revoked_grant_refs` to make stale active grants fail closed. Missing, expired, revoked, or mismatched grants return `enigma.context_pack_recall_blocked.v1` with `context_pack_returned:false` and no memory payload.

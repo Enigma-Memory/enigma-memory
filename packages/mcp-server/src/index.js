@@ -16,6 +16,7 @@ import {
 import {
   assertImmuneIngressPublicSafe,
   createImmuneIngressReport,
+  createImportBatchReceipt,
   createImportPreview,
   importTextMemoryList,
 } from '../../importers/src/index.js';
@@ -298,6 +299,16 @@ function validateToolArguments(name, args) {
       optionalBoolean(args, 'complete', name);
       optionalString(args, 'now', name);
       optionalString(args, 'confidence', name);
+      return args;
+    case 'enigma_import_approve':
+      rejectAdditionalProperties(args, new Set(['bundlePath', 'text', 'complete', 'now', 'confidence', 'approved', 'reviewed']), name);
+      optionalString(args, 'bundlePath', name);
+      optionalString(args, 'text', name);
+      optionalBoolean(args, 'complete', name);
+      optionalString(args, 'now', name);
+      optionalString(args, 'confidence', name);
+      optionalBoolean(args, 'approved', name);
+      optionalBoolean(args, 'reviewed', name);
       return args;
     case 'enigma_context_pack':
       rejectAdditionalProperties(args, new Set([
@@ -629,6 +640,24 @@ export const toolDescriptors = [
         now: { type: 'string' },
         confidence: { type: 'string' },
       },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'enigma_import_approve',
+    description: 'Write user-approved text or Markdown memory candidates to the local vault and return only public-safe receipt metadata.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        bundlePath: { type: 'string' },
+        text: { type: 'string' },
+        complete: { type: 'boolean' },
+        now: { type: 'string' },
+        confidence: { type: 'string' },
+        approved: { type: 'boolean' },
+        reviewed: { type: 'boolean' },
+      },
+      required: ['approved'],
       additionalProperties: false,
     },
   },
@@ -1302,6 +1331,78 @@ export async function enigma_import_preview(input = {}) {
   };
 }
 
+function blockedImportApproval(reasonCode, preview = undefined) {
+  return {
+    ok: false,
+    schema: 'enigma.import_approval_blocked.v1',
+    reason_code: reasonCode,
+    vault_write_performed: false,
+    ...(preview ? {
+      preview_summary: {
+        schema: preview.schema,
+        preview_id: preview.preview_id,
+        import_decision: preview.import_decision,
+        candidate_count: preview.candidate_count,
+        duplicate_group_count: preview.counts?.dedupe?.duplicate_group_count ?? 0,
+        primary_action: preview.primary_action,
+      },
+    } : {}),
+    claim_boundaries: {
+      local_preview_only: true,
+      raw_memory_returned: false,
+      provider_deletion_proof: false,
+      model_forgetting_proof: false,
+      hosted_saas_live: false,
+    },
+  };
+}
+
+export async function enigma_import_approve(input = {}) {
+  input = validateToolArguments('enigma_import_approve', input);
+  const previewReport = importTextMemoryList(input.text ?? '', {
+    now: input.now,
+    complete: input.complete === true,
+    confidence: input.confidence,
+  });
+  const preview = createImportPreview(previewReport, { now: input.now });
+  if (input.approved !== true) return blockedImportApproval('explicit_approval_required', preview);
+  if (preview.import_decision !== 'ready_for_import' && input.reviewed !== true) {
+    return blockedImportApproval('review_required_before_write', preview);
+  }
+  const path = bundlePath(input);
+  if (!(await fileExists(path))) return blockedImportApproval('bundle_missing', preview);
+  const { vault } = await loadState(path);
+  const report = importTextMemoryList(input.text ?? '', {
+    now: input.now,
+    complete: input.complete === true,
+    confidence: input.confidence,
+    vault,
+  });
+  await persistState(path, vault);
+  const postWritePreview = createImportPreview(report, { now: input.now });
+  const batchReceipt = createImportBatchReceipt(report, { now: input.now });
+  return {
+    ok: true,
+    schema: 'enigma.import_approved_batch.v1',
+    vault_write_performed: true,
+    preview_summary: {
+      schema: postWritePreview.schema,
+      preview_id: postWritePreview.preview_id,
+      import_decision: postWritePreview.import_decision,
+      candidate_count: postWritePreview.candidate_count,
+      duplicate_group_count: postWritePreview.counts?.dedupe?.duplicate_group_count ?? 0,
+    },
+    import_batch_receipt: batchReceipt,
+    claim_boundaries: {
+      local_enigma_vault_only: true,
+      raw_memory_returned: false,
+      provider_deletion_proof: false,
+      model_forgetting_proof: false,
+      hosted_saas_live: false,
+    },
+  };
+}
+
 export async function enigma_remember(input = {}) {
   input = validateToolArguments('enigma_remember', input);
   const path = bundlePath(input);
@@ -1525,6 +1626,7 @@ export const handlers = Object.freeze({
   enigma_init,
   enigma_remember,
   enigma_import_preview,
+  enigma_import_approve,
   enigma_search,
   enigma_context_pack,
   enigma_delete,
@@ -1753,6 +1855,7 @@ export default {
   enigma_next_action,
   enigma_remember,
   enigma_import_preview,
+  enigma_import_approve,
   enigma_search,
   enigma_context_pack,
   enigma_delete,

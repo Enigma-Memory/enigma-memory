@@ -482,6 +482,7 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
   assert.ok(names.includes('enigma_remember'));
   assert.ok(names.includes('enigma_search'));
   assert.ok(names.includes('enigma_import_preview'));
+  assert.ok(names.includes('enigma_import_approve'));
   assert.ok(names.includes('enigma_context_pack'));
   const contextPackTool = list.result.tools.find((tool) => tool.name === 'enigma_context_pack');
   assert.equal(contextPackTool.inputSchema.properties.revoked_grant_refs.items.pattern.startsWith('^ref:'), true);
@@ -507,6 +508,15 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
   assert.equal(importPreview.result.duplicate_groups.length, 1);
   assert.equal(importPreview.result.claim_boundaries.raw_memory_returned, false);
   assert.doesNotMatch(JSON.stringify(importPreview.response), /mcp import preview private sentinel/);
+  const unapprovedImport = await callTool('import-approve-unapproved', 'enigma_import_approve', {
+    text: previewText,
+    complete: true,
+    approved: false,
+  });
+  assert.equal(unapprovedImport.result.schema, 'enigma.import_approval_blocked.v1');
+  assert.equal(unapprovedImport.result.reason_code, 'explicit_approval_required');
+  assert.equal(unapprovedImport.result.vault_write_performed, false);
+  assert.doesNotMatch(JSON.stringify(unapprovedImport.response), /mcp import preview private sentinel/);
 
   const tempRoot = process.env.TEMP ?? process.env.TMP ?? '.';
   const dir = `${tempRoot}/enigma-network-${process.pid}-${Date.now()}`;
@@ -524,14 +534,42 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
     assert.equal(initialized.result.schema, 'enigma.vault_bundle.v1');
     assert.equal(typeof initialized.result.bundlePath, 'string');
     assert.equal(resolve(initialized.result.bundlePath), resolve(bundlePath));
-    assert.ok(initialized.result.bundlePath.endsWith('bundle.json'));
-    assert.equal(typeof initialized.result.vault_id, 'string');
-    assert.ok(initialized.result.vault_id.length > 0);
 
     const emptyNext = await callTool('next-empty-bundle', 'enigma_next_action', { bundlePath });
     assert.equal(emptyNext.result.state, 'needs_first_memory');
     assert.equal(emptyNext.result.primary_action.tool, 'enigma_remember');
     assert.equal(emptyNext.result.lanes.memory_inventory.status, 'empty');
+
+    const duplicateApproval = await callTool('import-approve-duplicate-blocked', 'enigma_import_approve', {
+      bundlePath,
+      text: '- duplicate mcp import note\n- duplicate mcp import note',
+      complete: true,
+      approved: true,
+    });
+    assert.equal(duplicateApproval.result.schema, 'enigma.import_approval_blocked.v1');
+    assert.equal(duplicateApproval.result.reason_code, 'review_required_before_write');
+    assert.equal(duplicateApproval.result.vault_write_performed, false);
+    assert.doesNotMatch(JSON.stringify(duplicateApproval.response), /duplicate mcp import note/);
+
+    const approvedImport = await callTool('import-approve-write', 'enigma_import_approve', {
+      bundlePath,
+      text: '- approved mcp import private note',
+      complete: true,
+      approved: true,
+      now: '2026-06-28T13:45:00.000Z',
+    });
+    assert.equal(approvedImport.result.schema, 'enigma.import_approved_batch.v1');
+    assert.equal(approvedImport.result.vault_write_performed, true);
+    assert.equal(approvedImport.result.import_batch_receipt.write_count, 1);
+    assert.equal(approvedImport.result.import_batch_receipt.claim_boundaries.raw_memory_returned, false);
+    assert.doesNotMatch(JSON.stringify(approvedImport.response), /approved mcp import private note/);
+
+    const postImportNext = await callTool('next-after-approved-import', 'enigma_next_action', { bundlePath });
+    assert.equal(postImportNext.result.lanes.memory_inventory.active_count, 1);
+    assert.ok(initialized.result.bundlePath.endsWith('bundle.json'));
+    assert.equal(typeof initialized.result.vault_id, 'string');
+    assert.ok(initialized.result.vault_id.length > 0);
+
 
     const secretText = 'network plaintext sentinel must not leak';
     const remembered = await callTool('remember', 'enigma_remember', {
@@ -550,7 +588,7 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
     const populatedNext = await callTool('next-populated-bundle', 'enigma_next_action', { bundlePath });
     assert.equal(populatedNext.result.state, 'ready_for_app_connection');
     assert.equal(populatedNext.result.primary_action.id, 'connect_ai_app');
-    assert.equal(populatedNext.result.lanes.memory_inventory.active_count, 1);
+    assert.equal(populatedNext.result.lanes.memory_inventory.active_count, 2);
     assert.doesNotMatch(JSON.stringify(populatedNext.response), /network plaintext sentinel/);
 
     const searched = await callTool('search', 'enigma_search', { bundlePath, query: 'plaintext sentinel', limit: 1 });
@@ -771,7 +809,7 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
     assert.equal(resource.error, undefined);
     const summary = JSON.parse(resource.result.contents[0].text);
     assert.equal(summary.ok, true);
-    assert.equal(summary.counts.memory_objects, 1);
+    assert.equal(summary.counts.memory_objects, 2);
 
     const prompt = await handleJsonRpcRequest({
       jsonrpc: '2.0',

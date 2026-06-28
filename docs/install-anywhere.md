@@ -195,6 +195,7 @@ MCP tools available through the server:
 - `enigma_next_action`
 - `enigma_remember`
 - `enigma_import_preview`
+- `enigma_import_approve`
 - `enigma_search`
 - `enigma_context_pack`
 - `enigma_delete`
