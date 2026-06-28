@@ -89,6 +89,8 @@ Run `npm run public-beta-qa` or `node scripts/run-public-beta-qa-matrix.mjs --js
 
 Treat `pass` as evidence for the automated local/static slice only. Treat `fail`, `blocked`, `missing`, or `pending` as a hold for public beta until the named blocker has public-safe evidence. The matrix must not be used as a substitute for clean Windows/macOS manual install tests, signed Windows/macOS artifact evidence, Apple notarization/stapling evidence, Microsoft/Windows signing evidence, Apple/Microsoft signing identity and signing-secret custody evidence, `0.1.19` npm publish evidence, PR approval/merge, reviewer approval, or a support dry run; do not mark any of those complete unless the supporting public-safe repo artifact/evidence exists.
 
+If the matrix reports `BLOCKER-SUPPORT-DRY-RUN`, the concrete public-safe evidence item to collect is `EV-P10-SUPPORT-DRY-RUN-SUMMARY`: a support dry-run summary with scenario ID, issue code, triage result, bundle privacy-check status, and support owner ref. Recording that item makes the missing evidence reviewable; it does not clear clean-machine, signing, release, approval, or support blockers by itself.
+
 ## Public beta hold conditions
 
 Hold P9 and the public beta announcement if any of these remain true:

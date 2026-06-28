@@ -18,6 +18,7 @@ For most people, start with the signed Enigma Memory desktop app. It creates you
 The desktop app bundles its runtime. Consumers should not install Node or npm for the default path.
 
 The desktop app uses the [Memory Controller](docs/memory-controller.md) to show Memory Weather, app permissions, recall approval, and `safe to share` / `not shared` decisions before Enigma offers context to a connected app.
+Consent grant scopes are canonicalized before verification, so the same app, purpose, operation set, and memory-zone set behave the same regardless of list order without widening what the app may access.
 
 For the public launch desktop flow, pair this with the [consumer onboarding UX plan](docs/public-launch/consumer-onboarding-ux.md), which keeps app permissions just-in-time and CLI/MCP details secondary.
 
@@ -47,10 +48,10 @@ Prerequisites:
 
 ```sh
 npm install -g enigma-memory
-enigma init
 enigma setup --bundle "$HOME/.enigma/bundle.json" --client auto --connect-installed --overwrite
-enigma drive health
-enigma status
+enigma doctor --bundle "$HOME/.enigma/bundle.json"
+enigma drive health --bundle "$HOME/.enigma/bundle.json"
+enigma status --bundle "$HOME/.enigma/bundle.json"
 ```
 
 Preview a single client before writing:

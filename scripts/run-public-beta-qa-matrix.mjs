@@ -59,6 +59,20 @@ const BLOCKERS = Object.freeze({
     blocker_id: 'BLOCKER-SUPPORT-DRY-RUN',
     status: 'blocked',
     evidence_refs: [REFS.qaSupport, REFS.releaseChecklist],
+    missing_evidence_items: [
+      {
+        evidence_item_id: 'EV-P10-SUPPORT-DRY-RUN-SUMMARY',
+        evidence_kind: 'public-safe support dry-run summary',
+        required_fields: [
+          'scenario_id',
+          'issue_code',
+          'triage_result',
+          'bundle_privacy_check_status',
+          'support_owner_ref',
+        ],
+        notes: 'Record support triage outcomes only; omit raw logs, screenshots, transcripts, credentials, account identifiers, owner names, and local absolute paths.',
+      },
+    ],
   },
   windowsSignedArtifact: {
     blocker_id: 'BLOCKER-WINDOWS-SIGNED-ARTIFACT',
@@ -213,17 +227,25 @@ function collectBlockers(rows) {
         status: definition?.status ?? row.status,
         scenario_ids: [],
         evidence_refs: definition?.evidence_refs ?? [],
+        missing_evidence_items: definition?.missing_evidence_items ?? [],
       };
       existing.scenario_ids.push(row.scenario_id);
       byId.set(blockerId, existing);
     }
   }
   return [...byId.values()]
-    .map((blocker) => ({
-      ...blocker,
-      scenario_ids: unique(blocker.scenario_ids).sort(),
-      evidence_refs: unique(blocker.evidence_refs).sort(),
-    }))
+    .map((blocker) => {
+      const missingEvidenceItems = [...blocker.missing_evidence_items]
+        .sort((left, right) => left.evidence_item_id.localeCompare(right.evidence_item_id));
+      const mapped = {
+        blocker_id: blocker.blocker_id,
+        status: blocker.status,
+        scenario_ids: unique(blocker.scenario_ids).sort(),
+        evidence_refs: unique(blocker.evidence_refs).sort(),
+      };
+      if (missingEvidenceItems.length > 0) mapped.missing_evidence_items = missingEvidenceItems;
+      return mapped;
+    })
     .sort((left, right) => left.blocker_id.localeCompare(right.blocker_id));
 }
 

@@ -16,6 +16,7 @@
 ## Boundary
 
 The package is deterministic, local, and dependency-free. It imports only core helpers for canonical hashes, Merkle roots, and public-safe artifact checks. It does not open sockets, inspect local files, call providers, persist state, or make claims about provider-side systems.
+Consent grant scope arrays are canonicalized before verification: operation and memory-zone order does not change the approved set, and mismatched app, operation, zone, expiry, revocation, malformed, or non-public-safe state still fails closed.
 
 Artifacts contain schema ids, refs, counts, hashes, statuses, and time buckets. Data-bearing or identity-bearing fields are rejected by the public-safe guard; generated examples use only synthetic refs.
 

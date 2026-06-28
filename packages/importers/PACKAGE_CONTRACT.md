@@ -12,12 +12,14 @@ Required named exports:
 - `importZepGraphitiExport(input, options)`
 - `exportEnigmaCapsule(options)`
 - `importEnigmaCapsule(capsule, options)`
+- `createImportPreview(reportOrReports, options)`
 - `runImporterDemo(options)`
 
 Invariants:
 
 - Importers accept already-parsed JSON objects, arrays, or text strings; they never call external provider services.
 - Import reports use `schema: enigma.import_report.v1`, return `memory_candidates`, `source_refs`, `limitations`, `confidence`, and a source fingerprint.
+- Import previews use `schema: enigma.import_preview.v1` and expose only counts, refs, commitments, limitations, and recommended review/import actions. They never return `memory_candidates.content`.
 - Import reports preserve source limitations and add an explicit completeness limitation unless the source includes a positive completeness flag. `complete: true` is emitted only from explicit source completeness.
 - Provider-native memory remains a cache. Imported candidates become canonical only when written through an Enigma vault.
 - When `options.vault` is supplied, importers call the local vault `remember` API and return only safe `vault_writes` metadata: candidate id, memory address, receipt hash, and event id.

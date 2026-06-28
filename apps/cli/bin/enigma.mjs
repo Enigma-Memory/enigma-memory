@@ -12,7 +12,7 @@ import { startStdioServer } from '../../../packages/mcp-server/src/index.js';
 import { runMeshDemo } from '../../../packages/mesh/src/index.js';
 import { runEnterpriseDemo } from '../../../packages/enterprise/src/index.js';
 import { connectClient, disconnectClient, doctorConnectors, getClientProfile, planConnectWizard, renderMcpConfig, supportedClients } from '../../../packages/connectors/src/index.js';
-import { exportEnigmaCapsule, importChatGptExport, importClaudeMemory, importEnigmaCapsule, importLangGraphStore, importLettaAgentFile, importMem0Export, importZepGraphitiExport } from '../../../packages/importers/src/index.js';
+import { createImportPreview, exportEnigmaCapsule, importChatGptExport, importClaudeMemory, importEnigmaCapsule, importLangGraphStore, importLettaAgentFile, importMem0Export, importZepGraphitiExport } from '../../../packages/importers/src/index.js';
 import * as relayServer from '../../relay/src/server.mjs';
 import * as gatewayServer from '../../gateway/src/server.mjs';
 import { verifyBundle } from '../../verifier/bin/enigma-verify.mjs';
@@ -667,7 +667,7 @@ async function bundleInitializedCheck(bundlePath, vaultPath) {
       target_exists: false,
       schema: null,
       reason: 'bundle_missing',
-      hint: 'Run quickstart or setup before using doctor as the final green check.',
+      hint: 'Run setup before using doctor as the final green check.',
     };
   }
   try {
@@ -1148,12 +1148,11 @@ function doctorNextCommands(bundleDisplay, client) {
   const clientId = client ?? DEFAULT_SETUP_CLIENTS[0];
   const bundle = commandPath(bundleDisplay);
   return [
-    `enigma quickstart --bundle ${bundle} --overwrite`,
-    `enigma setup --bundle ${bundle} --overwrite`,
+    `enigma setup --bundle ${bundle} --client auto --connect-installed --overwrite`,
     `enigma doctor --bundle ${bundle} --client ${clientId}`,
-    `enigma status --bundle ${bundle}`,
     `enigma drive health --bundle ${bundle}`,
-    `enigma connect ${clientId} --bundle ${bundle}`,
+    `enigma status --bundle ${bundle}`,
+    `enigma connect ${clientId} --bundle ${bundle} --dry-run`,
   ];
 }
 
@@ -1162,10 +1161,11 @@ function doctorFirstRunHint(_bundleDisplay, client) {
   const bundle = commandPath('<bundle-path>');
   return {
     bundle: '<bundle-path>',
+    command: `enigma setup --bundle ${bundle} --client auto --connect-installed --overwrite`,
     commands: [
-      `enigma quickstart --bundle ${bundle} --overwrite`,
-      `enigma setup --bundle ${bundle} --overwrite`,
+      `enigma setup --bundle ${bundle} --client auto --connect-installed --overwrite`,
       `enigma doctor --bundle ${bundle} --client ${clientId}`,
+      `enigma drive health --bundle ${bundle}`,
     ],
   };
 }
@@ -2297,8 +2297,25 @@ export async function importCommand(source, flags, io, positionalFile = undefine
   const report = importer(input, options);
   if (vault) await persistState(bundlePath, vault, { passphrase: getFlag(flags, ['passphrase']) });
   const out = getFlag(flags, ['out']);
-  if (out && out !== true) await writeJson(resolve(String(out)), report);
-  print({ ...report, source_file: file, bundle: vault ? bundlePath : undefined, out: out && out !== true ? resolve(String(out)) : undefined }, io);
+  const reportOut = out && out !== true ? resolve(String(out)) : undefined;
+  if (reportOut) await writeJson(reportOut, report);
+  const preview = createImportPreview(report, options);
+  print({
+    ...preview,
+    source_file: '<source-file>',
+    source_file_redacted: true,
+    bundle: vault ? publicPathDisplay(bundlePath, 'bundle-path') : undefined,
+    vault_write_performed: Boolean(vault),
+    raw_report_written: Boolean(reportOut),
+    report_out: reportOut ? publicPathDisplay(reportOut, 'out') : undefined,
+    claim_boundaries: {
+      provider_native_memory_canonical: false,
+      provider_deletion_proof: false,
+      model_forgetting_proof: false,
+      raw_memory_printed: false,
+      imported_candidates_canonical_only_after_vault_write: true,
+    },
+  }, io);
   return report.memory_candidates?.length > 0 || report.ok === true ? 0 : 1;
 }
 
@@ -3071,6 +3088,7 @@ Usage: enigma <command> [options]
 Quick start:
   npm install -g enigma-memory
   enigma setup --bundle "$HOME/.enigma/bundle.json" --client auto --connect-installed --overwrite
+  enigma doctor --bundle "$HOME/.enigma/bundle.json"
   echo "Your memory text" > memory.txt
   enigma remember --bundle "$HOME/.enigma/bundle.json" --text-file memory.txt
   enigma search  --bundle "$HOME/.enigma/bundle.json" --query "your topic"
@@ -3303,6 +3321,12 @@ function usage() {
         '--out <path>': 'Write the JSON report to a file in addition to stdout.',
       },
       boundary: 'Computed locally from public-safe counters, roots, receipt metadata, tombstones, and derived/context-pack refs only. No network or chain calls; transaction_submitted and raw_memory_on_chain are always false. It is local operational evidence, not provider-deletion, model-forgetting, compliance, or live-chain-settlement proof.',
+    },
+    import_options: {
+      'enigma import <source> --file <export.json>': 'Preview import candidates locally without printing memory plaintext.',
+      '--out <path>': 'Write the raw local import report for capsule export or review. CLI stdout remains a public-safe preview.',
+      '--write-vault': 'Explicitly write accepted importer candidates into the selected local bundle.',
+      '--bundle <path>': 'Bundle JSON to write when --write-vault is present. Defaults to .enigma/bundle.json.',
     },
     relay_gateway_options: {
       '--host <host>': 'Bind host. Defaults to 127.0.0.1.',

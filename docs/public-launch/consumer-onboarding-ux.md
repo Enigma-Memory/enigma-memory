@@ -60,12 +60,13 @@ The consumer journey begins before the wizard. These surfaces must also keep one
 ### Download page
 
 - **Title:** `Download Enigma Memory`
-- **Body:** `Install the desktop app to create a private Memory Drive on this computer.`
+- **Body:** `Download the desktop app, open Enigma Memory, and create a private Memory Drive on this computer.`
 - **Primary:** `Download for this computer`
 - **Secondary:** `Advanced install options`
-- **Trust note:** `Signed app. Local-first setup. No terminal required.`
+- **Trust note:** `Desktop app. Local-first setup. No terminal required.`
+- **10-second path:** `Download the desktop app → create your Memory Drive → connect a supported AI app.`
 
-The default download page must detect the operating system where possible and recommend the signed desktop installer. npm, CLI, and manual connection instructions belong behind `Advanced install options`.
+The default download page must detect the operating system where possible and recommend the desktop installer. npm, CLI, and manual connection instructions belong behind `Advanced install options`. Public copy must not imply signed distribution is complete until release evidence proves it.
 
 ### Installer complete
 

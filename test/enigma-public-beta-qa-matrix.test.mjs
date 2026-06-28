@@ -190,6 +190,33 @@ test('public beta QA matrix reports external production blockers without requiri
   }
 });
 
+test('support dry-run blocker names the concrete public-safe evidence summary still missing', async () => {
+  const matrix = await loadMatrix();
+  const supportDryRun = matrix.blockers.find((blocker) => blocker.blocker_id === 'BLOCKER-SUPPORT-DRY-RUN');
+
+  assert.ok(supportDryRun, 'support dry-run blocker must be reported');
+  assert.equal(supportDryRun.status, 'blocked');
+  assert.ok(supportDryRun.scenario_ids.includes('BETA-DIAG-001'));
+  assert.ok(supportDryRun.scenario_ids.includes('BETA-CRASH-001'));
+
+  assert.deepEqual(supportDryRun.missing_evidence_items, [
+    {
+      evidence_item_id: 'EV-P10-SUPPORT-DRY-RUN-SUMMARY',
+      evidence_kind: 'public-safe support dry-run summary',
+      required_fields: [
+        'scenario_id',
+        'issue_code',
+        'triage_result',
+        'bundle_privacy_check_status',
+        'support_owner_ref',
+      ],
+      notes: 'Record support triage outcomes only; omit raw logs, screenshots, transcripts, credentials, account identifiers, owner names, and local absolute paths.',
+    },
+  ]);
+  assert.equal(matrix.advisor_decision, 'hold');
+  assert.equal(matrix.summary.ready_for_public_beta, false);
+});
+
 test('config recovery scenarios are blocked once command and UI recovery surfaces exist', () => {
   const scenarios = buildScenarioRows({
     tauriConfig: {},

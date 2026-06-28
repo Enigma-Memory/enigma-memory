@@ -154,6 +154,37 @@ function optionalObjectArray(object, key, context) {
 const CONSENT_GRANT_ARTIFACT_KEYS = new Set(Object.keys(CONSENT_GRANT_JSON_SCHEMA.properties));
 const PRIVATE_MEMORY_BUBBLE_ARTIFACT_KEYS = new Set(Object.keys(PRIVATE_MEMORY_BUBBLE_JSON_SCHEMA.properties));
 const WEATHER_TILE_KEYS = new Set(['tile_ref', 'status', 'metric', 'count', 'evidence_refs']);
+const MEMORY_CONTROLLER_PUBLIC_SAFE_INPUT_DESCRIPTION = 'Use opaque refs, counts, timestamps, and reason codes only; never send raw memory, prompts, transcripts, provider output, local paths, secrets, or account/customer identifiers.';
+const MEMORY_CONTROLLER_TOOL_ANNOTATIONS = Object.freeze({
+  weather: Object.freeze({
+    title: 'Show Memory Weather',
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  }),
+  recall: Object.freeze({
+    title: 'Check Recall Boundary',
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  }),
+  grant: Object.freeze({
+    title: 'Create Consent Grant',
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: false,
+  }),
+  bubble: Object.freeze({
+    title: 'Open or Close Private Bubble',
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: false,
+    openWorldHint: false,
+  }),
+});
 const MEMORY_CONTROLLER_FORBIDDEN_INPUT_KEY_RE = /(?:^|_)(?:raw|text|content|plaintext|memory|raw_text|raw_memory|memory_payload|prompt|raw_prompt|transcript|transcript_payload|provider_payload|provider_response|provider_output|private_data|secret|secret_material|signing_secret|api_key|token|credential|embedding|embeddings|local_absolute_path|account|account_id|customer|customer_id|customer_identifier)$/u;
 
 function assertMcpMemoryControllerPublicSafeInput(value, context, seen = new Set()) {
@@ -615,6 +646,7 @@ export const toolDescriptors = [
     description: 'Return a public-safe Memory Weather report with opaque evidence refs and one next action before context is shared.',
     inputSchema: {
       type: 'object',
+      description: MEMORY_CONTROLLER_PUBLIC_SAFE_INPUT_DESCRIPTION,
       properties: {
         tiles: {
           type: 'array',
@@ -636,6 +668,7 @@ export const toolDescriptors = [
       },
       additionalProperties: false,
     },
+    annotations: MEMORY_CONTROLLER_TOOL_ANNOTATIONS.weather,
     outputSchema: MEMORY_WEATHER_REPORT_JSON_SCHEMA,
   },
   {
@@ -643,6 +676,7 @@ export const toolDescriptors = [
     description: 'Decide whether a local recall candidate set is safe to share for an app and purpose without returning raw memory.',
     inputSchema: {
       type: 'object',
+      description: MEMORY_CONTROLLER_PUBLIC_SAFE_INPUT_DESCRIPTION,
       properties: {
         grant: CONSENT_GRANT_JSON_SCHEMA,
         grants: { type: 'array', items: CONSENT_GRANT_JSON_SCHEMA },
@@ -659,6 +693,7 @@ export const toolDescriptors = [
       },
       additionalProperties: false,
     },
+    annotations: MEMORY_CONTROLLER_TOOL_ANNOTATIONS.recall,
     outputSchema: RECALL_VETO_DECISION_JSON_SCHEMA,
   },
   {
@@ -666,6 +701,7 @@ export const toolDescriptors = [
     description: 'Create a public-safe app permission grant for local Memory Controller decisions.',
     inputSchema: {
       type: 'object',
+      description: MEMORY_CONTROLLER_PUBLIC_SAFE_INPUT_DESCRIPTION,
       properties: {
         app_ref: { type: 'string' },
         purpose_ref: { type: 'string' },
@@ -684,6 +720,7 @@ export const toolDescriptors = [
       },
       additionalProperties: false,
     },
+    annotations: MEMORY_CONTROLLER_TOOL_ANNOTATIONS.grant,
     outputSchema: CONSENT_GRANT_JSON_SCHEMA,
   },
   {
@@ -691,6 +728,7 @@ export const toolDescriptors = [
     description: 'Open, keep, or discard a private memory bubble while returning only public-safe refs, counts, and boundary flags.',
     inputSchema: {
       type: 'object',
+      description: MEMORY_CONTROLLER_PUBLIC_SAFE_INPUT_DESCRIPTION,
       properties: {
         action: { type: 'string', enum: ['open', 'keep', 'discard'] },
         bubble: PRIVATE_MEMORY_BUBBLE_JSON_SCHEMA,
@@ -708,6 +746,7 @@ export const toolDescriptors = [
       required: ['action'],
       additionalProperties: false,
     },
+    annotations: MEMORY_CONTROLLER_TOOL_ANNOTATIONS.bubble,
     outputSchema: PRIVATE_MEMORY_BUBBLE_JSON_SCHEMA,
   },
   {

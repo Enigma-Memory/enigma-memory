@@ -23,6 +23,10 @@ async function readDesktopUiFile(name) {
   return readFile(new URL(`../apps/desktop-tauri/ui/${name}`, import.meta.url), 'utf8');
 }
 
+async function readWebsiteFile(name) {
+  return readFile(new URL(`../website/${name}`, import.meta.url), 'utf8');
+}
+
 function assertControllerPrimitiveContracts(controller) {
   assert.equal(CONSENT_GRANT_SCHEMA, 'enigma.memory_controller_grant.v1');
   assert.equal(MEMORY_WEATHER_REPORT_SCHEMA, 'enigma.memory_weather_report.v1');
@@ -217,9 +221,13 @@ test('desktop Tauri dashboard exposes Memory Controller consumer controls', asyn
   assert.match(wizard, /close-private-bubble/);
   assert.match(wizard, /review-recall/);
   assert.match(help, /just-in-time consent/i);
+  assert.match(help, /Setup has six short steps/i);
+  assert.match(wizard, /Read it like a traffic light/i);
+  assert.match(help, /Read the section like a traffic light/i);
   assert.match(help, /recall stays not shared/i);
   assert.match(help, /local review space/i);
   assert.match(styles, /memory-controller-grid/);
+  assert.match(styles, /memory-controller__plain-language/);
   assert.doesNotMatch(ui, /provider-side control/i);
   assert.doesNotMatch(ui, /provider deletion/i);
   assert.doesNotMatch(ui, /model forgetting|make a model forget/i);
@@ -233,4 +241,26 @@ test('desktop Tauri dashboard exposes Memory Controller consumer controls', asyn
   assert.doesNotMatch(ui, /summarize the customer transcript/i);
   assert.doesNotMatch(ui, /secret token/i);
   assert.doesNotMatch(ui, /model returned private content/i);
+});
+
+test('public website explains consumer install path without unsupported claims', async () => {
+  const [home, download, help, onboardingUx] = await Promise.all([
+    readWebsiteFile('index.html'),
+    readWebsiteFile('download.html'),
+    readWebsiteFile('help/index.html'),
+    readFile(new URL('../docs/public-launch/consumer-onboarding-ux.md', import.meta.url), 'utf8'),
+  ]);
+  const publicWebsite = `${home}\n${download}\n${help}`;
+  const funnelSpec = `${publicWebsite}\n${onboardingUx}`;
+
+  assert.match(home, /Download the desktop app/);
+  assert.match(home, /Create your Memory Drive/);
+  assert.match(home, /Connect an AI app/);
+  assert.match(download, /After the download/);
+  assert.match(download, /open Enigma Memory/i);
+  assert.match(help, /Start here/);
+  assert.match(help, /You should not need Node, npm, terminal commands, or JSON edits/);
+  assert.match(onboardingUx, /Download the desktop app → create your Memory Drive → connect a supported AI app/);
+  assert.match(funnelSpec, /Public copy must not imply signed distribution is complete until release evidence proves it/);
+  assertPublicSafe(publicWebsite);
 });

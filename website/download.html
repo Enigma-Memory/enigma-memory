@@ -24,8 +24,8 @@
   <main>
     <section class="hero">
       <span class="eyebrow">Download</span>
-      <h1>Install the desktop app. No terminal required.</h1>
-      <p>Choose your platform, open the signed installer, and Enigma will create a local vault during first run.</p>
+      <h1>Download the desktop app, then create your Memory Drive.</h1>
+      <p>Choose your platform, open Enigma Memory, and first run will create a private local vault on this computer.</p>
       <div class="cta-row">
         <a class="btn btn-primary" href="#platforms">Download for this device</a>
       </div>
@@ -37,13 +37,13 @@
       <div class="platform-grid">
         <article class="platform-card">
           <h3>macOS</h3>
-          <p>Requires macOS 13 or later. Open the signed, notarized disk image or installer package.</p>
-          <a class="btn btn-secondary" href="#signing">macOS download</a>
+          <p>Requires macOS 13 or later. Use the Enigma desktop package for macOS; see signing notes below if your OS warns before launch.</p>
+          <a class="btn btn-secondary" href="#signing">macOS signing notes</a>
         </article>
         <article class="platform-card">
           <h3>Windows</h3>
-          <p>Requires Windows 10 or later. Run the signed installer or install from the Microsoft Store.</p>
-          <a class="btn btn-secondary" href="#signing">Windows download</a>
+          <p>Requires Windows 10 or later. Use the Enigma desktop installer for Windows; see signing notes below if SmartScreen appears.</p>
+          <a class="btn btn-secondary" href="#signing">Windows signing notes</a>
         </article>
         <article class="platform-card">
           <h3>Linux</h3>
@@ -56,6 +56,24 @@
         <summary>Developer CLI</summary>
         <p>If you prefer the command line, see the <a href="./developers/cli.html">CLI appendix</a> for npm, Node, and manual MCP setup. This is not the default consumer path.</p>
       </details>
+    </section>
+
+    <section class="content-section" aria-labelledby="next-heading">
+      <h2 id="next-heading">After the download</h2>
+      <div class="card-grid">
+        <article class="card">
+          <h3>1. Open Enigma Memory</h3>
+          <p>Use the desktop app for the default consumer setup. Node, npm, and manual configuration stay in the CLI appendix.</p>
+        </article>
+        <article class="card">
+          <h3>2. Create your Memory Drive</h3>
+          <p>The app creates a private local vault for Enigma Memory data on this computer.</p>
+        </article>
+        <article class="card">
+          <h3>3. Connect supported apps</h3>
+          <p>Pick an AI app, preview the setting Enigma will change, approve it, then restart the app if prompted.</p>
+        </article>
+      </div>
     </section>
 
     <section class="content-section" id="signing" aria-labelledby="signing-heading">

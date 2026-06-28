@@ -380,6 +380,19 @@ p {
   margin-bottom: 0;
 }
 
+.memory-controller__plain-language {
+  padding: 0.8rem 0.9rem;
+  border: 1px solid rgba(126, 226, 168, 0.22);
+  border-radius: 0.75rem;
+  background: rgba(126, 226, 168, 0.08);
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.memory-controller__plain-language strong {
+  color: var(--text);
+}
+
 .memory-controller-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);

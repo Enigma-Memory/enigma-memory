@@ -306,6 +306,9 @@ function renderMemoryControllerSection() {
         <p class="eyebrow">Memory Controller</p>
         <h2 id="memory-controller-title">What can be shared right now?</h2>
         <p>Enigma shows the local decision before any connected app receives context. The controller can approve recall, keep memory not shared, or hold it in a private bubble while you decide.</p>
+        <div class="memory-controller__plain-language" role="note">
+          <strong>Read it like a traffic light:</strong> Clear means local checks found no issue and you still approve each app request. Needs review means check permissions. Sharing paused means fix the warning before Enigma shares local context.
+        </div>
       </div>
       <dl class="memory-controller-grid">
         ${renderControllerTile('Memory Weather', controller.weather)}

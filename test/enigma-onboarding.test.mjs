@@ -403,20 +403,21 @@ test('doctor reports first-run diagnostics without echoing local paths', async (
       target_exists: false,
       schema: null,
       reason: 'bundle_missing',
-      hint: 'Run quickstart or setup before using doctor as the final green check.',
+      hint: 'Run setup before using doctor as the final green check.',
     });
     assert.equal(summary.bundle_default_path.resolved, '<bundle-path>');
     assert.deepEqual(summary.connectors.clients.map((client) => client.config_path), ['[redacted:config_path]']);
     assert.ok(summary.next_commands.some((command) => command.startsWith('enigma setup ')));
     assert.ok(summary.next_commands.some((command) => command.startsWith('enigma connect generic-mcp ')));
     assert.equal(summary.first_run_hint.bundle, '<bundle-path>');
+    assert.equal(summary.first_run_hint.command, 'enigma setup --bundle "<bundle-path>" --client auto --connect-installed --overwrite');
     assert.deepEqual(summary.first_run_hint.commands, [
-      'enigma quickstart --bundle "<bundle-path>" --overwrite',
-      'enigma setup --bundle "<bundle-path>" --overwrite',
+      'enigma setup --bundle "<bundle-path>" --client auto --connect-installed --overwrite',
       'enigma doctor --bundle "<bundle-path>" --client generic-mcp',
+      'enigma drive health --bundle "<bundle-path>"',
     ]);
     assert.deepEqual(summary.fresh_install_hint, summary.first_run_hint);
-    assert.equal(summary.next_commands[0], 'enigma quickstart --bundle "<bundle-path>" --overwrite');
+    assert.equal(summary.next_commands[0], 'enigma setup --bundle "<bundle-path>" --client auto --connect-installed --overwrite');
   } finally {
     if (previousUserAgent === undefined) {
       delete process.env.npm_config_user_agent;
@@ -483,10 +484,11 @@ test('doctor explains connector bundle mismatch as first-run state without local
   assert.deepEqual(summary.connectors.clients.map((client) => client.config_path), ['[redacted:config_path]']);
   assert.deepEqual(summary.connectors.clients[0].repair_reasons, ['bundle_env_mismatch']);
   assert.equal(summary.first_run_hint.bundle, '<bundle-path>');
+  assert.equal(summary.first_run_hint.command, 'enigma setup --bundle "<bundle-path>" --client auto --connect-installed --overwrite');
   assert.deepEqual(summary.first_run_hint.commands, [
-    'enigma quickstart --bundle "<bundle-path>" --overwrite',
-    'enigma setup --bundle "<bundle-path>" --overwrite',
+    'enigma setup --bundle "<bundle-path>" --client auto --connect-installed --overwrite',
     'enigma doctor --bundle "<bundle-path>" --client generic-mcp',
+    'enigma drive health --bundle "<bundle-path>"',
   ]);
   assert.equal(JSON.stringify(summary.first_run_hint).includes(dir), false);
 });

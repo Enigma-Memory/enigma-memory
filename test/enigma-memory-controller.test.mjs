@@ -72,7 +72,7 @@ function assertBoundaryBooleans(value) {
   assert.equal(value.compliance_certification_claim, false);
 }
 
-test('consent grants use schema fields and verify array scopes', () => {
+test('consent grants canonicalize array scopes and verify exact coverage', () => {
   const grant = createConsentGrant(grantOptions());
   assert.equal(grant.schema, CONSENT_GRANT_SCHEMA);
   assert.equal(CONSENT_GRANT_SCHEMA, MEMORY_CONTROLLER_GRANT_SCHEMA);
@@ -95,6 +95,10 @@ test('consent grants use schema fields and verify array scopes', () => {
   assert.deepEqual(grant.operations, ['read_local', 'recall_context'].sort());
   assert.deepEqual(grant.memory_zone_refs, ['ref:zone:archive', 'ref:zone:work']);
   assertBoundaryBooleans(grant);
+
+  const reordered = createConsentGrant(grantOptions({ operations: ['read_local', 'recall_context'], memory_zone_refs: ['ref:zone:archive', 'ref:zone:work'] }));
+  assert.deepEqual(reordered.operations, grant.operations);
+  assert.deepEqual(reordered.memory_zone_refs, grant.memory_zone_refs);
 
   assert.equal(verifyConsentGrant(grant, grantOptions({ operation: 'recall_context', memory_zone_ref: 'ref:zone:work' })).ok, true);
   assert.deepEqual(

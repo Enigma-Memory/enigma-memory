@@ -4,6 +4,7 @@ import { createCapsuleManifest, createMeshNode, verifyCapsuleManifest } from '..
 
 const REPORT_SCHEMA = 'enigma.import_report.v1';
 const CAPSULE_SCHEMA = 'enigma.import_capsule.v1';
+const PREVIEW_SCHEMA = 'enigma.import_preview.v1';
 const CAPSULE_PAYLOAD_SCHEMA = 'enigma.import_capsule_payload.v1';
 const VERIFIER_METADATA_SCHEMA = 'enigma.import_capsule_verifier_metadata.v1';
 const IMMUNE_INGRESS_SCHEMA = 'enigma.immune_scan_report.v1';
@@ -589,6 +590,96 @@ function reportFrom(importer, sourceType, input, candidates, baseLimitations, op
     memory_candidates: memoryCandidates,
     vault_writes
   };
+}
+
+function normalizeReportsForPreview(input) {
+  if (Array.isArray(input)) return input.filter(isRecord);
+  if (!isRecord(input)) return [];
+  if (Array.isArray(input.reports)) return input.reports.filter(isRecord);
+  if (Array.isArray(input.report)) return input.report.filter(isRecord);
+  return [input];
+}
+
+function previewCandidateRef(candidate, index) {
+  if (typeof candidate.candidate_id === 'string' && candidate.candidate_id.length > 0) {
+    return `ref:import-candidate:${candidate.candidate_id.replace(/[^A-Za-z0-9._~:@#?=&%+-]/gu, '_')}`;
+  }
+  return `ref:import-candidate:${shortHash({ index, candidate })}`;
+}
+
+function importPreviewAction(candidate, report) {
+  if (candidate.confidence === 'low') return 'review_before_import';
+  if (report.complete !== true) return 'review_before_import';
+  if (Array.isArray(candidate.limitations) && candidate.limitations.length > 0) return 'review_before_import';
+  return 'ready_for_import';
+}
+
+function importPreviewCandidates(reports) {
+  const previews = [];
+  let index = 0;
+  for (const report of reports) {
+    for (const candidate of asArray(report.memory_candidates).filter(isRecord)) {
+      const action = importPreviewAction(candidate, report);
+      previews.push({
+        candidate_ref: previewCandidateRef(candidate, index),
+        importer: report.importer ?? 'unknown',
+        source_type: report.source_type ?? 'unknown',
+        kind: candidate.kind ?? 'fact',
+        confidence: normalizeConfidence(candidate.confidence, 'medium'),
+        recommended_action: action,
+        content_commitment: rootOf(candidate.content ?? ''),
+        source_ref_count: asArray(candidate.source_refs).length,
+        limitation_count: asArray(candidate.limitations).length,
+        metadata_commitment: rootOf(candidate.metadata ?? {}),
+      });
+      index += 1;
+    }
+  }
+  return previews;
+}
+
+function importPreviewCounts(candidates) {
+  const confidence = { high: 0, medium: 0, low: 0 };
+  const recommended_actions = { ready_for_import: 0, review_before_import: 0 };
+  for (const candidate of candidates) {
+    if (Object.prototype.hasOwnProperty.call(confidence, candidate.confidence)) confidence[candidate.confidence] += 1;
+    recommended_actions[candidate.recommended_action] += 1;
+  }
+  return { confidence, recommended_actions };
+}
+
+export function createImportPreview(input, options = {}) {
+  const reports = normalizeReportsForPreview(input);
+  const candidates = importPreviewCandidates(reports);
+  const reportRefs = reports.map((report, index) => `ref:import-report:${report.report_id ?? shortHash({ index, report })}`);
+  const sourceTypes = uniqueStrings(reports.map((report) => report.source_type).filter(Boolean));
+  const importers = uniqueStrings(reports.map((report) => report.importer).filter(Boolean));
+  const limitations = uniqueStrings(reports.flatMap((report) => asArray(report.limitations).filter((item) => typeof item === 'string')));
+  const candidateRefs = candidates.map((candidate) => candidate.candidate_ref);
+  const preview = {
+    schema: PREVIEW_SCHEMA,
+    preview_id: `preview_${shortHash({ reportRefs, candidateRefs, generated_at: nowFrom(options) })}`,
+    generated_at: nowFrom(options),
+    report_count: reports.length,
+    importers,
+    source_types: sourceTypes,
+    candidate_count: candidates.length,
+    candidates,
+    counts: importPreviewCounts(candidates),
+    limitations,
+    roots: {
+      report_root: new MerkleSet(reportRefs).root(),
+      candidate_preview_root: new MerkleSet(candidateRefs).root(),
+      content_commitment_root: new MerkleSet(candidates.map((candidate) => candidate.content_commitment)).root(),
+    },
+    private_plaintext_boundary: {
+      raw_plaintext_returned: false,
+      default_action: 'preview_only',
+      write_requires_explicit_approval: true,
+      public_artifact_policy: 'hashes_counts_refs_and_commitments_only',
+    },
+  };
+  return preview;
 }
 
 function uniqueSourceRefs(refs) {
@@ -1333,6 +1424,7 @@ export default {
   createImmuneIngressReport,
   quarantineImmuneIngressCandidates,
   assertImmuneIngressPublicSafe,
+  createImportPreview,
   exportEnigmaCapsule,
   importEnigmaCapsule,
   runImporterDemo

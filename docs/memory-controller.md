@@ -25,6 +25,7 @@ Recall approval happens before Enigma shares context with the app. A `not shared
 ## Technical contract
 
 The primitive layer is deterministic and fail-closed. A missing grant, unknown connector, expired bubble, unsafe export scan, or unavailable policy result becomes `withhold`, `needs_review`, or `blocked`; it never silently falls back to sharing memory.
+Consent grant operation lists and memory-zone lists are canonicalized as scoped sets. Reordering the same approved operations or zones does not create a broader permission, and verification still checks the exact app, operation, memory zone, expiry, revocation state, and public-safe shape before a recall can proceed.
 
 Public schemas use draft 2020-12 and stable `enigma.<snake_case>.v1` identifiers for the public-safe shape of each primitive:
 
@@ -40,6 +41,8 @@ The implementation exports `createConsentGrant`, `verifyConsentGrant`, `createRe
 ## MCP tools
 
 MCP clients use the same primitives through public-safe tools. Each tool returns refs, labels, counts, booleans, and reason codes only; it must fail closed rather than return raw memory, prompts, transcripts, provider payloads, local paths, or secrets.
+
+MCP-compatible clients can inspect tool annotations and schema descriptions during Claude/Cursor setup. Enigma marks Weather and Recall checks as read-only/idempotent, marks Consent Grant and Private Bubble as state-affecting, marks Private Bubble close/discard as potentially destructive, marks all four as local-only (`openWorldHint: false`), and repeats opaque-ref-only input guidance so clients that surface these hints can show safer labels before a user wires the connector.
 
 | Tool | Consumer meaning | Public-safe result |
 | --- | --- | --- |

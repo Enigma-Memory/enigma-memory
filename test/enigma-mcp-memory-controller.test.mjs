@@ -22,6 +22,37 @@ const MEMORY_CONTROLLER_TOOLS = Object.freeze([
   'enigma_consent_grant',
   'enigma_private_bubble',
 ]);
+const EXPECTED_TOOL_ANNOTATIONS = Object.freeze({
+  enigma_memory_weather: Object.freeze({
+    title: 'Show Memory Weather',
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  }),
+  enigma_recall_veto: Object.freeze({
+    title: 'Check Recall Boundary',
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  }),
+  enigma_consent_grant: Object.freeze({
+    title: 'Create Consent Grant',
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: false,
+  }),
+  enigma_private_bubble: Object.freeze({
+    title: 'Open or Close Private Bubble',
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: false,
+    openWorldHint: false,
+  }),
+});
+const EXPECTED_INPUT_DESCRIPTION = 'Use opaque refs, counts, timestamps, and reason codes only; never send raw memory, prompts, transcripts, provider output, local paths, secrets, or account/customer identifiers.';
 
 function descriptor(name) {
   return toolDescriptors.find((tool) => tool.name === name);
@@ -57,9 +88,11 @@ test('MCP Memory Controller tools are listed, handled, and exported with strict 
     const tool = descriptor(name);
     assert.ok(tool, `${name} descriptor missing`);
     assert.equal(tool.inputSchema.type, 'object');
+    assert.equal(tool.inputSchema.description, EXPECTED_INPUT_DESCRIPTION);
     assert.equal(tool.inputSchema.additionalProperties, false);
     assert.equal(tool.outputSchema.type, 'object');
     assert.equal(tool.outputSchema.additionalProperties, false);
+    assert.deepEqual(tool.annotations, EXPECTED_TOOL_ANNOTATIONS[name]);
     assert.equal(typeof handlers[name], 'function');
     assert.equal(typeof mcpServer.handlers[name], 'function');
     assert.equal(typeof mcpServer[name], 'function');
@@ -70,8 +103,11 @@ test('MCP Memory Controller tools are listed, handled, and exported with strict 
     id: 'tools-list',
     method: 'tools/list',
   });
-  const listedNames = new Set(listResponse.result.tools.map((tool) => tool.name));
-  for (const name of MEMORY_CONTROLLER_TOOLS) assert.equal(listedNames.has(name), true);
+  const listedTools = new Map(listResponse.result.tools.map((tool) => [tool.name, tool]));
+  for (const name of MEMORY_CONTROLLER_TOOLS) {
+    assert.equal(listedTools.has(name), true);
+    assert.deepEqual(listedTools.get(name).annotations, EXPECTED_TOOL_ANNOTATIONS[name]);
+  }
 
   assert.equal(descriptor('enigma_recall_veto').inputSchema.properties.grant.additionalProperties, false);
   assert.equal(descriptor('enigma_recall_veto').inputSchema.properties.grants.items.additionalProperties, false);
