@@ -46,7 +46,7 @@
 - Desktop-first `README.md`.
 - Updated `docs/install-anywhere.md`.
 - Static `website/` pages: home, download, setup, help hub, install/connect/troubleshooting guides, privacy, proofs, FAQ, and developer CLI appendix. Home/download pages now present a consumer setup path, local trust boundary, Import Sandbox, Proof Activity, and unsigned-build caveat without claiming signed public release.
-- CLI-first fallback is still supported for power users: `enigma doctor --plain` gives a one-screen, path-redacted next action instead of JSON.
+- CLI-first fallback is still supported for power users: `enigma setup --plain`, `enigma doctor --plain`, and `enigma next --plain` give one-screen, path-redacted next actions instead of JSON.
 
 ---
 
@@ -67,11 +67,11 @@
 
 - `npm run check` at repo root: **pass**.
 - `npm run secret-scan` at repo root: **pass**.
-- `npm test` at repo root: **611/611 pass**.
+- `npm test` at repo root: **612/612 pass**.
 - `npm pack --dry-run` at repo root: **pass** (`enigma-memory-0.1.18.tgz` dry-run output).
 - `npm run public-beta-qa` at repo root: **hold**, `21 blocked / 0 missing`, required public beta version `0.1.19`.
 - `cargo test` in `apps/desktop-tauri/`: **23/23 pass**.
-- PR #60 latest checks after commit `2c3c833`: Anchor Build and Test **pass**, Package gates Ubuntu **pass**, Package gates Windows **pass**.
+- PR #60 latest checks after commit `f1a0be1`: Anchor Build and Test **pass**, Package gates Ubuntu **pass**, Package gates Windows **pass**.
 
 ---
 
