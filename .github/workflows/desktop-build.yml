@@ -1,0 +1,74 @@
+name: Desktop build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: short
+  TAURI_SIGNING_PRIVATE_KEY: ""
+  TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+  UPDATER_MANIFEST_URL: "https://example.com/enigma-desktop/updater.json"
+
+jobs:
+  build:
+    name: Build desktop app (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set up Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop-tauri
+
+      - name: Run package metadata check
+        run: npm run check
+
+      - name: Run secret scan
+        run: npm run secret-scan
+
+      - name: Run clippy
+        working-directory: apps/desktop-tauri
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Check Tauri app
+        working-directory: apps/desktop-tauri
+        run: cargo check --bin enigma-desktop-tauri
+
+      - name: Build Tauri app (debug, no code signing)
+        working-directory: apps/desktop-tauri
+        run: cargo build --bin enigma-desktop-tauri
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ""
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Connect Enigma Memory to Claude Desktop.">
+  <title>Connect Claude Desktop to Enigma Memory</title>
+  <link rel="stylesheet" href="../../styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="site-logo" href="../../index.html">Enigma Memory</a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="../../download.html">Download</a>
+        <a href="../../setup.html">How it works</a>
+        <a href="../../privacy.html">Privacy</a>
+        <a href="../index.html">Help</a>
+        <a href="../../faq.html">FAQ</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <span class="eyebrow">Connect apps</span>
+      <h1>Connect Claude Desktop to Enigma Memory.</h1>
+      <p>The Enigma desktop app detects Claude Desktop, previews the settings change, and applies it only after you approve it.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="steps-heading">
+      <h2 id="steps-heading">Connect Claude Desktop</h2>
+      <ol>
+        <li>Make sure Claude Desktop is installed and has been opened at least once.</li>
+        <li>Open Enigma Memory and run the setup wizard, or open the Connections screen.</li>
+        <li>When Claude Desktop appears in the detected apps list, click <strong>Connect</strong>.</li>
+        <li>Review the preview of the settings change, then approve it.</li>
+        <li>Restart Claude Desktop if Enigma asks you to.</li>
+      </ol>
+
+      <div class="boundary-callout">
+        <strong>Boundary note:</strong> Enigma connectors can only configure Claude Desktop to start Enigma's local MCP server. They cannot make Anthropic delete logs or force a model to forget.
+      </div>
+    </section>
+
+    <section class="content-section" aria-labelledby="extension-heading">
+      <h2 id="extension-heading">Claude Desktop Extension</h2>
+      <p>When the Enigma Desktop Extension (.mcpb) is available, it is the easiest Claude path. Enigma will offer it before falling back to manual MCP settings.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="trouble-heading">
+      <h2 id="trouble-heading">If Claude Desktop is not detected</h2>
+      <p>Try these steps:</p>
+      <ul>
+        <li>Confirm Claude Desktop is installed and was opened at least once.</li>
+        <li>Click <strong>Refresh detection</strong> in Enigma.</li>
+        <li>Restart Claude Desktop, then refresh detection again.</li>
+      </ul>
+      <p>If it still is not detected, see <a href="../troubleshooting/client-not-detected.html">AI app not detected</a>.</p>
+    </section>
+
+    <section class="content-section">
+      <details>
+        <summary>Manual MCP configuration</summary>
+        <p>Manual MCP JSON is for developers and troubleshooting only. If the desktop app cannot detect or connect Claude Desktop, see the <a href="../../developers/cli.html">CLI appendix</a> for manual snippets and connector commands.</p>
+      </details>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer__inner">
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="../../download.html">Download</a></li>
+          <li><a href="../../setup.html">How it works</a></li>
+          <li><a href="../../privacy.html">Privacy</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Support</h4>
+        <ul>
+          <li><a href="../index.html">Help hub</a></li>
+          <li><a href="../install.html">Install guide</a></li>
+          <li><a href="../troubleshooting.html">Troubleshooting</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Developers</h4>
+        <ul>
+          <li><a href="../../developers/cli.html">CLI appendix</a></li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

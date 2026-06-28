@@ -2,15 +2,68 @@ import { createInterface } from "node:readline";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createServer } from "node:http";
 import { randomUUID, createHmac } from "node:crypto";
+import { resolve, dirname, join } from "node:path";
+import { mkdirSync } from "node:fs";
 import { Connection, PublicKey } from "@solana/web3.js";
-import { createStore } from "./store.mjs";
+import { createStore, deriveDataEncryptionKey } from "./store.mjs";
 import { createEmbedder } from "./embed.mjs";
 
 let defaultStore;
 let defaultEmbedder;
 
+// Fixed test entropy used only when no wallet entropy is configured. This
+// makes local/test stores deterministic and reproducible, but it is NOT
+// secrets-manager grade: any party that knows this constant can derive the
+// same per-user keys. Production deployments MUST supply wallet entropy via
+// options.getOwnerEntropy.
+const TEST_MASTER_ENTROPY = Buffer.from(
+  "cortex-deterministic-test-master-entropy-v1",
+  "utf8"
+);
+
+function getOwnerEntropy(owner, options = {}) {
+  if (typeof options.getOwnerEntropy === "function") {
+    return options.getOwnerEntropy(owner);
+  }
+  return null;
+}
+
+function deriveDekForOwner(owner, options = {}) {
+  const entropy = getOwnerEntropy(owner, options);
+  if (entropy) {
+    return deriveDataEncryptionKey(entropy, options.passphrase);
+  }
+  return deriveDataEncryptionKey(TEST_MASTER_ENTROPY, owner);
+}
+
+function makeUserStorePath(owner, options = {}) {
+  if (options.storePath) {
+    return join(options.storePath, `${owner}.sqlite`);
+  }
+  return resolve(`data/cortex-stores/${owner}.sqlite`);
+}
+
 function getStore(options = {}) {
   return options.store ?? (defaultStore ??= createStore());
+}
+
+function getStoreForUser(options = {}, userId) {
+  if (options.store) {
+    return options.store;
+  }
+  if (!userId) {
+    return getStore(options);
+  }
+  const stores = options.stores ?? (options.stores = new Map());
+  if (stores.has(userId)) {
+    return stores.get(userId);
+  }
+  const dek = deriveDekForOwner(userId, options);
+  const path = makeUserStorePath(userId, options);
+  mkdirSync(dirname(path), { recursive: true });
+  const store = createStore({ path, dek });
+  stores.set(userId, store);
+  return store;
 }
 
 function getEmbedder(options = {}) {
@@ -536,7 +589,6 @@ function readResource(store, uri) {
 }
 
 async function handle(request, options = {}) {
-  const store = getStore(options);
   const embedder = getEmbedder(options);
   const auth = options.auth ?? { userId: undefined, scopes: ["*"] };
 
@@ -556,7 +608,11 @@ async function handle(request, options = {}) {
   if (request.method === "tools/call") {
     const { name, arguments: args = {} } = request.params;
     authorizeTool(auth, name);
-    await verifyOnChainSession(auth, name, options);
+    if (!options.skipSessionVerification) {
+      await verifyOnChainSession(auth, name, options);
+    }
+
+    const store = getStoreForUser(options, auth.userId);
 
     if (name === "store_memory") {
       const { id, text, owner } = args;
@@ -612,6 +668,13 @@ async function handle(request, options = {}) {
       return uri.startsWith(prefix.split("//")[0]) || uri.startsWith(prefix);
     })?.uriTemplate;
     authorizeResource(auth, template);
+    let resourceUserId = auth.userId;
+    if (uri.startsWith("cortex://memory/")) {
+      resourceUserId = uri.slice("cortex://memory/".length);
+    } else if (uri.startsWith("cortex://budget/")) {
+      resourceUserId = uri.slice("cortex://budget/".length);
+    }
+    const store = getStoreForUser(options, resourceUserId);
     const content = readResource(store, uri);
     return { contents: [content] };
   }
@@ -761,6 +824,7 @@ export function startMcpHttpServer(port = 3001, options = {}) {
       for (const request of requests) {
         try {
           const result = await handle(request, {
+            ...options,
             store,
             embedder,
             auth: session.auth,
@@ -788,11 +852,17 @@ export function startMcpHttpServer(port = 3001, options = {}) {
     res.writeHead(404, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ error: "not found" }));
   });
-
   server.on("close", () => {
     try {
       store.close();
     } catch {}
+    if (options.stores) {
+      for (const userStore of options.stores.values()) {
+        try {
+          userStore.close();
+        } catch {}
+      }
+    }
   });
 
   return new Promise((resolve) => {

@@ -5,6 +5,8 @@
  * Falls back to mock responses when opened directly in a browser for smoke tests.
  */
 
+import { renderHelpButton } from './help.js';
+
 const SCREENS = [
   { id: 'welcome', label: 'Welcome' },
   { id: 'vault', label: 'Private vault' },
@@ -32,6 +34,8 @@ let clients = [];
 let health = {};
 let diagnostics = {};
 let update = {};
+let serviceStatus = {};
+let serviceLogs = [];
 let busy = false;
 
 function $(selector) {
@@ -47,12 +51,13 @@ async function mockInvoke(cmd, args = {}) {
   await new Promise((r) => setTimeout(r, 350));
   switch (cmd) {
     case 'create_vault':
+    case 'get_health':
       return {
         memory_drive_status: 'ready',
         connected_app_count: clients.filter((c) => c.status === 'connected').length,
         proof_status: clients.some((c) => c.status === 'connected') ? 'active' : 'idle',
-        update_status: 'current',
-        diagnostics_status: 'passed',
+        update_status: update.status || 'current',
+        diagnostics_status: diagnostics.status || 'passed',
         offline_ready: true,
         issue_codes: [],
       };
@@ -75,20 +80,23 @@ async function mockInvoke(cmd, args = {}) {
       if (c) c.status = 'ready';
       return c || { id: args.id, name: args.id, status: 'ready' };
     }
-    case 'get_health':
-      return {
-        memory_drive_status: 'ready',
-        connected_app_count: clients.filter((c) => c.status === 'connected').length,
-        proof_status: clients.some((c) => c.status === 'connected') ? 'active' : 'idle',
-        update_status: 'current',
-        diagnostics_status: 'passed',
-        offline_ready: true,
-        issue_codes: [],
-      };
     case 'get_diagnostics':
       return { status: 'passed', summary: 'Local checks completed.', issue_codes: [] };
+    case 'export_diagnostics':
+      return { exported: true, path: '<redacted-path>' };
     case 'check_update':
-      return { status: 'current', version: '0.1.18' };
+      return { status: 'current', current_version: '0.1.18', available_version: '0.1.18' };
+    case 'start_service':
+    case 'get_service_status':
+      return { running: true, pid: 12345, restarts: 0, uptime_secs: 0 };
+    case 'stop_service':
+      return { running: false, pid: 0, restarts: 0, uptime_secs: 0 };
+    case 'get_service_logs':
+      return ['[mock] service started', '[mock] ready'];
+    case 'create_memory_drive':
+      return { ok: true, memory_drive_status: 'ready' };
+    case 'get_memory_drive_status':
+      return { memory_drive_status: 'ready' };
     case 'shutdown_service':
       return 'service stopped';
     default:
@@ -110,17 +118,20 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
-function renderHeader() {
+function renderHeader(context = 'welcome') {
   return `
     <header class="app-header">
       <div class="brand"><div class="brand-mark" aria-hidden="true"></div>Enigma Memory</div>
-      <div class="progress">${currentStep < SCREENS.length ? `Step ${currentStep + 1} of ${SCREENS.length} · ${escapeHtml(SCREENS[currentStep].label)}` : 'Dashboard'}</div>
+      <div class="app-header__actions">
+        <div class="progress">${currentStep < SCREENS.length ? `Step ${currentStep + 1} of ${SCREENS.length} · ${escapeHtml(SCREENS[currentStep].label)}` : 'Dashboard'}</div>
+        ${renderHelpButton(context)}
+      </div>
     </header>
   `;
 }
 
-function renderCard(body) {
-  return `${renderHeader()}<main class="wizard-card">${body}<p id="status" class="status-line" aria-live="polite"></p></main>`;
+function renderCard(body, context = 'welcome') {
+  return `${renderHeader(context)}<main class="wizard-card">${body}<p id="status" class="status-line" aria-live="polite"></p></main>`;
 }
 
 function primaryButton(label, action, opts = {}) {
@@ -143,7 +154,7 @@ function renderWelcome() {
     <div id="privacy-disclosure" class="disclosure hidden">
       Setup creates local files for Enigma Memory. It does not delete anything from AI providers, change a model, or publish your memory.
     </div>
-  `);
+  `, 'welcome');
 }
 
 function renderVault() {
@@ -159,7 +170,7 @@ function renderVault() {
       ${primaryButton('Create vault', 'create-vault-action')}
       ${secondaryButton('Choose a different location', 'choose-location')}
     </div>
-  `);
+  `, 'vault');
 }
 
 function renderFindApps() {
@@ -171,7 +182,7 @@ function renderFindApps() {
       ${primaryButton('Find my apps', 'detect-clients')}
       ${secondaryButton('I will connect apps later', 'skip-apps')}
     </div>
-  `);
+  `, 'connections');
 }
 
 function renderConnectApps() {
@@ -207,7 +218,7 @@ function renderConnectApps() {
     <div id="connection-disclosure" class="disclosure hidden">
       Connected apps can ask Enigma for relevant memory. Enigma still keeps your private vault local. You control which apps are connected.
     </div>
-  `);
+  `, 'connections');
 }
 
 function renderHealth() {
@@ -219,7 +230,7 @@ function renderHealth() {
       ${primaryButton('Run health check', 'run-health')}
       ${secondaryButton('Open dashboard anyway', 'go-dashboard')}
     </div>
-  `);
+  `, 'health');
 }
 
 function renderReady() {
@@ -239,13 +250,19 @@ function renderReady() {
       ${primaryButton('Open dashboard', 'go-dashboard')}
       ${secondaryButton('Explore advanced details', 'go-dashboard')}
     </div>
-  `);
+  `, 'welcome');
 }
 
 function renderDashboard() {
   const issueTags = (health.issue_codes?.length ? health.issue_codes : ['none']).map(
     (code) => `<li>${escapeHtml(code)}</li>`
   ).join('');
+  const serviceRunning = serviceStatus?.running;
+  const serviceAction = serviceRunning ? 'stop-service' : 'start-service';
+  const serviceLabel = serviceRunning ? 'Stop engine' : 'Start engine';
+  const logsText = serviceLogs?.length ? serviceLogs.slice(-5).join('\n') : 'No logs yet.';
+  const updateStatus = update?.status || 'unknown';
+  const updateAvailable = update?.available_version && update.available_version !== update.current_version;
 
   return renderCard(`
     <p class="eyebrow">Memory health</p>
@@ -255,7 +272,7 @@ function renderDashboard() {
       <div class="metric"><dt>Memory Drive</dt><dd>${escapeHtml(health.memory_drive_status || 'unknown')}</dd></div>
       <div class="metric"><dt>Connected apps</dt><dd>${escapeHtml(String(health.connected_app_count ?? 0))}</dd></div>
       <div class="metric"><dt>Proof activity</dt><dd>${escapeHtml(health.proof_status || 'idle')}</dd></div>
-      <div class="metric"><dt>Update status</dt><dd>${escapeHtml(health.update_status || 'unknown')}</dd></div>
+      <div class="metric"><dt>Update status</dt><dd>${escapeHtml(updateStatus)}</dd></div>
       <div class="metric"><dt>Diagnostics</dt><dd>${escapeHtml(health.diagnostics_status || 'idle')}</dd></div>
       <div class="metric"><dt>Offline ready</dt><dd>${health.offline_ready ? 'Yes' : 'No'}</dd></div>
     </div>
@@ -263,11 +280,44 @@ function renderDashboard() {
       <dt>Issue codes</dt>
       <ul class="issue-list">${issueTags}</ul>
     </div>
+
+    <div class="dashboard-section">
+      <h2>Engine service</h2>
+      <p>Status: <strong>${serviceRunning ? 'Running' : 'Stopped'}</strong>
+        ${serviceStatus?.pid ? `(pid ${escapeHtml(String(serviceStatus.pid))})` : ''}</p>
+      <p class="note">Restarts: ${escapeHtml(String(serviceStatus?.restarts ?? 0))} · Uptime: ${escapeHtml(String(serviceStatus?.uptime_secs ?? 0))}s</p>
+      <div class="button-row">
+        ${primaryButton(serviceLabel, serviceAction)}
+        ${secondaryButton('Refresh logs', 'view-logs')}
+      </div>
+      <pre class="log-view" aria-label="Recent engine logs">${escapeHtml(logsText)}</pre>
+    </div>
+
+    <div class="dashboard-section">
+      <h2>Diagnostics bundle</h2>
+      <p>${escapeHtml(diagnostics?.summary || 'Run diagnostics to collect public-safe health metadata.')}</p>
+      <p class="note">Status: ${escapeHtml(diagnostics?.status || 'idle')}</p>
+      <div class="button-row">
+        ${primaryButton('Run diagnostics', 'run-diagnostics')}
+        ${secondaryButton('Export bundle', 'export-diagnostics')}
+      </div>
+    </div>
+
+    <div class="dashboard-section">
+      <h2>Update check</h2>
+      <p>Current version: ${escapeHtml(update?.current_version || '0.1.18')}</p>
+      <p>Available version: ${escapeHtml(update?.available_version || 'unknown')}
+        ${updateAvailable ? ` <span class="status-pill warning">Update available</span>` : ''}</p>
+      <div class="button-row">
+        ${primaryButton('Check for updates', 'check-update')}
+      </div>
+    </div>
+
     <div class="button-row">
       ${primaryButton('Run health check', 'run-health')}
       ${secondaryButton('Shutdown service', 'shutdown')}
     </div>
-  `);
+  `, 'health');
 }
 
 function render() {
@@ -374,6 +424,8 @@ async function handleAction(event) {
       busy = true;
       setStatus('Checking vault...');
       health = await call('get_health');
+      serviceStatus = await call('get_service_status');
+      serviceLogs = await call('get_service_logs', { limit: 100 });
       diagnostics = await call('get_diagnostics');
       update = await call('check_update');
       health.diagnostics_status = diagnostics.status;
@@ -396,6 +448,67 @@ async function handleAction(event) {
       health = await call('get_health');
       busy = false;
       render();
+      return;
+    }
+    case 'start-service': {
+      busy = true;
+      setStatus('Starting engine...');
+      serviceStatus = await call('start_service');
+      serviceLogs = await call('get_service_logs', { limit: 100 });
+      busy = false;
+      render();
+      setStatus('Engine started.');
+      return;
+    }
+    case 'stop-service': {
+      busy = true;
+      setStatus('Stopping engine...');
+      serviceStatus = await call('stop_service');
+      serviceLogs = await call('get_service_logs', { limit: 100 });
+      busy = false;
+      render();
+      setStatus('Engine stopped.');
+      return;
+    }
+    case 'view-logs': {
+      busy = true;
+      setStatus('Loading logs...');
+      serviceLogs = await call('get_service_logs', { limit: 100 });
+      busy = false;
+      render();
+      setStatus('Logs refreshed.');
+      return;
+    }
+    case 'run-diagnostics': {
+      busy = true;
+      setStatus('Collecting diagnostics...');
+      diagnostics = await call('get_diagnostics');
+      busy = false;
+      render();
+      setStatus(diagnostics.summary || 'Diagnostics collected.');
+      return;
+    }
+    case 'export-diagnostics': {
+      if (!confirm('Export a redacted diagnostics JSON file? No raw memory or paths will be included.')) {
+        return;
+      }
+      busy = true;
+      setStatus('Exporting diagnostics...');
+      const result = await call('export_diagnostics', { approve: true });
+      diagnostics.exported = result;
+      busy = false;
+      render();
+      setStatus(`Diagnostics exported to ${result.path || 'unknown'}.`);
+      return;
+    }
+    case 'check-update': {
+      busy = true;
+      setStatus('Checking for updates...');
+      update = await call('check_update');
+      health.update_status = update.status;
+      busy = false;
+      render();
+      setStatus(update.status === 'available' ? 'An update is available.' : 'App is up to date.');
       return;
     }
     default:

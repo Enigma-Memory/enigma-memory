@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="What to do if your operating system blocks the Enigma Memory installer.">
+  <title>Installer blocked by the operating system</title>
+  <link rel="stylesheet" href="../../styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="site-logo" href="../../index.html">Enigma Memory</a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="../../download.html">Download</a>
+        <a href="../../setup.html">How it works</a>
+        <a href="../../privacy.html">Privacy</a>
+        <a href="../index.html">Help</a>
+        <a href="../../faq.html">FAQ</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <span class="eyebrow">Troubleshooting</span>
+      <h1>Installer blocked by the operating system.</h1>
+      <p>Operating systems sometimes warn about apps downloaded from the web. Use signing-safe guidance and do not bypass warnings for unknown sources.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="symptom-heading">
+      <h2 id="symptom-heading">Symptom</h2>
+      <p>You see a security warning when you try to open the Enigma Memory installer, or the installer is moved to trash/quarantine.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="windows-heading">
+      <h2 id="windows-heading">Windows SmartScreen</h2>
+      <ol>
+        <li>Click <strong>More info</strong> on the SmartScreen prompt.</li>
+        <li>Click <strong>Run anyway</strong>, but only if the installer came from an Enigma distribution channel.</li>
+      </ol>
+      <p>For public launch, Enigma uses a signed Windows installer or Store/MSIX package to reduce SmartScreen friction.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="macos-heading">
+      <h2 id="macos-heading">macOS Gatekeeper</h2>
+      <ol>
+        <li>Right-click the installer or app and choose <strong>Open</strong>.</li>
+        <li>Click <strong>Open</strong> in the dialog to confirm, but only if the installer came from an Enigma distribution channel.</li>
+      </ol>
+      <p>For public launch, Enigma uses Developer ID signing, notarization, and stapling so Gatekeeper recognizes the app.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="fallback-heading">
+      <h2 id="fallback-heading">If that does not work</h2>
+      <ul>
+        <li>Download the installer again from the official <a href="../../download.html">download page</a>.</li>
+        <li>Check that the file size and name match the download page.</li>
+        <li>Do not run installers from unofficial mirrors or email attachments.</li>
+      </ul>
+    </section>
+
+    <section class="content-section" aria-labelledby="support-heading">
+      <h2 id="support-heading">What to send support</h2>
+      <p>Safe to share: app version, OS family and version, installer channel, and the visible support code. Do not send raw memory, prompts, transcripts, credentials, account IDs, or local paths.</p>
+    </section>
+
+    <section class="content-section">
+      <details>
+        <summary>Signing technical details</summary>
+        <p>Public launch builds are signed with the chosen production trust channel. If you are testing a pre-launch build, the trust prompt may be expected. See the <a href="../../developers/cli.html">CLI appendix</a> for the developer engine path.</p>
+      </details>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer__inner">
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="../../download.html">Download</a></li>
+          <li><a href="../../setup.html">How it works</a></li>
+          <li><a href="../../privacy.html">Privacy</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Support</h4>
+        <ul>
+          <li><a href="../index.html">Help hub</a></li>
+          <li><a href="../install.html">Install guide</a></li>
+          <li><a href="../troubleshooting.html">Troubleshooting</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Developers</h4>
+        <ul>
+          <li><a href="../../developers/cli.html">CLI appendix</a></li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

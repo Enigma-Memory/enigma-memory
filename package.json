@@ -127,6 +127,8 @@
     "scripts/build-proof-network-packet.mjs",
     "scripts/simulate-production-env.mjs",
     "scripts/wait-for-backend-ready.mjs",
+    "scripts/sign-update-manifest.mjs",
+    "scripts/release-evidence-desktop.mjs",
     "docs/sdk-api.md",
     "docs/install-anywhere.md",
     "docs/client-connectors.md",

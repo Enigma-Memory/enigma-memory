@@ -1,10 +1,13 @@
 {
+  "$schema": "https://schema.tauri.app/config/2",
   "productName": "Enigma Memory",
   "version": "0.1.18",
   "identifier": "com.enigmaprotocol.memory",
   "build": {
     "frontendDist": "ui",
-    "devUrl": "http://localhost:1420"
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "",
+    "beforeDevCommand": ""
   },
   "app": {
     "windows": [
@@ -21,14 +24,54 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://localhost:*; font-src 'self' data:;"
     }
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["msi", "nsis", "dmg", "app"],
     "icon": [
-      "icons/icon.ico"
-    ]
+      "icons/icon.ico",
+      "icons/icon.png"
+    ],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "embedBootstrapper"
+      },
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "",
+      "nsis": {
+        "installMode": "both",
+        "installerIcon": "icons/icon.ico",
+        "sidebarImage": null,
+        "headerImage": null
+      },
+      "wix": {
+        "language": "en-US",
+        "upgradeCode": "3F9B1E2C-7A4D-4B8E-9C5F-1D2E4A6B7C8D"
+      }
+    },
+    "macOS": {
+      "frameworks": [],
+      "minimumSystemVersion": "11.0",
+      "entitlements": null,
+      "exceptionDomain": null,
+      "dmg": {
+        "appPosition": { "x": 192, "y": 128 },
+        "applicationFolderPosition": { "x": 448, "y": 128 },
+        "windowSize": { "width": 660, "height": 400 }
+      },
+      "signingIdentity": null,
+      "providerShortName": null
+    }
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "dialog": true,
+      "endpoints": ["{{env:UPDATER_MANIFEST_URL}}"],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk0MUEyMTY0RUE4N0M3MkIKUldRRjlUa3drZzRlL3Jab05Ea1l6N1E3aVRSMkt3a0IrZ3F3R0Zqa2hhd1I3d1RMcjBYYkxLUjEK"
+    }
   }
 }

@@ -344,6 +344,26 @@ h1 {
   font-size: 0.9375rem;
 }
 
+.guide-list {
+  list-style: none;
+  padding: 0;
+  margin: 1.5rem 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 0.75rem;
+}
+
+.guide-list li {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.875rem 1rem;
+}
+
+.guide-list a {
+  font-weight: 500;
+  text-decoration: none;
+}
 /* FAQ */
 
 .faq-item {
