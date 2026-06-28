@@ -270,7 +270,9 @@ fn default_home_dir(platform: &Platform) -> Result<PathBuf, ConnectorError> {
             }
         }
     }
-    Err(ConnectorError::Other("Cannot resolve home directory. Pass homeDir or configPath explicitly.".to_string()))
+    Err(ConnectorError::Other(
+        "Cannot resolve home directory. Pass homeDir or configPath explicitly.".to_string(),
+    ))
 }
 
 fn default_app_data_dir(platform: &Platform, home: &Path) -> PathBuf {
@@ -459,7 +461,11 @@ impl ConnectorEngine {
             .collect()
     }
 
-    pub fn detect(&self, client: ClientId, ctx: &EngineContext) -> Result<DetectResult, ConnectorError> {
+    pub fn detect(
+        &self,
+        client: ClientId,
+        ctx: &EngineContext,
+    ) -> Result<DetectResult, ConnectorError> {
         let profile = build_profile(client, ctx);
         let config_path = resolve_config_path(&profile, ctx, None);
         let public_path = redact_path(&config_path, profile.public_config_label, ctx.redact_paths);
@@ -518,7 +524,10 @@ impl ConnectorEngine {
                 Ok(DetectResult {
                     ok: false,
                     exists: true,
-                    parse_error: matches!(e, ConnectorError::ConfigParse(_) | ConnectorError::ConfigType),
+                    parse_error: matches!(
+                        e,
+                        ConnectorError::ConfigParse(_) | ConnectorError::ConfigType
+                    ),
                     action,
                     repair_reasons,
                     error,
@@ -591,10 +600,14 @@ impl ConnectorEngine {
             let profile = build_profile(client, ctx);
             let config_path = resolve_config_path(&profile, ctx, None);
             let latest = find_latest_backup(self.fs.as_ref(), &config_path)?;
-            let plan = self.rollback_internal(client, ctx, &RollbackOptions {
-                backup_path: Some(latest),
-                confirmed: opts.confirmed,
-            })?;
+            let plan = self.rollback_internal(
+                client,
+                ctx,
+                &RollbackOptions {
+                    backup_path: Some(latest),
+                    confirmed: opts.confirmed,
+                },
+            )?;
             return Ok(RepairResult {
                 ok: true,
                 action: "rollback",
@@ -663,7 +676,8 @@ impl ConnectorEngine {
         }
         self.fs.copy(&backup_path, &config_path)?;
         let public_backup = redact_path(&backup_path, "backup", ctx.redact_paths);
-        let public_config = redact_path(&config_path, profile.public_config_label, ctx.redact_paths);
+        let public_config =
+            redact_path(&config_path, profile.public_config_label, ctx.redact_paths);
         Ok(Plan {
             ok: true,
             action: "rollback",
@@ -696,38 +710,38 @@ impl ConnectorEngine {
         let config_path = resolve_config_path(&profile, ctx, None);
         let mut details = Vec::new();
 
-        let (parse_ok, entry_present, entry_correct, bundle_ok) = match read_json_config(self.fs.as_ref(), &config_path) {
-            Ok((false, _)) => {
-                details.push("Config file does not exist.".to_string());
-                (true, false, false, self.fs.exists(&ctx.bundle_path))
-            }
-            Ok((true, Some(config))) => {
-                details.push("Config file parsed successfully.".to_string());
-                let state = installed_state(&config, &profile, ctx, &ConnectOptions::default());
-                let present = state.server_entry_exists;
-                let correct = state.command_ok && state.args_ok && state.env_ok;
-                if present {
-                    details.push("Enigma MCP server entry is present.".to_string());
+        let (parse_ok, entry_present, entry_correct, bundle_ok) =
+            match read_json_config(self.fs.as_ref(), &config_path) {
+                Ok((false, _)) => {
+                    details.push("Config file does not exist.".to_string());
+                    (true, false, false, self.fs.exists(&ctx.bundle_path))
                 }
-                if correct {
-                    details.push("Enigma MCP server entry matches expected values.".to_string());
+                Ok((true, Some(config))) => {
+                    details.push("Config file parsed successfully.".to_string());
+                    let state = installed_state(&config, &profile, ctx, &ConnectOptions::default());
+                    let present = state.server_entry_exists;
+                    let correct = state.command_ok && state.args_ok && state.env_ok;
+                    if present {
+                        details.push("Enigma MCP server entry is present.".to_string());
+                    }
+                    if correct {
+                        details
+                            .push("Enigma MCP server entry matches expected values.".to_string());
+                    }
+                    (true, present, correct, self.fs.exists(&ctx.bundle_path))
                 }
-                (
-                    true,
-                    present,
-                    correct,
-                    self.fs.exists(&ctx.bundle_path),
-                )
-            }
-            Ok((true, None)) => {
-                details.push("Config file is empty.".to_string());
-                (true, false, false, self.fs.exists(&ctx.bundle_path))
-            }
-            Err(e) => {
-                details.push(format!("Config parse failed: {}", redact_error_message(&e.to_string(), &config_path, ctx)));
-                (false, false, false, self.fs.exists(&ctx.bundle_path))
-            }
-        };
+                Ok((true, None)) => {
+                    details.push("Config file is empty.".to_string());
+                    (true, false, false, self.fs.exists(&ctx.bundle_path))
+                }
+                Err(e) => {
+                    details.push(format!(
+                        "Config parse failed: {}",
+                        redact_error_message(&e.to_string(), &config_path, ctx)
+                    ));
+                    (false, false, false, self.fs.exists(&ctx.bundle_path))
+                }
+            };
 
         if bundle_ok {
             details.push("Local vault bundle is reachable.".to_string());
@@ -782,11 +796,19 @@ impl ConnectorEngine {
             ctx,
             label: profile.public_config_label,
         });
-        let generated_json = format!("{}\n", serde_json::to_string_pretty(&next_config).map_err(|e| ConnectorError::ConfigParse(e.to_string()))?);
+        let generated_json = format!(
+            "{}\n",
+            serde_json::to_string_pretty(&next_config)
+                .map_err(|e| ConnectorError::ConfigParse(e.to_string()))?
+        );
 
         Ok(Plan {
             ok: true,
-            action: if changed { "connect" } else { "already_configured" },
+            action: if changed {
+                "connect"
+            } else {
+                "already_configured"
+            },
             client_id: client.as_str().to_string(),
             config_path: redact_path(&config_path, profile.public_config_label, ctx.redact_paths),
             server_name: profile.server_name.to_string(),
@@ -832,11 +854,19 @@ impl ConnectorEngine {
             ctx,
             label: profile.public_config_label,
         });
-        let generated_json = format!("{}\n", serde_json::to_string_pretty(&next_config).map_err(|e| ConnectorError::ConfigParse(e.to_string()))?);
+        let generated_json = format!(
+            "{}\n",
+            serde_json::to_string_pretty(&next_config)
+                .map_err(|e| ConnectorError::ConfigParse(e.to_string()))?
+        );
 
         Ok(Plan {
             ok: true,
-            action: if changed { "disconnect" } else { "already_disconnected" },
+            action: if changed {
+                "disconnect"
+            } else {
+                "already_disconnected"
+            },
             client_id: client.as_str().to_string(),
             config_path: redact_path(&config_path, profile.public_config_label, ctx.redact_paths),
             server_name: profile.server_name.to_string(),
@@ -863,10 +893,14 @@ impl ConnectorEngine {
         let config_path = resolve_config_path(&profile, ctx, opts.config_path_override.as_deref());
         let raw_backup = plan.raw_backup_path.clone();
 
-        self.fs.create_dir_all(config_path.parent().unwrap_or(Path::new(".")))?;
+        self.fs
+            .create_dir_all(config_path.parent().unwrap_or(Path::new(".")))?;
         let temp_name = format!(
             "{}.tmp.{}.{}.tmp",
-            config_path.file_name().unwrap_or_default().to_string_lossy(),
+            config_path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy(),
             std::process::id(),
             ctx.now.map(|n| n.timestamp()).unwrap_or(0)
         );
@@ -912,8 +946,8 @@ fn read_json_config(
     let bytes = fs.read(path)?;
     let text = String::from_utf8(bytes)
         .map_err(|e| ConnectorError::ConfigParse(format!("not valid UTF-8: {}", e)))?;
-    let value: Value = serde_json::from_str(&text)
-        .map_err(|e| ConnectorError::ConfigParse(e.to_string()))?;
+    let value: Value =
+        serde_json::from_str(&text).map_err(|e| ConnectorError::ConfigParse(e.to_string()))?;
     if !value.is_object() {
         return Err(ConnectorError::ConfigType);
     }
@@ -927,23 +961,27 @@ fn apply_server(
     server_entry: &Value,
 ) -> Result<Value, ConnectorError> {
     let mut next = config.clone();
-    let container =
-        ensure_container(&mut next, &profile.server_container_path, true).ok_or(ConnectorError::ConfigType)?;
+    let container = ensure_container(&mut next, &profile.server_container_path, true)
+        .ok_or(ConnectorError::ConfigType)?;
     container[server_name] = server_entry.clone();
     Ok(next)
 }
 
 fn remove_server(config: &Value, profile: &ClientProfile, server_name: &str) -> Value {
     let mut next = config.clone();
-    if let Some(map) =
-        ensure_container(&mut next, &profile.server_container_path, false).and_then(Value::as_object_mut)
+    if let Some(map) = ensure_container(&mut next, &profile.server_container_path, false)
+        .and_then(Value::as_object_mut)
     {
         map.remove(server_name);
     }
     next
 }
 
-fn ensure_container<'a>(value: &'a mut Value, path: &[&str], create: bool) -> Option<&'a mut Value> {
+fn ensure_container<'a>(
+    value: &'a mut Value,
+    path: &[&str],
+    create: bool,
+) -> Option<&'a mut Value> {
     let mut cursor = value;
     for segment in path {
         if !cursor.is_object() {
@@ -1027,23 +1065,40 @@ fn installed_state(
 
     let expected = build_server_entry(ctx, opts);
     let actual_command = entry.get("command").and_then(|v| v.as_str()).unwrap_or("");
-    let expected_command = expected.get("command").and_then(|v| v.as_str()).unwrap_or("");
+    let expected_command = expected
+        .get("command")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
     let command_ok = actual_command == expected_command;
 
     let actual_args: Vec<String> = entry
         .get("args")
         .and_then(|v| v.as_array())
-        .map(|arr| arr.iter().map(|v| v.as_str().unwrap_or("").to_string()).collect())
+        .map(|arr| {
+            arr.iter()
+                .map(|v| v.as_str().unwrap_or("").to_string())
+                .collect()
+        })
         .unwrap_or_default();
     let expected_args: Vec<String> = expected
         .get("args")
         .and_then(|v| v.as_array())
-        .map(|arr| arr.iter().map(|v| v.as_str().unwrap_or("").to_string()).collect())
+        .map(|arr| {
+            arr.iter()
+                .map(|v| v.as_str().unwrap_or("").to_string())
+                .collect()
+        })
         .unwrap_or_default();
     let args_ok = actual_args == expected_args;
 
-    let actual_env = entry.get("env").cloned().unwrap_or_else(|| Value::Object(Map::new()));
-    let expected_env = expected.get("env").cloned().unwrap_or_else(|| Value::Object(Map::new()));
+    let actual_env = entry
+        .get("env")
+        .cloned()
+        .unwrap_or_else(|| Value::Object(Map::new()));
+    let expected_env = expected
+        .get("env")
+        .cloned()
+        .unwrap_or_else(|| Value::Object(Map::new()));
     let actual_bundle = actual_env
         .get("ENIGMA_BUNDLE")
         .and_then(|v| v.as_str())
@@ -1067,7 +1122,11 @@ fn installed_state(
     }
 }
 
-fn recommended_action(_exists: bool, state: &InstalledState, error: Option<&ConnectorError>) -> &'static str {
+fn recommended_action(
+    _exists: bool,
+    state: &InstalledState,
+    error: Option<&ConnectorError>,
+) -> &'static str {
     if error.is_some() {
         return "repair";
     }
@@ -1080,7 +1139,11 @@ fn recommended_action(_exists: bool, state: &InstalledState, error: Option<&Conn
     "repair"
 }
 
-fn repair_reasons(exists: bool, state: &InstalledState, error: Option<&ConnectorError>) -> Vec<String> {
+fn repair_reasons(
+    exists: bool,
+    state: &InstalledState,
+    error: Option<&ConnectorError>,
+) -> Vec<String> {
     if let Some(e) = error {
         return vec![match e {
             ConnectorError::ConfigParse(_) => "config_json_invalid".to_string(),
@@ -1120,7 +1183,10 @@ fn backup_path_for(config_path: &Path, now: chrono::DateTime<Utc>) -> PathBuf {
     let suffix = timestamp_suffix(now);
     config_path.with_extension(format!(
         "{}.bak.{}",
-        config_path.extension().unwrap_or_default().to_string_lossy(),
+        config_path
+            .extension()
+            .unwrap_or_default()
+            .to_string_lossy(),
         suffix
     ))
 }
@@ -1138,7 +1204,10 @@ fn unused_backup_path(
     for index in 1..1000 {
         let candidate = config_path.with_extension(format!(
             "{}.bak.{}.{}",
-            config_path.extension().unwrap_or_default().to_string_lossy(),
+            config_path
+                .extension()
+                .unwrap_or_default()
+                .to_string_lossy(),
             timestamp_suffix(now),
             index
         ));
@@ -1157,10 +1226,7 @@ fn backup_id_from_path(path: &Path) -> Option<String> {
         .map(str::to_string)
 }
 
-fn find_latest_backup(
-    _fs: &dyn FileSystem,
-    config_path: &Path,
-) -> Result<PathBuf, ConnectorError> {
+fn find_latest_backup(_fs: &dyn FileSystem, config_path: &Path) -> Result<PathBuf, ConnectorError> {
     let parent = config_path.parent().unwrap_or(Path::new("."));
     let file_name = config_path
         .file_name()
@@ -1391,7 +1457,10 @@ pub fn resolve_default_config_path(
                 .join("Application Support")
                 .join("Claude")
                 .join("claude_desktop_config.json"),
-            Platform::Linux => home.join(".config").join("Claude").join("claude_desktop_config.json"),
+            Platform::Linux => home
+                .join(".config")
+                .join("Claude")
+                .join("claude_desktop_config.json"),
         },
         ClientId::Cursor => match platform {
             Platform::Win32 => home.join(".cursor").join("mcp.json"),
@@ -1487,7 +1556,12 @@ mod tests {
             PathBuf::from("/home/alice/.config/Claude/claude_desktop_config.json")
         );
         assert_eq!(
-            resolve_default_config_path(ClientId::Cursor, Platform::Win32, &PathBuf::from("C:\\Users\\Alice"), &PathBuf::from("C:\\Users\\Alice\\AppData\\Roaming")),
+            resolve_default_config_path(
+                ClientId::Cursor,
+                Platform::Win32,
+                &PathBuf::from("C:\\Users\\Alice"),
+                &PathBuf::from("C:\\Users\\Alice\\AppData\\Roaming")
+            ),
             PathBuf::from("C:\\Users\\Alice\\.cursor\\mcp.json")
         );
     }
@@ -1517,7 +1591,9 @@ mod tests {
         .unwrap();
 
         let engine = ConnectorEngine::new();
-        let plan = engine.preview_connect(ClientId::Cursor, &ctx, &ConnectOptions::dry_run()).unwrap();
+        let plan = engine
+            .preview_connect(ClientId::Cursor, &ctx, &ConnectOptions::dry_run())
+            .unwrap();
         assert!(plan.changed);
         assert_eq!(plan.action, "connect");
         let servers = plan.config.get("mcpServers").unwrap();
@@ -1543,7 +1619,9 @@ mod tests {
             .connect(ClientId::Cursor, &ctx, &ConnectOptions::confirmed())
             .unwrap();
 
-        let plan = engine.preview_connect(ClientId::Cursor, &ctx, &ConnectOptions::dry_run()).unwrap();
+        let plan = engine
+            .preview_connect(ClientId::Cursor, &ctx, &ConnectOptions::dry_run())
+            .unwrap();
         assert!(!plan.changed);
         assert_eq!(plan.action, "already_configured");
     }
@@ -1554,7 +1632,8 @@ mod tests {
         let ctx = linux_ctx(&dir);
         let path = cursor_config_path(&ctx);
         fs::create_dir_all(path.parent().unwrap()).unwrap();
-        let original = r#"{"mcpServers":{"other":{"command":"other-cmd","args":[]}},"unrelated":true}"#;
+        let original =
+            r#"{"mcpServers":{"other":{"command":"other-cmd","args":[]}},"unrelated":true}"#;
         fs::write(&path, original).unwrap();
 
         let engine = ConnectorEngine::new();
@@ -1625,6 +1704,23 @@ mod tests {
         let s = serde_json::to_string(&manifest).unwrap();
         assert!(s.contains("enigma-memory"));
         assert!(s.contains("1.2.3"));
+        assert_eq!(manifest["server"]["type"].as_str(), Some("binary"));
+        assert_eq!(
+            manifest["server"]["entry_point"].as_str(),
+            Some("server/enigma-mcp")
+        );
+        assert_eq!(
+            manifest["server"]["mcp_config"]["command"].as_str(),
+            Some("server/enigma-mcp")
+        );
+        assert_eq!(
+            manifest["server"]["mcp_config"]["env"]["ENIGMA_BUNDLE"].as_str(),
+            Some("${user_config.enigma_bundle}")
+        );
+        assert_eq!(
+            manifest["user_config"]["enigma_bundle"]["type"].as_str(),
+            Some("file")
+        );
         assert!(!s.contains("C:\\"));
         assert!(!s.contains("/home/"));
         assert!(!s.contains("/Users/"));

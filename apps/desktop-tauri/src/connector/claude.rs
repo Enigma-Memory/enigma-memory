@@ -5,7 +5,10 @@ pub fn profile(ctx: &EngineContext) -> ClientProfile {
     build_profile(ClientId::ClaudeDesktop, ctx)
 }
 
-pub fn detect(engine: &ConnectorEngine, ctx: &EngineContext) -> Result<DetectResult, ConnectorError> {
+pub fn detect(
+    engine: &ConnectorEngine,
+    ctx: &EngineContext,
+) -> Result<DetectResult, ConnectorError> {
     engine.detect(ClientId::ClaudeDesktop, ctx)
 }
 
@@ -102,19 +105,27 @@ pub fn create_claude_desktop_mcpb_manifest(version: &str) -> Value {
         "author": { "name": "Enigma Memory" },
         "description": "Claude Desktop extension contract for the local Enigma Memory MCP bridge.",
         "server": {
-            "transport": "stdio",
-            "command": {
-                "name": "enigma-mcp",
-                "description": "Starts the Enigma Memory MCP bridge through the Enigma-managed runtime.",
-            },
-            "args": [],
-            "environment_names": ["ENIGMA_BUNDLE"],
             "type": "binary",
-            "entry_point": "bin/enigma-mcp",
+            "entry_point": "server/enigma-mcp",
             "mcp_config": {
-                "command": "enigma-mcp",
+                "command": "server/enigma-mcp",
                 "args": [],
-                "environment_names": ["ENIGMA_BUNDLE"],
+                "env": {
+                    "ENIGMA_BUNDLE": "${user_config.enigma_bundle}",
+                },
+                "platform_overrides": {
+                    "win32": {
+                        "command": "server/enigma-mcp.exe",
+                    },
+                },
+            },
+        },
+        "user_config": {
+            "enigma_bundle": {
+                "type": "file",
+                "title": "Enigma Memory bundle",
+                "description": "Select the local Enigma Memory bundle that Claude may use through this extension.",
+                "required": true,
             },
         },
         "environment_names": ["ENIGMA_BUNDLE"],
@@ -127,6 +138,11 @@ pub fn create_claude_desktop_mcpb_manifest(version: &str) -> Value {
             "note": "Requires Enigma Desktop bundled runtime or an Enigma-managed MCP bridge; the public manifest does not carry local paths or config bodies.",
         },
         "required_runtime_note": "Requires Enigma Desktop bundled runtime or an Enigma-managed MCP bridge; the public manifest does not carry local paths or config bodies.",
+        "spec_reference": {
+            "manifest_spec": "modelcontextprotocol/mcpb MANIFEST.md",
+            "package_shape": "zip_with_manifest_json",
+            "server_type": "binary",
+        },
         "claim_boundary": claim_boundary(),
         "public_safety": {
             "public_payload_only": true,
@@ -224,14 +240,20 @@ fn has_passing_evidence(evidence: &Value) -> bool {
     matches!(evidence.as_bool(), Some(true))
         || matches!(evidence.get("passed").and_then(Value::as_bool), Some(true))
         || matches!(evidence.get("ok").and_then(Value::as_bool), Some(true))
-        || matches!(evidence.get("status").and_then(Value::as_str), Some("passed"))
+        || matches!(
+            evidence.get("status").and_then(Value::as_str),
+            Some("passed")
+        )
 }
 
 fn has_failing_evidence(evidence: &Value) -> bool {
     matches!(evidence.as_bool(), Some(false))
         || matches!(evidence.get("passed").and_then(Value::as_bool), Some(false))
         || matches!(evidence.get("ok").and_then(Value::as_bool), Some(false))
-        || matches!(evidence.get("status").and_then(Value::as_str), Some("failed"))
+        || matches!(
+            evidence.get("status").and_then(Value::as_str),
+            Some("failed")
+        )
 }
 
 fn mcpb_primary_action(status: &str) -> Value {
@@ -380,7 +402,10 @@ mod tests {
             mcpb_installed: true,
             ..Default::default()
         });
-        assert_eq!(health.get("status").unwrap().as_str().unwrap(), "mcpb_ready");
+        assert_eq!(
+            health.get("status").unwrap().as_str().unwrap(),
+            "mcpb_ready"
+        );
         assert_eq!(
             health
                 .get("primary_action")

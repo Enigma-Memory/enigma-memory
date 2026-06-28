@@ -13,5 +13,6 @@ This package is part of Enigma, the provider-agnostic AI memory and proof layer.
 - Connector receipts, plans, and demo artifacts must not contain raw memory plaintext.
 - Public exports are `supportedClients`, `getClientProfile`, `renderMcpConfig`, `connectClient`, `disconnectClient`, `detectClientConnector`, `detectConnectors`, `doctorConnectors`, `planConnectWizard`, `platformDefaultConfigPath`, `runConnectorDemo`, `createClaudeDesktopMcpbManifest`, `createClaudeDesktopMcpbConnectionPlan`, and `createClaudeDesktopMcpbHealth`.
 - Claude `.mcpb` health must fail closed and include public-safe `primary_action` / `next_action_id` fields for every state; installed-but-untested is never connected or ready.
+- `createClaudeDesktopMcpbManifest()` must emit MCPB manifest `0.3` fields (`server.type`, `server.entry_point`, `server.mcp_config`, and `user_config`) without raw config bodies, absolute paths, secrets, provider responses, or memory content.
 
 Package-specific implementation details are governed by `research/handoff-enigma/09_BUILD_BACKLOG.md` and `research/handoff-enigma/12_KIMI_BUILD_BRIEF.md`.

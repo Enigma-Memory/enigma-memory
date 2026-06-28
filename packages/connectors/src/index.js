@@ -701,19 +701,27 @@ export function createClaudeDesktopMcpbManifest(options = {}) {
     },
     description: 'Claude Desktop extension contract for the local Enigma Memory MCP bridge.',
     server: {
-      transport: 'stdio',
-      command: {
-        name: MCP_COMMAND,
-        description: 'Starts the Enigma Memory MCP bridge through the Enigma-managed runtime.',
-      },
-      args: [],
-      environment_names: [...CLAUDE_DESKTOP_MCPB_ENVIRONMENT_NAMES],
       type: 'binary',
-      entry_point: 'bin/enigma-mcp',
+      entry_point: 'server/enigma-mcp',
       mcp_config: {
-        command: MCP_COMMAND,
+        command: 'server/enigma-mcp',
         args: [],
-        environment_names: [...CLAUDE_DESKTOP_MCPB_ENVIRONMENT_NAMES],
+        env: {
+          ENIGMA_BUNDLE: '${user_config.enigma_bundle}',
+        },
+        platform_overrides: {
+          win32: {
+            command: 'server/enigma-mcp.exe',
+          },
+        },
+      },
+    },
+    user_config: {
+      enigma_bundle: {
+        type: 'file',
+        title: 'Enigma Memory bundle',
+        description: 'Select the local Enigma Memory bundle that Claude may use through this extension.',
+        required: true,
       },
     },
     environment_names: [...CLAUDE_DESKTOP_MCPB_ENVIRONMENT_NAMES],
@@ -728,6 +736,11 @@ export function createClaudeDesktopMcpbManifest(options = {}) {
       note: 'Requires Enigma Desktop bundled runtime or an Enigma-managed MCP bridge; the public manifest does not carry local paths or config bodies.',
     },
     required_runtime_note: 'Requires Enigma Desktop bundled runtime or an Enigma-managed MCP bridge; the public manifest does not carry local paths or config bodies.',
+    spec_reference: {
+      manifest_spec: 'modelcontextprotocol/mcpb MANIFEST.md',
+      package_shape: 'zip_with_manifest_json',
+      server_type: 'binary',
+    },
     claim_boundary: claudeDesktopMcpbClaimBoundary(),
     public_safety: {
       public_payload_only: true,
