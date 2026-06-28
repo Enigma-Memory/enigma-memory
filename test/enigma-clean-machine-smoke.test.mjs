@@ -11,8 +11,6 @@ const execFileAsync = promisify(execFile);
 const PROJECT_ROOT = fileURLToPath(new URL('../', import.meta.url));
 
 async function runSmoke(args = []) {
-  // The harness exits 1 when the machine is not healthy, which is expected in CI/dev.
-  // Use execFile without throwing on non-zero exit so we can still parse stdout.
   const { stdout } = await execFileAsync(process.execPath, ['scripts/run-clean-machine-smoke.mjs', '--json', ...args], {
     cwd: PROJECT_ROOT,
     timeout: 30000,

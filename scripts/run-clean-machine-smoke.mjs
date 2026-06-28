@@ -4,19 +4,14 @@
 // public-safe evidence. Does not drive the UI; it inspects the installed
 // app, vault, connectors, and local services.
 
-import { execFile } from 'node:child_process';
-import { createHash, createPublicKey, verify } from 'node:crypto';
-import { readFile, stat } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { readFile, readdir, stat, unlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
 
-const execFileAsync = promisify(execFile);
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const ROOT = path.resolve(path.dirname(SCRIPT_PATH), '..');
-
-const STATUS_VALUES = new Set(['pass', 'fail', 'skip']);
 
 function scenario(id, name, status, evidence = {}) {
   return { scenario_id: id, name, status, evidence };
@@ -24,7 +19,6 @@ function scenario(id, name, status, evidence = {}) {
 
 function publicSafePath(p) {
   if (typeof p !== 'string') return '';
-  // Replace home directory with ~ and Windows profile roots with generic labels.
   const home = os.homedir();
   return p.replace(home, '~').replace(/^[A-Za-z]:\\Users\\[^\\]+/g, '~');
 }
@@ -88,7 +82,7 @@ async function checkVaultExists() {
 
   const files = [];
   try {
-    const entries = await (await import('node:fs/promises')).readdir(vaultDir);
+    const entries = await readdir(vaultDir);
     for (const entry of entries.slice(0, 20)) files.push(entry);
   } catch {
     // ignore
@@ -133,7 +127,6 @@ async function checkConnectorConfig() {
 }
 
 async function checkEngineService() {
-  // Try to GET the local engine health endpoint if the service is running.
   try {
     const response = await fetch('http://127.0.0.1:8787/health');
     const body = await response.text();
@@ -161,19 +154,6 @@ async function checkUpdateManifest() {
     });
   } catch (err) {
     return scenario('SMOKE-UPDATE-001', 'Update manifest reachable', 'fail', { reason: err.message });
-  }
-}
-
-function verifyManifestSignature(manifest, signatureRecord) {
-  try {
-    const publicKeyRaw = Buffer.from(signatureRecord.public_key, 'hex');
-    const prefix = Buffer.from('302a300506032b6570032100', 'hex');
-    const publicKey = createPublicKey({ key: Buffer.concat([prefix, publicKeyRaw]), format: 'der', type: 'spki' });
-    const signature = Buffer.from(signatureRecord.signature, 'base64');
-    const canonical = JSON.stringify(manifest, Object.keys(manifest).sort());
-    return verify(null, Buffer.from(canonical, 'utf8'), publicKey, signature);
-  } catch {
-    return false;
   }
 }
 
@@ -214,7 +194,7 @@ async function runSmoke() {
   const counts = { pass: 0, fail: 0, skip: 0 };
   for (const s of scenarios) counts[s.status] += 1;
 
-  const report = {
+  return {
     schema: 'enigma.clean_machine_smoke.v1',
     generated_at: new Date().toISOString(),
     app_version: '0.1.18',
@@ -228,8 +208,6 @@ async function runSmoke() {
     },
     scenarios,
   };
-
-  return report;
 }
 
 function usage() {
@@ -253,8 +231,9 @@ async function main() {
 
   const report = await runSmoke();
   const output = json ? JSON.stringify(report, null, 2) : JSON.stringify(report, null, 2);
+
   if (outPath) {
-    await (await import('node:fs/promises')).writeFile(path.resolve(outPath), `${output}\n`, 'utf8');
+    await writeFile(path.resolve(outPath), `${output}\n`, 'utf8');
   }
   console.log(output);
 

@@ -255,7 +255,10 @@
     "simulate:production": "node scripts/simulate-production-env.mjs",
     "wait:backend": "node scripts/wait-for-backend-ready.mjs",
     "public-beta-qa": "node scripts/run-public-beta-qa-matrix.mjs --json",
-    "clean-machine-smoke": "node scripts/run-clean-machine-smoke.mjs --json"
+    "clean-machine-smoke": "node scripts/run-clean-machine-smoke.mjs --json",
+    "build:cortex-v3:docker": "node scripts/build-cortex-v3-in-docker.mjs",
+    "build:desktop:docker": "docker compose -f docker-compose.build.yml run --rm desktop-tauri-build cargo tauri build",
+    "build:cortex-v3:docker:compose": "docker compose -f docker-compose.build.yml run --rm cortex-v3-build anchor build --no-idl"
   },
   "optionalDependencies": {
     "@solana/web3.js": "^1.98.2"
