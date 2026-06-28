@@ -20,6 +20,85 @@ const NULLIFIER_RE = /^nullifier:hmac-sha256:[a-f0-9]{64}$/;
 const SECRET_VALUE_RE = /(?:-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:sk|pk|rk)_(?:live|test|proj)_[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{20,}|bearer\s+[A-Za-z0-9._~+/=-]{20,})/i;
 const LOCAL_PATH_RE = /^(?:[A-Za-z]:[\\/]|\\\\|\/(?:Users|home|tmp|var|etc|private|Volumes)\/)/;
 const FORBIDDEN_PUBLIC_CLAIM_RE = /\b(?:provider(?:-native)?\s+(?:deletion|memory\s+control)|model\s+forgetting|compliance\s+certification|certif(?:y|ies|ied)\s+compliance|benchmark\s+superiority|hosted\s+(?:saas|cloud)\s+ready|byoc\s+ready|patent(?:ability|able)|legal\s+conclusion|raw\s+embeddings?\s+(?:are\s+)?safe|hardware\s+tamper[-\s]?proof|tamper[-\s]?proof\s+hardware)\b/i;
+const PUBLIC_LAUNCH_EVIDENCE_LEDGER_SCHEMA = 'enigma.public_launch_evidence_ledger.v1';
+const PUBLIC_LAUNCH_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{1,127}$/;
+const PUBLIC_LAUNCH_REF_RE = /^ref:[A-Za-z0-9][A-Za-z0-9._~:@#?=&%+-]{0,255}$/;
+const PUBLIC_LAUNCH_DATE_TIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
+const PUBLIC_LAUNCH_STATUSES = new Set(['missing', 'pending', 'pass', 'fail', 'blocked']);
+const PUBLIC_LAUNCH_ADVISOR_DECISIONS = new Set(['ship', 'hold', 'rollback', 'not_reviewed']);
+const PUBLIC_LAUNCH_LEDGER_FIELDS = new Set([
+  'schema',
+  'ledger_id',
+  'ledgerId',
+  'generated_at',
+  'generatedAt',
+  'phase_owners',
+  'phaseOwners',
+  'claim_boundary',
+  'claimBoundary',
+  'privacy_export_allowlist',
+  'privacyExportAllowlist',
+  'entries',
+  'summary'
+]);
+const PUBLIC_LAUNCH_PHASE_OWNER_FIELDS = new Set([
+  'phase_id',
+  'phaseId',
+  'owner_ref',
+  'ownerRef',
+  'support_owner_ref',
+  'supportOwnerRef',
+  'release_owner_ref',
+  'releaseOwnerRef',
+  'signing_owner_ref',
+  'signingOwnerRef'
+]);
+const PUBLIC_LAUNCH_CLAIM_BOUNDARY_FIELDS = new Set([
+  'version_ref',
+  'versionRef',
+  'allowed_claim_refs',
+  'allowedClaimRefs',
+  'disallowed_claim_refs',
+  'disallowedClaimRefs'
+]);
+const PUBLIC_LAUNCH_ENTRY_FIELDS = new Set([
+  'phase_id',
+  'phaseId',
+  'scenario_id',
+  'scenarioId',
+  'owner_ref',
+  'ownerRef',
+  'status',
+  'advisor_decision',
+  'advisorDecision',
+  'evidence_refs',
+  'evidenceRefs',
+  'privacy_review',
+  'privacyReview',
+  'claim_review',
+  'claimReview',
+  'rollback_ready',
+  'rollbackReady',
+  'support_owner_ref',
+  'supportOwnerRef',
+  'release_owner_ref',
+  'releaseOwnerRef',
+  'signing_owner_ref',
+  'signingOwnerRef',
+  'updated_at',
+  'updatedAt',
+  'issue_codes',
+  'issueCodes'
+]);
+const PUBLIC_LAUNCH_REVIEW_FIELDS = new Set([
+  'status',
+  'reviewer_ref',
+  'reviewerRef',
+  'evidence_ref_count',
+  'evidenceRefCount',
+  'issue_codes',
+  'issueCodes'
+]);
 const PUBLIC_FORBIDDEN_KEYS = new Set([
   'api_key',
   'authorization',
@@ -658,6 +737,253 @@ export function verifyPublicSafeHash(value, maybeExpectedHash, options = {}) {
     }
   }
   return verificationResult(errors.length === 0, errors, { forbidden_paths: [], public_hash: publicHash });
+}
+
+export function createPublicLaunchEvidenceLedger(args = {}) {
+  if (!isPlainRecord(args)) throw new TypeError('public launch evidence ledger must be an object');
+  assertAllowedPublicLaunchKeys(args, PUBLIC_LAUNCH_LEDGER_FIELDS, 'public launch evidence ledger');
+  if (args.schema !== undefined && args.schema !== PUBLIC_LAUNCH_EVIDENCE_LEDGER_SCHEMA) {
+    throw new TypeError('public launch evidence ledger schema mismatch');
+  }
+
+  const entries = normalizePublicLaunchEntries(args.entries ?? []);
+  const summary = summarizePublicLaunchEvidence(entries);
+  if (args.summary !== undefined) {
+    assertPublicSafeFields(args.summary);
+    if (canonicalize(args.summary) !== canonicalize(summary)) throw new TypeError('public launch evidence ledger summary mismatch');
+  }
+  const ledger = {
+    schema: PUBLIC_LAUNCH_EVIDENCE_LEDGER_SCHEMA,
+    ledger_id: normalizePublicLaunchId(args.ledger_id ?? args.ledgerId, 'ledger_id'),
+    generated_at: normalizePublicLaunchDateTime(args.generated_at ?? args.generatedAt, 'generated_at'),
+    phase_owners: normalizePublicLaunchPhaseOwners(args.phase_owners ?? args.phaseOwners),
+    claim_boundary: normalizePublicLaunchClaimBoundary(args.claim_boundary ?? args.claimBoundary),
+    privacy_export_allowlist: normalizePublicLaunchRefArray(args.privacy_export_allowlist ?? args.privacyExportAllowlist ?? [], 'privacy_export_allowlist'),
+    entries,
+    summary
+  };
+
+  assertPublicSafeFields(ledger);
+  return ledger;
+}
+
+export function addPublicLaunchEvidenceEntry(ledger, entry) {
+  if (!isPlainRecord(ledger)) throw new TypeError('public launch evidence ledger must be an object');
+  assertAllowedPublicLaunchKeys(ledger, PUBLIC_LAUNCH_LEDGER_FIELDS, 'public launch evidence ledger');
+  assertPublicSafeFields(ledger);
+  return createPublicLaunchEvidenceLedger({
+    schema: ledger.schema,
+    ledger_id: ledger.ledger_id,
+    generated_at: ledger.generated_at,
+    phase_owners: ledger.phase_owners,
+    claim_boundary: ledger.claim_boundary,
+    privacy_export_allowlist: ledger.privacy_export_allowlist,
+    entries: [...(Array.isArray(ledger.entries) ? ledger.entries : []), entry]
+  });
+}
+
+export function summarizePublicLaunchEvidence(entries = []) {
+  const normalizedEntries = normalizePublicLaunchEntries(entries);
+  const status_counts = publicLaunchStatusCounts();
+  const advisor_decision_counts = publicLaunchAdvisorDecisionCounts();
+  const privacy_review_counts = publicLaunchStatusCounts();
+  const claim_review_counts = publicLaunchStatusCounts();
+  const issueCounts = new Map();
+  let rollback_ready_count = 0;
+
+  for (const entry of normalizedEntries) {
+    status_counts[entry.status] += 1;
+    advisor_decision_counts[entry.advisor_decision] += 1;
+    privacy_review_counts[entry.privacy_review.status] += 1;
+    claim_review_counts[entry.claim_review.status] += 1;
+    if (entry.rollback_ready === true) rollback_ready_count += 1;
+    for (const issueCode of entry.issue_codes) {
+      issueCounts.set(issueCode, (issueCounts.get(issueCode) ?? 0) + 1);
+    }
+    for (const issueCode of entry.privacy_review.issue_codes) {
+      issueCounts.set(issueCode, (issueCounts.get(issueCode) ?? 0) + 1);
+    }
+    for (const issueCode of entry.claim_review.issue_codes) {
+      issueCounts.set(issueCode, (issueCounts.get(issueCode) ?? 0) + 1);
+    }
+  }
+
+  return {
+    total_entries: normalizedEntries.length,
+    status_counts,
+    advisor_decision_counts,
+    privacy_review_counts,
+    claim_review_counts,
+    rollback_ready_count,
+    issue_code_counts: [...issueCounts.entries()]
+      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+      .map(([issue_code, count]) => ({ issue_code, count })),
+    advisor_decision: derivePublicLaunchAdvisorDecision(normalizedEntries, status_counts, advisor_decision_counts)
+  };
+}
+
+function normalizePublicLaunchEntries(entries) {
+  if (!Array.isArray(entries)) throw new TypeError('public launch evidence entries must be an array');
+  return entries.map((entry, index) => normalizePublicLaunchEntry(entry, `entries[${index}]`));
+}
+
+function normalizePublicLaunchEntry(entry, field) {
+  if (!isPlainRecord(entry)) throw new TypeError(`${field} must be an object`);
+  assertAllowedPublicLaunchKeys(entry, PUBLIC_LAUNCH_ENTRY_FIELDS, field);
+  const normalized = {
+    phase_id: normalizePublicLaunchId(entry.phase_id ?? entry.phaseId, `${field}.phase_id`),
+    scenario_id: normalizePublicLaunchId(entry.scenario_id ?? entry.scenarioId, `${field}.scenario_id`),
+    owner_ref: normalizePublicLaunchRef(entry.owner_ref ?? entry.ownerRef, `${field}.owner_ref`),
+    status: normalizePublicLaunchStatus(entry.status, `${field}.status`),
+    advisor_decision: normalizePublicLaunchAdvisorDecision(entry.advisor_decision ?? entry.advisorDecision, `${field}.advisor_decision`),
+    evidence_refs: normalizePublicLaunchRefArray(entry.evidence_refs ?? entry.evidenceRefs, `${field}.evidence_refs`),
+    privacy_review: normalizePublicLaunchReview(entry.privacy_review ?? entry.privacyReview, `${field}.privacy_review`),
+    claim_review: normalizePublicLaunchReview(entry.claim_review ?? entry.claimReview, `${field}.claim_review`),
+    rollback_ready: requiredBoolean(entry.rollback_ready ?? entry.rollbackReady, `${field}.rollback_ready`),
+    support_owner_ref: normalizePublicLaunchRef(entry.support_owner_ref ?? entry.supportOwnerRef, `${field}.support_owner_ref`),
+    release_owner_ref: normalizePublicLaunchRef(entry.release_owner_ref ?? entry.releaseOwnerRef, `${field}.release_owner_ref`),
+    signing_owner_ref: normalizePublicLaunchRef(entry.signing_owner_ref ?? entry.signingOwnerRef, `${field}.signing_owner_ref`),
+    updated_at: normalizePublicLaunchDateTime(entry.updated_at ?? entry.updatedAt, `${field}.updated_at`),
+    issue_codes: normalizePublicLaunchIssueCodes(entry.issue_codes ?? entry.issueCodes, `${field}.issue_codes`)
+  };
+  assertPublicSafeFields(normalized);
+  return normalized;
+}
+
+function normalizePublicLaunchReview(review, field) {
+  if (!isPlainRecord(review)) throw new TypeError(`${field} must be an object`);
+  assertAllowedPublicLaunchKeys(review, PUBLIC_LAUNCH_REVIEW_FIELDS, field);
+  const normalized = {
+    status: normalizePublicLaunchStatus(review.status, `${field}.status`),
+    reviewer_ref: normalizePublicLaunchRef(review.reviewer_ref ?? review.reviewerRef, `${field}.reviewer_ref`),
+    evidence_ref_count: requiredInteger(review.evidence_ref_count ?? review.evidenceRefCount, `${field}.evidence_ref_count`),
+    issue_codes: normalizePublicLaunchIssueCodes(review.issue_codes ?? review.issueCodes, `${field}.issue_codes`)
+  };
+  assertPublicSafeFields(normalized);
+  return normalized;
+}
+
+function normalizePublicLaunchPhaseOwners(phaseOwners) {
+  if (!Array.isArray(phaseOwners)) throw new TypeError('phase_owners must be an array');
+  if (phaseOwners.length === 0) throw new TypeError('phase_owners must not be empty');
+  const normalizedOwners = phaseOwners.map((owner, index) => {
+    const field = `phase_owners[${index}]`;
+    if (!isPlainRecord(owner)) throw new TypeError(`${field} must be an object`);
+    assertAllowedPublicLaunchKeys(owner, PUBLIC_LAUNCH_PHASE_OWNER_FIELDS, field);
+    const normalized = {
+      phase_id: normalizePublicLaunchId(owner.phase_id ?? owner.phaseId, `${field}.phase_id`),
+      owner_ref: normalizePublicLaunchRef(owner.owner_ref ?? owner.ownerRef, `${field}.owner_ref`),
+      support_owner_ref: normalizePublicLaunchRef(owner.support_owner_ref ?? owner.supportOwnerRef, `${field}.support_owner_ref`),
+      release_owner_ref: normalizePublicLaunchRef(owner.release_owner_ref ?? owner.releaseOwnerRef, `${field}.release_owner_ref`),
+      signing_owner_ref: normalizePublicLaunchRef(owner.signing_owner_ref ?? owner.signingOwnerRef, `${field}.signing_owner_ref`)
+    };
+    assertPublicSafeFields(normalized);
+    return normalized;
+  });
+  assertUniqueCanonicalPublicLaunchValues(normalizedOwners, 'phase_owners');
+  return normalizedOwners;
+}
+
+function normalizePublicLaunchClaimBoundary(boundary) {
+  if (!isPlainRecord(boundary)) throw new TypeError('claim_boundary must be an object');
+  assertAllowedPublicLaunchKeys(boundary, PUBLIC_LAUNCH_CLAIM_BOUNDARY_FIELDS, 'claim_boundary');
+  const normalized = {
+    version_ref: normalizePublicLaunchRef(boundary.version_ref ?? boundary.versionRef, 'claim_boundary.version_ref'),
+    allowed_claim_refs: normalizePublicLaunchRefArray(boundary.allowed_claim_refs ?? boundary.allowedClaimRefs, 'claim_boundary.allowed_claim_refs'),
+    disallowed_claim_refs: normalizePublicLaunchRefArray(boundary.disallowed_claim_refs ?? boundary.disallowedClaimRefs, 'claim_boundary.disallowed_claim_refs')
+  };
+  assertPublicSafeFields(normalized);
+  return normalized;
+}
+
+function normalizePublicLaunchRefArray(values, field) {
+  if (!Array.isArray(values)) throw new TypeError(`${field} must be an array`);
+  const seen = new Set();
+  return values.map((value, index) => {
+    const normalized = normalizePublicLaunchRef(value, `${field}[${index}]`);
+    if (seen.has(normalized)) throw new TypeError(`${field} must not contain duplicate refs`);
+    seen.add(normalized);
+    return normalized;
+  });
+}
+
+function normalizePublicLaunchIssueCodes(values, field) {
+  if (!Array.isArray(values)) throw new TypeError(`${field} must be an array`);
+  const seen = new Set();
+  return values.map((value, index) => {
+    const normalized = normalizePublicLaunchId(value, `${field}[${index}]`);
+    if (seen.has(normalized)) throw new TypeError(`${field} must not contain duplicate issue codes`);
+    seen.add(normalized);
+    return normalized;
+  });
+}
+
+function normalizePublicLaunchId(value, field) {
+  const text = requiredString(value, field);
+  if (!PUBLIC_LAUNCH_ID_RE.test(text)) throw new TypeError(`${field} must be a public id`);
+  assertPublicSafeFields({ value: text });
+  return text;
+}
+
+function normalizePublicLaunchRef(value, field) {
+  const text = requiredString(value, field);
+  if (!PUBLIC_LAUNCH_REF_RE.test(text)) throw new TypeError(`${field} must be a public ref`);
+  assertPublicSafeFields({ value: text });
+  return text;
+}
+
+function normalizePublicLaunchDateTime(value, field) {
+  const text = requiredString(value, field);
+  if (!PUBLIC_LAUNCH_DATE_TIME_RE.test(text)) throw new TypeError(`${field} must be an ISO-8601 UTC timestamp`);
+  return text;
+}
+
+function normalizePublicLaunchStatus(value, field) {
+  const text = requiredString(value, field);
+  if (!PUBLIC_LAUNCH_STATUSES.has(text)) throw new TypeError(`${field} must be a public launch evidence status`);
+  return text;
+}
+
+function normalizePublicLaunchAdvisorDecision(value, field) {
+  const text = requiredString(value, field);
+  if (!PUBLIC_LAUNCH_ADVISOR_DECISIONS.has(text)) throw new TypeError(`${field} must be an Advisor decision`);
+  return text;
+}
+
+function derivePublicLaunchAdvisorDecision(entries, statusCounts, advisorDecisionCounts) {
+  if (entries.length === 0) return 'not_reviewed';
+  if (statusCounts.fail > 0 || statusCounts.blocked > 0 || statusCounts.missing > 0 || advisorDecisionCounts.hold > 0) return 'hold';
+  if (advisorDecisionCounts.rollback > 0) return 'rollback';
+  if (statusCounts.pending > 0 || advisorDecisionCounts.not_reviewed > 0) return 'not_reviewed';
+  return 'ship';
+}
+
+function publicLaunchStatusCounts() {
+  return { missing: 0, pending: 0, pass: 0, fail: 0, blocked: 0 };
+}
+
+function publicLaunchAdvisorDecisionCounts() {
+  return { ship: 0, hold: 0, rollback: 0, not_reviewed: 0 };
+}
+
+function assertAllowedPublicLaunchKeys(record, allowed, field) {
+  for (const key of Object.keys(record)) {
+    if (!allowed.has(key)) throw new TypeError(`unknown ${field} field: ${key}`);
+  }
+}
+
+function requiredBoolean(value, field) {
+  if (typeof value !== 'boolean') throw new TypeError(`${field} must be a boolean`);
+  return value;
+}
+
+function assertUniqueCanonicalPublicLaunchValues(values, field) {
+  const seen = new Set();
+  for (const value of values) {
+    const key = canonicalize(value);
+    if (seen.has(key)) throw new TypeError(`${field} must not contain duplicates`);
+    seen.add(key);
+  }
 }
 
 function bytesForHash(value) {

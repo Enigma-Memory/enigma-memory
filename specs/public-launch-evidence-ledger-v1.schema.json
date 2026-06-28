@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.enigma.ai/public-launch-evidence-ledger-v1.schema.json",
+  "title": "Enigma Public Launch Evidence Ledger v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "ledger_id",
+    "generated_at",
+    "phase_owners",
+    "claim_boundary",
+    "privacy_export_allowlist",
+    "entries",
+    "summary"
+  ],
+  "properties": {
+    "schema": { "const": "enigma.public_launch_evidence_ledger.v1" },
+    "ledger_id": { "$ref": "#/$defs/publicId" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "phase_owners": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/phaseOwner" }
+    },
+    "claim_boundary": { "$ref": "#/$defs/claimBoundary" },
+    "privacy_export_allowlist": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/publicRef" }
+    },
+    "entries": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/ledgerEntry" }
+    },
+    "summary": { "$ref": "#/$defs/ledgerSummary" }
+  },
+  "$defs": {
+    "publicId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{1,127}$" },
+    "publicRef": { "type": "string", "pattern": "^ref:[A-Za-z0-9][A-Za-z0-9._~:@#?=&%+-]{0,255}$" },
+    "issueCode": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{1,127}$" },
+    "status": { "type": "string", "enum": ["missing", "pending", "pass", "fail", "blocked"] },
+    "advisorDecision": { "type": "string", "enum": ["ship", "hold", "rollback", "not_reviewed"] },
+    "count": { "type": "integer", "minimum": 0 },
+    "phaseOwner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phase_id", "owner_ref", "support_owner_ref", "release_owner_ref", "signing_owner_ref"],
+      "properties": {
+        "phase_id": { "$ref": "#/$defs/publicId" },
+        "owner_ref": { "$ref": "#/$defs/publicRef" },
+        "support_owner_ref": { "$ref": "#/$defs/publicRef" },
+        "release_owner_ref": { "$ref": "#/$defs/publicRef" },
+        "signing_owner_ref": { "$ref": "#/$defs/publicRef" }
+      }
+    },
+    "claimBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version_ref", "allowed_claim_refs", "disallowed_claim_refs"],
+      "properties": {
+        "version_ref": { "$ref": "#/$defs/publicRef" },
+        "allowed_claim_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/publicRef" }
+        },
+        "disallowed_claim_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/publicRef" }
+        }
+      }
+    },
+    "reviewState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "reviewer_ref", "evidence_ref_count", "issue_codes"],
+      "properties": {
+        "status": { "$ref": "#/$defs/status" },
+        "reviewer_ref": { "$ref": "#/$defs/publicRef" },
+        "evidence_ref_count": { "$ref": "#/$defs/count" },
+        "issue_codes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/issueCode" }
+        }
+      }
+    },
+    "ledgerEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "phase_id",
+        "scenario_id",
+        "owner_ref",
+        "status",
+        "advisor_decision",
+        "evidence_refs",
+        "privacy_review",
+        "claim_review",
+        "rollback_ready",
+        "support_owner_ref",
+        "release_owner_ref",
+        "signing_owner_ref",
+        "updated_at",
+        "issue_codes"
+      ],
+      "properties": {
+        "phase_id": { "$ref": "#/$defs/publicId" },
+        "scenario_id": { "$ref": "#/$defs/publicId" },
+        "owner_ref": { "$ref": "#/$defs/publicRef" },
+        "status": { "$ref": "#/$defs/status" },
+        "advisor_decision": { "$ref": "#/$defs/advisorDecision" },
+        "evidence_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/publicRef" }
+        },
+        "privacy_review": { "$ref": "#/$defs/reviewState" },
+        "claim_review": { "$ref": "#/$defs/reviewState" },
+        "rollback_ready": { "type": "boolean" },
+        "support_owner_ref": { "$ref": "#/$defs/publicRef" },
+        "release_owner_ref": { "$ref": "#/$defs/publicRef" },
+        "signing_owner_ref": { "$ref": "#/$defs/publicRef" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "issue_codes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/issueCode" }
+        }
+      }
+    },
+    "statusCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["missing", "pending", "pass", "fail", "blocked"],
+      "properties": {
+        "missing": { "$ref": "#/$defs/count" },
+        "pending": { "$ref": "#/$defs/count" },
+        "pass": { "$ref": "#/$defs/count" },
+        "fail": { "$ref": "#/$defs/count" },
+        "blocked": { "$ref": "#/$defs/count" }
+      }
+    },
+    "advisorDecisionCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ship", "hold", "rollback", "not_reviewed"],
+      "properties": {
+        "ship": { "$ref": "#/$defs/count" },
+        "hold": { "$ref": "#/$defs/count" },
+        "rollback": { "$ref": "#/$defs/count" },
+        "not_reviewed": { "$ref": "#/$defs/count" }
+      }
+    },
+    "issueCodeCount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["issue_code", "count"],
+      "properties": {
+        "issue_code": { "$ref": "#/$defs/issueCode" },
+        "count": { "$ref": "#/$defs/count" }
+      }
+    },
+    "ledgerSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total_entries",
+        "status_counts",
+        "advisor_decision_counts",
+        "privacy_review_counts",
+        "claim_review_counts",
+        "rollback_ready_count",
+        "issue_code_counts",
+        "advisor_decision"
+      ],
+      "properties": {
+        "total_entries": { "$ref": "#/$defs/count" },
+        "status_counts": { "$ref": "#/$defs/statusCounts" },
+        "advisor_decision_counts": { "$ref": "#/$defs/advisorDecisionCounts" },
+        "privacy_review_counts": { "$ref": "#/$defs/statusCounts" },
+        "claim_review_counts": { "$ref": "#/$defs/statusCounts" },
+        "rollback_ready_count": { "$ref": "#/$defs/count" },
+        "issue_code_counts": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/issueCodeCount" }
+        },
+        "advisor_decision": { "$ref": "#/$defs/advisorDecision" }
+      }
+    }
+  }
+}

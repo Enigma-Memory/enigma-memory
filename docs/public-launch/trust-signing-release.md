@@ -23,6 +23,10 @@ Public artifacts must not include raw memory, prompts, transcripts, local absolu
 | npm package | Developers and power users | `enigma-memory` package | npm trusted publishing with GitHub Actions OIDC and registry provenance | Package release owner | Publishes the CLI engine. It is not the consumer default and does not substitute for signed desktop distribution. |
 | Local evidence packet | Reviewers and support | Redacted checksums, manifests, logs, and release decisions | Human review plus optional detached signature once signing is added | Release engineering | Supports release review only. It is not registry provenance, OS notarization, compliance, or live deployment proof. |
 
+## P9 release-owner checklist
+
+First-sprint signing prerequisites are tracked in [release-owner-checklist.md](release-owner-checklist.md). That checklist is the source for release-owner, signing-owner, support-owner, rollback rehearsal, Windows path decision, Apple Developer ID prerequisite, update signing custody, public-safe evidence, private runbook, and Advisor decision fields. It is a blocker ledger only; it does not claim signing, notarization, update signing, or release approval is complete.
+
 ## Desktop release deliverables
 
 ### Product deliverables
@@ -240,10 +244,13 @@ Required GA rehearsal coverage:
 - Repeat beta coverage on every supported OS version and architecture.
 - Verify stable-channel update behavior separately from beta and internal channels.
 - Verify certificate/key renewal calendar, revocation procedure, emergency signer access, and signing audit log ownership.
+
 - Verify support can reproduce and resolve install warning, connector setup failure, vault recovery, update failure, and uninstall issues using public-safe artifacts.
 - Verify npm package publication, if included in the release train, remains a separate trusted-publishing flow and does not require or store a long-lived npm publish token.
 
 ## Dependencies and owners
+
+Use [release-owner-checklist.md](release-owner-checklist.md) as the first-sprint P9 ledger for the owner refs and manual prerequisite statuses below; keep detailed access, custody, and support procedures in the private release runbook.
 
 | Dependency | Owner | Needed for | Repo-automatable? |
 | --- | --- | --- | --- |

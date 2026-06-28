@@ -9,6 +9,28 @@ const MCP_COMMAND = 'enigma-mcp';
 const MCP_CONTAINER_PATH = Object.freeze(['mcpServers']);
 const SUPPORTED_PLATFORMS = Object.freeze(['win32', 'darwin', 'linux']);
 const TRUST_CARD_SCHEMA = 'enigma.trust_card.v1';
+const CLAUDE_DESKTOP_MCPB_SCHEMA = 'enigma.claude_desktop_mcpb_manifest.v1';
+const CLAUDE_DESKTOP_MCPB_PLAN_SCHEMA = 'enigma.claude_desktop_mcpb_connection_plan.v1';
+const CLAUDE_DESKTOP_MCPB_HEALTH_SCHEMA = 'enigma.claude_desktop_mcpb_health.v1';
+const CLAUDE_DESKTOP_MCPB_ENVIRONMENT_NAMES = Object.freeze(['ENIGMA_BUNDLE']);
+const CLAUDE_DESKTOP_MCPB_STATES = Object.freeze([
+  'detect',
+  'preview',
+  'consent',
+  'install_handoff',
+  'restart',
+  'test',
+  'ready',
+]);
+const CLAUDE_DESKTOP_MCPB_HEALTH_STATES = Object.freeze([
+  'not_installed',
+  'mcpb_ready',
+  'restart_required',
+  'testing',
+  'ready',
+  'repair_required',
+  'advanced_fallback',
+]);
 
 const CLIENT_DEFINITIONS = Object.freeze({
   'claude-desktop': Object.freeze({
@@ -651,6 +673,203 @@ export function planConnectWizard(clientIdOrOptions = {}, maybeOptions = {}) {
       connect_command: connectCommandFor(clientId, platform),
       mcp_config_preview: renderMcpConfig(clientId, { platform, bundlePath: publicBundlePlaceholder(platform) }),
     })),
+  };
+}
+
+function claudeDesktopMcpbClaimBoundary() {
+  return {
+    ...connectorTrustBoundary(),
+    provider_native_memory_control_claim: false,
+    compliance_certification_claim: false,
+    benchmark_superiority_claim: false,
+    legal_or_patent_conclusion_claim: false,
+    chain_submission_claim: false,
+    tamper_proof_claim: false,
+  };
+}
+
+export function createClaudeDesktopMcpbManifest(options = {}) {
+  return {
+    ok: true,
+    schema: CLAUDE_DESKTOP_MCPB_SCHEMA,
+    manifest_version: '0.3',
+    name: 'enigma-memory',
+    display_name: 'Enigma Memory',
+    version: String(options.version ?? options.manifestVersion ?? options.manifest_version ?? '0.0.0'),
+    author: {
+      name: 'Enigma Memory',
+    },
+    description: 'Claude Desktop extension contract for the local Enigma Memory MCP bridge.',
+    server: {
+      transport: 'stdio',
+      command: {
+        name: MCP_COMMAND,
+        description: 'Starts the Enigma Memory MCP bridge through the Enigma-managed runtime.',
+      },
+      args: [],
+      environment_names: [...CLAUDE_DESKTOP_MCPB_ENVIRONMENT_NAMES],
+      type: 'binary',
+      entry_point: 'bin/enigma-mcp',
+      mcp_config: {
+        command: MCP_COMMAND,
+        args: [],
+        environment_names: [...CLAUDE_DESKTOP_MCPB_ENVIRONMENT_NAMES],
+      },
+    },
+    environment_names: [...CLAUDE_DESKTOP_MCPB_ENVIRONMENT_NAMES],
+    supported_platforms: [...SUPPORTED_PLATFORMS],
+    compatibility: {
+      platforms: [...SUPPORTED_PLATFORMS],
+      runtimes: {
+        enigma_desktop: 'bundled-runtime-required',
+      },
+    },
+    required_runtime: {
+      note: 'Requires Enigma Desktop bundled runtime or an Enigma-managed MCP bridge; the public manifest does not carry local paths or config bodies.',
+    },
+    required_runtime_note: 'Requires Enigma Desktop bundled runtime or an Enigma-managed MCP bridge; the public manifest does not carry local paths or config bodies.',
+    claim_boundary: claudeDesktopMcpbClaimBoundary(),
+    public_safety: {
+      public_payload_only: true,
+      raw_config_body_included: false,
+      local_absolute_path_included: false,
+      credential_included: false,
+      token_included: false,
+      signing_secret_included: false,
+    },
+  };
+}
+
+export function createClaudeDesktopMcpbConnectionPlan(options = {}) {
+  const platform = normalizePlatform(options.platform ?? process.platform);
+  return {
+    ok: true,
+    schema: CLAUDE_DESKTOP_MCPB_PLAN_SCHEMA,
+    client_id: 'claude-desktop',
+    display_name: CLIENT_DEFINITIONS['claude-desktop'].display_name,
+    platform,
+    preferred_path: 'mcpb_extension',
+    writes_performed: false,
+    writesPerformed: false,
+    automatic_config_write: false,
+    default_manual_json_fallback: false,
+    states: CLAUDE_DESKTOP_MCPB_STATES.map((id, index) => ({
+      order: index + 1,
+      id,
+      write: false,
+    })),
+    install_handoff: {
+      artifact: '.mcpb',
+      user_confirms_in_claude: true,
+      enigma_writes_claude_config: false,
+    },
+    bridge_pairing: {
+      scope: 'current_os_user',
+      local_service_required: true,
+      public_payload_only: true,
+      pairing_secret_in_manifest: false,
+      pairing_secret_in_support_export: false,
+      raw_local_service_endpoint_included: false,
+    },
+    repair_boundaries: {
+      primary_action_per_state: true,
+      writes_only_after_explicit_consent: true,
+      public_logs_redacted: true,
+      raw_config_body_included: false,
+    },
+    disconnect_boundaries: {
+      mcpb_path: 'Guide the user to remove or disable the Enigma Memory extension in Claude Desktop.',
+      fallback_path: 'Remove only the Enigma MCP server entry after advanced-user consent.',
+      automatic_config_write: false,
+    },
+    fallback_boundaries: {
+      manual_json: {
+        available: true,
+        default: false,
+        audience: 'advanced',
+        requires_explicit_selection: true,
+        automatic_config_write: false,
+      },
+    },
+    manual_json_fallback: {
+      available: true,
+      default: false,
+      audience: 'advanced',
+      advanced_only: true,
+      requires_explicit_selection: true,
+      automatic_config_write: false,
+    },
+    test_boundary: {
+      ready_requires_test_evidence: true,
+      local_checks_only_before_user_test: true,
+    },
+    claim_boundary: claudeDesktopMcpbClaimBoundary(),
+  };
+}
+
+function hasPassingClaudeMcpbTestEvidence(evidence) {
+  if (evidence === true) return true;
+  if (!isPlainObject(evidence)) return false;
+  return evidence.passed === true || evidence.ok === true || evidence.status === 'passed';
+}
+
+function hasFailingClaudeMcpbTestEvidence(evidence) {
+  if (evidence === false) return true;
+  if (!isPlainObject(evidence)) return false;
+  return evidence.passed === false || evidence.ok === false || evidence.status === 'failed';
+}
+
+function publicReasonCodes(values) {
+  if (!Array.isArray(values)) return [];
+  return uniqueSortedStrings(values.filter((value) => /^[a-z0-9_.:-]+$/i.test(String(value))));
+}
+
+export function createClaudeDesktopMcpbHealth(options = {}) {
+  const testEvidence = options.testEvidence ?? options.test_evidence;
+  const mcpbInstalled = options.mcpbInstalled === true
+    || options.mcpb_installed === true
+    || options.extensionInstalled === true
+    || options.extension_installed === true
+    || options.installed === true;
+  const restartRequired = options.restartRequired === true || options.restart_required === true;
+  const testing = options.testing === true;
+  const advancedFallback = options.advancedFallback === true || options.advanced_fallback === true;
+  const repairRequired = options.repairRequired === true
+    || options.repair_required === true
+    || hasFailingClaudeMcpbTestEvidence(testEvidence);
+  const testPassed = hasPassingClaudeMcpbTestEvidence(testEvidence);
+  const testEvidencePresent = testEvidence !== undefined;
+  let status = 'not_installed';
+
+  if (advancedFallback) status = 'advanced_fallback';
+  else if (testing) status = 'testing';
+  else if (repairRequired) status = 'repair_required';
+  else if (!mcpbInstalled) status = 'not_installed';
+  else if (restartRequired) status = 'restart_required';
+  else if (testPassed) status = 'ready';
+  else status = 'mcpb_ready';
+
+  return {
+    ok: status === 'ready',
+    schema: CLAUDE_DESKTOP_MCPB_HEALTH_SCHEMA,
+    client_id: 'claude-desktop',
+    display_name: CLIENT_DEFINITIONS['claude-desktop'].display_name,
+    status,
+    state: status,
+    health_status: status,
+    supported_statuses: [...CLAUDE_DESKTOP_MCPB_HEALTH_STATES],
+    installed: mcpbInstalled,
+    connected: status === 'ready',
+    ready: status === 'ready',
+    test_evidence_present: testEvidencePresent,
+    test_passed: testPassed,
+    ready_requires_test_evidence: true,
+    repair_reasons: status === 'repair_required'
+      ? publicReasonCodes(options.repairReasons ?? options.repair_reasons ?? ['test_failed_or_repair_required'])
+      : [],
+    advanced_fallback: advancedFallback,
+    automatic_config_write: false,
+    claim_boundary: claudeDesktopMcpbClaimBoundary(),
   };
 }
 

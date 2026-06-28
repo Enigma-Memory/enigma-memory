@@ -4,6 +4,8 @@ const DELETE_EVIDENCE_SCHEMA = 'enigma.desktop.delete_evidence.v1';
 const VERIFIER_EVIDENCE_SCHEMA = 'enigma.desktop.verifier_evidence.v1';
 
 export const DESKTOP_SCREENS = Object.freeze([
+  'home',
+  'setup',
   'vault',
   'mcp',
   'clients',
@@ -42,17 +44,57 @@ const FORBIDDEN_IMPORT_RAW_KEYS = Object.freeze(new Set([
   'rawmemory',
   'memory'
 ]));
-const RAW_LOOKING_VALUE_RE = /(private\s+launch-code|must\s+not\s+leave\s+local\s+memory|raw[\s_-]*memory|plain[\s_-]*text|secret|password|api[\s_-]*key|body\s*:|content\s*:)/i;
+const RAW_LOOKING_VALUE_RE = /(private\s+launch-code|must\s+not\s+leave\s+local\s+memory|raw[\s_-]*memory|plain[\s_-]*text|secret|password|api[\s_-]*key|token|private[\s_-]*key|prompt|transcript|provider[\s_-]*response|body\s*:|content\s*:|[A-Za-z]:[\\/][^\s]+|\/(?:Users|home|var|tmp|private|Volumes)\/[^\s]+)/i;
 
 export function createDesktopState(options = {}) {
   const now = cleanString(options.now) || INITIAL_NOW;
   const vaultId = cleanString(options.vault_id ?? options.vaultId);
+  const memoryDriveReady = Boolean(vaultId);
+  const initialIssueCodes = memoryDriveReady ? [] : ['MEMORY_DRIVE_MISSING'];
   return {
     schema: DESKTOP_SCHEMA,
     version: 1,
     sequence: 0,
-    activeScreen: isKnownScreen(options.activeScreen) ? options.activeScreen : 'vault',
-    notice: 'Desktop shell state is operational evidence only. It is not cryptographic proof.',
+    activeScreen: isKnownScreen(options.activeScreen) ? options.activeScreen : 'home',
+    notice: 'Memory Drive is local operational evidence only. Receipts and verifier output remain the proof path.',
+    memoryDrive: {
+      status: memoryDriveReady ? 'ready' : 'missing',
+      drive_id: vaultId ? `drive_${localFingerprint(vaultId).slice(0, 16)}` : '',
+      created_at: vaultId ? now : '',
+      last_event_at: '',
+      issue_codes: initialIssueCodes.slice()
+    },
+    desktopService: {
+      status: 'stopped',
+      boundary: 'bundled-runtime-local-service',
+      started_at: '',
+      stopped_at: '',
+      issue_codes: ['SERVICE_NOT_RUNNING']
+    },
+    desktopHealth: {
+      status: memoryDriveReady ? 'fix-needed' : 'needs-setup',
+      checked_at: '',
+      issue_codes: memoryDriveReady ? ['SERVICE_NOT_RUNNING'] : initialIssueCodes.slice()
+    },
+    proofActivity: {
+      status: 'idle',
+      receipt_count: 0,
+      last_activity_at: '',
+      issue_codes: []
+    },
+    desktopUpdate: {
+      status: 'unknown',
+      version: cleanString(options.version),
+      checked_at: '',
+      issue_codes: []
+    },
+    desktopDiagnostics: {
+      status: 'not-run',
+      checked_at: '',
+      support_report_ready: false,
+      issue_codes: [],
+      safe_summary: []
+    },
     vault: {
       status: vaultId ? 'ready' : 'missing',
       vault_id: vaultId,
@@ -119,6 +161,20 @@ export function desktopReducer(state = createDesktopState(), action = {}) {
   switch (type) {
     case 'desktop/select-screen':
       return selectScreen(state, action.screen);
+    case 'desktop/create-memory-drive':
+      return createMemoryDriveState(state, action);
+    case 'desktop/service/update':
+      return updateDesktopServiceState(state, action);
+    case 'desktop/health/update':
+      return updateDesktopHealthState(state, action);
+    case 'desktop/proof/update':
+      return updateProofActivityState(state, action);
+    case 'desktop/update/status':
+      return updateDesktopUpdateStatusState(state, action);
+    case 'desktop/diagnostics/update':
+      return updateDesktopDiagnosticsState(state, action);
+    case 'desktop/shutdown':
+      return shutdownDesktopState(state, action);
     case 'mcp/start':
       return startMcpState(state, action);
     case 'mcp/stop':
@@ -148,7 +204,7 @@ export function desktopReducer(state = createDesktopState(), action = {}) {
     case 'draft/set':
       return setDraftState(state, action);
     default:
-      return withNotice(state, `Unknown action \"${type}\" was rejected.`);
+      return withNotice(state, 'Unknown action was rejected.');
   }
 }
 
@@ -157,13 +213,16 @@ export function renderDesktopModel(state = createDesktopState()) {
   const deletedMemories = state.memories.filter((memory) => memory.deleted);
   const connectedClients = state.clients.filter((client) => client.status === 'connected');
   const verifierOk = state.verifier.status === 'checked' && state.verifier.errors.length === 0;
+  const dashboard = renderMemoryDriveDashboard(state);
 
   return {
     schema: 'enigma.desktop.render_model.v1',
     activeScreen: state.activeScreen,
     notice: state.notice,
+    dashboard,
     navigation: DESKTOP_SCREENS.map((id) => ({ id, label: screenLabel(id), active: id === state.activeScreen })),
     summary: {
+      memory_drive: dashboard.memory_drive_status,
       vault: state.vault.status,
       mcp: state.mcp.status,
       clients: connectedClients.length,
@@ -174,12 +233,24 @@ export function renderDesktopModel(state = createDesktopState()) {
       enterprise: state.enterprise.status
     },
     screens: {
+      home: {
+        title: 'Memory Drive dashboard',
+        dashboard
+      },
+      setup: {
+        title: 'Set up Memory Drive',
+        memory_drive_status: dashboard.memory_drive_status,
+        service_status: state.desktopService.status,
+        health_status: dashboard.health_status,
+        next_action: dashboard.next_action,
+        issue_codes: dashboard.issue_codes.slice()
+      },
       vault: {
         title: 'Vault status',
         status: state.vault.status,
-        vault_id: state.vault.vault_id,
-        active_set_root: state.vault.active_set_root,
-        receipt_log_root: state.vault.receipt_log_root,
+        vault_id: safePublicString(state.vault.vault_id, '', 96),
+        active_set_root: safePublicString(state.vault.active_set_root, '', 96),
+        receipt_log_root: safePublicString(state.vault.receipt_log_root, '', 96),
         metrics: [
           { label: 'Active memories', value: activeMemories.length },
           { label: 'Deleted memories', value: deletedMemories.length },
@@ -190,16 +261,16 @@ export function renderDesktopModel(state = createDesktopState()) {
       mcp: {
         title: 'MCP server status',
         status: state.mcp.status,
-        endpoint: state.mcp.endpoint,
-        transport: state.mcp.transport,
+        endpoint: safePublicString(state.mcp.endpoint, 'local endpoint', 96),
+        transport: safePublicString(state.mcp.transport, 'local transport', 32),
         port: state.mcp.port,
         client_count: connectedClients.length,
         honest_status: state.mcp.status === 'running' ? 'local server claimed running' : 'local server stopped'
       },
       clients: {
-        title: 'Client connections',
+        title: 'Connected apps',
         templates: CLIENT_TEMPLATES.map((template) => ({ ...template, connected: state.clients.some((client) => client.id === template.id && client.status === 'connected') })),
-        connected: state.clients.map((client) => ({ ...client })),
+        connected: state.clients.map(renderClientRow),
         browser_bridge_status: BROWSER_BRIDGE_STATUS_COPY.slice()
       },
       importExport: {
@@ -235,12 +306,55 @@ export function renderDesktopModel(state = createDesktopState()) {
       enterprise: {
         title: 'Enterprise status',
         status: state.enterprise.status,
-        tenant_id: state.enterprise.tenant_id,
-        policy_id: state.enterprise.policy_id,
+        tenant_id: state.enterprise.tenant_id ? 'configured' : 'not configured',
+        policy_id: state.enterprise.policy_id ? 'configured' : 'not configured',
         siem: state.enterprise.siem,
         note: state.enterprise.note
+      },
+      diagnostics: {
+        title: 'Safe support report',
+        status: state.desktopDiagnostics.status,
+        checked_at: state.desktopDiagnostics.checked_at,
+        support_report_ready: Boolean(state.desktopDiagnostics.support_report_ready),
+        issue_codes: normalizeIssueCodes(state.desktopDiagnostics.issue_codes),
+        safe_summary: normalizeSafePublicList(state.desktopDiagnostics.safe_summary, 6)
       }
     }
+  };
+}
+
+export function renderMemoryDriveDashboard(state = createDesktopState()) {
+  const connectedAppCount = state.clients.filter((client) => client.status === 'connected').length;
+  const issueCodes = collectDashboardIssueCodes(state);
+  const memoryDriveStatus = normalizePublicStatus(state.memoryDrive?.status, ['missing', 'creating', 'ready', 'error'], 'missing');
+  const serviceStatus = normalizePublicStatus(state.desktopService?.status, ['stopped', 'starting', 'running', 'repair-needed', 'error'], 'stopped');
+  const healthStatus = normalizePublicStatus(state.desktopHealth?.status, ['needs-setup', 'checking', 'healthy', 'fix-needed', 'error'], 'needs-setup');
+  const proofStatus = normalizePublicStatus(state.proofActivity?.status || state.verifier?.status, ['idle', 'checking', 'checked', 'error', 'needs-review'], 'idle');
+  const updateStatus = normalizePublicStatus(state.desktopUpdate?.status, ['unknown', 'checking', 'current', 'available', 'installing', 'ready', 'error'], 'unknown');
+  const diagnosticsStatus = normalizePublicStatus(state.desktopDiagnostics?.status, ['not-run', 'running', 'ready', 'needs-review', 'error'], 'not-run');
+  const offlineReady = memoryDriveStatus === 'ready' && serviceStatus === 'running' && healthStatus === 'healthy';
+
+  return {
+    schema: 'enigma.desktop.memory_drive_dashboard.v1',
+    title: 'Memory Drive',
+    memory_drive_status: memoryDriveStatus,
+    health_status: healthStatus,
+    connected_app_count: connectedAppCount,
+    proof_status: proofStatus,
+    update_status: updateStatus,
+    diagnostics_status: diagnosticsStatus,
+    offline_ready: offlineReady,
+    issue_codes: issueCodes,
+    next_action: selectMemoryDriveNextAction({
+      memoryDriveStatus,
+      serviceStatus,
+      healthStatus,
+      proofStatus,
+      updateStatus,
+      diagnosticsStatus,
+      connectedAppCount,
+      issueCodes
+    })
   };
 }
 
@@ -300,6 +414,34 @@ export function selectDesktopScreen(screen) {
   return { screen, type: 'desktop/select-screen' };
 }
 
+export function createMemoryDrive(options = {}) {
+  return { ...options, type: 'desktop/create-memory-drive' };
+}
+
+export function updateDesktopService(service = {}, options = {}) {
+  return { ...options, service, type: 'desktop/service/update' };
+}
+
+export function updateDesktopHealth(health = {}, options = {}) {
+  return { ...options, health, type: 'desktop/health/update' };
+}
+
+export function updateProofActivity(proof = {}, options = {}) {
+  return { ...options, proof, type: 'desktop/proof/update' };
+}
+
+export function updateDesktopUpdateStatus(update = {}, options = {}) {
+  return { ...options, update, type: 'desktop/update/status' };
+}
+
+export function updateDesktopDiagnostics(diagnostics = {}, options = {}) {
+  return { ...options, diagnostics, type: 'desktop/diagnostics/update' };
+}
+
+export function shutdownDesktop(options = {}) {
+  return { ...options, type: 'desktop/shutdown' };
+}
+
 export function setDesktopDraft(name, value) {
   return { name, value, type: 'draft/set' };
 }
@@ -310,6 +452,7 @@ export const desktopActions = Object.freeze({
   startMCP: startMcp,
   stopMCP: stopMcp,
   createVault,
+  createMemoryDrive,
   rememberMemory,
   remember: rememberMemory,
   deleteMemory,
@@ -327,6 +470,12 @@ export const desktopActions = Object.freeze({
   exportDesktopBundle: exportBundle,
   updateMeshStatus,
   updateEnterpriseStatus,
+  updateDesktopService,
+  updateDesktopHealth,
+  updateProofActivity,
+  updateDesktopUpdateStatus,
+  updateDesktopDiagnostics,
+  shutdownDesktop,
   selectDesktopScreen,
   setDesktopDraft
 });
@@ -347,6 +496,7 @@ export const desktopApi = Object.freeze({
   createDesktopState,
   desktopReducer,
   renderDesktopModel,
+  renderMemoryDriveDashboard,
   desktopActions,
   actions,
   startMcp,
@@ -354,6 +504,7 @@ export const desktopApi = Object.freeze({
   startMCP,
   stopMCP,
   createVault,
+  createMemoryDrive,
   rememberMemory,
   remember,
   deleteMemory,
@@ -368,7 +519,17 @@ export const desktopApi = Object.freeze({
   importBundle,
   importDesktopBundle,
   exportBundle,
-  exportDesktopBundle
+  exportDesktopBundle,
+  updateMeshStatus,
+  updateEnterpriseStatus,
+  updateDesktopService,
+  updateDesktopHealth,
+  updateProofActivity,
+  updateDesktopUpdateStatus,
+  updateDesktopDiagnostics,
+  shutdownDesktop,
+  selectDesktopScreen,
+  setDesktopDraft
 });
 
 if (typeof globalThis !== 'undefined') {
@@ -423,6 +584,14 @@ function createVaultState(state, action) {
     ...state,
     activeScreen: 'vault',
     notice: 'Vault shell created. Receipts remain the source of proof.',
+    memoryDrive: {
+      ...state.memoryDrive,
+      status: 'ready',
+      drive_id: state.memoryDrive.drive_id || `drive_${localFingerprint(vaultId).slice(0, 16)}`,
+      created_at: state.memoryDrive.created_at || now,
+      last_event_at: now,
+      issue_codes: []
+    },
     vault: {
       ...state.vault,
       status: 'ready',
@@ -435,8 +604,43 @@ function createVaultState(state, action) {
   });
 }
 
+function createMemoryDriveState(state, action) {
+  const now = cleanString(action.now) || INITIAL_NOW;
+  const seed = cleanString(action.drive_id ?? action.driveId ?? action.name ?? action.label) || `memory-drive-${state.sequence + 1}`;
+  const driveId = `drive_${localFingerprint(seed).slice(0, 16)}`;
+  const vaultId = state.vault.vault_id || `vault_${localFingerprint(`${seed}|vault`).slice(0, 16)}`;
+  const serviceRunning = state.desktopService.status === 'running';
+  const healthIssueCodes = serviceRunning ? [] : ['SERVICE_NOT_RUNNING'];
+  return bump({
+    ...state,
+    activeScreen: 'home',
+    notice: 'Memory Drive created. Local service and receipts remain the evidence path.',
+    memoryDrive: {
+      ...state.memoryDrive,
+      status: 'ready',
+      drive_id: driveId,
+      created_at: state.memoryDrive.created_at || now,
+      last_event_at: now,
+      issue_codes: []
+    },
+    desktopHealth: {
+      ...state.desktopHealth,
+      status: serviceRunning ? 'healthy' : 'fix-needed',
+      checked_at: now,
+      issue_codes: healthIssueCodes
+    },
+    vault: {
+      ...state.vault,
+      status: 'ready',
+      vault_id: vaultId,
+      created_at: state.vault.created_at || now,
+      last_event_at: now
+    }
+  });
+}
+
 function rememberMemoryState(state, action) {
-  if (state.vault.status !== 'ready') return withNotice(state, 'Create a vault before remembering memory.');
+  if (state.vault.status !== 'ready') return withNotice(state, 'Create a Memory Drive before adding memory descriptors.');
 
   const memory = normalizeMemory(action.memory, state, action);
   const memories = upsertMemory(state.memories, memory);
@@ -665,6 +869,132 @@ function updateEnterpriseState(state, action) {
       siem: cleanString(enterprise.siem) || state.enterprise.siem
     },
     notice: 'Enterprise status updated as configuration evidence.'
+  });
+}
+
+function updateDesktopServiceState(state, action) {
+  const service = action.service ?? {};
+  const now = cleanString(action.now) || INITIAL_NOW;
+  const status = normalizePublicStatus(service.status, ['stopped', 'starting', 'running', 'repair-needed', 'error'], state.desktopService.status);
+  const issueCodes = normalizeIssueCodes(service.issue_codes ?? service.issueCodes);
+  const nextServiceIssues = status === 'running' ? issueCodes.filter((code) => code !== 'SERVICE_NOT_RUNNING') : uniqueIssueCodes(issueCodes.concat('SERVICE_NOT_RUNNING'));
+  const healthCanClear = status === 'running' && state.memoryDrive.status === 'ready' && state.desktopHealth.issue_codes.every((code) => code === 'SERVICE_NOT_RUNNING');
+  return bump({
+    ...state,
+    activeScreen: 'home',
+    desktopService: {
+      ...state.desktopService,
+      status,
+      started_at: status === 'running' ? now : state.desktopService.started_at,
+      stopped_at: status === 'stopped' ? now : state.desktopService.stopped_at,
+      issue_codes: nextServiceIssues
+    },
+    desktopHealth: healthCanClear ? {
+      ...state.desktopHealth,
+      status: 'healthy',
+      checked_at: now,
+      issue_codes: []
+    } : state.desktopHealth,
+    notice: 'Memory Drive service status updated.'
+  });
+}
+
+function updateDesktopHealthState(state, action) {
+  const health = action.health ?? {};
+  const now = cleanString(action.now) || INITIAL_NOW;
+  const status = normalizePublicStatus(health.status, ['needs-setup', 'checking', 'healthy', 'fix-needed', 'error'], state.desktopHealth.status);
+  const inputIssueCodes = normalizeIssueCodes(health.issue_codes ?? health.issueCodes);
+  const issueCodes = status === 'healthy' ? [] : uniqueIssueCodes(inputIssueCodes.length ? inputIssueCodes : [state.memoryDrive.status === 'ready' ? 'HEALTH_FIX_REQUIRED' : 'MEMORY_DRIVE_MISSING']);
+  return bump({
+    ...state,
+    activeScreen: 'home',
+    desktopHealth: {
+      ...state.desktopHealth,
+      status,
+      checked_at: now,
+      issue_codes: issueCodes
+    },
+    notice: 'Memory Drive health updated with public-safe issue codes.'
+  });
+}
+
+function updateProofActivityState(state, action) {
+  const proof = action.proof ?? {};
+  const now = cleanString(action.now) || INITIAL_NOW;
+  return bump({
+    ...state,
+    activeScreen: 'home',
+    proofActivity: {
+      ...state.proofActivity,
+      status: normalizePublicStatus(proof.status, ['idle', 'checking', 'checked', 'error', 'needs-review'], state.proofActivity.status),
+      receipt_count: normalizeNonNegativeInteger(proof.receipt_count ?? proof.receiptCount, state.proofActivity.receipt_count),
+      last_activity_at: cleanString(proof.last_activity_at ?? proof.lastActivityAt) || now,
+      issue_codes: normalizeIssueCodes(proof.issue_codes ?? proof.issueCodes)
+    },
+    notice: 'Proof activity updated without exposing receipt bodies or provider responses.'
+  });
+}
+
+function updateDesktopUpdateStatusState(state, action) {
+  const update = action.update ?? {};
+  const now = cleanString(action.now) || INITIAL_NOW;
+  return bump({
+    ...state,
+    activeScreen: 'home',
+    desktopUpdate: {
+      ...state.desktopUpdate,
+      status: normalizePublicStatus(update.status, ['unknown', 'checking', 'current', 'available', 'installing', 'ready', 'error'], state.desktopUpdate.status),
+      version: safePublicString(update.version, state.desktopUpdate.version, 32),
+      checked_at: now,
+      issue_codes: normalizeIssueCodes(update.issue_codes ?? update.issueCodes)
+    },
+    notice: 'Update status refreshed.'
+  });
+}
+
+function updateDesktopDiagnosticsState(state, action) {
+  const diagnostics = action.diagnostics ?? {};
+  const now = cleanString(action.now) || INITIAL_NOW;
+  return bump({
+    ...state,
+    activeScreen: 'home',
+    desktopDiagnostics: {
+      ...state.desktopDiagnostics,
+      status: normalizePublicStatus(diagnostics.status, ['not-run', 'running', 'ready', 'needs-review', 'error'], state.desktopDiagnostics.status),
+      checked_at: now,
+      support_report_ready: Boolean(diagnostics.support_report_ready ?? diagnostics.supportReportReady),
+      issue_codes: normalizeIssueCodes(diagnostics.issue_codes ?? diagnostics.issueCodes),
+      safe_summary: normalizeSafePublicList(diagnostics.safe_summary ?? diagnostics.safeSummary ?? diagnostics.summary, 6)
+    },
+    notice: 'Diagnostics updated with safe support-report metadata only.'
+  });
+}
+
+function shutdownDesktopState(state, action) {
+  const now = cleanString(action.now) || INITIAL_NOW;
+  return bump({
+    ...state,
+    activeScreen: 'home',
+    desktopService: {
+      ...state.desktopService,
+      status: 'stopped',
+      stopped_at: now,
+      issue_codes: ['SERVICE_NOT_RUNNING']
+    },
+    mcp: {
+      ...state.mcp,
+      status: 'stopped',
+      stopped_at: now,
+      client_count: 0
+    },
+    clients: state.clients.map((client) => ({ ...client, status: 'disconnected', disconnected_at: now })),
+    desktopHealth: {
+      ...state.desktopHealth,
+      status: state.memoryDrive.status === 'ready' ? 'fix-needed' : 'needs-setup',
+      checked_at: now,
+      issue_codes: state.memoryDrive.status === 'ready' ? ['SERVICE_NOT_RUNNING'] : ['MEMORY_DRIVE_MISSING']
+    },
+    notice: 'Memory Drive local service stopped. This does not delete provider-side cache or make any model forget.'
   });
 }
 
@@ -949,42 +1279,67 @@ function createExportBundle(state, now, scope) {
     notice: `This bundle intentionally excludes raw memory plaintext. It is evidence metadata, not proof. ${BODY_FINGERPRINT_NOTE}`,
     vault: {
       status: state.vault.status,
-      vault_id: state.vault.vault_id,
-      active_set_root: state.vault.active_set_root,
-      receipt_log_root: state.vault.receipt_log_root,
+      vault_id: safePublicString(state.vault.vault_id, '', 96),
+      active_set_root: safePublicString(state.vault.active_set_root, '', 96),
+      receipt_log_root: safePublicString(state.vault.receipt_log_root, '', 96),
       receipt_count: state.vault.receipt_count
     },
     memories: state.memories.map((memory) => ({
-      address: memory.address,
+      address: safePublicString(memory.address, 'memory descriptor', 96),
       descriptor: safeImportedText(memory.descriptor, 'imported memory', 96),
       source: safeImportedText(memory.source, 'imported-bundle', 96),
       tags: sanitizeImportedTags(memory.tags),
-      tenant_id: memory.tenant_id,
-      subject_id: memory.subject_id,
+      tenant_id: memory.tenant_id ? 'configured' : '',
+      subject_id: memory.subject_id ? 'configured' : '',
       body_fingerprint: isRawLookingText(memory.body_fingerprint) ? '' : memory.body_fingerprint,
       body_bytes: memory.body_bytes,
       deleted: memory.deleted,
       created_at: memory.created_at,
       deleted_at: memory.deleted_at,
-      receipt_id: memory.receipt_id
+      receipt_id: safePublicString(memory.receipt_id, '', 96)
     })),
     deletionEvidence: state.deletionEvidence.map(sanitizeDeletionEvidenceForExport),
     verifierEvidence: state.verifier.evidence.map(sanitizeVerifierEvidenceForExport),
-    mesh: { ...state.mesh },
-    enterprise: { ...state.enterprise },
-    clients: includeClients ? state.clients.map((client) => ({ ...client })) : []
+    mesh: {
+      status: safePublicString(state.mesh.status, 'offline', 32),
+      peers: state.mesh.peers,
+      relays: state.mesh.relays,
+      last_witness_at: safePublicString(state.mesh.last_witness_at, '', 32),
+      note: safePublicString(state.mesh.note, 'Mesh status is local telemetry.', 120)
+    },
+    enterprise: {
+      status: safePublicString(state.enterprise.status, 'not-configured', 32),
+      tenant_id: state.enterprise.tenant_id ? 'configured' : '',
+      policy_id: state.enterprise.policy_id ? 'configured' : '',
+      siem: safePublicString(state.enterprise.siem, 'disconnected', 32),
+      note: safePublicString(state.enterprise.note, 'Enterprise controls report configuration evidence.', 120)
+    },
+    clients: includeClients ? state.clients.map(renderClientRow) : []
   };
 }
 
 function renderMemoryRow(memory) {
   return {
-    address: memory.address,
-    descriptor: memory.descriptor,
-    source: memory.source,
-    tags: memory.tags.slice(),
-    body_fingerprint: memory.body_fingerprint,
+    address: safePublicString(memory.address, 'memory descriptor', 96),
+    descriptor: safePublicString(memory.descriptor, 'redacted descriptor', 96),
+    source: safePublicString(memory.source, 'desktop-shell', 64),
+    tags: normalizeSafePublicList(memory.tags, 8),
+    body_fingerprint: safePublicString(memory.body_fingerprint, '', 96),
     deleted: memory.deleted,
-    receipt_id: memory.receipt_id
+    receipt_id: safePublicString(memory.receipt_id, '', 96)
+  };
+}
+
+function renderClientRow(client) {
+  return {
+    id: safePublicString(client.id, 'connected-app', 64),
+    name: safePublicString(client.name, 'Connected app', 64),
+    kind: safePublicString(client.kind, 'mcp-client', 32),
+    status: safePublicString(client.status, 'connected', 32),
+    connected_at: safePublicString(client.connected_at, '', 32),
+    disconnected_at: safePublicString(client.disconnected_at, '', 32),
+    endpoint: safePublicString(client.endpoint, 'local endpoint', 96),
+    capabilities: normalizeSafePublicList(client.capabilities, 12)
   };
 }
 
@@ -1002,9 +1357,11 @@ function isKnownScreen(screen) {
 
 function screenLabel(screen) {
   switch (screen) {
+    case 'home': return 'Memory Drive';
+    case 'setup': return 'Setup';
     case 'vault': return 'Vault';
     case 'mcp': return 'MCP server';
-    case 'clients': return 'Clients';
+    case 'clients': return 'Connected apps';
     case 'import-export': return 'Import / export';
     case 'verifier': return 'Inspect receipt shape';
     case 'delete-prove': return 'Delete + prove';
@@ -1038,6 +1395,77 @@ function normalizeNonNegativeInteger(value, fallback) {
 function normalizeStringList(value) {
   if (Array.isArray(value)) return value.map(cleanString).filter(Boolean);
   return cleanString(value).split(',').map((item) => item.trim()).filter(Boolean);
+}
+
+function normalizeIssueCodes(value) {
+  const items = Array.isArray(value) ? value : normalizeStringList(value);
+  return uniqueIssueCodes(items.map((item) => cleanString(item).toUpperCase().replace(/[^A-Z0-9_:-]/g, '_')).filter((item) => item && item.length <= 64));
+}
+
+function uniqueIssueCodes(items) {
+  const seen = new Set();
+  const result = [];
+  for (const item of items) {
+    const code = cleanString(item);
+    if (!code || seen.has(code)) continue;
+    seen.add(code);
+    result.push(code);
+  }
+  return result;
+}
+
+function normalizePublicStatus(value, allowed, fallback) {
+  const status = cleanString(value).toLowerCase();
+  return allowed.includes(status) ? status : fallback;
+}
+
+function safePublicString(value, fallback = '', max = 96) {
+  const text = clamp(value, max);
+  if (!text || isRawLookingText(text)) return fallback;
+  return text;
+}
+
+function normalizeSafePublicList(value, maxItems) {
+  const items = Array.isArray(value) ? value : normalizeStringList(value);
+  return items.map((item) => safePublicString(item, '', 120)).filter(Boolean).slice(0, maxItems);
+}
+
+function collectDashboardIssueCodes(state) {
+  const codes = [];
+  if (state.memoryDrive?.status !== 'ready') codes.push('MEMORY_DRIVE_MISSING');
+  if (state.desktopService?.status !== 'running') codes.push('SERVICE_NOT_RUNNING');
+  codes.push(...normalizeIssueCodes(state.memoryDrive?.issue_codes));
+  codes.push(...normalizeIssueCodes(state.desktopService?.issue_codes));
+  codes.push(...normalizeIssueCodes(state.desktopHealth?.issue_codes));
+  codes.push(...normalizeIssueCodes(state.proofActivity?.issue_codes));
+  codes.push(...normalizeIssueCodes(state.desktopUpdate?.issue_codes));
+  codes.push(...normalizeIssueCodes(state.desktopDiagnostics?.issue_codes));
+  return uniqueIssueCodes(codes);
+}
+
+function selectMemoryDriveNextAction(input) {
+  if (input.memoryDriveStatus !== 'ready' || input.issueCodes.includes('MEMORY_DRIVE_MISSING')) {
+    return { id: 'create_memory_drive', label: 'Create Memory Drive', screen: 'setup', reason: 'Memory Drive has not been created on this device.' };
+  }
+  if (input.serviceStatus !== 'running' || input.issueCodes.includes('SERVICE_NOT_RUNNING')) {
+    return { id: 'start_service', label: 'Start local service', screen: 'setup', reason: 'Connected apps need the bundled local service.' };
+  }
+  if (input.healthStatus !== 'healthy') {
+    return { id: 'fix_health', label: 'Fix Memory Drive health', screen: 'setup', reason: 'Health checks found an issue that can be repaired locally.' };
+  }
+  if (input.updateStatus === 'available' || input.issueCodes.includes('UPDATE_AVAILABLE')) {
+    return { id: 'install_update', label: 'Install update', screen: 'setup', reason: 'A desktop update is ready.' };
+  }
+  if (input.diagnosticsStatus === 'needs-review' || input.diagnosticsStatus === 'error') {
+    return { id: 'open_diagnostics', label: 'Open safe support report', screen: 'setup', reason: 'Diagnostics need review before sharing support metadata.' };
+  }
+  if (input.proofStatus === 'error' || input.proofStatus === 'needs-review') {
+    return { id: 'review_proof', label: 'Review proof activity', screen: 'verifier', reason: 'Proof activity needs local review.' };
+  }
+  if (input.connectedAppCount === 0) {
+    return { id: 'connect_app', label: 'Connect an app', screen: 'clients', reason: 'No connected app has been recorded yet.' };
+  }
+  return { id: 'view_proof_activity', label: 'View proof activity', screen: 'verifier', reason: 'Memory Drive is ready.' };
 }
 
 function isPlainObject(value) {
@@ -1093,21 +1521,23 @@ function renderHtml(model, state) {
   return `
     <header class="shell-hero">
       <div>
-        <p class="eyebrow">Enigma desktop scaffold</p>
-        <h1>Provider-neutral memory custody, receipts, and MCP control.</h1>
+        <p class="eyebrow">Enigma Memory Drive</p>
+        <h1>Your local Memory Drive for connected AI apps.</h1>
         <p>${escapeHtml(model.notice)}</p>
       </div>
       <dl class="summary-grid">
-        ${renderMetric('Vault', model.summary.vault)}
-        ${renderMetric('MCP', model.summary.mcp)}
-        ${renderMetric('Clients', model.summary.clients)}
-        ${renderMetric('Receipt inspector', model.summary.verifier)}
+        ${renderMetric('Memory Drive', model.dashboard.memory_drive_status)}
+        ${renderMetric('Connected apps', model.dashboard.connected_app_count)}
+        ${renderMetric('Proof activity', model.dashboard.proof_status)}
+        ${renderMetric('Next action', model.dashboard.next_action.label)}
       </dl>
     </header>
     <nav class="screen-nav" aria-label="Desktop screens">
       ${model.navigation.map((item) => `<button class="screen-tab${item.active ? ' is-active' : ''}" type="button" data-screen="${escapeHtml(item.id)}">${escapeHtml(item.label)}</button>`).join('')}
     </nav>
     <main>
+      ${renderHomeScreen(model.screens.home)}
+      ${renderSetupScreen(model.screens.setup)}
       ${renderVaultScreen(model.screens.vault, state)}
       ${renderMcpScreen(model.screens.mcp)}
       ${renderClientsScreen(model.screens.clients)}
@@ -1125,6 +1555,46 @@ function renderMetric(label, value) {
 
 function renderScreen(id, title, body) {
   return `<section class="screen-card" id="screen-${escapeHtml(id)}"><div class="screen-heading"><p>${escapeHtml(screenLabel(id))}</p><h2>${escapeHtml(title)}</h2></div>${body}</section>`;
+}
+
+function renderHomeScreen(screen) {
+  const dashboard = screen.dashboard;
+  const issues = dashboard.issue_codes.length ? dashboard.issue_codes.map((code) => `<li>${escapeHtml(code)}</li>`).join('') : '<li>No issues found.</li>';
+  return renderScreen('home', screen.title, `
+    <div class="two-column">
+      <div class="panel status-panel">
+        <span class="status-pill">${escapeHtml(dashboard.memory_drive_status)}</span>
+        <h3>${escapeHtml(dashboard.next_action.label)}</h3>
+        <p>${escapeHtml(dashboard.next_action.reason)}</p>
+        <button type="button" data-action="${escapeHtml(dashboard.next_action.id)}">${escapeHtml(dashboard.next_action.label)}</button>
+      </div>
+      <dl class="panel detail-list">
+        ${renderMetric('Connected apps', dashboard.connected_app_count)}
+        ${renderMetric('Proof activity', dashboard.proof_status)}
+        ${renderMetric('Updates', dashboard.update_status)}
+        ${renderMetric('Diagnostics', dashboard.diagnostics_status)}
+        ${renderMetric('Offline ready', dashboard.offline_ready ? 'yes' : 'no')}
+      </dl>
+    </div>
+    <div class="panel"><h3>Issue codes</h3><ul class="boundary-list">${issues}</ul></div>`);
+}
+
+function renderSetupScreen(screen) {
+  const issues = screen.issue_codes.length ? screen.issue_codes.join(', ') : 'none';
+  return renderScreen('setup', screen.title, `
+    <div class="two-column">
+      <div class="panel status-panel">
+        <span class="status-pill">${escapeHtml(screen.memory_drive_status)}</span>
+        <h3>Memory Drive create or detect</h3>
+        <p>Create the local Memory Drive first. The shell does not claim provider deletion, model forgetting, or provider-native memory control.</p>
+      </div>
+      <div class="panel status-panel">
+        <span class="status-pill">${escapeHtml(screen.health_status)}</span>
+        <h3>Health and fix-it</h3>
+        <p>One primary action is exposed at a time: ${escapeHtml(screen.next_action.label)}. Issue codes: ${escapeHtml(issues)}.</p>
+        <button type="button" data-action="${escapeHtml(screen.next_action.id)}">${escapeHtml(screen.next_action.label)}</button>
+      </div>
+    </div>`);
 }
 
 function renderVaultScreen(screen, state) {
@@ -1248,6 +1718,31 @@ function wireDesktopEvents(root, state, dispatch) {
           break;
         case 'stop-mcp':
           dispatch(stopMcp({ now }));
+          break;
+        case 'create_memory_drive':
+          dispatch(createMemoryDrive({ now, label: 'Memory Drive' }));
+          break;
+        case 'start_service':
+          dispatch(updateDesktopService({ status: 'running', issue_codes: [] }, { now }));
+          break;
+        case 'fix_health':
+          dispatch(updateDesktopHealth({ status: 'healthy', issue_codes: [] }, { now }));
+          break;
+        case 'install_update':
+          dispatch(updateDesktopUpdateStatus({ status: 'current', issue_codes: [] }, { now }));
+          break;
+        case 'open_diagnostics':
+          dispatch(updateDesktopDiagnostics({ status: 'ready', support_report_ready: true, safe_summary: ['Safe support report prepared'] }, { now }));
+          break;
+        case 'shutdown_desktop':
+          dispatch(shutdownDesktop({ now }));
+          break;
+        case 'connect_app':
+          dispatch(selectDesktopScreen('clients'));
+          break;
+        case 'review_proof':
+        case 'view_proof_activity':
+          dispatch(selectDesktopScreen('verifier'));
           break;
         case 'mesh-online':
           dispatch(updateMeshStatus({ status: 'online', peers: 3, relays: 1, last_witness_at: now }, { now }));
