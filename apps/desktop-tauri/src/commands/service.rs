@@ -184,7 +184,6 @@ impl ServiceHandle {
         Ok(())
     }
 
-
     fn spawn_reader<R: tokio::io::AsyncRead + Send + Unpin + 'static>(
         self: &Arc<Self>,
         pipe: R,
@@ -262,6 +261,24 @@ impl ServiceHandle {
     }
 }
 
+fn dashboard_status_from_drive_health(status: Option<&str>) -> (&'static str, &'static str) {
+    match status.unwrap_or("unknown") {
+        "healthy" | "ready" => ("ready", "healthy"),
+        "watch" | "degraded" | "critical" => ("ready", "fix-needed"),
+        "missing" => ("missing", "needs-setup"),
+        "error" => ("error", "error"),
+        _ => ("unknown", "error"),
+    }
+}
+
+fn dashboard_offline_ready(
+    service: &ServiceStatus,
+    memory_drive_status: &str,
+    health_status: &str,
+) -> bool {
+    service.running && memory_drive_status == "ready" && health_status == "healthy"
+}
+
 async fn setup_bundle(config: &crate::DesktopConfig) -> Result<Value, String> {
     let bundle = config.bundle_path.to_string_lossy();
     run_cli(config, &["setup", "--bundle", &bundle, "--overwrite"]).await
@@ -270,12 +287,11 @@ async fn setup_bundle(config: &crate::DesktopConfig) -> Result<Value, String> {
 async fn drive_health(config: &crate::DesktopConfig) -> Result<Value, String> {
     let bundle = config.bundle_path.to_string_lossy();
     let report = run_cli(config, &["drive", "health", "--bundle", &bundle]).await?;
-    let status = report
-        .get("overall_status")
-        .and_then(|v| v.as_str())
-        .unwrap_or("unknown");
+    let (memory_drive_status, health_status) =
+        dashboard_status_from_drive_health(report.get("overall_status").and_then(|v| v.as_str()));
     Ok(json!({
-        "memory_drive_status": status,
+        "memory_drive_status": memory_drive_status,
+        "health_status": health_status,
         "report": report,
     }))
 }
@@ -315,7 +331,9 @@ fn current_epoch_millis() -> u64 {
 /// Redact absolute paths and credential-like tokens from a log line.
 pub fn redact_log(line: &str) -> String {
     let out = log_path_regex().replace_all(line, "<path>");
-    log_token_regex().replace_all(out.as_ref(), "<token>").into_owned()
+    log_token_regex()
+        .replace_all(out.as_ref(), "<token>")
+        .into_owned()
 }
 
 fn log_path_regex() -> &'static Regex {
@@ -404,39 +422,35 @@ pub async fn get_service_logs(
 #[tauri::command]
 pub async fn create_memory_drive(state: tauri::State<'_, AppState>) -> Result<Value, String> {
     let bundle = state.config.bundle_path.to_string_lossy();
-    run_cli(&state.config, &["setup", "--bundle", &bundle, "--overwrite"]).await
+    run_cli(
+        &state.config,
+        &["setup", "--bundle", &bundle, "--overwrite"],
+    )
+    .await
 }
 
 #[tauri::command]
 pub async fn get_memory_drive_status(state: tauri::State<'_, AppState>) -> Result<Value, String> {
-    let bundle = state.config.bundle_path.to_string_lossy();
-    let report = run_cli(&state.config, &["drive", "health", "--bundle", &bundle]).await?;
-    let status = report
-        .get("overall_status")
-        .and_then(|v| v.as_str())
-        .unwrap_or("unknown");
-    Ok(json!({
-        "memory_drive_status": status,
-        "report": report,
-    }))
+    drive_health(&state.config).await
 }
 
 #[tauri::command]
 pub async fn create_vault(state: tauri::State<'_, AppState>) -> Result<Value, String> {
     let drive = setup_bundle(&state.config).await?;
-    let status = if drive.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
-        "ready"
-    } else {
-        "error"
-    };
+    let service = state.service.status();
+    let setup_ok = drive.get("ok").and_then(|v| v.as_bool()).unwrap_or(false);
+    let memory_drive_status = if setup_ok { "ready" } else { "error" };
+    let health_status = if setup_ok { "healthy" } else { "error" };
     Ok(json!({
-        "memory_drive_status": status,
+        "memory_drive_status": memory_drive_status,
+        "health_status": health_status,
         "connected_app_count": 0,
         "proof_status": "idle",
         "update_status": "current",
         "diagnostics_status": "passed",
-        "offline_ready": true,
+        "offline_ready": dashboard_offline_ready(&service, memory_drive_status, health_status),
         "issue_codes": [],
+        "service": service,
     }))
 }
 
@@ -452,7 +466,9 @@ pub async fn connect_client(
 ) -> Result<Value, String> {
     use crate::connector::engine::{ClientId, ConnectOptions, ConnectorEngine, EngineContext};
 
-    let client = id.parse::<ClientId>().map_err(|_| format!("unknown client: {id}"))?;
+    let client = id
+        .parse::<ClientId>()
+        .map_err(|_| format!("unknown client: {id}"))?;
     let ctx = EngineContext::from_env().map_err(|e| e.to_string())?;
     let engine = ConnectorEngine::new();
     engine
@@ -468,7 +484,9 @@ pub async fn disconnect_client(
 ) -> Result<Value, String> {
     use crate::connector::engine::{ClientId, ConnectOptions, ConnectorEngine, EngineContext};
 
-    let client = id.parse::<ClientId>().map_err(|_| format!("unknown client: {id}"))?;
+    let client = id
+        .parse::<ClientId>()
+        .map_err(|_| format!("unknown client: {id}"))?;
     let ctx = EngineContext::from_env().map_err(|e| e.to_string())?;
     let engine = ConnectorEngine::new();
     engine
@@ -551,6 +569,7 @@ pub async fn get_health(state: tauri::State<'_, AppState>) -> Result<Value, Stri
     let drive = drive_health(&state.config).await.unwrap_or_else(|_| {
         json!({
             "memory_drive_status": "unknown",
+            "health_status": "error",
         })
     });
     let clients = detect_clients_internal().await.unwrap_or_default();
@@ -564,16 +583,21 @@ pub async fn get_health(state: tauri::State<'_, AppState>) -> Result<Value, Stri
         .unwrap_or(0);
     let memory_drive_status = drive
         .get("memory_drive_status")
-        .cloned()
-        .unwrap_or_else(|| json!("unknown"));
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown");
+    let health_status = drive
+        .get("health_status")
+        .and_then(|v| v.as_str())
+        .unwrap_or("error");
 
     Ok(json!({
         "memory_drive_status": memory_drive_status,
+        "health_status": health_status,
         "connected_app_count": connected_count,
         "proof_status": if service.running { "active" } else { "idle" },
         "update_status": "current",
         "diagnostics_status": "passed",
-        "offline_ready": true,
+        "offline_ready": dashboard_offline_ready(&service, memory_drive_status, health_status),
         "issue_codes": [],
         "service": service,
     }))
@@ -605,16 +629,69 @@ mod tests {
         assert!(redacted.contains("<token>"));
     }
 
+    #[test]
+    fn dashboard_health_adapter_matches_public_desktop_contract() {
+        assert_eq!(
+            dashboard_status_from_drive_health(Some("healthy")),
+            ("ready", "healthy")
+        );
+        assert_eq!(
+            dashboard_status_from_drive_health(Some("ready")),
+            ("ready", "healthy")
+        );
+        assert_eq!(
+            dashboard_status_from_drive_health(Some("watch")),
+            ("ready", "fix-needed")
+        );
+        assert_eq!(
+            dashboard_status_from_drive_health(Some("degraded")),
+            ("ready", "fix-needed")
+        );
+        assert_eq!(
+            dashboard_status_from_drive_health(Some("critical")),
+            ("ready", "fix-needed")
+        );
+        assert_eq!(
+            dashboard_status_from_drive_health(Some("missing")),
+            ("missing", "needs-setup")
+        );
+        assert_eq!(
+            dashboard_status_from_drive_health(Some("error")),
+            ("error", "error")
+        );
+        assert_eq!(
+            dashboard_status_from_drive_health(None),
+            ("unknown", "error")
+        );
+    }
+
+    #[test]
+    fn offline_ready_requires_running_ready_and_healthy() {
+        let running = ServiceStatus {
+            running: true,
+            pid: 1,
+            restarts: 0,
+            uptime_secs: 1,
+        };
+        let stopped = ServiceStatus {
+            running: false,
+            pid: 0,
+            restarts: 0,
+            uptime_secs: 0,
+        };
+        assert!(dashboard_offline_ready(&running, "ready", "healthy"));
+        assert!(!dashboard_offline_ready(&stopped, "ready", "healthy"));
+        assert!(!dashboard_offline_ready(&running, "missing", "healthy"));
+        assert!(!dashboard_offline_ready(&running, "ready", "fix-needed"));
+    }
+
     #[tokio::test]
     async fn service_restarts_crashed_process_up_to_max() {
         let program = if cfg!(windows) { "cmd" } else { "sh" };
         let args = if cfg!(windows) {
             vec!["/c".to_string(), "echo enigma-sidecar-ready".to_string()]
         } else {
-            vec![
-                "-c".to_string(),
-                "echo enigma-sidecar-ready".to_string(),
-            ]
+            vec!["-c".to_string(), "echo enigma-sidecar-ready".to_string()]
         };
         let service = Arc::new(ServiceHandle::new(ServiceConfig {
             program: PathBuf::from(program),

@@ -69,11 +69,12 @@ async function mockInvoke(cmd, args = {}) {
     case 'get_health':
       return {
         memory_drive_status: 'ready',
+        health_status: 'healthy',
         connected_app_count: clients.filter((c) => c.status === 'connected').length,
         proof_status: clients.some((c) => c.status === 'connected') ? 'active' : 'idle',
         update_status: update.status || 'current',
         diagnostics_status: diagnostics.status || 'passed',
-        offline_ready: true,
+        offline_ready: serviceStatus?.running === true,
         issue_codes: [],
         memory_controller: {
           memory_weather_report: {
@@ -153,9 +154,9 @@ async function mockInvoke(cmd, args = {}) {
     case 'get_service_logs':
       return ['[mock] service started', '[mock] ready'];
     case 'create_memory_drive':
-      return { ok: true, memory_drive_status: 'ready' };
+      return { ok: true, memory_drive_status: 'ready', health_status: 'healthy', offline_ready: serviceStatus?.running === true };
     case 'get_memory_drive_status':
-      return { memory_drive_status: 'ready' };
+      return { memory_drive_status: 'ready', health_status: 'healthy' };
     case 'shutdown_service':
       return 'service stopped';
     case 'get_crash_reporting_status':
@@ -538,14 +539,22 @@ function renderReady() {
   `, 'welcome');
 }
 
-function dashboardNextAction({ serviceRunning, updateAvailable }) {
-  if ((health.memory_drive_status || 'unknown') !== 'ready') {
+function normalizeMemoryDriveStatus(status) {
+  const value = String(status || 'unknown').toLowerCase();
+  if (value === 'healthy' || value === 'ready') return 'ready';
+  if (value === 'watch' || value === 'degraded' || value === 'critical') return 'ready';
+  if (value === 'missing' || value === 'creating' || value === 'error') return value;
+  return 'unknown';
+}
+
+function dashboardNextAction({ memoryDriveStatus, offlineReady, serviceRunning, updateAvailable }) {
+  if (memoryDriveStatus !== 'ready') {
     return { label: 'Create Memory Drive', action: 'create-vault-action', reason: 'Create the local encrypted Memory Drive before importing or connecting apps.' };
   }
   if (!serviceRunning) {
     return { label: 'Start engine', action: 'start-service', reason: 'Start the bundled local service so connected apps can talk to Enigma.' };
   }
-  if (health.offline_ready !== true) {
+  if (!offlineReady) {
     return { label: 'Run health check', action: 'run-health', reason: 'Check local vault, privacy guardrails, and app connection readiness.' };
   }
   if (Number(health.connected_app_count ?? 0) === 0) {
@@ -586,19 +595,22 @@ function renderDashboard() {
   const updateAvailable = update?.available_version && update.available_version !== update.current_version;
   const crashEnabled = crashReporting.status?.enabled ?? false;
   const crashPending = crashReporting.status?.pending_count ?? 0;
-  const nextAction = dashboardNextAction({ serviceRunning, updateAvailable });
+  const memoryDriveStatus = normalizeMemoryDriveStatus(health.memory_drive_status);
+  const offlineReady = serviceRunning && health.offline_ready === true;
+  const nextAction = dashboardNextAction({ memoryDriveStatus, offlineReady, serviceRunning, updateAvailable });
 
   return renderCard(`
     <p class="eyebrow">Memory health</p>
     <h1>Health dashboard</h1>
     <p>A simple check that your vault, app connections, and privacy checks are working.</p>
     <div class="dashboard-grid">
-      <div class="metric"><dt>Memory Drive</dt><dd>${escapeHtml(health.memory_drive_status || 'unknown')}</dd></div>
+      <div class="metric"><dt>Memory Drive</dt><dd>${escapeHtml(memoryDriveStatus)}</dd></div>
+      <div class="metric"><dt>Health</dt><dd>${escapeHtml(health.health_status || 'unknown')}</dd></div>
       <div class="metric"><dt>Connected apps</dt><dd>${escapeHtml(String(health.connected_app_count ?? 0))}</dd></div>
       <div class="metric"><dt>Proof activity</dt><dd>${escapeHtml(health.proof_status || 'idle')}</dd></div>
       <div class="metric"><dt>Update status</dt><dd>${escapeHtml(updateStatus)}</dd></div>
       <div class="metric"><dt>Diagnostics</dt><dd>${escapeHtml(health.diagnostics_status || 'idle')}</dd></div>
-      <div class="metric"><dt>Offline ready</dt><dd>${health.offline_ready ? 'Yes' : 'No'}</dd></div>
+      <div class="metric"><dt>Offline ready</dt><dd>${offlineReady ? 'Yes' : 'No'}</dd></div>
     </div>
     <div class="metric">
       <dt>Issue codes</dt>
@@ -720,16 +732,9 @@ async function handleAction(event) {
       $('#connection-disclosure')?.classList.toggle('hidden');
       return;
     case 'create-vault': {
-      busy = true;
-      setStatus('Preparing...');
-      const btn = event.currentTarget;
-      btn.disabled = true;
-      btn.textContent = 'Preparing...';
-      health = await call('create_vault');
-      busy = false;
       currentStep = 1;
       render();
-      setStatus('Checking this computer.');
+      setStatus('Choose where Enigma keeps your private vault.');
       return;
     }
     case 'create-vault-action': {
