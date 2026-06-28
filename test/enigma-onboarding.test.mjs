@@ -611,3 +611,29 @@ test('quickstart plain output summarizes outputs without JSON or local paths', a
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('status plain output reports counters without JSON or local paths', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-status-plain-'));
+  const bundlePath = join(dir, 'bundle.json');
+  const outDir = join(dir, 'out');
+  try {
+    const setupIo = makeIo();
+    assert.equal(await main(['setup', '--bundle', bundlePath, '--out-dir', outDir, '--overwrite'], setupIo.io), 0, setupIo.stderr());
+
+    const io = makeIo();
+    assert.equal(await main(['status', '--bundle', bundlePath, '--plain'], io.io), 0, io.stderr());
+    const stdout = io.stdout();
+
+    assert.match(stdout, /^Enigma status\n/);
+    assert.match(stdout, /Memory Drive: <bundle-path>/);
+    assert.match(stdout, /Active memories: \d+/);
+    assert.match(stdout, /Receipts: \d+/);
+    assert.match(stdout, /Setup: /);
+    assert.match(stdout, /Boundary: local Enigma counters and roots only/);
+    assert.doesNotMatch(stdout, /^\s*\{/);
+    assert.equal(stdout.includes(dir), false);
+    assert.equal(stdout.includes(bundlePath), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

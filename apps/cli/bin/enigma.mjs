@@ -1999,13 +1999,35 @@ function passportStatusReport({ bundlePath, stored = {}, vault, passport }) {
 async function statusCommand(flags, io) {
   const bundlePath = resolve(String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE)));
   const { stored, vault, passport } = await loadState(bundlePath, { passphrase: getFlag(flags, ['passphrase']) });
-  print(passportStatusReport({ bundlePath, stored, vault, passport }), io);
+  const report = passportStatusReport({ bundlePath, stored, vault, passport });
+  printStatusSummary(report, flags, io);
   return 0;
 }
 
 function nextPlainRequested(flags) {
   const format = getFlag(flags, ['format']);
   return booleanFlag(flags, ['plain', 'text'], false) || format === 'plain' || format === 'text';
+}
+
+function renderStatusPlain(report) {
+  const counts = report.counts ?? {};
+  const lines = [
+    'Enigma status',
+    `Memory Drive: <bundle-path>`,
+    `Active memories: ${counts.active_memories ?? report.active_memory_count ?? 0}`,
+    `Tombstones: ${counts.tombstoned_memories ?? report.tombstoned_memory_count ?? 0}`,
+    `Receipts: ${counts.receipts ?? report.receipt_count ?? 0}`,
+    `Setup: ${report.first_run_status?.state ?? 'unknown'}`,
+  ];
+  const command = report.first_run_status?.primary_action?.command;
+  if (command) lines.push(`Next: ${String(command).replaceAll(String(report.bundle), '<bundle-path>')}`);
+  lines.push('Boundary: local Enigma counters and roots only; no raw memory, local paths, provider deletion, model behavior, hosted service, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printStatusSummary(report, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderStatusPlain(report));
+  else print(report, io);
 }
 
 function renderNextActionPlain(action) {
@@ -3911,6 +3933,7 @@ function usage() {
     status_options: {
       'enigma status --bundle <path>': 'Show local Memory Passport counts, roots, owner display fields, connector readiness, and next commands.',
       'enigma passport status --bundle <path>': 'Alias for enigma status.',
+      '--plain': 'Print path-redacted local counters and the next setup action instead of JSON. Alias: --text or --format text.',
     },
     doctor_options: {
       'enigma doctor --bundle <path>': 'Run local install, package, bundle, schema, MCP command, and connector checks.',
