@@ -2025,6 +2025,32 @@ function renderNextActionPlain(action) {
   return `${lines.join('\n')}\n`;
 }
 
+function renderDoctorPlain(summary) {
+  const lines = [
+    'Enigma doctor',
+    `Status: ${summary.ok ? 'Ready' : 'Needs attention'}`,
+    `Setup: ${summary.setup_status?.state ?? 'unknown'}`,
+  ];
+  const reasons = Array.isArray(summary.setup_status?.reasons) ? summary.setup_status.reasons : [];
+  if (reasons.length > 0) lines.push(`Issue: ${reasons.join(', ')}`);
+  if (summary.first_run_hint?.command) lines.push(`Run: ${summary.first_run_hint.command}`);
+  const followUps = Array.isArray(summary.next_commands) ? summary.next_commands.slice(1, 3) : [];
+  for (const command of followUps) lines.push(`Then: ${command}`);
+  const clients = Array.isArray(summary.connectors?.clients) ? summary.connectors.clients : [];
+  if (clients.length > 0) {
+    const ready = clients.filter((client) => client.status === 'ready' || client.action === 'already_configured').length;
+    const repair = clients.filter((client) => Array.isArray(client.repair_reasons) && client.repair_reasons.length > 0).length;
+    lines.push(`Connectors: ${ready} ready, ${repair} need repair`);
+  }
+  lines.push('Boundary: local Enigma checks only; no raw memory, local paths, provider deletion, model behavior, or hosted readiness claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printDoctorSummary(summary, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderDoctorPlain(summary));
+  else print(summary, io);
+}
+
 function printNextAction(action, flags, io) {
   if (nextPlainRequested(flags)) io.stdout.write(renderNextActionPlain(action));
   else print(action, io);
@@ -2540,7 +2566,7 @@ export async function doctorCommand(flags, io) {
   const doctorClient = String(selectedClient && selectedClient !== true ? selectedClient : 'generic-mcp');
   const firstRunHint = doctorFirstRunHint(checks.vault_path.path, doctorClient);
   const setupStatus = doctorSetupStatus(checks, firstRunHint);
-  print({
+  const summary = {
     ok,
     node: checks.node,
     package_bins: checks.package_bins,
@@ -2557,7 +2583,8 @@ export async function doctorCommand(flags, io) {
     fresh_install_hint: firstRunHint,
     next_commands: doctorNextCommands(checks.vault_path.path, doctorClient),
     checks,
-  }, io);
+  };
+  printDoctorSummary(summary, flags, io);
   return ok ? 0 : 1;
 }
 
@@ -3806,6 +3833,10 @@ function usage() {
     status_options: {
       'enigma status --bundle <path>': 'Show local Memory Passport counts, roots, owner display fields, connector readiness, and next commands.',
       'enigma passport status --bundle <path>': 'Alias for enigma status.',
+    },
+    doctor_options: {
+      'enigma doctor --bundle <path>': 'Run local install, package, bundle, schema, MCP command, and connector checks.',
+      '--plain': 'Print one human-readable next action instead of JSON. Alias: --text or --format text.',
     },
     init_options: {
       '--dry-run': 'Print the first-run plan without writing local artifacts or client configs.',

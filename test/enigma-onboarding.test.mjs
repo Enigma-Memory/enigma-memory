@@ -544,3 +544,24 @@ test('doctor explains connector bundle mismatch as first-run state without local
   ]);
   assert.equal(JSON.stringify(summary.first_run_hint).includes(dir), false);
 });
+
+test('doctor plain output gives one readable next action without JSON or paths', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-doctor-plain-'));
+  const bundlePath = join(dir, 'bundle.json');
+  try {
+    const io = makeIo();
+    assert.equal(await main(['doctor', '--bundle', bundlePath, '--plain'], io.io), 1);
+    const stdout = io.stdout();
+
+    assert.match(stdout, /^Enigma doctor\n/);
+    assert.match(stdout, /Status: Needs attention/);
+    assert.match(stdout, /Setup: setup_needed/);
+    assert.match(stdout, /Run: enigma setup --bundle "<bundle-path>" --client auto --connect-installed --overwrite/);
+    assert.match(stdout, /Boundary: local Enigma checks only/);
+    assert.doesNotMatch(stdout, /^\s*\{/);
+    assert.equal(stdout.includes(dir), false);
+    assert.equal(stdout.includes(bundlePath), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
