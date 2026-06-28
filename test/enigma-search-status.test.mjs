@@ -24,6 +24,16 @@ async function runCli(argv) {
   return { code, ...captured.output() };
 }
 
+async function runCliText(argv) {
+  let stdout = '';
+  let stderr = '';
+  const code = await main(argv, {
+    stdout: { write: (chunk) => { stdout += chunk; } },
+    stderr: { write: (chunk) => { stderr += chunk; } },
+  });
+  return { code, stdout, stderr };
+}
+
 async function withBundle(build) {
   const dir = await mkdtemp(join(tmpdir(), 'enigma-search-status-'));
   try {
@@ -153,6 +163,22 @@ test('next gives setup action without requiring an existing bundle', async () =>
   }
 });
 
+test('next plain output is readable and path-redacted before setup', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-next-plain-missing-'));
+  try {
+    const missing = join(dir, 'missing-bundle.json');
+    const { code, stdout } = await runCliText(['next', '--plain', '--bundle', missing]);
+    assert.equal(code, 0);
+    assert.match(stdout, /Enigma next/);
+    assert.match(stdout, /Status: Create Memory Drive/);
+    assert.match(stdout, /Run: enigma quickstart --bundle "<bundle-path>" --overwrite/);
+    assert.doesNotMatch(stdout, /^\s*\{/);
+    assert.equal(stdout.includes(dir), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('next uses first-run status when the bundle exists', async () => withBundle(async (vault) => {
   remember({ vault, text: 'next command private canary', now: '2026-06-25T00:00:04.000Z' });
   return {
@@ -164,6 +190,21 @@ test('next uses first-run status when the bundle exists', async () => withBundle
       assert.equal(json.primary_action.id, 'connect_ai_app');
       assert.equal(json.lanes.import_sandbox.status, 'ready');
       assert.equal(stdout.includes('next command private canary'), false);
+      assert.equal(stdout.includes(bundlePath), false);
+    },
+  };
+}));
+
+test('next plain output summarizes populated setup without raw memory', async () => withBundle(async (vault) => {
+  remember({ vault, text: 'plain next private canary', now: '2026-06-25T00:00:05.000Z' });
+  return {
+    test: async (bundlePath) => {
+      const { code, stdout } = await runCliText(['next', '--format', 'text', '--bundle', bundlePath]);
+      assert.equal(code, 0);
+      assert.match(stdout, /Status: Connect an AI app/);
+      assert.match(stdout, /memory drive: Memory Drive exists/);
+      assert.match(stdout, /import sandbox: Import Sandbox ready/);
+      assert.equal(stdout.includes('plain next private canary'), false);
       assert.equal(stdout.includes(bundlePath), false);
     },
   };

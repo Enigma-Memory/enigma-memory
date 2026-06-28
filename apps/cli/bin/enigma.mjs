@@ -2000,6 +2000,36 @@ async function statusCommand(flags, io) {
   return 0;
 }
 
+function nextPlainRequested(flags) {
+  const format = getFlag(flags, ['format']);
+  return booleanFlag(flags, ['plain', 'text'], false) || format === 'plain' || format === 'text';
+}
+
+function renderNextActionPlain(action) {
+  const lines = [
+    'Enigma next',
+    `Status: ${action.primary_action?.label ?? action.state ?? 'Check Enigma'}`,
+    `State: ${action.state}`,
+  ];
+  if (action.primary_action?.command) lines.push(`Run: ${action.primary_action.command}`);
+  if (action.follow_up?.command) lines.push(`Then: ${action.follow_up.command}`);
+  const lanes = action.lanes && typeof action.lanes === 'object' ? Object.entries(action.lanes) : [];
+  for (const [name, lane] of lanes) {
+    const label = lane?.label ?? lane?.status ?? 'unknown';
+    lines.push(`${name.replace(/_/g, ' ')}: ${label}`);
+  }
+  if (Array.isArray(action.issue_codes) && action.issue_codes.length > 0) {
+    lines.push(`Issue: ${action.issue_codes.join(', ')}`);
+  }
+  lines.push('Boundary: local Enigma status only; no raw memory or outside-Enigma control claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printNextAction(action, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderNextActionPlain(action));
+  else print(action, io);
+}
+
 async function nextCommand(flags, io) {
   const bundleInput = String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE));
   const bundlePath = resolve(bundleInput);
@@ -2014,7 +2044,7 @@ async function nextCommand(flags, io) {
     hosted_saas_live: false,
   };
   if (vaultPath.ok !== true) {
-    print({
+    const action = {
       ok: false,
       schema: 'enigma.next_action.v1',
       state: 'attention_needed',
@@ -2027,12 +2057,13 @@ async function nextCommand(flags, io) {
       issue_codes: [vaultPath.reason || 'bundle_path_not_writable'],
       vault_path: vaultPath,
       claim_boundaries: claimBoundaries,
-    }, io);
+    };
+    printNextAction(action, flags, io);
     return 0;
   }
   const bundleStatus = await bundleInitializedCheck(bundlePath, vaultPath);
   if (bundleStatus.ok !== true) {
-    print({
+    const action = {
       ok: true,
       schema: 'enigma.next_action.v1',
       state: 'setup_needed',
@@ -2050,12 +2081,13 @@ async function nextCommand(flags, io) {
         command: `enigma status --bundle "${bundleDisplay}"`,
       },
       claim_boundaries: claimBoundaries,
-    }, io);
+    };
+    printNextAction(action, flags, io);
     return 0;
   }
   const { stored, vault, passport } = await loadState(bundlePath, { passphrase: getFlag(flags, ['passphrase']) });
   const report = passportStatusReport({ bundlePath, stored, vault, passport });
-  print({
+  const action = {
     ok: true,
     schema: 'enigma.next_action.v1',
     state: report.first_run_status.state,
@@ -2065,7 +2097,8 @@ async function nextCommand(flags, io) {
     status_ref: `enigma://status/${report.passport_ref.split('/').pop()}`,
     status_command: `enigma status --bundle "${bundleDisplay}"`,
     claim_boundaries: claimBoundaries,
-  }, io);
+  };
+  printNextAction(action, flags, io);
   return 0;
 }
 async function readOptionalJsonInput(flags, names) {
