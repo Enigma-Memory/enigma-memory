@@ -51,6 +51,8 @@ enigma status
 
 Run setup or quickstart before treating `enigma doctor` as a fully green install check. Doctor checks Node/package state, local paths, schemas, MCP command naming, and connector configs. On a fresh install it can return `ok:false` when an existing MCP client config points at a bundle that has not been initialized yet, or at a different bundle than the one you are checking. That is expected first-run state, not a package install failure. In JSON output, `setup_status.state:"setup_needed"` means run the included `setup_status.next_command`; `setup_status.state:"attention_needed"` means a real install/config issue still needs repair. The shortest repair path is `enigma quickstart --bundle ./.enigma/bundle.json --overwrite` or `enigma setup --bundle ./.enigma/bundle.json --overwrite`, then `enigma doctor --bundle ./.enigma/bundle.json`.
 
+`enigma status` is the one-screen local setup view after a bundle exists. Read `first_run_status.primary_action` for the next consumer-safe step, and use the lanes to check Memory Drive, Import Sandbox, memory inventory, proof activity, and diagnostics without raw memory text.
+
 For the one-off npm path, run `npx --yes --package enigma-memory enigma quickstart --bundle ./.enigma/bundle.json --overwrite` before `npx --yes --package enigma-memory enigma doctor --bundle ./.enigma/bundle.json`. Running the npx doctor first can report a red generic-MCP connector if an existing client config names a not-yet-created bundle.
 
 `enigma drive health` reports a SMART-style memory-drive health packet — freshness, duplicate rate, tombstone backlog, stale derived artifacts, receipt coverage, and connector health — from local metadata only, with no network calls or private payloads.

@@ -53,6 +53,7 @@ enigma doctor --bundle "$HOME/.enigma/bundle.json"
 enigma drive health --bundle "$HOME/.enigma/bundle.json"
 enigma status --bundle "$HOME/.enigma/bundle.json"
 ```
+`enigma status` includes `first_run_status`: one public-safe setup state, one primary action, and lanes for Memory Drive, Import Sandbox, memory inventory, proof activity, and diagnostics.
 If `doctor` is red on a fresh install, read `setup_status.state`: `setup_needed` means run the included `setup_status.next_command`; `attention_needed` means a real local install/config issue remains.
 
 Optional instant-value import preview:

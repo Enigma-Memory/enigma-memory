@@ -111,12 +111,31 @@ test('status reports passport counts and roots without raw memory', async () => 
       assert.match(json.active_set_root, /^sha256:[a-f0-9]{64}$/);
       assert.match(json.receipt_log_root, /^sha256:[a-f0-9]{64}$/);
       assert.equal(json.connector_readiness.ready, true);
+      assert.equal(json.first_run_status.schema, 'enigma.first_run_status.v1');
+      assert.equal(json.first_run_status.state, 'ready_for_app_connection');
+      assert.equal(json.first_run_status.primary_action.id, 'connect_ai_app');
+      assert.equal(json.first_run_status.lanes.import_sandbox.status, 'ready');
+      assert.equal(json.first_run_status.claim_boundaries.raw_memory_returned, false);
+      assert.equal(JSON.stringify(json.first_run_status).includes(bundlePath), false);
       assert.ok(json.next_recommended_commands.some((command) => command.includes('enigma search')));
       assert.doesNotMatch(stdout, /active status fixture plaintext canary|removed status fixture plaintext canary/);
       assert.equal(active.memory_addr.length > 0, true);
     },
   };
 }));
+
+test('status first-run summary points empty vaults to import sandbox', async () => withBundle(async () => ({
+  test: async (bundlePath) => {
+    const { code, json, stdout } = await runCli(['status', '--bundle', bundlePath]);
+    assert.equal(code, 0);
+    assert.equal(json.first_run_status.state, 'needs_first_memory');
+    assert.equal(json.first_run_status.primary_action.id, 'import_or_remember_first_memory');
+    assert.equal(json.first_run_status.lanes.memory_inventory.status, 'empty');
+    assert.equal(json.first_run_status.lanes.import_sandbox.next_action, 'preview_text_or_markdown_import');
+    assert.equal(JSON.stringify(json.first_run_status).includes(bundlePath), false);
+    assert.doesNotMatch(stdout, /plaintext canary/);
+  },
+})));
 
 test('search and status fail closed when the bundle is absent', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'enigma-search-status-missing-'));

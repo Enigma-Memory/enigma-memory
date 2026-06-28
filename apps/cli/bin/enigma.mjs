@@ -1904,6 +1904,58 @@ async function searchCommand(flags, io) {
   return 0;
 }
 
+function firstRunStatusSummary({ bundlePath, activeCount, tombstoneCount, receiptCount }) {
+  const hasMemory = activeCount > 0;
+  const bundleDisplay = publicPathDisplay(bundlePath, 'bundle-path');
+  const state = hasMemory ? 'ready_for_app_connection' : 'needs_first_memory';
+  return {
+    schema: 'enigma.first_run_status.v1',
+    state,
+    ready: hasMemory,
+    bundle: bundleDisplay,
+    primary_action: hasMemory
+      ? {
+        id: 'connect_ai_app',
+        label: 'Connect an AI app',
+        command: `enigma setup --bundle "${bundleDisplay}" --client auto --connect-installed --overwrite`,
+      }
+      : {
+        id: 'import_or_remember_first_memory',
+        label: 'Import or remember first memory',
+        command: 'enigma import text --file <memories.md> --complete',
+      },
+    lanes: {
+      memory_drive: { status: 'ready', label: 'Memory Drive exists' },
+      import_sandbox: {
+        status: 'ready',
+        label: 'Import Sandbox ready',
+        next_action: hasMemory ? 'optional_preview_more_imports' : 'preview_text_or_markdown_import',
+      },
+      memory_inventory: {
+        status: hasMemory ? 'has_memory' : 'empty',
+        active_count: activeCount,
+        tombstone_count: tombstoneCount,
+      },
+      proof_activity: {
+        status: receiptCount > 0 ? 'has_receipts' : 'empty',
+        receipt_count: receiptCount,
+      },
+      diagnostics: {
+        status: 'available',
+        command: `enigma doctor --bundle "${bundleDisplay}"`,
+      },
+    },
+    claim_boundaries: {
+      local_enigma_status_only: true,
+      raw_memory_returned: false,
+      local_paths_redacted: true,
+      provider_deletion_proof: false,
+      model_forgetting_proof: false,
+      hosted_saas_live: false,
+    },
+  };
+}
+
 function passportStatusReport({ bundlePath, stored = {}, vault, passport }) {
   const roots = vault.__computeRoots();
   const activeCount = activeMemoryCount(vault);
@@ -1929,6 +1981,7 @@ function passportStatusReport({ bundlePath, stored = {}, vault, passport }) {
     active_set_root: roots.active_set_root,
     receipt_log_root: roots.receipt_log_root,
     connector_readiness: connectorReadinessSummary(bundlePath),
+    first_run_status: firstRunStatusSummary({ bundlePath, activeCount, tombstoneCount, receiptCount }),
     next_recommended_commands: [
       `enigma remember --bundle "${bundlePath}" --text-file <path>`,
       `enigma search --bundle "${bundlePath}" --query <text>`,
