@@ -837,11 +837,10 @@ pub async fn rollback_client_config(
     }))
 }
 
-#[tauri::command]
-pub async fn get_support_summary(state: tauri::State<'_, AppState>) -> Result<Value, String> {
-    let bundle = state.config.bundle_path.to_string_lossy();
+async fn build_support_summary(config: &DesktopConfig) -> Result<Value, String> {
+    let bundle = config.bundle_path.to_string_lossy();
     let mut summary = run_cli(
-        &state.config,
+        config,
         &[
             "support",
             "summary",
@@ -860,6 +859,53 @@ pub async fn get_support_summary(state: tauri::State<'_, AppState>) -> Result<Va
         "shareable_by_default": false,
     });
     Ok(summary)
+}
+
+fn support_summary_export_path(config: &DesktopConfig) -> std::path::PathBuf {
+    let file_name = format!(
+        "enigma-support-summary-{}.json",
+        Utc::now().format("%Y%m%dT%H%M%SZ")
+    );
+    config
+        .bundle_path
+        .parent()
+        .map(std::path::Path::to_path_buf)
+        .unwrap_or_else(std::env::temp_dir)
+        .join(file_name)
+}
+
+#[tauri::command]
+pub async fn get_support_summary(state: tauri::State<'_, AppState>) -> Result<Value, String> {
+    build_support_summary(&state.config).await
+}
+
+#[tauri::command]
+pub async fn export_support_summary(
+    state: tauri::State<'_, AppState>,
+    approve: bool,
+) -> Result<Value, String> {
+    if !approve {
+        return Err("User approval is required before exporting support summary.".to_string());
+    }
+    let summary = build_support_summary(&state.config).await?;
+    let out_path = support_summary_export_path(&state.config);
+    if let Some(parent) = out_path.parent() {
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(redact_command_error)?;
+    }
+    let payload = serde_json::to_string_pretty(&summary).map_err(redact_command_error)?;
+    tokio::fs::write(out_path.as_path(), payload)
+        .await
+        .map_err(redact_command_error)?;
+    Ok(json!({
+        "exported": true,
+        "schema": "enigma.desktop_support_summary_export.v1",
+        "path": "<support-summary-file>",
+        "local_paths_hidden": true,
+        "raw_memory_hidden": true,
+        "shareable_by_default": false,
+    }))
 }
 
 #[tauri::command]

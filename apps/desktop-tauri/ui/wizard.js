@@ -317,6 +317,15 @@ async function mockInvoke(cmd, args = {}) {
           shareable_by_default: false,
         },
       };
+    case 'export_support_summary':
+      return {
+        exported: true,
+        schema: 'enigma.desktop_support_summary_export.v1',
+        path: '<support-summary-file>',
+        local_paths_hidden: true,
+        raw_memory_hidden: true,
+        shareable_by_default: false,
+      };
     case 'get_diagnostics':
       return { status: 'passed', summary: 'Local checks completed.', issue_codes: [] };
     case 'export_diagnostics':
@@ -680,6 +689,7 @@ function renderSupportSummarySection() {
   const issueCount = Array.isArray(summary.issue_codes) ? summary.issue_codes.length : 0;
   const nextLabel = summary.next_action?.label || 'Collect support summary';
   const supportCode = summary.support_code || 'not collected';
+  const exported = summary.exported?.schema === 'enigma.desktop_support_summary_export.v1';
   return `
     <section class="dashboard-section support-summary" aria-labelledby="support-summary-title">
       <p class="eyebrow">Support summary</p>
@@ -692,8 +702,10 @@ function renderSupportSummarySection() {
         <div class="metric"><dt>Support code</dt><dd>${escapeHtml(supportCode)}</dd></div>
       </div>
       <p class="note">Local Enigma status only. Summary sharing is explicit; Enigma does not claim outside-provider changes, model behavior changes, or hosted service readiness.</p>
+      ${exported ? `<p class="note">Support summary export ready. File location is hidden in this view.</p>` : ''}
       <div class="button-row">
         ${primaryButton('Collect support summary', 'collect-support-summary')}
+        <button type="button" class="secondary" data-action="export-support-summary" ${summary.schema ? '' : 'disabled'}>Export support summary</button>
       </div>
     </section>
   `;
@@ -1239,6 +1251,23 @@ async function handleAction(event) {
       busy = false;
       render();
       setStatus('Support summary collected without raw memory or local paths.');
+      return;
+    }
+    case 'export-support-summary': {
+      if (!supportSummary?.schema) {
+        setStatus('Collect a support summary before exporting it.');
+        return;
+      }
+      if (!confirm('Export a public-safe support summary JSON file? No raw memory or local paths will be included.')) {
+        return;
+      }
+      busy = true;
+      setStatus('Exporting public-safe support summary...');
+      const exported = await call('export_support_summary', { approve: true });
+      supportSummary = { ...supportSummary, exported };
+      busy = false;
+      render();
+      setStatus('Support summary exported. The file location is hidden in this view.');
       return;
     }
     case 'export-diagnostics': {

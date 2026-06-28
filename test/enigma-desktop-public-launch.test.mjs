@@ -300,10 +300,16 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(wizard, /Support summary/);
   assert.match(wizard, /Shareable status without private memory/);
   assert.match(wizard, /collect-support-summary/);
+  assert.match(wizard, /export-support-summary/);
+  assert.match(wizard, /Export support summary/);
+  assert.match(wizard, /Support summary exported/);
   assert.match(wizard, /get_support_summary/);
   assert.match(tauriService, /pub async fn get_support_summary/);
   assert.match(tauriService, /enigma\.desktop_support_summary_surface\.v1/);
+  assert.match(tauriService, /pub async fn export_support_summary/);
+  assert.match(tauriService, /enigma\.desktop_support_summary_export\.v1/);
   assert.match(tauriLib, /commands::service::get_support_summary/);
+  assert.match(tauriLib, /commands::service::export_support_summary/);
   assert.match(tauriService, /connector_card_status/);
   assert.match(tauriService, /recommended_action/);
   assert.match(tauriService, /repair_reasons/);
