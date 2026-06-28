@@ -207,8 +207,8 @@ mod tests {
             "nested": { "api_key": "xxx" },
         });
         let found = find_forbidden_keys(&value);
-        assert!(found.contains(&"secret".to_string()));
-        assert!(found.contains(&"api_key".to_string()));
+        assert!(found.iter().any(|key| key == "secret"));
+        assert!(found.iter().any(|key| key == "api_key"));
     }
 
     #[test]

@@ -199,19 +199,19 @@ pub async fn submit_pending_crash_reports() -> Result<Value, String> {
     let mut failed = 0usize;
 
     for path in reports {
-        match fs::read_to_string(&path)
+        match fs::read_to_string(path.as_path())
             .ok()
             .and_then(|s| serde_json::from_str::<CrashReport>(&s).ok())
         {
             Some(report) => match upload_report(&endpoint, &report).await {
                 Ok(true) => {
-                    let _ = fs::remove_file(&path);
+                    let _ = fs::remove_file(path.as_path());
                     submitted += 1;
                 }
                 _ => failed += 1,
             },
             None => {
-                let _ = fs::remove_file(&path);
+                let _ = fs::remove_file(path.as_path());
             }
         }
     }
@@ -242,9 +242,10 @@ async fn upload_report(endpoint: &str, report: &CrashReport) -> Result<bool, Str
         .build()
         .map_err(|e| e.to_string())?;
 
+    let payload = report.to_payload();
     let response = client
         .post(endpoint)
-        .json(&report.to_payload())
+        .json(&payload)
         .send()
         .await
         .map_err(|e| e.to_string())?;

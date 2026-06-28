@@ -24,7 +24,7 @@ Automated smoke should run on clean Windows and macOS runners or disposable VMs.
 
 ### Automated public beta QA matrix runner
 
-Run `node scripts/run-public-beta-qa-matrix.mjs --json` from the repository root to print the public-safe matrix report, or add `--out <relative-report-path>` to write the same JSON report. The report schema is `enigma.public_beta_qa_matrix.v1`; evidence references must stay relative or opaque and must not include raw memory, prompts, transcripts, credentials, account IDs, customer identifiers, provider responses, signing secrets, private owner names, or local absolute paths.
+Run `node scripts/run-public-beta-qa-matrix.mjs --json` from the repository root to print the public-safe matrix report, or add `--out <relative-report-path>` to write the same JSON report. The runner lives at [`scripts/run-public-beta-qa-matrix.mjs`](../../scripts/run-public-beta-qa-matrix.mjs). The report schema is `enigma.public_beta_qa_matrix.v1`; evidence references must stay relative or opaque and must not include raw memory, prompts, transcripts, credentials, account IDs, customer identifiers, provider responses, signing secrets, private owner names, or local absolute paths.
 
 Scenario status values are limited to `pass`, `fail`, `blocked`, `missing`, and `pending`:
 
@@ -510,6 +510,8 @@ Block public beta if any of these are true:
 - Offline launch fails for the default local app.
 - Corrupted config recovery requires unsupported manual editing for common cases.
 - Signed installer trust path is unresolved for the selected beta channel.
+- Automated public beta QA matrix has any `fail`, `blocked`, `missing`, or `pending` scenario.
+- Clean Windows/macOS manual install tests, support dry run, PR approval/merge, reviewer approval, npm publish evidence, signed Windows/macOS artifact evidence, or code-signing/notarization evidence is missing.
 
 Block GA if any beta blocker remains, or if any of these are true:
 

@@ -83,6 +83,12 @@ Use placeholders until the release team assigns real private owners. Do not inse
 - [ ] Confirm public-safe evidence packet owner and privacy reviewer.
 - [ ] Record Advisor decision as ship, hold, or rollback with public-safe failed gate refs.
 
+## Automated public beta QA matrix handoff
+
+Run `node scripts/run-public-beta-qa-matrix.mjs --json` as a public-safe status reporter before asking Advisor for beta approval. The runner lives at [`scripts/run-public-beta-qa-matrix.mjs`](../../scripts/run-public-beta-qa-matrix.mjs) and uses the [required scenario catalog](qa-support-observability.md#required-scenario-catalog): `BETA-INSTALL-001`, `BETA-FIRST-001`, `BETA-CLIENT-CLAUDE-001`, `BETA-PROOF-001`, `BETA-OFFLINE-001`, `BETA-CONFIG-001`, `BETA-DIAG-001`, `BETA-CRASH-001`, `BETA-SIGNING-WINDOWS-001`, `BETA-SIGNING-MACOS-001`, `BETA-UPDATE-001`, `BETA-NPM-001`, and `BETA-MERGE-001`.
+
+Treat `pass` as evidence for the automated local/static slice only. Treat `fail`, `blocked`, `missing`, or `pending` as a hold for public beta until the named blocker has public-safe evidence. The matrix must not be used as a substitute for clean Windows/macOS manual install tests, signed Windows/macOS artifact evidence, Apple notarization/stapling evidence, Microsoft/Windows signing evidence, npm publish evidence, PR approval/merge, reviewer approval, or a support dry run.
+
 ## Public beta hold conditions
 
 Hold P9 and the public beta announcement if any of these remain true:
@@ -94,4 +100,8 @@ Hold P9 and the public beta announcement if any of these remain true:
 - update signing key custody is undefined or relies on copying restricted signing material into public docs or repo artifacts;
 - rollback is unrehearsed or has no assigned owner;
 - public evidence cannot be separated from private runbooks;
+- automated public beta QA matrix has any `fail`, `blocked`, `missing`, or `pending` scenario;
+- required npm version is not published with public-safe install evidence;
+- release PR approval, merge, or reviewer approval evidence is absent;
+- clean Windows/macOS manual install evidence or support dry-run evidence is incomplete;
 - Advisor decision is absent, `hold`, or `rollback`.
