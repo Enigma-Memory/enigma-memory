@@ -22,8 +22,8 @@
 - Update-check card that fetches signed manifest and shows current/available versions without auto-download.
 - Opt-in crash reporting: panic hook writes redacted report to disk; user controls whether pending reports are uploaded. No memory, wallet, or path data is included.
 - Release evidence generator (`scripts/release-evidence-desktop.mjs`) dry-run tested.
-- Code-signing setup guide: `docs/public-launch/code-signing-setup.md`.
 - Signed release workflow: `.github/workflows/desktop-release.yml` with conditional Azure (Windows) and Apple (macOS) signing placeholders.
+- Tauri updater signing key: generated and stored as `TAURI_SIGNING_PRIVATE_KEY` GitHub secret; public key committed in `tauri.conf.json`.
 
 ### Connectors
 
