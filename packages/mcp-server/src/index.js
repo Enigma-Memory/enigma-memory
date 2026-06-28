@@ -1381,6 +1381,7 @@ export async function enigma_import_approve(input = {}) {
   if (input.approved !== true) return blockedImportApproval('explicit_approval_required', preview);
   const expectedApprovalToken = importApprovalToken(preview);
   if (input.approval_token !== expectedApprovalToken) return blockedImportApproval('approval_token_required', preview);
+  if (preview.candidate_count === 0) return blockedImportApproval('empty_import', preview);
   if (preview.import_decision !== 'ready_for_import' && input.reviewed !== true) {
     return blockedImportApproval('review_required_before_write', preview);
   }

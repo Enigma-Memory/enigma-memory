@@ -29,7 +29,7 @@ The generated server entry uses command `enigma-mcp`, no args, and `ENIGMA_BUNDL
 
 `enigma_import_preview` lets a client preview user-provided text or Markdown memory candidates without writing the vault. The response contains counts, duplicate groups, commitments, receipt/action metadata, and no raw memory text.
 
-`enigma_import_approve` is the explicit write step. It requires `approved:true` and the `approval_token` returned by `enigma_import_preview`, blocks duplicate/low-confidence/incomplete previews until `reviewed:true`, writes only to the local Enigma vault, and returns `enigma.import_approved_batch.v1` plus `enigma.import_batch_receipt.v1` metadata. It does not return raw memory text.
+`enigma_import_approve` is the explicit write step. It requires `approved:true` and the `approval_token` returned by `enigma_import_preview`, blocks empty imports, and blocks duplicate/low-confidence/incomplete previews until `reviewed:true`. Successful writes are local to the Enigma vault and return `enigma.import_approved_batch.v1` plus `enigma.import_batch_receipt.v1` metadata. It does not return raw memory text.
 
 ## Grant-gated context
 

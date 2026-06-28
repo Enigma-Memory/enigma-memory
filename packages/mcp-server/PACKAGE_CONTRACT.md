@@ -20,7 +20,7 @@ This package is part of Enigma, the provider-agnostic AI memory and proof layer.
 - Developer onboarding should point Claude Desktop, Cursor, Kimi Code, and VS Code users to `npm install -g enigma-memory && enigma setup --client <id> --write-connectors --overwrite` before any manual MCP JSON fallback.
 - `enigma_next_action` must not require an existing bundle; missing bundles return `enigma.next_action.v1` with `state:"setup_needed"` and tool-level next actions instead of an exception.
 - `enigma_import_preview` must be preview-only: no vault write, no raw memory in the result, and public-safe duplicate/receipt/action metadata only.
-- `enigma_import_approve` must require `approved:true` and the preview `approval_token`, fail closed when review is still required, and return `enigma.import_approved_batch.v1` with batch receipt metadata only.
+- `enigma_import_approve` must require `approved:true` and the preview `approval_token`, fail closed for empty imports or when review is still required, and return `enigma.import_approved_batch.v1` with batch receipt metadata only.
 - Grant-gated context must fail closed before returning context when a required grant is missing, expired, revoked by status, listed in `revoked_grant_refs`, scoped to the wrong app/purpose/zone, or malformed. The blocked result is public-safe and never includes raw memory.
 
 Package-specific implementation details are governed by `research/handoff-enigma/09_BUILD_BACKLOG.md` and `research/handoff-enigma/12_KIMI_BUILD_BRIEF.md`.

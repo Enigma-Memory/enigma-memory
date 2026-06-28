@@ -528,6 +528,21 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
   assert.equal(missingTokenImport.result.reason_code, 'approval_token_required');
   assert.equal(missingTokenImport.result.vault_write_performed, false);
   assert.doesNotMatch(JSON.stringify(missingTokenImport.response), /mcp import preview private sentinel/);
+
+  const emptyPreview = await callTool('import-preview-empty', 'enigma_import_preview', {
+    text: '',
+    complete: true,
+  });
+  const emptyApproval = await callTool('import-approve-empty', 'enigma_import_approve', {
+    text: '',
+    complete: true,
+    approved: true,
+    reviewed: true,
+    approval_token: emptyPreview.result.approval_token,
+  });
+  assert.equal(emptyApproval.result.schema, 'enigma.import_approval_blocked.v1');
+  assert.equal(emptyApproval.result.reason_code, 'empty_import');
+  assert.equal(emptyApproval.result.vault_write_performed, false);
   assert.doesNotMatch(JSON.stringify(unapprovedImport.response), /mcp import preview private sentinel/);
 
   const tempRoot = process.env.TEMP ?? process.env.TMP ?? '.';
