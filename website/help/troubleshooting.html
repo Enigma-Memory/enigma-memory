@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Troubleshoot Enigma Memory setup issues from the health dashboard.">
+  <title>Troubleshoot Enigma Memory</title>
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="site-logo" href="../index.html">Enigma Memory</a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="../download.html">Download</a>
+        <a href="../setup.html">How it works</a>
+        <a href="../privacy.html">Privacy</a>
+        <a href="./index.html">Help</a>
+        <a href="../faq.html">FAQ</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <span class="eyebrow">Troubleshooting</span>
+      <h1>Fix common setup issues from the health dashboard.</h1>
+      <p>Enigma explains what is wrong, what it can fix automatically, and what you need to approve.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="issues-heading">
+      <h2 id="issues-heading">Common issues</h2>
+
+      <article class="faq-item">
+        <h3>Installer blocked by the operating system</h3>
+        <p><strong>Try this first:</strong> Right-click the installer and choose Open (macOS), or click More info then Run anyway (Windows), if the installer came from an Enigma distribution channel.</p>
+        <p><strong>What Enigma checks:</strong> Whether the installer is signed and notarized before public launch.</p>
+        <p><strong>If that does not work:</strong> Download again from the official download page. Do not bypass warnings for installers from unknown sources.</p>
+      </article>
+
+      <article class="faq-item">
+        <h3>Vault not ready</h3>
+        <p><strong>Try this first:</strong> Open Enigma and click Create local vault in the setup wizard.</p>
+        <p><strong>What Enigma checks:</strong> The local vault bundle exists and is readable.</p>
+        <p><strong>If that does not work:</strong> Use the in-app Repair vault option. CLI repair is available in the advanced panel.</p>
+      </article>
+
+      <article class="faq-item">
+        <h3>AI app not detected</h3>
+        <p><strong>Try this first:</strong> Make sure the app is installed and has been opened at least once, then click Refresh detection in Enigma.</p>
+        <p><strong>What Enigma checks:</strong> Whether the client config directory exists and whether Enigma can write a previewed MCP entry.</p>
+        <p><strong>If that does not work:</strong> Restart the AI app, or use the manual MCP JSON in the advanced panel.</p>
+      </article>
+
+      <article class="faq-item">
+        <h3>Proof export rejected as unsafe</h3>
+        <p><strong>Try this first:</strong> Remove any raw memory text, prompts, transcripts, or provider responses from the export fields.</p>
+        <p><strong>What Enigma checks:</strong> The export contains only hashes, roots, opaque refs, counts, timestamps, signatures, and validation results.</p>
+        <p><strong>If that does not work:</strong> Use the in-app proof activity screen, which exports safe artifacts automatically.</p>
+      </article>
+
+      <article class="faq-item">
+        <h3>Send safe diagnostics to support</h3>
+        <p><strong>Safe to share:</strong> Health status, app version, sanitized error codes, and public-safe proof refs such as <code>ref_abc123</code>.</p>
+        <p><strong>Do not share:</strong> Raw memory, prompts, transcripts, credentials, account IDs, or local paths.</p>
+      </article>
+    </section>
+
+    <section class="content-section">
+      <details>
+        <summary>CLI repair commands</summary>
+        <p>If the desktop app repair options do not resolve the issue, see the <a href="../developers/cli.html">CLI appendix</a> for terminal-based repair commands. Run these only if you are comfortable with the command line.</p>
+      </details>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer__inner">
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="../download.html">Download</a></li>
+          <li><a href="../setup.html">How it works</a></li>
+          <li><a href="../privacy.html">Privacy</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Support</h4>
+        <ul>
+          <li><a href="./index.html">Help hub</a></li>
+          <li><a href="./install.html">Install guide</a></li>
+          <li><a href="./troubleshooting.html">Troubleshooting</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Developers</h4>
+        <ul>
+          <li><a href="../developers/cli.html">CLI appendix</a></li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

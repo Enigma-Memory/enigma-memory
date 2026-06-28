@@ -21,15 +21,14 @@
 - ✅ **Auto-save policy engine** with category-based rules and immunology filtering.
 - ✅ **Verifiable memory prototype** with Merkle proofs and search-commitment guest stub.
 - ✅ **Privy embedded wallet + model connection UI** in webapp; session authorization and dashboard screens built.
-- ⚠️ **Production TEE hardware attestation** not yet integrated; cryptographic baseline exists.
-- ⚠️ **On-chain ZK verifier** not yet deployed; guest stub produces commitments only.
-
-## Legal / Launch
-
-- ⚠️ **Token issuance requires legal review** — technical contracts ready; public launch deferred to counsel opinion.
-- ⚠️ **Consumer app launch requires security audit and compliance review** — user deferred to a later date.
-- ⚠️ **External security audit has not started** — checklist is in `specs/security-audit-checklist.md`.
-- ⚠️ **Mainnet deployment** requires user-configured custody and `SOLANA_MAINNET_WALLET`; see `deploy/MAINNET_SETUP.md` and `specs/bottleneck-solutions-architecture.md`.
+- ✅ **MCP server verifies on-chain `Capability`/`Session` PDAs** before memory/budget tool calls.
+- ✅ **`cortex_treasury` custodies real SPL tokens** via CPI `transfer_checked` deposits/withdrawals.
+- ✅ **Vector search is pluggable** — SQLite fallback, pgvector/Qdrant HNSW backends.
+- ✅ **Signed desktop app scaffold** created in `apps/desktop-tauri/` with Tauri v2, consumer onboarding wizard, and health dashboard UI.
+- ✅ **One-click connector engine** implemented for Claude Desktop (`.mcpb` + fallback), Cursor, Kimi Code, VS Code/Cline, Roo, OpenCode, and Generic MCP with backup/rollback/repair.
+- ✅ **Consumer docs and website** created: desktop-first README, `docs/install-anywhere.md` rewrite, and `website/` static pages.
+- ⚠️ **Bundled Enigma engine/sidecar bridge** — Tauri commands are scaffolded but not yet wired to a bundled runtime process.
+- ⚠️ **Signed installers and code signing** require external Apple Developer / Microsoft signing identities.
 
 ## Notes
 

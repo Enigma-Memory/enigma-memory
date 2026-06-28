@@ -3,7 +3,49 @@ import { isOAuthRoute, handleOAuthRequest } from "./oauth-server.mjs";
 import { createAutoSaveEngine } from "./auto-save.mjs";
 import { createStore } from "./store.mjs";
 import { createEmbedder } from "./embed.mjs";
+import { verifyOnChainSession } from "./mcp-server.mjs";
 
+
+function authFromRequest(req) {
+  const owner = req.headers["x-cortex-owner"];
+  const sessionKey = req.headers["x-cortex-session-key"];
+  if (!owner || !sessionKey) return null;
+  return {
+    userId: owner,
+    scopes: ["*"],
+    solana: {
+      owner,
+      sessionKey,
+      nonce: req.headers["x-cortex-nonce"],
+      capabilityScope: req.headers["x-cortex-capability-scope"],
+      grantedTo: req.headers["x-cortex-granted-to"],
+      capabilityPda: req.headers["x-cortex-capability-pda"],
+      sessionPda: req.headers["x-cortex-session-pda"],
+    },
+  };
+}
+
+function actionForEndpoint(method, pathname) {
+  if (method === "POST" && (pathname === "/ingest" || pathname === "/auto-save")) {
+    return "store_memory";
+  }
+  if (
+    (method === "GET" && pathname.startsWith("/retrieve/")) ||
+    pathname === "/search" ||
+    (method === "POST" && pathname === "/search")
+  ) {
+    return "retrieve_memory";
+  }
+  return null;
+}
+
+async function maybeVerifySession(req, method, pathname, options) {
+  const auth = authFromRequest(req);
+  if (!auth) return;
+  const action = actionForEndpoint(method, pathname);
+  if (!action) return;
+  await verifyOnChainSession(auth, action, options);
+}
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let body = "";
@@ -72,6 +114,7 @@ export function startServer(port = 3000, options = {}) {
 
     if (req.method === "POST" && pathname === "/ingest") {
       try {
+        await maybeVerifySession(req, req.method, pathname, { solanaConnection: options.solanaConnection });
         const body = await readBody(req);
         const { id, text, owner } = JSON.parse(body);
         if (!id || !text || !owner) {
@@ -96,33 +139,45 @@ export function startServer(port = 3000, options = {}) {
     }
 
     if (req.method === "GET" && pathname.startsWith("/retrieve/")) {
-      const id = pathname.slice("/retrieve/".length);
-      const memory = store.get(id);
-      if (!memory) {
-        res.writeHead(404);
-        res.end(JSON.stringify({ error: "not found" }));
-        return;
+      try {
+        await maybeVerifySession(req, req.method, pathname, { solanaConnection: options.solanaConnection });
+        const id = pathname.slice("/retrieve/".length);
+        const memory = store.get(id);
+        if (!memory) {
+          res.writeHead(404);
+          res.end(JSON.stringify({ error: "not found" }));
+          return;
+        }
+        res.writeHead(200);
+        res.end(JSON.stringify(memory));
+      } catch (err) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: err.message }));
       }
-      res.writeHead(200);
-      res.end(JSON.stringify(memory));
       return;
     }
 
     if (req.method === "GET" && pathname === "/search") {
-      const query = url.searchParams.get("query") || url.searchParams.get("q");
-      if (!query) {
+      try {
+        await maybeVerifySession(req, req.method, pathname, { solanaConnection: options.solanaConnection });
+        const query = url.searchParams.get("query") || url.searchParams.get("q");
+        if (!query) {
+          res.writeHead(400);
+          res.end(JSON.stringify({ error: "missing query" }));
+          return;
+        }
+        const results = await semanticSearch(store, embedder, query, topK);
+        res.writeHead(200);
+        res.end(JSON.stringify({ query, results }));
+      } catch (err) {
         res.writeHead(400);
-        res.end(JSON.stringify({ error: "missing query" }));
-        return;
+        res.end(JSON.stringify({ error: err.message }));
       }
-      const results = await semanticSearch(store, embedder, query, topK);
-      res.writeHead(200);
-      res.end(JSON.stringify({ query, results }));
       return;
     }
-
     if (req.method === "POST" && pathname === "/search") {
       try {
+        await maybeVerifySession(req, req.method, pathname, { solanaConnection: options.solanaConnection });
         const body = await readBody(req);
         const { query } = JSON.parse(body);
         if (!query) {
@@ -139,8 +194,10 @@ export function startServer(port = 3000, options = {}) {
       }
       return;
     }
+
     if (req.method === "POST" && pathname === "/auto-save") {
       try {
+        await maybeVerifySession(req, req.method, pathname, { solanaConnection: options.solanaConnection });
         const body = await readBody(req);
         const { text, owner, tags, turnId } = JSON.parse(body);
         if (!text || !owner) {

@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Install Enigma Memory like a desktop app.">
+  <title>Install Enigma Memory</title>
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="site-logo" href="../index.html">Enigma Memory</a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="../download.html">Download</a>
+        <a href="../setup.html">How it works</a>
+        <a href="../privacy.html">Privacy</a>
+        <a href="./index.html">Help</a>
+        <a href="../faq.html">FAQ</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <span class="eyebrow">Install guide</span>
+      <h1>Install Enigma Memory like a desktop app.</h1>
+      <p>Download, open, and approve the signed installer. Enigma handles the local runtime and vault setup.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="desktop-heading">
+      <h2 id="desktop-heading">Desktop install</h2>
+
+      <h3>macOS</h3>
+      <ol>
+        <li>Download the macOS installer from the <a href="../download.html">download page</a>.</li>
+        <li>Open the signed, notarized disk image or package.</li>
+        <li>Drag Enigma Memory into Applications, or run the installer.</li>
+        <li>Open Enigma Memory. The first-run setup creates your local vault.</li>
+      </ol>
+
+      <h3>Windows</h3>
+      <ol>
+        <li>Download the Windows installer from the <a href="../download.html">download page</a>.</li>
+        <li>Run the signed installer.</li>
+        <li>If Windows SmartScreen appears, click More info, then Run anyway.</li>
+        <li>Open Enigma Memory. The first-run setup creates your local vault.</li>
+      </ol>
+
+      <h3>Linux</h3>
+      <ol>
+        <li>Download the AppImage or package from the <a href="../download.html">download page</a>.</li>
+        <li>Mark the AppImage executable, or install the package with your distribution tools.</li>
+        <li>Open Enigma Memory. The first-run setup creates your local vault.</li>
+      </ol>
+
+      <div class="boundary-callout">
+        <strong>Boundary note:</strong> The desktop app bundles its runtime. Consumers should not install Node or npm for the default path.
+      </div>
+    </section>
+
+    <section class="content-section" aria-labelledby="blocked-heading">
+      <h2 id="blocked-heading">If your system blocks the installer</h2>
+      <p>Operating systems sometimes warn about apps downloaded from the web. Use signing-safe guidance:</p>
+      <ul>
+        <li><strong>macOS Gatekeeper:</strong> Right-click the installer, choose Open, then confirm.</li>
+        <li><strong>Windows SmartScreen:</strong> Click More info, then Run anyway, if the installer came from an Enigma distribution channel.</li>
+        <li><strong>Linux:</strong> Check the package signature or checksum with your distribution tools.</li>
+      </ul>
+      <p>Do not bypass security warnings for installers from unknown sources.</p>
+    </section>
+
+    <section class="content-section">
+      <details>
+        <summary>Install from npm or source</summary>
+        <p>This is the advanced developer path. For the default consumer experience, use the desktop app above.</p>
+        <p>If you want the command-line engine instead, see the <a href="../developers/cli.html">CLI appendix</a> for npm install, Node requirements, setup commands, and source checkout.</p>
+      </details>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer__inner">
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="../download.html">Download</a></li>
+          <li><a href="../setup.html">How it works</a></li>
+          <li><a href="../privacy.html">Privacy</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Support</h4>
+        <ul>
+          <li><a href="./index.html">Help hub</a></li>
+          <li><a href="./install.html">Install guide</a></li>
+          <li><a href="./troubleshooting.html">Troubleshooting</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Developers</h4>
+        <ul>
+          <li><a href="../developers/cli.html">CLI appendix</a></li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

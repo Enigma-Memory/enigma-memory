@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Enigma Memory CLI and MCP setup for developers and power users.">
+  <title>Developer CLI — Enigma Memory</title>
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="site-logo" href="../index.html">Enigma Memory</a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="../download.html">Download</a>
+        <a href="../setup.html">How it works</a>
+        <a href="../privacy.html">Privacy</a>
+        <a href="../help/index.html">Help</a>
+        <a href="../faq.html">FAQ</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <span class="eyebrow">Developers</span>
+      <h1>CLI and MCP setup for power users.</h1>
+      <p>Use npm, Node, terminal commands, and manual MCP snippets only when you want the developer engine instead of the desktop-first consumer app.</p>
+      <div class="boundary-callout">
+        <strong>This is not the default consumer setup path.</strong> Most people should use the <a href="../download.html">desktop app</a>.
+      </div>
+    </section>
+
+    <section class="content-section" aria-labelledby="prereqs-heading">
+      <h2 id="prereqs-heading">Prerequisites</h2>
+      <ul>
+        <li>Node.js 24 or later.</li>
+        <li>A local filesystem path for the Enigma vault bundle.</li>
+        <li>No database, provider credential, cloud credential, or hosted Enigma account for the local path.</li>
+      </ul>
+    </section>
+
+    <section class="content-section" aria-labelledby="install-heading">
+      <h2 id="install-heading">Install with npm</h2>
+      <div class="terminal"><code>npm install -g enigma-memory</code></div>
+      <p>Initialize a local vault and connect installed clients:</p>
+      <div class="terminal"><code>enigma init<br>enigma setup --client auto --connect-installed --overwrite<br>enigma drive health<br>enigma status</code></div>
+      <p>Preview before writing any client config:</p>
+      <div class="terminal"><code>enigma connect claude-desktop --dry-run<br>enigma connect cursor --dry-run<br>enigma connect kimi-code --dry-run</code></div>
+    </section>
+
+    <section class="content-section" aria-labelledby="mcp-heading">
+      <h2 id="mcp-heading">Run the MCP server</h2>
+      <p>Start the Enigma MCP stdio server:</p>
+      <div class="terminal"><code>ENIGMA_BUNDLE="$HOME/.enigma/bundle.json" enigma-mcp</code></div>
+      <p>Or through the CLI:</p>
+      <div class="terminal"><code>ENIGMA_BUNDLE="$HOME/.enigma/bundle.json" enigma mcp serve</code></div>
+
+      <h3>Generic MCP client entry</h3>
+      <p>Use an absolute bundle path and set <code>ENIGMA_BUNDLE</code> directly in the entry for portability:</p>
+      <pre><code>{
+  "mcpServers": {
+    "enigma": {
+      "command": "enigma-mcp",
+      "args": [],
+      "env": {
+        "ENIGMA_BUNDLE": "/absolute/path/to/.enigma/bundle.json"
+      }
+    }
+  }
+}</code></pre>
+      <p>If a GUI app cannot find shell-installed binaries, use <code>--mcp-command</code> with an absolute path to the executable.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="proof-heading">
+      <h2 id="proof-heading">Export and verify proof artifacts</h2>
+      <div class="terminal"><code>enigma export --bundle ./.enigma/bundle.json --out ./.enigma/export.json<br>enigma verify --export ./.enigma/export.json</code></div>
+      <p>Exported proof artifacts contain commitments, roots, and receipt metadata. Do not paste raw memory plaintext into relay records, witness checkpoints, SIEM events, public proof artifacts, or shell command lines.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="source-heading">
+      <h2 id="source-heading">Source checkout</h2>
+      <p>Use a source checkout only when you need source-only docs, Docker assets, browser-extension scaffolding, package development, or release scripts.</p>
+      <div class="terminal"><code>git clone https://github.com/Enigma-Memory/enigma-memory.git<br>cd enigma-memory<br>npm run install:local -- --execute --init-vault --bundle ./.enigma/bundle.json<br>enigma doctor --bundle ./.enigma/bundle.json</code></div>
+      <p>Full installation and connector details are in <a href="https://github.com/Enigma-Memory/enigma-memory/blob/main/docs/install-anywhere.md">docs/install-anywhere.md</a> and <a href="https://github.com/Enigma-Memory/enigma-memory/blob/main/docs/client-connectors.md">docs/client-connectors.md</a>.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="boundary-heading">
+      <h2 id="boundary-heading">Claim boundary</h2>
+      <p>Enigma proves Enigma-controlled local vault and receipt events. It does not prove provider deletion, provider-native memory removal, model forgetting, hosted SaaS readiness, compliance certification, or benchmark superiority.</p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer__inner">
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="../download.html">Download</a></li>
+          <li><a href="../setup.html">How it works</a></li>
+          <li><a href="../privacy.html">Privacy</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Support</h4>
+        <ul>
+          <li><a href="../help/index.html">Help hub</a></li>
+          <li><a href="../help/install.html">Install guide</a></li>
+          <li><a href="../help/troubleshooting.html">Troubleshooting</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Developers</h4>
+        <ul>
+          <li><a href="./cli.html">CLI appendix</a></li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

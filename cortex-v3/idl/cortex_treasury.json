@@ -26,14 +26,24 @@
           "signer": true
         },
         {
+          "name": "mint"
+        },
+        {
           "name": "treasury",
-          "writable": true,
-          "signer": false
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "tokenProgram"
+        },
+        {
+          "name": "associatedTokenProgram"
         },
         {
           "name": "systemProgram",
-          "writable": false,
-          "signer": false,
           "address": "11111111111111111111111111111111"
         }
       ],
@@ -58,9 +68,22 @@
           "signer": true
         },
         {
+          "name": "mint"
+        },
+        {
           "name": "treasury",
-          "writable": true,
-          "signer": false
+          "writable": true
+        },
+        {
+          "name": "authorityAta",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "tokenProgram"
         }
       ],
       "args": [
@@ -89,9 +112,25 @@
           "signer": true
         },
         {
+          "name": "mint"
+        },
+        {
           "name": "treasury",
-          "writable": true,
-          "signer": false
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "recipientAta",
+          "writable": true
+        },
+        {
+          "name": "recipient"
+        },
+        {
+          "name": "tokenProgram"
         }
       ],
       "args": [
@@ -122,6 +161,21 @@
       "code": 6000,
       "name": "InsufficientFunds",
       "msg": "Insufficient funds"
+    },
+    {
+      "code": 6001,
+      "name": "InvalidAmount",
+      "msg": "Invalid amount"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidMint",
+      "msg": "Invalid mint"
+    },
+    {
+      "code": 6003,
+      "name": "Unauthorized",
+      "msg": "Unauthorized"
     }
   ],
   "types": [
@@ -135,12 +189,12 @@
             "type": "pubkey"
           },
           {
-            "name": "balance",
-            "type": "u64"
+            "name": "mint",
+            "type": "pubkey"
           },
           {
-            "name": "createdAt",
-            "type": "i64"
+            "name": "vault",
+            "type": "pubkey"
           },
           {
             "name": "bump",

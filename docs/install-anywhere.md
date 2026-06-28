@@ -1,19 +1,43 @@
 # Install Enigma anywhere
 
-Start with the published npm package path for `enigma-memory`: install once, connect your installed AI clients, then inspect Memory Drive health and passport status. Use a source checkout only when you need source-only docs, Docker assets, browser-extension scaffolding, package development, or release scripts.
+The default public-launch path is the signed Enigma Memory desktop app. Download, open the installer, and follow the guided first-run flow. No Node, npm, terminal, or JSON editing is required.
+
+The command-line engine remains supported for developers and power users. Use it when you need npm-based automation, source checkout, Docker assets, browser-extension scaffolding, package development, or release scripts.
+
 Hosted cloud and BYOC operation are waitlist/operator-deploy only; they require real deployment credentials, domains, TLS, durable storage, KMS/secrets, monitoring, backups, and operator/customer infrastructure. The relay and gateway binaries included in the package are local bootstrap probes, not a live hosted service. They are not activated by installing the package, running setup, or running the test drive.
 
-## Requirements
+## Default path: install the desktop app
+
+1. Download the signed installer for your platform from the Enigma Memory website or release page.
+2. Open the installer:
+   - **macOS:** Open the signed, notarized disk image or package. If Gatekeeper appears, right-click and choose Open.
+   - **Windows:** Run the signed installer. If SmartScreen appears, click More info, then Run anyway.
+   - **Linux:** Mark the AppImage executable or install the distribution package.
+3. Open Enigma Memory. The first-run setup creates your local vault.
+4. Review detected AI clients, preview the connection change, and approve the clients you want to connect.
+5. Check the health dashboard and follow any fix-it guidance.
+
+The desktop app bundles its runtime. Consumers should not install Node or npm.
+
+### Platform requirements
+
+- macOS 13 or later for the signed, notarized installer.
+- Windows 10 or later for the signed installer or Store/MSIX path.
+- A recent Linux distribution for the AppImage or package.
+
+A local filesystem path for the Enigma vault bundle is created during first run. No database, provider credential, cloud credential, npm publishing token, package registry account, or hosted Enigma account is required for the default desktop path.
+
+## Advanced path: install with npm
+
+Use npm only when you want the command-line engine instead of the desktop app.
+
+### Requirements
 
 - Node.js `>=24`
 - A local filesystem path for the Enigma vault bundle
-- No database, provider credential, cloud credential, npm publishing token, package registry account, or hosted Enigma account for the local test-drive or setup paths
-- Git only for the advanced source-checkout path
-- Optional: Docker for source-checkout containerized relay/gateway operation
+- No database, package registry account, provider credential, cloud credential, hosted Enigma account, or external account for the local test-drive or setup paths
 
-## Default path: install once, use everywhere
-
-Use the published package as the primary path:
+### Install once, use everywhere
 
 ```sh
 npm install -g enigma-memory
@@ -21,10 +45,6 @@ enigma init
 enigma setup --client auto --connect-installed --overwrite
 enigma drive health
 enigma status
-enigma remember --text-file ./memory.txt
-enigma search --query "project context"
-enigma context --query "project context" --optimize
-enigma verify --export ./.enigma/export.json
 ```
 
 `enigma init` is the credential-free first run that creates the local `.enigma` workspace, bundle, and proof artifacts. `enigma setup --client auto --connect-installed --overwrite` then configures the drive and writes the `mcpServers.enigma` entry into every installed/config-present client it detects; it skips clients that are not installed and never creates configs from scratch. Preview with `--dry-run` first to see which clients will be written. Both commands emit deterministic, public-safe JSON without printing raw memory plaintext, and both run on Windows PowerShell via the `enigma.cmd` shim the npm global install adds.
@@ -33,7 +53,7 @@ Run setup or quickstart before treating `enigma doctor` as a fully green install
 
 For the one-off npm path, run `npx --yes --package enigma-memory enigma quickstart --bundle ./.enigma/bundle.json --overwrite` before `npx --yes --package enigma-memory enigma doctor --bundle ./.enigma/bundle.json`. Running the npx doctor first can report a red generic-MCP connector if an existing client config names a not-yet-created bundle.
 
-`enigma drive health` reports a SMART-style memory-drive health packet — freshness, duplicate rate, tombstone backlog, stale derived artifacts, receipt coverage, and connector health — from local metadata only, with no network calls or private payloads. It is part of the Memory Drive surface in this release; `enigma status` and `enigma doctor` cover local passport counts, roots, and connector readiness in every build.
+`enigma drive health` reports a SMART-style memory-drive health packet — freshness, duplicate rate, tombstone backlog, stale derived artifacts, receipt coverage, and connector health — from local metadata only, with no network calls or private payloads.
 
 The local Enigma vault is the canonical memory passport. Provider-native memory is non-canonical cache only. Enigma proof covers Enigma-controlled vault state, receipts, checkpoints, committed roots, and exported bundle shape; it does not prove provider deletion, model forgetting, provider-native memory removal, hosted/BYOC availability, legal approval, ROI/savings, or compliance certification.
 
@@ -66,10 +86,6 @@ To perform the local global install from the checkout and initialize a local vau
 npm run install:local -- --execute --init-vault --bundle ./.enigma/bundle.json
 enigma doctor --bundle ./.enigma/bundle.json
 enigma --help
-enigma demo cross-model
-enigma-verify --help
-enigma-relay demo
-enigma-gateway demo
 ```
 
 Equivalent explicit source-checkout steps:
@@ -78,11 +94,6 @@ Equivalent explicit source-checkout steps:
 npm install -g .
 enigma init --bundle ./.enigma/bundle.json --subject local-user --display-name "Local user"
 enigma doctor --bundle ./.enigma/bundle.json
-enigma --help
-enigma demo cross-model
-enigma-verify --help
-enigma-relay demo
-enigma-gateway demo
 ```
 
 If you do not want a global install from the checkout, run the bins directly:
@@ -90,9 +101,6 @@ If you do not want a global install from the checkout, run the bins directly:
 ```sh
 node apps/cli/bin/enigma.mjs --help
 node apps/verifier/bin/enigma-verify.mjs --help
-node apps/cli/bin/enigma.mjs demo cross-model
-node apps/relay/bin/enigma-relay.mjs demo
-node apps/gateway/bin/enigma-gateway.mjs demo
 ```
 
 ## Manual local no-network path
@@ -101,7 +109,7 @@ Use this when you want to inspect each step behind the setup-first path:
 
 ```sh
 mkdir -p .enigma
-ENIGMA_DEMO_MEMORY_FILE=/absolute/path/to/tenant-approved-smoke-memory.txt
+ENIGMA_DEMO_MEMORY_FILE=/path/to/tenant-approved-smoke-memory.txt
 test -f "$ENIGMA_DEMO_MEMORY_FILE"
 enigma init --bundle ./.enigma/bundle.json --subject local-user --display-name "Local user"
 enigma remember --bundle ./.enigma/bundle.json --text-file "$ENIGMA_DEMO_MEMORY_FILE" --purpose user_memory --tags local
@@ -284,7 +292,7 @@ Minimum development load steps:
 2. Create a local Enigma bundle and keep `ENIGMA_BUNDLE` set to its absolute path. GUI-launched browsers may not inherit shell environment variables; if needed, point the native-host manifest at a local wrapper that sets `ENIGMA_BUNDLE` before launching `enigma-native-host`.
 3. Find the unpacked extension ID: Chrome uses `chrome://extensions` > Developer mode > Enigma > Details; Edge uses `edge://extensions` > Developer mode > Enigma > Details; Firefox uses `about:debugging#/runtime/this-firefox` for temporary add-ons, or a stable `browser_specific_settings.gecko.id`/signed add-on ID for repeatable installs.
 4. Resolve the absolute host executable or wrapper path. Do not use `~`, `$HOME`, `%USERPROFILE%`, shell aliases, `PATH` lookup, or command arguments in the manifest path.
-5. Generate the manifest JSON:
+5. Generate the manifest JSON with the native-host install-plan preflight:
 
    ```sh
    enigma native-host manifest --browser chrome --host-path "/absolute/path/to/enigma-native-host" --extension-id "REPLACE_WITH_EXTENSION_ID" --out ./com.enigma.native_host.json
@@ -314,31 +322,11 @@ Native-host manifest install location quick reference:
 
 All-users locations and exact copy/registry commands are in [`../apps/native-host/README.md`](../apps/native-host/README.md).
 
-The extension requires explicit user approval before inserting context. It does not use browser sync storage (`chrome.storage.sync`) at all. It stores target metadata and receipt metadata for insertion records, not raw memory plaintext. The native host is a local trust boundary component: users must protect the manifest, wrapper, executable, and `ENIGMA_BUNDLE` path from unwanted local modification. Provider-native memory remains cache only; Enigma cannot delete provider-side memories or force a provider model to forget.
+The extension requires explicit user approval before inserting context. It does not use browser sync storage (`chrome.storage.sync`) at all. It stores target metadata and receipt metadata for insertion records, not raw memory plaintext. The native host is a local trust boundary component: users must protect the manifest, wrapper, executable, and `ENIGMA_BUNDLE` path from unwanted local modification. Enigma cannot delete provider-side memories or force a provider model to forget.
 
 ## Desktop path
 
-The desktop scaffold is static and dependency-free:
-
-```sh
-cd enigma
-node --input-type=module -e "import { readFile } from 'node:fs/promises'; const html = await readFile('apps/desktop/src/index.html', 'utf8'); console.log(html.includes('Enigma Desktop Shell') ? 'desktop scaffold present' : 'desktop scaffold missing');"
-```
-
-Open the UI directly:
-
-```sh
-cd enigma
-python -m http.server 4173
-```
-
-Then open:
-
-```text
-http://127.0.0.1:4173/apps/desktop/src/index.html
-```
-
-If Python is unavailable, open `enigma/apps/desktop/src/index.html` directly from the filesystem. The scaffold models state and flows; cryptographic proof still comes from Enigma receipts and verifier output.
+The desktop scaffold is static and dependency-free. Open `apps/desktop/src/index.html` directly from the filesystem or serve it locally. The scaffold models state and flows; cryptographic proof still comes from Enigma receipts and verifier output.
 
 ## Relay server path
 
@@ -359,8 +347,6 @@ Start the local in-memory relay HTTP server:
 ```sh
 enigma-relay serve --host 127.0.0.1 --port 8787
 ```
-
-`enigma-relay --host 127.0.0.1 --port 8787` is also accepted; when the first argument is not `demo`, `serve`, `--help`, or `-h`, the direct bin treats the arguments as `serve` options. `enigma-relay --help`, `enigma-relay -h`, and `enigma-relay serve --help` print direct-bin help and exit without starting the server.
 
 Health check:
 
@@ -397,8 +383,6 @@ Start the local in-memory gateway HTTP server:
 ```sh
 enigma-gateway serve --host 127.0.0.1 --port 8797
 ```
-
-`enigma-gateway --host 127.0.0.1 --port 8797` is also accepted; when the first argument is not `demo`, `serve`, `--help`, or `-h`, the direct bin treats the arguments as `serve` options. `enigma-gateway --help`, `enigma-gateway -h`, and `enigma-gateway serve --help` print direct-bin help and exit without starting the server.
 
 Health and policy:
 
@@ -504,7 +488,7 @@ See `docs/deployment-runbook.md` for the production and BYOC operating checklist
 CLI/verifier:
 
 ```sh
-ENIGMA_DEMO_MEMORY_FILE=/absolute/path/to/tenant-approved-smoke-memory.txt
+ENIGMA_DEMO_MEMORY_FILE=/path/to/tenant-approved-smoke-memory.txt
 test -f "$ENIGMA_DEMO_MEMORY_FILE"
 enigma init --bundle ./.enigma/bundle.json
 enigma remember --bundle ./.enigma/bundle.json --text-file "$ENIGMA_DEMO_MEMORY_FILE" --purpose verification

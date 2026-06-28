@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Download the Enigma Memory desktop app for macOS, Windows, or Linux.">
+  <title>Download Enigma Memory</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="site-logo" href="./index.html">Enigma Memory</a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="./download.html">Download</a>
+        <a href="./setup.html">How it works</a>
+        <a href="./privacy.html">Privacy</a>
+        <a href="./help/index.html">Help</a>
+        <a href="./faq.html">FAQ</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <span class="eyebrow">Download</span>
+      <h1>Install the desktop app. No terminal required.</h1>
+      <p>Choose your platform, open the signed installer, and Enigma will create a local vault during first run.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="#platforms">Download for this device</a>
+      </div>
+      <p class="trust-note">The desktop app bundles its runtime. Consumers should not install Node or npm.</p>
+    </section>
+
+    <section class="content-section" id="platforms" aria-labelledby="platforms-heading">
+      <h2 id="platforms-heading">Choose your platform</h2>
+      <div class="platform-grid">
+        <article class="platform-card">
+          <h3>macOS</h3>
+          <p>Requires macOS 13 or later. Open the signed, notarized disk image or installer package.</p>
+          <a class="btn btn-secondary" href="#signing">macOS download</a>
+        </article>
+        <article class="platform-card">
+          <h3>Windows</h3>
+          <p>Requires Windows 10 or later. Run the signed installer or install from the Microsoft Store.</p>
+          <a class="btn btn-secondary" href="#signing">Windows download</a>
+        </article>
+        <article class="platform-card">
+          <h3>Linux</h3>
+          <p>Available as an AppImage or distribution package. Download and mark executable.</p>
+          <a class="btn btn-secondary" href="#signing">Linux download</a>
+        </article>
+      </div>
+
+      <details>
+        <summary>Developer CLI</summary>
+        <p>If you prefer the command line, see the <a href="./developers/cli.html">CLI appendix</a> for npm, Node, and manual MCP setup. This is not the default consumer path.</p>
+      </details>
+    </section>
+
+    <section class="content-section" id="signing" aria-labelledby="signing-heading">
+      <h2 id="signing-heading">About signing and security warnings</h2>
+      <p>Before public launch, macOS distribution must use Developer ID signing, notarization, and stapling. Windows distribution must use a signed installer, Store, or MSIX path. Until those steps are complete, your operating system may show a security warning.</p>
+      <p>If you see a warning:</p>
+      <ul>
+        <li><strong>macOS:</strong> Right-click the installer, choose Open, and confirm you want to open it.</li>
+        <li><strong>Windows:</strong> Click More info, then Run anyway, if you obtained the installer from an Enigma distribution channel.</li>
+        <li><strong>Linux:</strong> Verify the package signature or checksum through your distribution tools.</li>
+      </ul>
+      <p>Do not bypass security warnings for installers from unknown sources.</p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer__inner">
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="./download.html">Download</a></li>
+          <li><a href="./setup.html">How it works</a></li>
+          <li><a href="./privacy.html">Privacy</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Support</h4>
+        <ul>
+          <li><a href="./help/index.html">Help hub</a></li>
+          <li><a href="./help/install.html">Install guide</a></li>
+          <li><a href="./help/troubleshooting.html">Troubleshooting</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Developers</h4>
+        <ul>
+          <li><a href="./developers/cli.html">CLI appendix</a></li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,26 @@
+[package]
+name = "enigma-desktop-tauri"
+version = "0.1.18"
+description = "Enigma Memory consumer desktop app"
+authors = ["Enigma Protocol"]
+license = "Apache-2.0"
+edition = "2021"
+rust-version = "1.75"
+
+[lib]
+name = "enigma_desktop_tauri_lib"
+crate-type = ["rlib"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+thiserror = "1.0"
+
+[dev-dependencies]
+tempfile = "3.9"
+
+[profile.release]
+strip = true
+lto = true
+opt-level = "s"
