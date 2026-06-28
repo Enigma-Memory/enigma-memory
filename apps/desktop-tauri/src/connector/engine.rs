@@ -1704,14 +1704,15 @@ mod tests {
         let s = serde_json::to_string(&manifest).unwrap();
         assert!(s.contains("enigma-memory"));
         assert!(s.contains("1.2.3"));
-        assert_eq!(manifest["server"]["type"].as_str(), Some("binary"));
+        assert_eq!(manifest["server"]["type"].as_str(), Some("node"));
         assert_eq!(
             manifest["server"]["entry_point"].as_str(),
-            Some("server/enigma-mcp")
+            Some("packages/mcp-server/bin/enigma-mcp.mjs")
         );
+        assert_eq!(manifest["server"]["mcp_config"]["command"].as_str(), Some("node"));
         assert_eq!(
-            manifest["server"]["mcp_config"]["command"].as_str(),
-            Some("server/enigma-mcp")
+            manifest["server"]["mcp_config"]["args"][0].as_str(),
+            Some("packages/mcp-server/bin/enigma-mcp.mjs")
         );
         assert_eq!(
             manifest["server"]["mcp_config"]["env"]["ENIGMA_BUNDLE"].as_str(),

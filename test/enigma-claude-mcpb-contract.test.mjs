@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtemp, readFile, stat } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 import {
   createClaudeDesktopMcpbConnectionPlan,
@@ -7,6 +10,7 @@ import {
   createClaudeDesktopMcpbManifest,
   planConnectWizard,
 } from '../packages/connectors/src/index.js';
+import { buildClaudeMcpbPackage } from '../scripts/build-claude-mcpb-package.mjs';
 
 const PRIVATE_STRINGS = [
   'C:\\Users\\Casey',
@@ -43,12 +47,11 @@ test('Claude Desktop mcpb manifest is public-safe command metadata only', () => 
   assert.equal(manifest.name, 'enigma-memory');
   assert.equal(manifest.display_name, 'Enigma Memory');
   assert.equal(manifest.version, '1.2.3');
-  assert.equal(manifest.server.type, 'binary');
-  assert.equal(manifest.server.entry_point, 'server/enigma-mcp');
-  assert.equal(manifest.server.mcp_config.command, 'server/enigma-mcp');
-  assert.deepEqual(manifest.server.mcp_config.args, []);
+  assert.equal(manifest.server.type, 'node');
+  assert.equal(manifest.server.entry_point, 'packages/mcp-server/bin/enigma-mcp.mjs');
+  assert.equal(manifest.server.mcp_config.command, 'node');
+  assert.deepEqual(manifest.server.mcp_config.args, ['packages/mcp-server/bin/enigma-mcp.mjs']);
   assert.equal(manifest.server.mcp_config.env.ENIGMA_BUNDLE, '${user_config.enigma_bundle}');
-  assert.equal(manifest.server.mcp_config.platform_overrides.win32.command, 'server/enigma-mcp.exe');
   assert.equal(manifest.user_config.enigma_bundle.type, 'file');
   assert.equal(manifest.user_config.enigma_bundle.required, true);
   assert.deepEqual(manifest.environment_names, ['ENIGMA_BUNDLE']);
@@ -150,4 +153,34 @@ test('Claude Desktop mcpb health fails closed until test evidence exists', () =>
   assert.equal(advanced.status, 'advanced_fallback');
   assert.equal(advanced.connected, false);
   assert.equal(advanced.primary_action.id, 'use_advanced_config_fallback');
+});
+
+test('Claude Desktop mcpb package builder writes deterministic public-safe artifact', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-claude-mcpb-'));
+  const mcpbPath = join(dir, 'enigma-memory.mcpb');
+  const outPath = join(dir, 'report.json');
+
+  const report = await buildClaudeMcpbPackage({ version: '1.2.3', mcpb: mcpbPath, out: outPath });
+  const mcpbStat = await stat(mcpbPath);
+  const written = JSON.parse(await readFile(outPath, 'utf8'));
+
+  assert.equal(report.schema, 'enigma.claude_desktop_mcpb_package.v1');
+  assert.equal(report.ok, true);
+  assert.equal(report.manifest.server_type, 'node');
+  assert.equal(report.manifest.entry_point, 'packages/mcp-server/bin/enigma-mcp.mjs');
+  assert.equal(report.package.mcpb_path, '<mcpb-output>');
+  assert.match(report.package.mcpb_sha256, /^sha256:[a-f0-9]{64}$/);
+  assert.ok(mcpbStat.size > 0);
+  assert.deepEqual(written.package.deterministic_order, report.package.deterministic_order);
+  assert.deepEqual(report.package.deterministic_order.slice(0, 3), [
+    'apps/verifier/bin/enigma-verify.mjs',
+    'manifest.json',
+    'packages/controller/src/index.js',
+  ]);
+  assert.ok(report.package.deterministic_order.includes('packages/mcp-server/bin/enigma-mcp.mjs'));
+  assert.equal(report.package.install_performed, false);
+  assert.equal(report.package.provider_launched, false);
+  assert.equal(report.package.network_performed, false);
+  assert.doesNotMatch(JSON.stringify(report), new RegExp(dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assertPublicSafe(report);
 });

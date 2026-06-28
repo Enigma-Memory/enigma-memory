@@ -701,18 +701,13 @@ export function createClaudeDesktopMcpbManifest(options = {}) {
     },
     description: 'Claude Desktop extension contract for the local Enigma Memory MCP bridge.',
     server: {
-      type: 'binary',
-      entry_point: 'server/enigma-mcp',
+      type: 'node',
+      entry_point: 'packages/mcp-server/bin/enigma-mcp.mjs',
       mcp_config: {
-        command: 'server/enigma-mcp',
-        args: [],
+        command: 'node',
+        args: ['packages/mcp-server/bin/enigma-mcp.mjs'],
         env: {
           ENIGMA_BUNDLE: '${user_config.enigma_bundle}',
-        },
-        platform_overrides: {
-          win32: {
-            command: 'server/enigma-mcp.exe',
-          },
         },
       },
     },
@@ -739,7 +734,7 @@ export function createClaudeDesktopMcpbManifest(options = {}) {
     spec_reference: {
       manifest_spec: 'modelcontextprotocol/mcpb MANIFEST.md',
       package_shape: 'zip_with_manifest_json',
-      server_type: 'binary',
+      server_type: 'node',
     },
     claim_boundary: claudeDesktopMcpbClaimBoundary(),
     public_safety: {

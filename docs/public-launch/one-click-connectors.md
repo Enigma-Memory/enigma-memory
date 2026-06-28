@@ -135,7 +135,9 @@ Best consumer path: Claude Desktop Extension (`.mcpb`) when feasible.
 
 #### Concrete `.mcpb` contract
 
-The Claude-first public helper is `createClaudeDesktopMcpbManifest()`. It emits only public MCPB `manifest.json` metadata aligned with manifest version `0.3`: `name`, `display_name`, `version`, description, `server.type`, `server.entry_point`, `server.mcp_config`, `user_config.enigma_bundle`, supported platforms, required runtime note, spec reference, and the Enigma claim boundary. It must not include raw config JSON, local absolute paths, credentials, tokens, provider responses, transcripts, memory contents, signing secrets, or customer identifiers.
+The Claude-first public helper is `createClaudeDesktopMcpbManifest()`. It emits only public MCPB `manifest.json` metadata aligned with manifest version `0.3`: `name`, `display_name`, `version`, description, `server.type: "node"`, `server.entry_point`, `server.mcp_config`, `user_config.enigma_bundle`, supported platforms, required runtime note, spec reference, and the Enigma claim boundary. It must not include raw config JSON, local absolute paths, credentials, tokens, provider responses, transcripts, memory contents, signing secrets, or customer identifiers.
+
+`npm run claude:mcpb:package -- --mcpb .enigma/claude/enigma-memory.mcpb --out .enigma/claude/enigma-memory-mcpb.json` builds the deterministic `.mcpb` artifact for review. The package contains `manifest.json` plus the local Enigma MCP node runtime source, writes no client config, performs no install, launches no provider app, performs no network call, and reports `<mcpb-output>` instead of a local path.
 
 `createClaudeDesktopMcpbConnectionPlan()` defines the desktop state order as `detect -> preview -> consent -> install_handoff -> restart -> test -> ready`. The default Claude path is an extension install handoff: Enigma does not write Claude config automatically for the `.mcpb` path. The bridge pairing contract is current-OS-user scoped and keeps pairing secrets, raw local service endpoints, and local paths out of the manifest and support exports. Manual JSON remains an advanced fallback only and requires explicit user selection plus the normal consent/backup rules.
 
@@ -144,7 +146,7 @@ The Claude-first public helper is `createClaudeDesktopMcpbManifest()`. It emits 
 #### Connect
 
 1. Detect Claude Desktop installation and supported extension capability.
-2. Prefer a signed Enigma `.mcpb` package that contains the Enigma MCP server metadata and uses the bundled Enigma runtime bridge.
+2. Prefer the Enigma `.mcpb` package when it is available from an approved release channel; the deterministic review package contains the MCPB manifest and local Enigma MCP node runtime source, while release signing/distribution approval remains a separate blocker.
 3. Show preview: "Install Enigma Memory extension for Claude Desktop" with no raw config path.
 4. User clicks Connect.
 5. If `.mcpb` flow is available, launch/import the extension package and guide the user through Claude's extension install confirmation.
