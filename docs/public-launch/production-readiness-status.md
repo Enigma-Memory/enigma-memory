@@ -20,10 +20,10 @@
 - Tauri commands wired to bundled Enigma engine sidecar via `ServiceHandle`: spawns engine process, captures stdout/stderr, bounded restart on crash, clean shutdown.
 - Health dashboard normalizes CLI health into consumer states, avoids duplicate vault creation, and requires service-running plus healthy Memory Drive before showing offline-ready.
 - Memory Controller dashboard cards show consent/review/private-bubble states without approving recall on review alone.
-- Import Sandbox supports local text/Markdown paste, preview counts and duplicate groups, explicit approve, local vault write, and batch receipt; raw text is not printed in the UI result.
-- Proof Activity summary shows local receipt counts, Memory Drive roots, verifier status, and claim boundaries without raw memory, prompts, transcripts, provider responses, or paths.
+- Import Sandbox supports local text/Markdown paste, preview counts and duplicate groups, explicit approve, local vault write, batch receipt, and latest-import rollback; raw text and raw report paths are not printed in the UI result.
+- Proof Activity summary shows local receipt counts, Memory Drive roots, verifier status, claim boundaries, and explicit public-safe export without raw memory, prompts, transcripts, provider responses, or paths.
 - Diagnostics preview/export with forbidden-field rejection and user approval.
-- Support summary surfaces exist through CLI, MCP, and the desktop dashboard; the support dry-run script can ingest only redacted `enigma.support_summary.v1` / `enigma.diagnostics.v1` artifacts as allowlisted hash snapshots.
+- Support summary surfaces exist through CLI, MCP, and the desktop dashboard with explicit public-safe export; the support dry-run script can ingest only redacted `enigma.support_summary.v1` / `enigma.diagnostics.v1` artifacts as allowlisted hash snapshots.
 - Update-check card fetches signed manifest metadata and shows current/available versions without auto-download.
 - Opt-in crash reporting: panic hook writes redacted report to disk; user controls whether pending reports are uploaded. No memory, wallet, or path data is included.
 - Release evidence generator (`scripts/release-evidence-desktop.mjs`) dry-run tested.
@@ -38,6 +38,7 @@
 - Per-client modules: Claude Desktop (`.mcpb` manifest + config fallback), Cursor, Kimi Code, VS Code/Cline, Roo, OpenCode, Generic MCP.
 - Claude `.mcpb` manifest helper aligns with MCPB manifest `0.3` fields (`server.type: "node"`, `server.entry_point`, `server.mcp_config`, `user_config`) and remains public-safe.
 - Deterministic Claude `.mcpb` package builder (`npm run claude:mcpb:package`) creates a reviewable package with `manifest.json` and local Enigma MCP node runtime source; it performs no install, provider launch, network call, or config write.
+- Claude `.mcpb` packages include a minimal root `package.json` with `type: "module"` for Node ESM scope; they do not copy repo scripts, dependency lists, local paths, secrets, provider responses, or memory content.
 - Backup, rollback, repair, disconnect, and local test flows with JSON-preserving config writes.
 - Desktop connector cards expose a local "Test connection" action that checks config parse, Enigma entry correctness, bundle reachability, and restart guidance without launching provider apps.
 
@@ -45,6 +46,7 @@
 - Desktop-first `README.md`.
 - Updated `docs/install-anywhere.md`.
 - Static `website/` pages: home, download, setup, help hub, install/connect/troubleshooting guides, privacy, proofs, FAQ, and developer CLI appendix. Home/download pages now present a consumer setup path, local trust boundary, Import Sandbox, Proof Activity, and unsigned-build caveat without claiming signed public release.
+- CLI-first fallback is still supported for power users: `enigma doctor --plain` gives a one-screen, path-redacted next action instead of JSON.
 
 ---
 
@@ -65,11 +67,11 @@
 
 - `npm run check` at repo root: **pass**.
 - `npm run secret-scan` at repo root: **pass**.
-- `npm test` at repo root: **609/609 pass**.
+- `npm test` at repo root: **610/610 pass**.
 - `npm pack --dry-run` at repo root: **pass** (`enigma-memory-0.1.18.tgz` dry-run output).
 - `npm run public-beta-qa` at repo root: **hold**, `21 blocked / 0 missing`, required public beta version `0.1.19`.
-- `cargo test` in `apps/desktop-tauri/`: **22/22 pass**.
-- PR #60 latest checks after commit `dbb78e8`: Anchor Build and Test **pass**, Package gates Ubuntu **pass**, Package gates Windows **pass**.
+- `cargo test` in `apps/desktop-tauri/`: **23/23 pass**.
+- PR #60 latest checks after commit `fd18d8d`: Anchor Build and Test **pass**, Package gates Ubuntu **pass**, Package gates Windows **pass**.
 
 ---
 
