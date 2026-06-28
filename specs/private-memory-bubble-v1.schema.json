@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.enigma.ai/scoped-memory-bubble-v1.schema.json",
-  "title": "Enigma Scoped Memory Bubble v1",
+  "$id": "https://schemas.enigma.ai/private-memory-bubble-v1.schema.json",
+  "title": "Enigma Private Memory Bubble v1",
   "type": "object",
   "required": [
     "schema",
