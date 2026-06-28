@@ -38,6 +38,8 @@ The automated matrix is a hold/block reporter, not a public readiness substitute
 
 When a blocker can be narrowed to one public-safe next artifact, the runner may emit `missing_evidence_items` without changing the blocker status. The current concrete item is `EV-P10-SUPPORT-DRY-RUN-SUMMARY` on `BLOCKER-SUPPORT-DRY-RUN`: record scenario ID, issue code, triage result, bundle privacy-check status, and support owner ref for a support dry run. Build the reviewable summary with `npm run production:support-dry-run -- --scenario-id BETA-DIAG-001 --issue-code DIAG-BUNDLE-PREVIEWED --triage-result needs_user_action --bundle-privacy-check-status pass --support-owner-ref ref:role:beta-support --out .enigma/support-dry-run-summary.json`. That summary is evidence to review, not a pass condition by itself; clean-machine, signing, release, and approval gates stay blocked until their observed public-safe evidence is present.
 
+The matrix also emits `next_actions`: a ranked, public-safe release-owner queue that maps active blockers to owner refs, scenario IDs, evidence refs, and missing evidence items. This is a triage aid only; an action remains blocked until the referenced public-safe evidence is actually collected.
+
 | Scenario | Windows beta | macOS beta | GA pass bar |
 | --- | --- | --- | --- |
 | Fresh install launches | Installer completes, app opens, trust prompts are understandable, no terminal required. | Installer completes, app opens, Gatekeeper/notarization path is acceptable for channel. | Passes on current and one previous supported OS release per platform. |

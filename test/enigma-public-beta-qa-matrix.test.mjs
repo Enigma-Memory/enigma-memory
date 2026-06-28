@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { buildPublicBetaQaMatrix, buildScenarioRows } from '../scripts/run-public-beta-qa-matrix.mjs';
+import { buildPublicBetaQaMatrix, buildRankedNextActions, buildScenarioRows } from '../scripts/run-public-beta-qa-matrix.mjs';
 
 const GENERATED_AT = '2026-06-28T00:00:00.000Z';
 
@@ -155,6 +155,11 @@ test('public beta QA matrix emits the expected public schema and scenario covera
   assert.ok(matrix.summary && typeof matrix.summary === 'object', 'matrix.summary missing');
   assert.ok(Array.isArray(matrix.blockers), 'matrix.blockers must be an array');
 
+  assert.ok(Array.isArray(matrix.next_actions), 'matrix.next_actions must be an array');
+  assert.equal(matrix.next_actions[0].action_id, 'approve_merge_release_pr');
+  assert.equal(matrix.next_actions[0].blocker_id, 'BLOCKER-PR-APPROVAL-MERGE-REVIEWER-APPROVAL');
+  assert.equal(matrix.next_actions[0].priority, 1);
+  assert.equal(matrix.next_actions.every((action, index) => action.priority === index + 1), true);
   for (const id of REQUIRED_SCENARIO_IDS) assert.ok(ids.has(id), `missing required public beta QA scenario ${id}`);
   for (const scenario of scenarios) {
     assert.equal(typeof scenarioId(scenario), 'string', 'scenario id must be a string');
@@ -173,6 +178,8 @@ test('public beta QA matrix summary counts match scenario statuses and hold the 
   assert.equal(matrix.advisor_decision, 'hold');
   assert.ok(statusCounts.blocked + statusCounts.missing + statusCounts.pending + statusCounts.fail > 0, 'matrix must not overclaim public beta readiness');
   assert.ok(matrix.blockers.length > 0, 'hold decision must name blockers');
+  assert.ok(matrix.next_actions.length > 0, 'hold decision must include ranked next actions');
+  assert.equal(matrix.next_actions.every((action) => matrix.blockers.some((blocker) => blocker.blocker_id === action.blocker_id)), true);
 });
 
 test('public beta QA matrix reports external production blockers without requiring real installers or network', async () => {
@@ -216,6 +223,16 @@ test('support dry-run blocker names the concrete public-safe evidence summary st
   ]);
   assert.equal(matrix.advisor_decision, 'hold');
   assert.equal(matrix.summary.ready_for_public_beta, false);
+});
+
+test('public beta next actions are ranked and public-safe', async () => {
+  const matrix = await loadMatrix();
+  assertPublicSafe(matrix.next_actions);
+  const direct = buildRankedNextActions(matrix.blockers);
+  assert.deepEqual(direct, matrix.next_actions);
+  assert.equal(matrix.next_actions.some((action) => action.action_id === 'record_support_dry_run'), true);
+  const supportAction = matrix.next_actions.find((action) => action.action_id === 'record_support_dry_run');
+  assert.equal(supportAction.missing_evidence_items[0].evidence_item_id, 'EV-P10-SUPPORT-DRY-RUN-SUMMARY');
 });
 
 test('config recovery scenarios are blocked once command and UI recovery surfaces exist', () => {

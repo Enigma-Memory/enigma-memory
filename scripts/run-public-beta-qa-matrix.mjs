@@ -117,8 +117,86 @@ const BLOCKERS = Object.freeze({
   },
 });
 
+const NEXT_ACTION_ORDER = Object.freeze([
+  {
+    action_id: 'approve_merge_release_pr',
+    blocker_id: 'BLOCKER-PR-APPROVAL-MERGE-REVIEWER-APPROVAL',
+    summary: 'Get release PR approval, reviewer approval, and merge evidence before publishing or announcing beta.',
+    owner_ref: 'ref:role:release-owner',
+  },
+  {
+    action_id: 'approve_public_safe_release_packet',
+    blocker_id: 'BLOCKER-PUBLIC-SAFE-RELEASE-PACKET',
+    summary: 'Approve the public-safe release packet after claim-boundary review.',
+    owner_ref: 'ref:role:release-owner',
+  },
+  {
+    action_id: 'publish_npm_0_1_19',
+    blocker_id: 'BLOCKER-NPM-0.1.19-PUBLISH',
+    summary: 'Publish enigma-memory 0.1.19 through the trusted npm workflow after the release PR is merged.',
+    owner_ref: 'ref:role:release-owner',
+  },
+  {
+    action_id: 'complete_signing_identities',
+    blocker_id: 'BLOCKER-APPLE-MICROSOFT-SIGNING-IDENTITIES',
+    summary: 'Finish Apple/Microsoft signing identity setup and signing secret custody evidence.',
+    owner_ref: 'ref:role:release-engineer',
+  },
+  {
+    action_id: 'produce_signed_desktop_artifacts',
+    blocker_id: 'BLOCKER-WINDOWS-SIGNED-ARTIFACT',
+    summary: 'Produce signed Windows desktop artifact evidence.',
+    owner_ref: 'ref:role:release-engineer',
+  },
+  {
+    action_id: 'produce_notarized_macos_artifacts',
+    blocker_id: 'BLOCKER-MACOS-NOTARIZED-ARTIFACT',
+    summary: 'Produce signed, notarized, and stapled macOS artifact evidence.',
+    owner_ref: 'ref:role:release-engineer',
+  },
+  {
+    action_id: 'rehearse_update_rollback',
+    blocker_id: 'BLOCKER-UPDATE-ROLLBACK-REHEARSAL',
+    summary: 'Run signed update verification and rollback rehearsal evidence.',
+    owner_ref: 'ref:role:release-engineer',
+  },
+  {
+    action_id: 'run_clean_machine_qa',
+    blocker_id: 'BLOCKER-CLEAN-MACHINE-QA',
+    summary: 'Run clean-machine Windows/macOS install, first-run, connector, proof, offline, update, diagnostics, and uninstall QA.',
+    owner_ref: 'ref:role:qa-owner',
+  },
+  {
+    action_id: 'record_support_dry_run',
+    blocker_id: 'BLOCKER-SUPPORT-DRY-RUN',
+    summary: 'Record the public-safe support dry-run summary evidence item.',
+    owner_ref: 'ref:role:beta-support',
+  },
+]);
+
+export function buildRankedNextActions(blockers) {
+  const byId = new Map(blockers.map((blocker) => [blocker.blocker_id, blocker]));
+  return NEXT_ACTION_ORDER
+    .map((action, index) => {
+      const blocker = byId.get(action.blocker_id);
+      if (!blocker) return null;
+      return {
+        priority: index + 1,
+        action_id: action.action_id,
+        blocker_id: action.blocker_id,
+        status: blocker.status,
+        summary: action.summary,
+        owner_ref: action.owner_ref,
+        scenario_ids: blocker.scenario_ids,
+        evidence_refs: blocker.evidence_refs,
+        missing_evidence_items: blocker.missing_evidence_items ?? [],
+      };
+    })
+    .filter(Boolean);
+}
+
 function usage() {
-  return `Usage: node scripts/run-public-beta-qa-matrix.mjs [--json] [--out <path>]\n\nGenerates a public-safe ${PUBLIC_BETA_QA_MATRIX_SCHEMA} report from repository files only.\n`;
+  return `Usage: node scripts/run-public-beta-qa-matrix.mjs [--json] [--out <path>]\n\nGenerates a public-safe ${PUBLIC_BETA_QA_MATRIX_SCHEMA} report from repository files only, including ranked next_actions for release owners.\n`;
 }
 
 function readArg(argv, index, flag) {
@@ -581,6 +659,7 @@ export async function buildPublicBetaQaMatrix(options = {}) {
   const scenarios = buildScenarioRows(inputs);
   const counts = statusCounts(scenarios);
   const blockers = collectBlockers(scenarios);
+  const nextActions = buildRankedNextActions(blockers);
   const readyForPublicBeta = scenarios.every((row) => row.status === 'pass');
   const ledgerSummary = summarizePublicLaunchEvidence(scenarios.map((row) => ledgerEntry(row, generatedAt)));
   const report = {
@@ -597,6 +676,7 @@ export async function buildPublicBetaQaMatrix(options = {}) {
       ledger_status_counts: ledgerSummary.status_counts,
     },
     blockers,
+    next_actions: nextActions,
     scenarios,
   };
   publicSafeAssert(report);
