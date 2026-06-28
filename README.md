@@ -2,20 +2,20 @@
 
 A local-first Memory Drive for the AI apps you already use.
 
-For most people, start with the signed Enigma Memory desktop app. It creates your local vault, connects supported assistants, and shows health/fix-it guidance without requiring Node, npm, terminal commands, or JSON editing.
+For most people, start with the Enigma Memory desktop app. The public launch target is a signed desktop installer with in-app setup; until Windows signing and macOS notarization are complete, use unsigned builds only for testing or wait for the signed release.
 
-- [Download the desktop app](#download-the-desktop-app)
-- [Read privacy and proof boundaries](#privacy-and-proof-boundaries)
+- [Download status](#download-the-desktop-app)
+- [Check public launch status](website/launch-status.html)
 - [Understand Memory Controller decisions](docs/memory-controller.md)
 
 ## Download the desktop app
 
 1. Go to the [download page](website/download.html) or the Enigma Memory website.
-2. Choose your platform: macOS, Windows, or Linux.
-3. Open the signed installer and follow the first-run setup flow.
+2. Check the current platform status. Signed Windows and macOS installers are the consumer target; unsigned development builds are testing-only until signing evidence is complete.
+3. When a signed installer is available for your platform, open it and follow the first-run setup flow.
 4. Enigma creates a local vault, detects installed AI clients, and previews connection changes before applying them.
 
-The desktop app bundles its runtime. Consumers should not install Node or npm for the default path.
+The desktop app bundles its runtime. Consumers should not install Node or npm for the default path; command-line setup is advanced developer/troubleshooting material.
 
 The desktop app uses the [Memory Controller](docs/memory-controller.md) to show Memory Weather, app permissions, recall approval, and `safe to share` / `not shared` decisions before Enigma offers context to a connected app.
 Consent grant scopes are canonicalized before verification, so the same app, purpose, operation set, and memory-zone set behave the same regardless of list order without widening what the app may access.
@@ -56,6 +56,7 @@ enigma status --bundle "$HOME/.enigma/bundle.json"
 ```
 `enigma next --plain` is the simplest first command: it prints one human-readable next step without requiring an existing bundle. `enigma status` includes `first_run_status`: one public-safe setup state, one primary action, and lanes for Memory Drive, Import Sandbox, memory inventory, proof activity, and diagnostics.
 If `doctor` is red on a fresh install, read `setup_status.state`: `setup_needed` means run the included `setup_status.next_command`; `attention_needed` means a real local install/config issue remains.
+For support, use `enigma support summary --bundle "$HOME/.enigma/bundle.json"` and share only that redacted JSON unless support explicitly asks for a private local artifact.
 
 Optional instant-value import preview:
 

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { access, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { main } from '../apps/cli/bin/enigma.mjs';
@@ -428,6 +428,48 @@ test('doctor reports first-run diagnostics without echoing local paths', async (
     } else {
       process.env.npm_config_user_agent = previousUserAgent;
     }
+  }
+});
+
+test('support summary is public-safe on fresh install and initialized bundles', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-support-summary-'));
+  const bundlePath = join(dir, 'bundle.json');
+  const configPath = join(dir, 'client-config.json');
+  const outPath = join(dir, 'support-summary.json');
+  try {
+    const freshIo = makeIo();
+    assert.equal(await main(['support', 'summary', '--bundle', bundlePath, '--client', 'generic-mcp', '--config', configPath, '--now', '2026-06-28T14:40:00.000Z'], freshIo.io), 0, freshIo.stderr());
+    const freshStdout = freshIo.stdout();
+    const fresh = freshIo.json();
+
+    assert.equal(fresh.schema, 'enigma.support_summary.v1');
+    assert.equal(fresh.setup_status.state, 'setup_needed');
+    assert.equal(fresh.next_action.id, 'run_setup');
+    assert.equal(fresh.bundle, '<bundle-path>');
+    assert.equal(fresh.redaction.raw_memory_included, false);
+    assert.equal(fresh.redaction.local_paths_redacted, true);
+    assert.equal(fresh.claim_boundaries.provider_deletion_proof, false);
+    assert.equal(freshStdout.includes(dir), false);
+
+    const setupIo = makeIo();
+    assert.equal(await main(['quickstart', '--bundle', bundlePath, '--overwrite'], setupIo.io), 0, setupIo.stderr());
+
+    const readyIo = makeIo();
+    assert.equal(await main(['support', 'summary', '--bundle', bundlePath, '--client', 'generic-mcp', '--config', configPath, '--out', outPath, '--now', '2026-06-28T14:41:00.000Z'], readyIo.io), 0, readyIo.stderr());
+    const readyStdout = readyIo.stdout();
+    const ready = readyIo.json();
+    const written = JSON.parse(await readFile(outPath, 'utf8'));
+
+    assert.deepEqual(written, ready);
+    assert.equal(ready.schema, 'enigma.support_summary.v1');
+    assert.equal(ready.first_run_status.schema, 'enigma.first_run_status.v1');
+    assert.equal(ready.first_run_status.claim_boundaries.raw_memory_returned, false);
+    assert.equal(ready.diagnostics.bundle_initialized_ok, true);
+    assert.equal(JSON.stringify(ready).includes('Enigma quickstart demo memory'), false);
+    assert.equal(readyStdout.includes(dir), false);
+    assert.equal(JSON.stringify(ready).includes(dir), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
 });
 

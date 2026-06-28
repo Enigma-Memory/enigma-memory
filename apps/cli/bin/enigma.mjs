@@ -2561,6 +2561,114 @@ export async function doctorCommand(flags, io) {
   return ok ? 0 : 1;
 }
 
+export async function supportSummaryCommand(flags, io) {
+  const packageJson = await readPackageJson();
+  const requiredNodeMajor = minimumNodeMajor(packageJson.engines?.node);
+  const currentNodeMajor = nodeMajor(process.versions.node);
+  const binMap = packageJson.bin && typeof packageJson.bin === 'object' && !Array.isArray(packageJson.bin) ? packageJson.bin : {};
+  const binEntries = await Promise.all(REQUIRED_PACKAGE_BINS.map(async (name) => {
+    const target = binMap[name];
+    const declared = typeof target === 'string' && target.length > 0;
+    return { name, declared, exists: declared ? await fileExists(packageFileUrl(target)) : false };
+  }));
+  const bundleInput = pathFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE);
+  const resolvedBundlePath = resolve(bundleInput);
+  const publicBundlePath = publicPathDisplay(bundleInput, 'bundle-path');
+  const vaultPath = await writableVaultPathCheck(resolvedBundlePath, publicBundlePath);
+  const selectedClient = getFlag(flags, ['client']);
+  const doctorClient = String(selectedClient && selectedClient !== true ? selectedClient : 'generic-mcp');
+  const connectorDoctor = await doctorConnectors({
+    ...connectorOptions(flags),
+    clientId: selectedClient && selectedClient !== true ? String(selectedClient) : undefined,
+    redactPaths: true,
+  });
+  const profile = getClientProfile(doctorClient, connectorOptions(flags));
+  const bundleInitialized = await bundleInitializedCheck(resolvedBundlePath, vaultPath);
+  const checks = {
+    node: {
+      ok: requiredNodeMajor === 0 || currentNodeMajor >= requiredNodeMajor,
+      current_major: currentNodeMajor,
+      required: packageJson.engines?.node ?? null,
+    },
+    npm: npmUserAgentCheck(),
+    package_bins: {
+      ok: binEntries.every((entry) => entry.declared && entry.exists),
+      required: REQUIRED_PACKAGE_BINS,
+      entries: binEntries,
+      missing: binEntries.filter((entry) => !entry.declared).map((entry) => entry.name),
+      missing_targets: binEntries.filter((entry) => entry.declared && !entry.exists).map((entry) => entry.name),
+    },
+    vault_path: vaultPath,
+    bundle_initialized: bundleInitialized,
+    mcp_command_name: {
+      ok: profile.command === 'enigma-mcp',
+      command: profile.command,
+      expected: 'enigma-mcp',
+    },
+    connectors: connectorDoctor,
+  };
+  const firstRunHint = doctorFirstRunHint(checks.vault_path.path, doctorClient);
+  const setupStatus = doctorSetupStatus(checks, firstRunHint);
+  let firstRunStatus = null;
+  if (bundleInitialized.ok === true) {
+    try {
+      const { stored, vault, passport } = await loadState(resolvedBundlePath, { passphrase: getFlag(flags, ['passphrase']) });
+      firstRunStatus = passportStatusReport({ bundlePath: resolvedBundlePath, stored, vault, passport }).first_run_status;
+    } catch {
+      firstRunStatus = null;
+    }
+  }
+  const connectorSummary = connectorReadinessSummary(connectorDoctor);
+  const issueCodes = [
+    ...setupStatus.reasons,
+    ...((connectorDoctor.clients ?? []).flatMap((client) => Array.isArray(client.repair_reasons) ? client.repair_reasons.map((reason) => `connector_${reason}`) : [])),
+  ];
+  const generatedAt = getFlag(flags, ['now']);
+  const summary = {
+    ok: setupStatus.state === 'ready',
+    schema: 'enigma.support_summary.v1',
+    generated_at: generatedAt && generatedAt !== true ? String(generatedAt) : new Date().toISOString(),
+    support_code: `ref:support-summary:${sha256Json({ setup_state: setupStatus.state, issueCodes, bundle: '<bundle-path>' }).slice('sha256:'.length, 'sha256:'.length + 32)}`,
+    package: {
+      name: packageJson.name,
+      version: packageJson.version,
+    },
+    bundle: publicBundlePath,
+    setup_status: setupStatus,
+    first_run_status: firstRunStatus,
+    diagnostics: {
+      node_ok: checks.node.ok,
+      npm_ok: checks.npm.ok,
+      package_bins_ok: checks.package_bins.ok,
+      bundle_initialized_ok: bundleInitialized.ok,
+      mcp_command_name_ok: checks.mcp_command_name.ok,
+      connector_summary: connectorSummary,
+    },
+    issue_codes: [...new Set(issueCodes.filter(Boolean))],
+    next_action: setupStatus.next_command
+      ? { id: 'run_setup', label: 'Run setup', command: setupStatus.next_command }
+      : firstRunStatus?.primary_action ?? { id: 'open_status', label: 'Open status', command: `enigma status --bundle ${commandPath('<bundle-path>')}` },
+    redaction: {
+      raw_memory_included: false,
+      prompts_included: false,
+      transcripts_included: false,
+      credentials_included: false,
+      local_paths_redacted: true,
+      provider_responses_included: false,
+    },
+    claim_boundaries: {
+      local_enigma_status_only: true,
+      provider_deletion_proof: false,
+      model_forgetting_proof: false,
+      hosted_saas_live: false,
+    },
+  };
+  const out = getFlag(flags, ['out']);
+  if (out && out !== true) await writeJson(resolve(String(out)), summary);
+  print(summary, io);
+  return 0;
+}
+
 export async function installCommand(flags, io) {
   const bundlePath = resolve(String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE)));
   const bundleState = await ensureBundle(bundlePath, flags);
@@ -3463,7 +3571,7 @@ export async function settlementReceiptCommand(flags, io) {
   if (flags.has('out')) {
     const outPath = resolve(String(requireFlag(flags, ['out'])));
     await writeJson(outPath, receipt);
-    print({ ok: true, path: outPath, settlement_receipt_id: receipt.settlement_receipt_id, settlement_receipt_hash: receipt.settlement_receipt_hash }, io);
+    print({ ok: true, path: outPath, receipt_ref: receipt.receipt_ref ?? receipt.receipt_id ?? receipt.settlement_ref ?? null }, io);
   } else {
     print(receipt, io);
   }
@@ -3571,7 +3679,7 @@ Common commands:
   init, setup, start, quickstart, test-drive First-run / demo paths
   remember, recall, update, delete         Memory operations
   search, context                          Retrieval / context packs
-  status, drive health, doctor             Health and diagnostics
+  status, drive health, doctor, support summary
   connect <client>, disconnect <client>    MCP client connectors
   export, import <source>, capsule ...     Migration and packaging
   verify                                   Verify an exported bundle
@@ -3746,7 +3854,6 @@ function usage() {
       '--dry-run': 'Plan the local test drive without writing artifacts.',
     },
     cross_model_demo_options: {
-      '--bundle <path>': `Reuse a local Enigma bundle. If omitted, ${DEFAULT_CROSS_MODEL_DEMO_BUNDLE} is recreated as a demo-only local vault.`,
       '--memory-file <path>': 'Seed the demo from a local file without echoing plaintext. Alias: --text-file.',
       '--out <path>': 'Write the same public-safe JSON report to a local file.',
       '--limit <n>': 'Maximum active memories per generated profile context pack. Defaults to 1 for the same-memory demo story.',
@@ -3854,7 +3961,7 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     }
     return 0;
   }
-  const twoPartCommands = ['boundary', 'mcp', 'mesh', 'enterprise', 'capsule', 'relay', 'gateway', 'connect', 'disconnect', 'import', 'native-host', 'meter', 'settlement', 'chain', 'demo', 'passport', 'drive', 'controller'];
+  const twoPartCommands = ['boundary', 'mcp', 'mesh', 'enterprise', 'capsule', 'relay', 'gateway', 'connect', 'disconnect', 'import', 'native-host', 'meter', 'settlement', 'chain', 'demo', 'passport', 'drive', 'controller', 'support'];
   const flags = parseArgs(twoPartCommands.includes(command) ? argv.slice(2) : argv.slice(1));
   const positionalFile = optionalPositional(argv[2]);
   if (command === 'help') {
@@ -3873,6 +3980,7 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     if (command === 'test-drive') return await testDriveCommand(flags, io);
     if (command === 'demo' && subcommand === 'cross-model') return await crossModelDemoCommand(flags, io);
     if (command === 'doctor') return await doctorCommand(flags, io);
+    if (command === 'support' && subcommand === 'summary') return await supportSummaryCommand(flags, io);
     if (command === 'install') return await installCommand(flags, io);
     if (command === 'connect') return await connectCommand(subcommand, flags, io);
     if (command === 'disconnect') return await disconnectCommand(subcommand, flags, io);

@@ -53,6 +53,7 @@ Run setup or quickstart before treating `enigma doctor` as a fully green install
 
 `enigma status` is the one-screen local setup view after a bundle exists. Read `first_run_status.primary_action` for the next consumer-safe step, and use the lanes to check Memory Drive, Import Sandbox, memory inventory, proof activity, and diagnostics without raw memory text.
 `enigma next --plain` is safe to run before or after setup. If no bundle exists, it prints a human-readable `run_quickstart` action instead of a stack trace; after setup, it mirrors `first_run_status`. Omit `--plain` when automation needs JSON.
+`enigma support summary --bundle ./.enigma/bundle.json` creates the redacted support artifact to share first when asking for help. It contains setup/diagnostic status and issue codes, not memory text, prompts, transcripts, credentials, provider responses, or local absolute paths.
 
 For the one-off npm path, run `npx --yes --package enigma-memory enigma quickstart --bundle ./.enigma/bundle.json --overwrite` before `npx --yes --package enigma-memory enigma doctor --bundle ./.enigma/bundle.json`. Running the npx doctor first can report a red generic-MCP connector if an existing client config names a not-yet-created bundle.
 
