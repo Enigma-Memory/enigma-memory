@@ -1510,7 +1510,7 @@ export async function quickstartCommand(flags, io) {
   ], overwrite);
   const artifacts = await buildQuickstartArtifacts(flags, { bundleInput, outDirInput, overwrite, write: true, checkExisting: false });
 
-  print({
+  const summary = {
     ok: artifacts.verifyReport.ok === true,
     bundle: displays.bundle,
     context_pack: displays.context_pack,
@@ -1533,7 +1533,8 @@ export async function quickstartCommand(flags, io) {
       roi_or_savings_guarantee: false,
       compliance_certification: false,
     },
-  }, io);
+  };
+  printQuickstartSummary(summary, flags, io);
   return artifacts.verifyReport.ok === true ? 0 : 1;
 }
 
@@ -2046,6 +2047,25 @@ function renderSetupPlain(summary) {
 
 function printSetupSummary(summary, flags, io) {
   if (nextPlainRequested(flags)) io.stdout.write(renderSetupPlain(summary));
+  else print(summary, io);
+}
+
+function renderQuickstartPlain(summary) {
+  const lines = [
+    'Enigma quickstart',
+    `Status: ${summary.ok ? 'Ready' : 'Needs attention'}`,
+    `Memory Drive: ${summary.bundle}`,
+    `Memories: ${summary.memory_count}`,
+    `Receipts: ${summary.receipt_count}`,
+  ];
+  const next = Array.isArray(summary.next_commands) ? summary.next_commands : [];
+  for (const command of next) lines.push(`Next: ${command}`);
+  lines.push('Boundary: local Enigma quickstart only; no raw memory, local paths, provider deletion, model behavior, hosted service, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printQuickstartSummary(summary, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderQuickstartPlain(summary));
   else print(summary, io);
 }
 
@@ -3913,6 +3933,7 @@ function usage() {
       '--memory-file <path>': 'Read local memory text from a file. Alias: --text-file.',
       '--memory-text <text>': 'Inline demo memory text for non-private demos only.',
       '--overwrite': 'Replace existing quickstart output files.',
+      '--plain': 'Print a human-readable quickstart summary with next commands instead of JSON. Alias: --text or --format text.',
     },
     test_drive_options: {
       '--out-dir <path>': `Isolated demo directory. Defaults to ${DEFAULT_TEST_DRIVE_DIR}.`,

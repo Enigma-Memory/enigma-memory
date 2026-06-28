@@ -589,3 +589,25 @@ test('setup plain output summarizes first run without JSON or local paths', asyn
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('quickstart plain output summarizes outputs without JSON or local paths', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-quickstart-plain-'));
+  const bundlePath = join(dir, 'bundle.json');
+  try {
+    const io = makeIo();
+    assert.equal(await main(['quickstart', '--bundle', bundlePath, '--out-dir', dir, '--overwrite', '--plain'], io.io), 0, io.stderr());
+    const stdout = io.stdout();
+
+    assert.match(stdout, /^Enigma quickstart\n/);
+    assert.match(stdout, /Status: Ready/);
+    assert.match(stdout, /Memory Drive: <bundle-path>/);
+    assert.match(stdout, /Receipts: \d+/);
+    assert.match(stdout, /Next: enigma verify --export <out-dir>\/export\.json/);
+    assert.match(stdout, /Boundary: local Enigma quickstart only/);
+    assert.doesNotMatch(stdout, /^\s*\{/);
+    assert.equal(stdout.includes(dir), false);
+    assert.equal(stdout.includes(bundlePath), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
