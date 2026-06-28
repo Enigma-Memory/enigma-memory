@@ -1999,6 +1999,75 @@ async function statusCommand(flags, io) {
   print(passportStatusReport({ bundlePath, stored, vault, passport }), io);
   return 0;
 }
+
+async function nextCommand(flags, io) {
+  const bundleInput = String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE));
+  const bundlePath = resolve(bundleInput);
+  const bundleDisplay = publicPathDisplay(bundleInput, 'bundle-path');
+  const vaultPath = await writableVaultPathCheck(bundlePath, bundleDisplay);
+  const claimBoundaries = {
+    local_enigma_status_only: true,
+    raw_memory_returned: false,
+    local_paths_redacted: true,
+    provider_deletion_proof: false,
+    model_forgetting_proof: false,
+    hosted_saas_live: false,
+  };
+  if (vaultPath.ok !== true) {
+    print({
+      ok: false,
+      schema: 'enigma.next_action.v1',
+      state: 'attention_needed',
+      bundle: bundleDisplay,
+      primary_action: {
+        id: 'choose_writable_bundle',
+        label: 'Choose writable Memory Drive path',
+        command: 'enigma quickstart --bundle <writable-bundle-path> --overwrite',
+      },
+      issue_codes: [vaultPath.reason || 'bundle_path_not_writable'],
+      vault_path: vaultPath,
+      claim_boundaries: claimBoundaries,
+    }, io);
+    return 0;
+  }
+  const bundleStatus = await bundleInitializedCheck(bundlePath, vaultPath);
+  if (bundleStatus.ok !== true) {
+    print({
+      ok: true,
+      schema: 'enigma.next_action.v1',
+      state: 'setup_needed',
+      bundle: bundleDisplay,
+      primary_action: {
+        id: 'run_quickstart',
+        label: 'Create Memory Drive',
+        command: `enigma quickstart --bundle "${bundleDisplay}" --overwrite`,
+      },
+      issue_codes: [bundleStatus.reason || 'bundle_missing'],
+      bundle_initialized: bundleStatus,
+      follow_up: {
+        id: 'run_status_after_setup',
+        label: 'Check setup status',
+        command: `enigma status --bundle "${bundleDisplay}"`,
+      },
+      claim_boundaries: claimBoundaries,
+    }, io);
+    return 0;
+  }
+  const { stored, vault, passport } = await loadState(bundlePath, { passphrase: getFlag(flags, ['passphrase']) });
+  const report = passportStatusReport({ bundlePath, stored, vault, passport });
+  print({
+    ok: true,
+    schema: 'enigma.next_action.v1',
+    state: report.first_run_status.state,
+    bundle: bundleDisplay,
+    primary_action: report.first_run_status.primary_action,
+    lanes: report.first_run_status.lanes,
+    status_ref: `enigma://status/${report.passport_ref.split('/').pop()}`,
+    status_command: `enigma status --bundle "${bundleDisplay}"`,
+    claim_boundaries: claimBoundaries,
+  }, io);
+  return 0;
+}
 async function readOptionalJsonInput(flags, names) {
   const path = getFlag(flags, names);
   if (!path) return null;
@@ -3488,6 +3557,7 @@ function usage() {
     usage: 'enigma <command> [options]',
     commands: [
       'init',
+      'next',
       'setup',
       'quickstart',
       'start',
@@ -3758,7 +3828,7 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     io.stdout.write(`${humanUsage()}\n`);
     return 0;
   }
-  if ((command === 'chain' && (!subcommand || subcommand === '--help' || subcommand === '-h' || flags.has('help'))) || ((flags.has('help') || argv.includes('-h')) && (command === 'init' || command === 'setup' || command === 'start' || command === 'quickstart' || command === 'test-drive' || command === 'search' || command === 'context' || command === 'status' || (command === 'passport' && subcommand === 'status') || ((command === 'relay' || command === 'gateway') && (subcommand === 'serve' || subcommand === 'demo')) || (command === 'native-host' && (subcommand === 'manifest' || subcommand === 'install-plan')) || (command === 'demo' && subcommand === 'cross-model') || (command === 'drive' && subcommand === 'health') || (command === 'controller' && (subcommand === 'grant' || subcommand === 'revoke'))))) {
+  if ((command === 'chain' && (!subcommand || subcommand === '--help' || subcommand === '-h' || flags.has('help'))) || ((flags.has('help') || argv.includes('-h')) && (command === 'init' || command === 'setup' || command === 'start' || command === 'next' || command === 'quickstart' || command === 'test-drive' || command === 'search' || command === 'context' || command === 'status' || (command === 'passport' && subcommand === 'status') || ((command === 'relay' || command === 'gateway') && (subcommand === 'serve' || subcommand === 'demo')) || (command === 'native-host' && (subcommand === 'manifest' || subcommand === 'install-plan')) || (command === 'demo' && subcommand === 'cross-model') || (command === 'drive' && subcommand === 'health') || (command === 'controller' && (subcommand === 'grant' || subcommand === 'revoke'))))) {
     print(usage(), io);
     return 0;
   }
@@ -3781,6 +3851,7 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     if (command === 'search') return await searchCommand(flags, io);
     if (command === 'controller' && subcommand === 'grant') return await controllerGrantCommand(flags, io);
     if (command === 'controller' && subcommand === 'revoke') return await controllerRevokeCommand(flags, io, positionalFile);
+    if (command === 'next') return await nextCommand(flags, io);
     if (command === 'status') return await statusCommand(flags, io);
     if (command === 'passport' && subcommand === 'status') return await statusCommand(flags, io);
     if (command === 'drive' && subcommand === 'health') return await driveHealthCommand(flags, io);

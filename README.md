@@ -48,6 +48,7 @@ Prerequisites:
 
 ```sh
 npm install -g enigma-memory
+enigma next --bundle "$HOME/.enigma/bundle.json"
 enigma setup --bundle "$HOME/.enigma/bundle.json" --client auto --connect-installed --overwrite
 enigma doctor --bundle "$HOME/.enigma/bundle.json"
 enigma drive health --bundle "$HOME/.enigma/bundle.json"

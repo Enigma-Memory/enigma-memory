@@ -137,6 +137,38 @@ test('status first-run summary points empty vaults to import sandbox', async () 
   },
 })));
 
+test('next gives setup action without requiring an existing bundle', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-next-missing-'));
+  try {
+    const missing = join(dir, 'missing-bundle.json');
+    const { code, json, stdout } = await runCli(['next', '--bundle', missing]);
+    assert.equal(code, 0);
+    assert.equal(json.schema, 'enigma.next_action.v1');
+    assert.equal(json.state, 'setup_needed');
+    assert.equal(json.primary_action.id, 'run_quickstart');
+    assert.equal(json.follow_up.id, 'run_status_after_setup');
+    assert.equal(stdout.includes(dir), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('next uses first-run status when the bundle exists', async () => withBundle(async (vault) => {
+  remember({ vault, text: 'next command private canary', now: '2026-06-25T00:00:04.000Z' });
+  return {
+    test: async (bundlePath) => {
+      const { code, json, stdout } = await runCli(['next', '--bundle', bundlePath]);
+      assert.equal(code, 0);
+      assert.equal(json.schema, 'enigma.next_action.v1');
+      assert.equal(json.state, 'ready_for_app_connection');
+      assert.equal(json.primary_action.id, 'connect_ai_app');
+      assert.equal(json.lanes.import_sandbox.status, 'ready');
+      assert.equal(stdout.includes('next command private canary'), false);
+      assert.equal(stdout.includes(bundlePath), false);
+    },
+  };
+}));
+
 test('search and status fail closed when the bundle is absent', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'enigma-search-status-missing-'));
   try {
