@@ -64,6 +64,7 @@ test('context --require-grant fails closed until matching controller grant is su
   const dir = await mkdtemp(join(tmpdir(), 'enigma-context-grant-cli-'));
   const bundle = join(dir, 'bundle.json');
   const grantFile = join(dir, 'grant.json');
+  const revokedGrantFile = join(dir, 'grant.revoked.json');
   try {
     const quickstart = makeIo();
     assert.equal(await main(['quickstart', '--bundle', bundle, '--overwrite'], quickstart.io), 0, quickstart.stderr());
@@ -122,6 +123,39 @@ test('context --require-grant fails closed until matching controller grant is su
     assert.deepEqual(allowedOutput.memory_controller.recall_veto.grant_refs, [grantOutput.grant_ref]);
     assert.equal(allowed.stdout().includes('Enigma quickstart demo memory'), false);
     assert.equal(allowed.stdout().includes(dir), false);
+
+    const revoked = makeIo();
+    assert.equal(await main(['controller', 'revoke', '--grant-file', grantFile, '--out', revokedGrantFile], revoked.io), 0, revoked.stderr());
+    const revokedOutput = revoked.json();
+    assert.equal(revokedOutput.schema, 'enigma.memory_controller_grant.v1');
+    assert.equal(revokedOutput.status, 'revoked');
+    assert.equal(revokedOutput.grant_ref, grantOutput.grant_ref);
+
+    const revokedContext = makeIo();
+    assert.equal(await main([
+      'context',
+      '--bundle',
+      bundle,
+      '--query',
+      'local proof bundle',
+      '--proof',
+      '--require-grant',
+      '--grant-file',
+      revokedGrantFile,
+      '--app-ref',
+      'ref:app:cli-test',
+      '--purpose-ref',
+      'ref:purpose:cli_context',
+      '--memory-zone-ref',
+      'ref:zone:default',
+    ], revokedContext.io), 0, revokedContext.stderr());
+    const revokedContextOutput = revokedContext.json();
+    assert.equal(revokedContextOutput.schema, 'enigma.context_pack_recall_blocked.v1');
+    assert.equal(revokedContextOutput.recall_veto.decision, 'deny');
+    assert.deepEqual(revokedContextOutput.recall_veto.grant_refs, [grantOutput.grant_ref]);
+    assert.ok(revokedContextOutput.recall_veto.reason_codes.includes('policy_denies_recall'));
+    assert.equal(revokedContext.stdout().includes('Enigma quickstart demo memory'), false);
+    assert.equal(revokedContext.stdout().includes(dir), false);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

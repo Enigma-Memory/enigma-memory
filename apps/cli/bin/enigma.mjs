@@ -3206,6 +3206,30 @@ export async function controllerGrantCommand(flags, io) {
   return 0;
 }
 
+export async function controllerRevokeCommand(flags, io, positionalFile) {
+  const grantPath = resolve(String(requireFileArg(flags, ['grant-file', 'grantFile', 'in'], positionalFile, 'grant-file')));
+  const source = await readJson(grantPath);
+  const proofRefs = parseList(getFlag(flags, ['proof-refs', 'proofRefs']));
+  const receiptRefs = parseList(getFlag(flags, ['receipt-refs', 'receiptRefs']));
+  const revoked = createConsentGrant({
+    app_ref: source.app_ref,
+    purpose_ref: source.purpose_ref,
+    operations: source.operations,
+    memory_zone_refs: source.memory_zone_refs,
+    issued_at: source.issued_at,
+    expires_at: source.expires_at,
+    status: 'revoked',
+    grant_ref: source.grant_ref,
+    policy_ref: getFlag(flags, ['policy-ref', 'policyRef'], source.policy_ref),
+    proof_refs: proofRefs.length === 0 ? source.proof_refs : proofRefs,
+    receipt_refs: receiptRefs.length === 0 ? source.receipt_refs : receiptRefs,
+  });
+  const out = getFlag(flags, ['out']);
+  if (out && out !== true) await writeJson(resolve(String(out)), revoked);
+  print(revoked, io);
+  return 0;
+}
+
 function humanUsage() {
   return `Enigma Memory CLI — local-first AI Memory Passport
 
@@ -3263,6 +3287,7 @@ function usage() {
       'context',
       'search',
       'controller grant',
+      'controller revoke',
       'status',
       'passport status',
       'export',
@@ -3326,12 +3351,14 @@ function usage() {
     },
     controller_options: {
       'controller grant': 'Create a public-safe Memory Controller consent grant for local context recall.',
+      'controller revoke': 'Mark an existing public-safe Memory Controller grant revoked without exposing memory.',
+      '--grant-file <path>': 'Grant JSON to revoke for controller revoke. Positional file is also accepted.',
       '--app-ref <ref>': 'Opaque connected-app ref. Defaults to ref:app:cli.',
       '--purpose-ref <ref>': 'Opaque purpose ref. Defaults to ref:purpose:cli_context.',
       '--operation <id>': 'Grant operation. Defaults to recall_context.',
       '--memory-zone-ref <ref>': 'Opaque memory zone ref. Defaults to ref:zone:default.',
       '--ttl-seconds <n>': 'Grant lifetime in seconds when --expires-at is omitted.',
-      '--out <path>': 'Write the grant JSON for later enigma context --require-grant --grant-file use.',
+      '--out <path>': 'Write grant JSON for later enigma context --require-grant --grant-file use.',
     },
     search_options: {
       '--query <text>': 'Required local query. Output redacts the query and memory plaintext by default. Alias: --q.',
@@ -3506,7 +3533,7 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     io.stdout.write(`${humanUsage()}\n`);
     return 0;
   }
-  if ((command === 'chain' && (!subcommand || subcommand === '--help' || subcommand === '-h' || flags.has('help'))) || ((flags.has('help') || argv.includes('-h')) && (command === 'init' || command === 'setup' || command === 'start' || command === 'quickstart' || command === 'test-drive' || command === 'search' || command === 'context' || command === 'status' || (command === 'passport' && subcommand === 'status') || ((command === 'relay' || command === 'gateway') && (subcommand === 'serve' || subcommand === 'demo')) || (command === 'native-host' && (subcommand === 'manifest' || subcommand === 'install-plan')) || (command === 'demo' && subcommand === 'cross-model') || (command === 'drive' && subcommand === 'health') || (command === 'controller' && subcommand === 'grant')))) {
+  if ((command === 'chain' && (!subcommand || subcommand === '--help' || subcommand === '-h' || flags.has('help'))) || ((flags.has('help') || argv.includes('-h')) && (command === 'init' || command === 'setup' || command === 'start' || command === 'quickstart' || command === 'test-drive' || command === 'search' || command === 'context' || command === 'status' || (command === 'passport' && subcommand === 'status') || ((command === 'relay' || command === 'gateway') && (subcommand === 'serve' || subcommand === 'demo')) || (command === 'native-host' && (subcommand === 'manifest' || subcommand === 'install-plan')) || (command === 'demo' && subcommand === 'cross-model') || (command === 'drive' && subcommand === 'health') || (command === 'controller' && (subcommand === 'grant' || subcommand === 'revoke'))))) {
     print(usage(), io);
     return 0;
   }
@@ -3528,6 +3555,7 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     if (command === 'context') return await contextCommand(flags, io);
     if (command === 'search') return await searchCommand(flags, io);
     if (command === 'controller' && subcommand === 'grant') return await controllerGrantCommand(flags, io);
+    if (command === 'controller' && subcommand === 'revoke') return await controllerRevokeCommand(flags, io, positionalFile);
     if (command === 'status') return await statusCommand(flags, io);
     if (command === 'passport' && subcommand === 'status') return await statusCommand(flags, io);
     if (command === 'drive' && subcommand === 'health') return await driveHealthCommand(flags, io);

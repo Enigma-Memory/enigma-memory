@@ -103,6 +103,7 @@ For grant-gated local context, create an opaque consent grant and require it bef
 ```sh
 enigma controller grant --app-ref ref:app:cli --purpose-ref ref:purpose:cli_context --memory-zone-ref ref:zone:default --out grant.json
 enigma context --bundle "$HOME/.enigma/bundle.json" --query "project context" --require-grant --grant-file grant.json --proof
+enigma controller revoke --grant-file grant.json --out grant.revoked.json
 ```
 
 If the grant is missing, expired, revoked, or scoped to the wrong app/purpose/zone, Enigma returns `enigma.context_pack_recall_blocked.v1` with `context_pack_returned:false`.
