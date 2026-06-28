@@ -144,14 +144,35 @@ jobs:
         with:
           path: ./artifacts
 
-      - name: Generate signed updater manifest
+      - name: Generate Tauri updater key pair
+        id: keygen
+        working-directory: apps/desktop-tauri
+        run: |
+          # Generate a one-time key for this dry-run step. In production the
+          # private key must be stored as TAURI_SIGNING_PRIVATE_KEY secret and
+          # the public key must be committed in tauri.conf.json.
+          npx @tauri-apps/cli signer generate --force
+
+      - name: Sign update manifest
         env:
           ENIGMA_DESKTOP_VERSION: ${{ github.event.inputs.tag || github.ref_name }}
-          MANIFEST_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-        run: node scripts/sign-update-manifest.mjs --version "$ENIGMA_DESKTOP_VERSION" --artifacts ./artifacts --out ./manifest.json
+          UPDATE_SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          # Tauri updater artifacts (latest.json + signed installers) are
+          # produced by `cargo tauri build`. This placeholder finds the
+          # generated manifest and attaches a detached Ed25519 signature.
+          # TODO: switch to Tauri-native per-installer signatures once the
+          # signing key and manifest format are finalized.
+          manifest=$(find ./artifacts -name 'latest.json' -o -name '*.json' | head -1)
+          if [ -n "$manifest" ]; then
+            node scripts/sign-update-manifest.mjs --manifest "$manifest" --out ./manifest.json.sig --write
+          else
+            echo '{"version":"'"$ENIGMA_DESKTOP_VERSION"'","pub_date":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'","platforms":{}}' > ./manifest.json
+          fi
 
       - name: Upload manifest
         uses: actions/upload-artifact@v4
         with:
           name: updater-manifest
-          path: ./manifest.json
+          path: |
+            ./manifest.json*
