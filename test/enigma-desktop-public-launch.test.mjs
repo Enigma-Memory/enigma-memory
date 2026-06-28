@@ -298,6 +298,11 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(tauriService, /pub async fn get_support_summary/);
   assert.match(tauriService, /enigma\.desktop_support_summary_surface\.v1/);
   assert.match(tauriLib, /commands::service::get_support_summary/);
+  assert.match(tauriService, /connector_card_status/);
+  assert.match(tauriService, /recommended_action/);
+  assert.match(tauriService, /repair_reasons/);
+  assert.match(tauriService, /parse_error/);
+  assert.match(tauriService, /restart_guidance/);
   assert.match(help, /just-in-time consent/i);
   assert.match(help, /Setup has six short steps/i);
   assert.match(wizard, /Read it like a traffic light/i);

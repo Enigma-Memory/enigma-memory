@@ -393,28 +393,48 @@ async fn proof_activity_summary(config: &crate::DesktopConfig) -> Value {
     })
 }
 
+fn connector_card_status(result: &crate::connector::engine::DetectResult) -> &'static str {
+    if !result.installed {
+        "not-installed"
+    } else if result.parse_error {
+        "malformed"
+    } else if result.action == "repair" || !result.ok {
+        "repair-required"
+    } else if result.server_entry_exists && result.env_ok && result.command_ok {
+        "connected"
+    } else {
+        "ready"
+    }
+}
+
+fn connector_card_value(result: crate::connector::engine::DetectResult) -> Value {
+    let mut value = json!({
+        "id": result.client_id,
+        "name": result.display_name,
+        "status": connector_card_status(&result),
+        "recommended_action": result.action,
+        "repair_reasons": result.repair_reasons,
+        "parse_error": result.parse_error,
+        "restart_guidance": result.restart_guidance,
+        "checks": {
+            "installed": result.installed,
+            "server_entry_exists": result.server_entry_exists,
+            "env_ok": result.env_ok,
+            "command_ok": result.command_ok,
+        },
+    });
+    if let Some(error) = result.error {
+        value["error"] = json!(error);
+    }
+    value
+}
+
 async fn detect_clients_internal() -> Result<Value, String> {
     use crate::connector::engine::{ConnectorEngine, EngineContext};
     let ctx = EngineContext::from_env().map_err(|e| e.to_string())?;
     let engine = ConnectorEngine::new();
     let results = engine.detect_all(&ctx);
-    let clients: Vec<Value> = results
-        .into_iter()
-        .map(|r| {
-            let status = if r.installed && r.server_entry_exists && r.env_ok && r.command_ok {
-                "connected"
-            } else if r.installed {
-                "ready"
-            } else {
-                "not-installed"
-            };
-            json!({
-                "id": r.client_id,
-                "name": r.display_name,
-                "status": status,
-            })
-        })
-        .collect();
+    let clients: Vec<Value> = results.into_iter().map(connector_card_value).collect();
     Ok(json!(clients))
 }
 
@@ -858,6 +878,59 @@ mod tests {
         assert!(!redacted.contains("key-abcdef"));
         assert!(redacted.contains("<path>"));
         assert!(redacted.contains("<token>"));
+    }
+
+    fn detect_fixture(action: &'static str) -> crate::connector::engine::DetectResult {
+        crate::connector::engine::DetectResult {
+            ok: true,
+            client_id: "claude-desktop".to_string(),
+            display_name: "Claude Desktop",
+            platform: crate::connector::engine::Platform::Win32,
+            config_path: "<redacted>".to_string(),
+            exists: true,
+            installed: true,
+            server_entry_exists: false,
+            command_ok: false,
+            args_ok: false,
+            bundle_env_present: false,
+            bundle_env_ok: false,
+            env_ok: false,
+            action,
+            repair_reasons: Vec::new(),
+            parse_error: false,
+            error: None,
+            restart_guidance: "Restart Claude Desktop.",
+        }
+    }
+
+    #[test]
+    fn connector_card_preserves_public_repair_detection() {
+        let mut connected = detect_fixture("already_configured");
+        connected.server_entry_exists = true;
+        connected.env_ok = true;
+        connected.command_ok = true;
+        assert_eq!(connector_card_status(&connected), "connected");
+
+        let mut malformed = detect_fixture("repair");
+        malformed.ok = false;
+        malformed.parse_error = true;
+        malformed.repair_reasons = vec!["config_parse_error".to_string()];
+        let malformed_value = connector_card_value(malformed);
+        assert_eq!(malformed_value["status"].as_str(), Some("malformed"));
+        assert_eq!(
+            malformed_value["recommended_action"].as_str(),
+            Some("repair")
+        );
+        assert_eq!(
+            malformed_value["repair_reasons"][0].as_str(),
+            Some("config_parse_error")
+        );
+        assert_eq!(malformed_value["parse_error"].as_bool(), Some(true));
+        assert_eq!(malformed_value["checks"]["installed"].as_bool(), Some(true));
+
+        let mut missing = detect_fixture("missing_client_config");
+        missing.installed = false;
+        assert_eq!(connector_card_status(&missing), "not-installed");
     }
 
     #[test]
