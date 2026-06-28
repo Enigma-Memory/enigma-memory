@@ -2078,6 +2078,44 @@ function printSupportSummary(summary, flags, io) {
   else print(summary, io);
 }
 
+function renderImportPlain(preview) {
+  const lines = [
+    'Enigma import',
+    `Decision: ${preview.import_decision ?? 'unknown'}`,
+    `Candidates: ${preview.candidate_count ?? 0}`,
+    `Duplicates: ${preview.counts?.dedupe?.duplicate_group_count ?? preview.preview_receipt?.duplicate_group_count ?? 0}`,
+    `Vault write: ${preview.vault_write_performed ? 'performed' : 'not performed'}`,
+  ];
+  if (preview.raw_report_written) lines.push('Report: written to <out>');
+  if (preview.import_batch_receipt?.schema) lines.push(`Batch receipt: ${preview.import_batch_receipt.write_count ?? 0} write(s)`);
+  if (preview.primary_action?.label) lines.push(`Next: ${preview.primary_action.label}`);
+  lines.push('Boundary: local import preview/write only; no raw memory, local paths, provider deletion, model behavior, or hosted service claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printImportPreview(preview, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderImportPlain(preview));
+  else print(preview, io);
+}
+
+function renderImportRollbackPlain(receipt) {
+  const lines = [
+    'Enigma import rollback',
+    `Status: ${receipt.ok ? 'Ready' : 'Needs attention'}`,
+    `Requested writes: ${receipt.requested_write_count ?? 0}`,
+    `Tombstoned: ${receipt.tombstoned_count ?? 0}`,
+    `Skipped: ${receipt.skipped_count ?? 0}`,
+    'Source report: <import-report-file>',
+  ];
+  lines.push('Boundary: local Enigma vault tombstones only; no raw memory, local paths, provider deletion, model behavior, or hosted service claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printImportRollbackReceipt(receipt, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderImportRollbackPlain(receipt));
+  else print(receipt, io);
+}
+
 function renderNextActionPlain(action) {
   const lines = [
     'Enigma next',
@@ -2898,7 +2936,7 @@ export async function importCommand(source, flags, io, positionalFile = undefine
   if (reportOut) await writeJson(reportOut, report);
   const batchReceipt = vault ? createImportBatchReceipt(report, options) : undefined;
   const preview = createImportPreview(report, options);
-  print({
+  const previewOutput = {
     ...preview,
     source_file: '<source-file>',
     source_file_redacted: true,
@@ -2914,7 +2952,8 @@ export async function importCommand(source, flags, io, positionalFile = undefine
       raw_memory_printed: false,
       imported_candidates_canonical_only_after_vault_write: true,
     },
-  }, io);
+  };
+  printImportPreview(previewOutput, flags, io);
   return report.memory_candidates?.length > 0 || report.ok === true ? 0 : 1;
 }
 
@@ -3005,7 +3044,7 @@ export async function importRollbackCommand(flags, io, positionalFile = undefine
   };
   const out = getFlag(flags, ['out']);
   if (out && out !== true) await writeJson(resolve(String(out)), receipt);
-  print(receipt, io);
+  printImportRollbackReceipt(receipt, flags, io);
   return 0;
 }
 
@@ -4117,6 +4156,7 @@ function usage() {
       '--out <path>': 'Write the raw local import report for capsule export or review. CLI stdout remains a public-safe preview.',
       '--write-vault': 'Explicitly write accepted importer candidates into the selected local bundle.',
       '--bundle <path>': 'Bundle JSON to write when --write-vault is present. Defaults to .enigma/bundle.json.',
+      '--plain': 'Print a human-readable import or rollback summary instead of JSON. Alias: --text or --format text.',
     },
     relay_gateway_options: {
       '--host <host>': 'Bind host. Defaults to 127.0.0.1.',

@@ -197,6 +197,26 @@ test('CLI import prints a public-safe preview and redacts local paths', async ()
   assert.equal(rawReport.memory_candidates[0].content, PRIVATE_MEMORY);
 });
 
+test('CLI import plain output summarizes preview without raw content or paths', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-import-plain-cli-'));
+  const source = join(dir, 'memories.md');
+  const note = 'plain import should hide this note';
+  await writeFile(source, `- ${note}\n`, 'utf8');
+
+  const io = makeIo();
+  assert.equal(await main(['import', 'text', '--file', source, '--complete', '--plain'], io.io), 0, io.stderr());
+  const stdout = io.stdout();
+
+  assert.match(stdout, /^Enigma import\n/);
+  assert.match(stdout, /Decision: ready_for_import/);
+  assert.match(stdout, /Candidates: 1/);
+  assert.match(stdout, /Vault write: not performed/);
+  assert.match(stdout, /Boundary: local import preview\/write only/);
+  assert.doesNotMatch(stdout, /^\s*\{/);
+  assert.equal(stdout.includes(note), false);
+  assert.equal(stdout.includes(dir), false);
+});
+
 test('CLI text import previews curated notes without raw note output', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'enigma-import-text-preview-cli-'));
   const source = join(dir, 'memories.md');
@@ -258,6 +278,17 @@ test('CLI text import with write-vault returns sanitized batch receipt', async (
   assert.equal(rollbackStdout.includes(note), false);
   assert.equal(rollbackStdout.includes(dir), false);
 
+
+  const rollbackPlain = makeIo();
+  assert.equal(await main(['import', 'rollback', '--file', reportOut, '--bundle', bundle, '--now', NOW, '--plain'], rollbackPlain.io), 0, rollbackPlain.stderr());
+  assert.match(rollbackPlain.stdout(), /^Enigma import rollback\n/);
+  assert.match(rollbackPlain.stdout(), /Requested writes: 1/);
+  assert.match(rollbackPlain.stdout(), /Skipped: 1/);
+  assert.match(rollbackPlain.stdout(), /Source report: <import-report-file>/);
+  assert.match(rollbackPlain.stdout(), /Boundary: local Enigma vault tombstones only/);
+  assert.doesNotMatch(rollbackPlain.stdout(), /^\s*\{/);
+  assert.equal(rollbackPlain.stdout().includes(note), false);
+  assert.equal(rollbackPlain.stdout().includes(dir), false);
   const rollbackAgain = makeIo();
   assert.equal(await main(['import', 'rollback', '--file', reportOut, '--bundle', bundle, '--now', NOW], rollbackAgain.io), 0, rollbackAgain.stderr());
   const secondReceipt = rollbackAgain.json();
