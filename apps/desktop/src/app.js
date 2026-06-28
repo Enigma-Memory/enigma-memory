@@ -339,6 +339,7 @@ export function renderMemoryDriveDashboard(state = createDesktopState()) {
     offlineReady,
     proofStatus
   });
+  const importSandbox = selectImportSandboxSummary({ memoryDriveStatus, offlineReady });
 
   return {
     schema: 'enigma.desktop.memory_drive_dashboard.v1',
@@ -352,6 +353,7 @@ export function renderMemoryDriveDashboard(state = createDesktopState()) {
     offline_ready: offlineReady,
     issue_codes: issueCodes,
     memory_controller: memoryController,
+    import_sandbox: importSandbox,
     next_action: selectMemoryDriveNextAction({
       memoryDriveStatus,
       serviceStatus,
@@ -1524,6 +1526,34 @@ function selectMemoryControllerSummary(input) {
       label: 'Private bubble closed',
       summary: 'Open a local bubble to review memory before sharing.',
       primary_action: { id: 'open_private_bubble', label: 'Open private bubble' }
+    }
+  };
+}
+
+function selectImportSandboxSummary(input) {
+  const ready = input.memoryDriveStatus === 'ready';
+  return {
+    schema: 'enigma.desktop.import_sandbox_summary.v1',
+    status: ready ? 'ready' : 'needs_memory_drive',
+    label: ready ? 'Ready to preview imports' : 'Create Memory Drive first',
+    summary: ready
+      ? 'Preview text, Markdown, or provider exports before writing memory. Duplicate groups, batch receipts, and rollback receipts stay public-safe.'
+      : 'Create a local Memory Drive before previewing or writing imported memories.',
+    primary_action: ready
+      ? { id: 'preview_import', label: 'Preview import' }
+      : { id: 'create_memory_drive', label: 'Create Memory Drive' },
+    secondary_actions: [
+      { id: 'approve_import', label: 'Approve selected memories' },
+      { id: 'rollback_import', label: 'Rollback local import' }
+    ],
+    receipt_boundaries: {
+      preview_receipt: 'counts_refs_commitments_only',
+      batch_receipt: 'write_refs_and_receipt_hashes_only',
+      rollback_receipt: 'tombstone_refs_and_commitments_only',
+      raw_memory_returned: false,
+      local_paths_returned: false,
+      provider_deletion_proof: false,
+      model_forgetting_proof: false
     }
   };
 }

@@ -76,6 +76,11 @@ test('desktop first-run defaults to Memory Drive home dashboard', async () => {
   assert.equal(model.dashboard.memory_controller.recall_approval.secondary_actions[1].id, 'deny_recall');
   assert.equal(model.dashboard.memory_controller.private_memory_bubble.primary_action.id, 'open_private_bubble');
   assertControllerPrimitiveContracts(model.dashboard.memory_controller);
+  assert.equal(model.dashboard.import_sandbox.schema, 'enigma.desktop.import_sandbox_summary.v1');
+  assert.equal(model.dashboard.import_sandbox.status, 'needs_memory_drive');
+  assert.equal(model.dashboard.import_sandbox.primary_action.id, 'create_memory_drive');
+  assert.equal(model.dashboard.import_sandbox.receipt_boundaries.raw_memory_returned, false);
+  assert.equal(model.dashboard.import_sandbox.receipt_boundaries.provider_deletion_proof, false);
 });
 
 test('desktop create Memory Drive action prepares consumer dashboard without raw paths', async () => {
@@ -99,6 +104,10 @@ test('desktop create Memory Drive action prepares consumer dashboard without raw
   assert.equal(model.dashboard.memory_controller.recall_approval.secondary_actions[0].label, 'Approve this local recall');
   assert.equal(model.dashboard.memory_controller.recall_approval.secondary_actions[1].label, 'Keep not shared');
   assertControllerPrimitiveContracts(model.dashboard.memory_controller);
+  assert.equal(model.dashboard.import_sandbox.status, 'ready');
+  assert.equal(model.dashboard.import_sandbox.primary_action.id, 'preview_import');
+  assert.equal(model.dashboard.import_sandbox.secondary_actions[1].id, 'rollback_import');
+  assert.equal(model.dashboard.import_sandbox.receipt_boundaries.batch_receipt, 'write_refs_and_receipt_hashes_only');
   assertPublicSafe(model.dashboard);
 });
 
@@ -207,7 +216,7 @@ test('desktop unknown public-launch action fails closed', async () => {
   assertPublicSafe(after);
 });
 
-test('desktop Tauri dashboard exposes Memory Controller consumer controls', async () => {
+test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consumer controls', async () => {
   const [wizard, help, styles] = await Promise.all([
     readDesktopUiFile('wizard.js'),
     readDesktopUiFile('help.js'),
@@ -230,12 +239,18 @@ test('desktop Tauri dashboard exposes Memory Controller consumer controls', asyn
   assert.match(wizard, /deny-recall/);
   assert.match(wizard, /recallReviewOpen = true/);
   assert.doesNotMatch(wizard, /recallReviewed = true/);
+  assert.match(wizard, /Import Sandbox/);
+  assert.match(wizard, /Preview plain text, Markdown, or provider exports/);
+  assert.match(wizard, /duplicate groups/);
+  assert.match(wizard, /batch receipt/);
+  assert.match(wizard, /rollback receipt/);
   assert.match(help, /just-in-time consent/i);
   assert.match(help, /Setup has six short steps/i);
   assert.match(wizard, /Read it like a traffic light/i);
   assert.match(help, /Read the section like a traffic light/i);
   assert.match(help, /Review alone never shares memory/i);
   assert.match(help, /local review space/i);
+  assert.match(help, /Import Sandbox previews text, Markdown, and provider exports/i);
   assert.match(styles, /memory-controller-grid/);
   assert.match(styles, /memory-controller__plain-language/);
   assert.match(styles, /controller-tile__actions/);

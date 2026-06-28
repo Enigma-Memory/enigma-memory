@@ -438,6 +438,22 @@ function renderWelcome() {
   `, 'welcome');
 }
 
+function renderImportSandboxSection() {
+  return `
+    <section class="dashboard-section import-sandbox" aria-labelledby="import-sandbox-title">
+      <p class="eyebrow">Import Sandbox</p>
+      <h2 id="import-sandbox-title">Bring memories in safely</h2>
+      <p>Preview plain text, Markdown, or provider exports before anything is written. The preview shows counts, duplicate groups, commitments, and the one next action without raw memory text.</p>
+      <ol class="import-sandbox__steps">
+        <li><strong>Preview:</strong> public-safe receipt only.</li>
+        <li><strong>Approve:</strong> writes selected memories and returns a batch receipt.</li>
+        <li><strong>Rollback:</strong> uses the private raw report to tombstone local imports and returns a rollback receipt.</li>
+      </ol>
+      <p class="note">Import receipts prove Enigma-local vault activity only. They do not prove changes outside Enigma or model behavior changes.</p>
+    </section>
+  `;
+}
+
 function renderVault() {
   return renderCard(`
     <p class="eyebrow">Step 2 of 6 · Private vault</p>
@@ -553,6 +569,8 @@ function renderDashboard() {
     </div>
 
     ${renderMemoryControllerSection()}
+    ${renderImportSandboxSection()}
+
 
     <div class="dashboard-section">
       <h2>App connection recovery</h2>

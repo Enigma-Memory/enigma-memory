@@ -38,6 +38,7 @@ const HELP_ARTICLES = {
       <p>If something needs attention, Enigma explains the issue and offers a fix-it action. Issue codes are safe to share with support.</p>
       <p>Connection recovery can restore an Enigma-managed backup, rollback the last Enigma-managed connector change, or reapply Enigma's entry while preserving unrelated MCP settings.</p>
       <p>Repair and rollback do not alter provider memory, model behavior, or provider-side logs. Local health checks work without network access.</p>
+      <p>The Import Sandbox previews text, Markdown, and provider exports before any vault write, then shows duplicate groups, batch receipts, and rollback receipts as public-safe metadata.</p>
     `,
   },
   memoryController: {
