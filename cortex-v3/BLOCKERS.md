@@ -9,11 +9,10 @@
   - `cargo check --workspace`, `anchor build --no-idl`, and `anchor test --skip-build` pass in CI (all 28 Anchor tests green on Run #175).
 - ✅ **Solana credentials configured** — devnet wallet stored as GitHub secret `SOLANA_DEVNET_WALLET`.
   - Public key: `FasTsgodYjJwiiZ1eAxHmocVCvKcKNiXZYVJUZiZ3rh7`
-- ✅ **Local Windows development path documented** — WSL2 setup script and GitHub Codespaces devcontainer available.
-- ⚠️ **Mainnet deployment credentials not configured** — devnet only; custody policy documented in `specs/bottleneck-solutions-architecture.md`.
+- ✅ **Local build environments** — Docker images for Anchor/Solana (`cortex-v3/Dockerfile`) and Tauri Linux (`apps/desktop-tauri/Dockerfile`) plus `docker-compose.build.yml` provide reproducible builds without host-native toolchains.
+- ⚠️ **Mainnet deployment credentials not configured** — devnet only; custody policy documented in `docs/public-launch/mainnet-custody-plan.md`.
 
 ## Technical
-
 - ✅ **Session PDA + invisible session keys** implemented in `capability_registry`; session variants in `memory_registry`, `budget_escrow`, `royalty_router`.
 - ✅ **USDC/SPL token settlement** finalized in `budget_escrow` with Token/Token-2022 support.
 - ✅ **SAL/ENIGMA token program** created with mint, transfer, staking, veSAL lockup, and voting scaffolding.
@@ -32,7 +31,6 @@
 - ✅ **QA smoke scenarios + support playbooks** added in `docs/public-launch/`.
 - ✅ **Release/build pipeline** added: Tauri bundle config, GitHub Actions `desktop-build.yml`, Ed25519 update-manifest signer, release evidence generator.
 - ✅ **Opt-in crash reporting** implemented: redacted panic reports written locally; upload only after explicit opt-in. No memory, wallet, or path data included.
-- 🔄 **Signed installers and code signing** — Azure Artifact Signing setup reached the Azure portal; Microsoft account `noahkopp@outlook.com` is signed in but no paid Azure subscription exists. User must complete the pay-as-you-go signup (Start free) before automation can create an Artifact Signing account. Apple Developer enrollment still pending Apple ID credentials/2FA. Scaffolding at `docs/public-launch/code-signing-setup.md` and `.github/workflows/desktop-release.yml`.
-## Notes
+- 🔄 **Signed installers and code signing** — Azure subscription `Azure subscription 1` is active and Artifact Signing account creation is in progress. Apple Developer enrollment still pending Apple ID credentials/2FA. Scaffolding at `docs/public-launch/code-signing-setup.md` and `.github/workflows/desktop-release.yml`.
 
 Use this file to track progress against blockers.
