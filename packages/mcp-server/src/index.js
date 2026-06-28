@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createInterface } from 'node:readline';
 import { dirname, resolve } from 'node:path';
@@ -301,7 +302,7 @@ function validateToolArguments(name, args) {
       optionalString(args, 'confidence', name);
       return args;
     case 'enigma_import_approve':
-      rejectAdditionalProperties(args, new Set(['bundlePath', 'text', 'complete', 'now', 'confidence', 'approved', 'reviewed']), name);
+      rejectAdditionalProperties(args, new Set(['bundlePath', 'text', 'complete', 'now', 'confidence', 'approved', 'reviewed', 'approval_token']), name);
       optionalString(args, 'bundlePath', name);
       optionalString(args, 'text', name);
       optionalBoolean(args, 'complete', name);
@@ -309,6 +310,7 @@ function validateToolArguments(name, args) {
       optionalString(args, 'confidence', name);
       optionalBoolean(args, 'approved', name);
       optionalBoolean(args, 'reviewed', name);
+      optionalString(args, 'approval_token', name);
       return args;
     case 'enigma_context_pack':
       rejectAdditionalProperties(args, new Set([
@@ -656,6 +658,7 @@ export const toolDescriptors = [
         confidence: { type: 'string' },
         approved: { type: 'boolean' },
         reviewed: { type: 'boolean' },
+        approval_token: { type: 'string' },
       },
       required: ['approved'],
       additionalProperties: false,
@@ -1320,6 +1323,7 @@ export async function enigma_import_preview(input = {}) {
     ...preview,
     mcp_tool: 'enigma_import_preview',
     vault_write_performed: false,
+    approval_token: importApprovalToken(preview),
     claim_boundaries: {
       ...preview.claim_boundaries,
       local_preview_only: true,
@@ -1329,6 +1333,15 @@ export async function enigma_import_preview(input = {}) {
       model_forgetting_proof: false,
     },
   };
+}
+
+function importApprovalToken(preview) {
+  return `ref:import-approval:${createHash('sha256').update(JSON.stringify({
+    preview_id: preview.preview_id,
+    import_decision: preview.import_decision,
+    candidate_count: preview.candidate_count,
+    roots: preview.roots,
+  })).digest('hex').slice(0, 32)}`;
 }
 
 function blockedImportApproval(reasonCode, preview = undefined) {
@@ -1366,6 +1379,8 @@ export async function enigma_import_approve(input = {}) {
   });
   const preview = createImportPreview(previewReport, { now: input.now });
   if (input.approved !== true) return blockedImportApproval('explicit_approval_required', preview);
+  const expectedApprovalToken = importApprovalToken(preview);
+  if (input.approval_token !== expectedApprovalToken) return blockedImportApproval('approval_token_required', preview);
   if (preview.import_decision !== 'ready_for_import' && input.reviewed !== true) {
     return blockedImportApproval('review_required_before_write', preview);
   }

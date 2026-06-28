@@ -504,6 +504,7 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
   assert.equal(importPreview.result.schema, 'enigma.import_preview.v1');
   assert.equal(importPreview.result.mcp_tool, 'enigma_import_preview');
   assert.equal(importPreview.result.vault_write_performed, false);
+  assert.match(importPreview.result.approval_token, /^ref:import-approval:/);
   assert.equal(importPreview.result.import_decision, 'needs_review');
   assert.equal(importPreview.result.duplicate_groups.length, 1);
   assert.equal(importPreview.result.claim_boundaries.raw_memory_returned, false);
@@ -516,6 +517,15 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
   assert.equal(unapprovedImport.result.schema, 'enigma.import_approval_blocked.v1');
   assert.equal(unapprovedImport.result.reason_code, 'explicit_approval_required');
   assert.equal(unapprovedImport.result.vault_write_performed, false);
+  const missingTokenImport = await callTool('import-approve-missing-token', 'enigma_import_approve', {
+    text: previewText,
+    complete: true,
+    approved: true,
+  });
+  assert.equal(missingTokenImport.result.schema, 'enigma.import_approval_blocked.v1');
+  assert.equal(missingTokenImport.result.reason_code, 'approval_token_required');
+  assert.equal(missingTokenImport.result.vault_write_performed, false);
+  assert.doesNotMatch(JSON.stringify(missingTokenImport.response), /mcp import preview private sentinel/);
   assert.doesNotMatch(JSON.stringify(unapprovedImport.response), /mcp import preview private sentinel/);
 
   const tempRoot = process.env.TEMP ?? process.env.TMP ?? '.';
@@ -540,29 +550,35 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
     assert.equal(emptyNext.result.primary_action.tool, 'enigma_remember');
     assert.equal(emptyNext.result.lanes.memory_inventory.status, 'empty');
 
+    const duplicatePreview = await callTool('import-preview-duplicate', 'enigma_import_preview', {
+      text: '- duplicate mcp import note\n- duplicate mcp import note',
+      complete: true,
+    });
     const duplicateApproval = await callTool('import-approve-duplicate-blocked', 'enigma_import_approve', {
       bundlePath,
       text: '- duplicate mcp import note\n- duplicate mcp import note',
       complete: true,
       approved: true,
+      approval_token: duplicatePreview.result.approval_token,
     });
     assert.equal(duplicateApproval.result.schema, 'enigma.import_approval_blocked.v1');
     assert.equal(duplicateApproval.result.reason_code, 'review_required_before_write');
     assert.equal(duplicateApproval.result.vault_write_performed, false);
     assert.doesNotMatch(JSON.stringify(duplicateApproval.response), /duplicate mcp import note/);
 
+    const approvalPreview = await callTool('import-preview-approval', 'enigma_import_preview', {
+      text: '- approved mcp import private note',
+      complete: true,
+      now: '2026-06-28T13:45:00.000Z',
+    });
     const approvedImport = await callTool('import-approve-write', 'enigma_import_approve', {
       bundlePath,
       text: '- approved mcp import private note',
       complete: true,
       approved: true,
+      approval_token: approvalPreview.result.approval_token,
       now: '2026-06-28T13:45:00.000Z',
     });
-    assert.equal(approvedImport.result.schema, 'enigma.import_approved_batch.v1');
-    assert.equal(approvedImport.result.vault_write_performed, true);
-    assert.equal(approvedImport.result.import_batch_receipt.write_count, 1);
-    assert.equal(approvedImport.result.import_batch_receipt.claim_boundaries.raw_memory_returned, false);
-    assert.doesNotMatch(JSON.stringify(approvedImport.response), /approved mcp import private note/);
 
     const postImportNext = await callTool('next-after-approved-import', 'enigma_next_action', { bundlePath });
     assert.equal(postImportNext.result.lanes.memory_inventory.active_count, 1);
