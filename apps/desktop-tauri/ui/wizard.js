@@ -57,6 +57,7 @@ let importSandbox = {
   error: null,
   pendingText: '',
 };
+let proofActivity = {};
 
 let busy = false;
 
@@ -78,7 +79,8 @@ async function mockInvoke(cmd, args = {}) {
         memory_drive_status: 'ready',
         health_status: 'healthy',
         connected_app_count: clients.filter((c) => c.status === 'connected').length,
-        proof_status: clients.some((c) => c.status === 'connected') ? 'active' : 'idle',
+        proof_status: proofActivity.proof_status || (clients.some((c) => c.status === 'connected') ? 'has_receipts' : 'empty'),
+        proof_activity: proofActivity,
         update_status: update.status || 'current',
         diagnostics_status: diagnostics.status || 'passed',
         offline_ready: serviceStatus?.running === true,
@@ -153,6 +155,31 @@ async function mockInvoke(cmd, args = {}) {
         claim_boundaries: { local_config_only: true, provider_launched: false },
       };
     }
+    case 'get_proof_activity':
+      return {
+        ok: true,
+        schema: 'enigma.desktop_proof_activity.v1',
+        proof_status: clients.some((c) => c.status === 'connected') ? 'has_receipts' : 'empty',
+        receipt_count: clients.some((c) => c.status === 'connected') ? 3 : 0,
+        active_memory_count: 1,
+        tombstoned_memory_count: 0,
+        verifier_status: 'not_run',
+        evidence_status: 'local_counts_and_roots_only',
+        redaction: {
+          raw_memory_included: false,
+          prompts_included: false,
+          transcripts_included: false,
+          credentials_included: false,
+          provider_responses_included: false,
+          local_paths_redacted: true,
+        },
+        claim_boundaries: {
+          local_enigma_events_only: true,
+          provider_deletion_proof: false,
+          model_forgetting_proof: false,
+          hosted_saas_live: false,
+        },
+      };
     case 'rollback_client_config': {
       const c = clients.find((c) => c.id === args.id);
       if (c) c.status = 'ready';
@@ -517,6 +544,32 @@ function renderImportSandboxSection() {
   `;
 }
 
+function renderProofActivitySection() {
+  const activity = proofActivity?.schema ? proofActivity : health.proof_activity || {};
+  const receiptCount = activity.receipt_count ?? 0;
+  const activeCount = activity.active_memory_count ?? 0;
+  const tombstoneCount = activity.tombstoned_memory_count ?? 0;
+  const verifierStatus = activity.verifier_status || 'not_run';
+  const evidenceStatus = activity.evidence_status || 'local_counts_and_roots_only';
+  return `
+    <section class="dashboard-section proof-activity" aria-labelledby="proof-activity-title">
+      <p class="eyebrow">Proof Activity</p>
+      <h2 id="proof-activity-title">What Enigma can prove locally</h2>
+      <p>Review local receipt counts, Memory Drive roots, and verifier state without exposing memory text, prompts, transcripts, provider responses, or local paths.</p>
+      <div class="dashboard-grid">
+        <div class="metric"><dt>Receipts</dt><dd>${escapeHtml(String(receiptCount))}</dd></div>
+        <div class="metric"><dt>Active memories</dt><dd>${escapeHtml(String(activeCount))}</dd></div>
+        <div class="metric"><dt>Tombstones</dt><dd>${escapeHtml(String(tombstoneCount))}</dd></div>
+        <div class="metric"><dt>Verifier</dt><dd>${escapeHtml(verifierStatus)}</dd></div>
+      </div>
+      <p class="note">Evidence status: ${escapeHtml(evidenceStatus)}. This is Enigma-controlled local evidence only; it does not prove outside-provider changes or model behavior changes.</p>
+      <div class="button-row">
+        ${primaryButton('Refresh proof activity', 'refresh-proof-activity')}
+      </div>
+    </section>
+  `;
+}
+
 function renderVault() {
   return renderCard(`
     <p class="eyebrow">Step 2 of 6 · Private vault</p>
@@ -682,6 +735,7 @@ function renderDashboard() {
     ${renderNextActionSection(nextAction)}
 
     ${renderMemoryControllerSection()}
+    ${renderProofActivitySection()}
     ${renderImportSandboxSection()}
 
 
@@ -918,6 +972,7 @@ async function handleAction(event) {
         const result = await call('approve_import_text', { text: importSandbox.pendingText });
         importSandbox = { preview: null, result, error: null, pendingText: '' };
         health = await call('get_health');
+        proofActivity = health.proof_activity?.schema ? health.proof_activity : await call('get_proof_activity');
         setStatus('Import written locally. Batch receipt is available.');
       } catch (_) {
         importSandbox = { ...importSandbox, error: 'Approval failed without exposing text.' };
@@ -932,6 +987,17 @@ async function handleAction(event) {
       render();
       setStatus('Import text cleared from this screen.');
       return;
+    case 'refresh-proof-activity': {
+      busy = true;
+      setStatus('Refreshing proof activity...');
+      proofActivity = await call('get_proof_activity');
+      health.proof_status = proofActivity.proof_status || health.proof_status;
+      health.proof_activity = proofActivity;
+      busy = false;
+      render();
+      setStatus('Proof activity refreshed without exposing raw memory.');
+      return;
+    }
     case 'go-health':
       currentStep = 4;
       render();
@@ -940,6 +1006,7 @@ async function handleAction(event) {
       busy = true;
       setStatus('Checking vault...');
       health = await call('get_health');
+      proofActivity = health.proof_activity?.schema ? health.proof_activity : await call('get_proof_activity');
       serviceStatus = await call('get_service_status');
       serviceLogs = await call('get_service_logs', { limit: 100 });
       diagnostics = await call('get_diagnostics');
@@ -956,6 +1023,7 @@ async function handleAction(event) {
     case 'go-dashboard': {
       currentStep = 6;
       clients = await call('detect_clients');
+      proofActivity = await call('get_proof_activity');
       crashReporting.status = await call('get_crash_reporting_status');
       render();
       return;

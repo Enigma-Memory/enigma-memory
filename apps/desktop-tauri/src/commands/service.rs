@@ -296,6 +296,103 @@ async fn drive_health(config: &crate::DesktopConfig) -> Result<Value, String> {
     }))
 }
 
+async fn proof_activity_summary(config: &crate::DesktopConfig) -> Value {
+    let bundle = config.bundle_path.to_string_lossy();
+    let status = match run_cli(config, &["status", "--bundle", &bundle]).await {
+        Ok(status) => status,
+        Err(_) => {
+            return json!({
+                "ok": false,
+                "schema": "enigma.desktop_proof_activity.v1",
+                "proof_status": "setup_needed",
+                "receipt_count": 0,
+                "active_memory_count": 0,
+                "tombstoned_memory_count": 0,
+                "verifier_status": "not_run",
+                "next_action": {
+                    "id": "create_memory_drive",
+                    "label": "Create Memory Drive",
+                    "kind": "local_action",
+                },
+                "redaction": {
+                    "raw_memory_included": false,
+                    "prompts_included": false,
+                    "transcripts_included": false,
+                    "credentials_included": false,
+                    "provider_responses_included": false,
+                    "local_paths_redacted": true,
+                },
+                "claim_boundaries": {
+                    "local_enigma_events_only": true,
+                    "provider_deletion_proof": false,
+                    "model_forgetting_proof": false,
+                    "hosted_saas_live": false,
+                },
+            });
+        }
+    };
+    let receipt_count = status
+        .get("receipt_count")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let active_memory_count = status
+        .get("active_memory_count")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let tombstoned_memory_count = status
+        .get("tombstoned_memory_count")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let proof_status = if receipt_count > 0 {
+        "has_receipts"
+    } else {
+        "empty"
+    };
+    let next_action = if receipt_count > 0 {
+        json!({
+            "id": "review_proof_activity",
+            "label": "Review proof activity",
+            "kind": "local_review",
+        })
+    } else {
+        json!({
+            "id": "import_or_remember_memory",
+            "label": "Import or add a memory",
+            "kind": "local_action",
+        })
+    };
+
+    json!({
+        "ok": true,
+        "schema": "enigma.desktop_proof_activity.v1",
+        "proof_status": proof_status,
+        "receipt_count": receipt_count,
+        "active_memory_count": active_memory_count,
+        "tombstoned_memory_count": tombstoned_memory_count,
+        "roots": {
+            "active_set_root": status.get("active_set_root").and_then(Value::as_str).unwrap_or(""),
+            "receipt_log_root": status.get("receipt_log_root").and_then(Value::as_str).unwrap_or(""),
+        },
+        "verifier_status": "not_run",
+        "evidence_status": "local_counts_and_roots_only",
+        "next_action": next_action,
+        "redaction": {
+            "raw_memory_included": false,
+            "prompts_included": false,
+            "transcripts_included": false,
+            "credentials_included": false,
+            "provider_responses_included": false,
+            "local_paths_redacted": true,
+        },
+        "claim_boundaries": {
+            "local_enigma_events_only": true,
+            "provider_deletion_proof": false,
+            "model_forgetting_proof": false,
+            "hosted_saas_live": false,
+        },
+    })
+}
+
 async fn detect_clients_internal() -> Result<Value, String> {
     use crate::connector::engine::{ConnectorEngine, EngineContext};
     let ctx = EngineContext::from_env().map_err(|e| e.to_string())?;
@@ -661,6 +758,11 @@ pub async fn rollback_client_config(
 }
 
 #[tauri::command]
+pub async fn get_proof_activity(state: tauri::State<'_, AppState>) -> Result<Value, String> {
+    Ok(proof_activity_summary(&state.config).await)
+}
+
+#[tauri::command]
 pub async fn get_health(state: tauri::State<'_, AppState>) -> Result<Value, String> {
     let service = state.service.status();
     let drive = drive_health(&state.config).await.unwrap_or_else(|_| {
@@ -687,11 +789,18 @@ pub async fn get_health(state: tauri::State<'_, AppState>) -> Result<Value, Stri
         .and_then(|v| v.as_str())
         .unwrap_or("error");
 
+    let proof = proof_activity_summary(&state.config).await;
+    let proof_status = proof
+        .get("proof_status")
+        .and_then(|v| v.as_str())
+        .unwrap_or("idle");
+
     Ok(json!({
         "memory_drive_status": memory_drive_status,
         "health_status": health_status,
         "connected_app_count": connected_count,
-        "proof_status": if service.running { "active" } else { "idle" },
+        "proof_status": proof_status,
+        "proof_activity": proof,
         "update_status": "current",
         "diagnostics_status": "passed",
         "offline_ready": dashboard_offline_ready(&service, memory_drive_status, health_status),

@@ -279,6 +279,13 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(tauriService, /import-sandbox-/);
   assert.match(tauriLib, /commands::service::preview_import_text/);
   assert.match(tauriLib, /commands::service::approve_import_text/);
+  assert.match(wizard, /Proof Activity/);
+  assert.match(wizard, /What Enigma can prove locally/);
+  assert.match(wizard, /refresh-proof-activity/);
+  assert.match(wizard, /enigma\.desktop_proof_activity\.v1/);
+  assert.match(tauriService, /pub async fn get_proof_activity/);
+  assert.match(tauriService, /local_counts_and_roots_only/);
+  assert.match(tauriLib, /commands::service::get_proof_activity/);
   assert.match(help, /just-in-time consent/i);
   assert.match(help, /Setup has six short steps/i);
   assert.match(wizard, /Read it like a traffic light/i);
