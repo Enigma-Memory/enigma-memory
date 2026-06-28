@@ -468,6 +468,15 @@ test('support summary is public-safe on fresh install and initialized bundles', 
     assert.equal(JSON.stringify(ready).includes('Enigma quickstart demo memory'), false);
     assert.equal(readyStdout.includes(dir), false);
     assert.equal(JSON.stringify(ready).includes(dir), false);
+
+    const plainIo = makeIo();
+    assert.equal(await main(['support', 'summary', '--bundle', bundlePath, '--client', 'generic-mcp', '--config', configPath, '--plain', '--now', '2026-06-28T14:42:00.000Z'], plainIo.io), 0, plainIo.stderr());
+    assert.match(plainIo.stdout(), /^Enigma support summary\n/);
+    assert.match(plainIo.stdout(), /Status: Ready/);
+    assert.match(plainIo.stdout(), /Support code: ref:support-summary:/);
+    assert.match(plainIo.stdout(), /Boundary: local Enigma support state only/);
+    assert.doesNotMatch(plainIo.stdout(), /^\s*\{/);
+    assert.equal(plainIo.stdout().includes(dir), false);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

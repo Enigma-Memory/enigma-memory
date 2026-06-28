@@ -2060,6 +2060,24 @@ function printDriveHealthReport(report, flags, io) {
   else print(report, io);
 }
 
+function renderSupportPlain(summary) {
+  const lines = [
+    'Enigma support summary',
+    `Status: ${summary.ok ? 'Ready' : 'Needs attention'}`,
+    `Setup: ${summary.setup_status?.state ?? 'unknown'}`,
+    `Support code: ${summary.support_code ?? 'unknown'}`,
+    `Issues: ${Array.isArray(summary.issue_codes) ? summary.issue_codes.length : 0}`,
+  ];
+  if (summary.next_action?.command) lines.push(`Next: ${summary.next_action.command}`);
+  lines.push('Boundary: local Enigma support state only; no raw memory, local paths, credentials, provider responses, provider deletion, model behavior, or hosted service claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printSupportSummary(summary, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderSupportPlain(summary));
+  else print(summary, io);
+}
+
 function renderNextActionPlain(action) {
   const lines = [
     'Enigma next',
@@ -2811,7 +2829,7 @@ export async function supportSummaryCommand(flags, io) {
   };
   const out = getFlag(flags, ['out']);
   if (out && out !== true) await writeJson(resolve(String(out)), summary);
-  print(summary, io);
+  printSupportSummary(summary, flags, io);
   return 0;
 }
 
@@ -3968,6 +3986,11 @@ function usage() {
     doctor_options: {
       'enigma doctor --bundle <path>': 'Run local install, package, bundle, schema, MCP command, and connector checks.',
       '--plain': 'Print one human-readable next action instead of JSON. Alias: --text or --format text.',
+    },
+    support_options: {
+      'enigma support summary --bundle <path>': 'Collect public-safe local support state for a support ticket or self-diagnosis.',
+      '--plain': 'Print a human-readable support summary instead of JSON. Alias: --text or --format text.',
+      '--out <path>': 'Write the public-safe JSON summary to a file.',
     },
     init_options: {
       '--dry-run': 'Print the first-run plan without writing local artifacts or client configs.',
