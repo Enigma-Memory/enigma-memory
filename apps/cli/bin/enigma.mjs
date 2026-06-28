@@ -1203,6 +1203,59 @@ function doctorFirstRunHint(_bundleDisplay, client) {
   };
 }
 
+function doctorSetupStatus(checks, firstRunHint) {
+  const setupReasons = [];
+  const attentionReasons = [];
+  const bundleReason = checks.bundle_initialized?.reason;
+  if (checks.bundle_initialized?.ok === false) {
+    if (['bundle_missing', 'bundle_schema_mismatch', 'bundle_json_invalid'].includes(bundleReason)) {
+      setupReasons.push(bundleReason);
+    } else {
+      attentionReasons.push(bundleReason || 'bundle_not_ready');
+    }
+  }
+  for (const client of checks.connectors?.clients ?? []) {
+    if (client.ok !== false) continue;
+    const repairReasons = Array.isArray(client.repair_reasons) ? client.repair_reasons : [];
+    const setupOnly = repairReasons.length > 0 && repairReasons.every((reason) => reason === 'bundle_env_missing' || reason === 'bundle_env_mismatch');
+    if (setupOnly) {
+      for (const reason of repairReasons) setupReasons.push(`connector_${reason}`);
+    } else {
+      attentionReasons.push(`connector_${client.client_id || 'unknown'}_${repairReasons[0] || 'not_ready'}`);
+    }
+  }
+  for (const [name, check] of Object.entries(checks)) {
+    if (name === 'bundle_initialized' || name === 'connectors') continue;
+    if (check?.ok === false) attentionReasons.push(name);
+  }
+  const uniqueSetupReasons = [...new Set(setupReasons)];
+  const uniqueAttentionReasons = [...new Set(attentionReasons.filter(Boolean))];
+  const state = uniqueAttentionReasons.length > 0
+    ? 'attention_needed'
+    : uniqueSetupReasons.length > 0
+      ? 'setup_needed'
+      : 'ready';
+  return {
+    schema: 'enigma.doctor_setup_status.v1',
+    state,
+    setup_needed: state === 'setup_needed',
+    ready: state === 'ready',
+    message: state === 'ready'
+      ? 'Enigma local setup checks are green.'
+      : state === 'setup_needed'
+        ? 'Run setup to create the local Memory Drive bundle and align connector bundle paths.'
+        : 'Fix the reported local install or connector issue before treating doctor as green.',
+    reasons: state === 'attention_needed' ? uniqueAttentionReasons : uniqueSetupReasons,
+    next_command: state === 'ready' ? null : firstRunHint.command,
+    claim_boundaries: {
+      local_enigma_checks_only: true,
+      provider_deletion_proof: false,
+      model_forgetting_proof: false,
+      hosted_saas_live: false,
+    },
+  };
+}
+
 async function setupDoctorChecks(flags, artifacts, clients, displays) {
   const packageJson = await readPackageJson();
   const requiredNodeMajor = minimumNodeMajor(packageJson.engines?.node);
@@ -2321,6 +2374,7 @@ export async function doctorCommand(flags, io) {
   const ok = Object.values(checks).every((check) => check.ok !== false);
   const doctorClient = String(selectedClient && selectedClient !== true ? selectedClient : 'generic-mcp');
   const firstRunHint = doctorFirstRunHint(checks.vault_path.path, doctorClient);
+  const setupStatus = doctorSetupStatus(checks, firstRunHint);
   print({
     ok,
     node: checks.node,
@@ -2333,6 +2387,7 @@ export async function doctorCommand(flags, io) {
     schemas: checks.schemas,
     mcp_command_name: checks.mcp_command_name.command,
     connectors: checks.connectors,
+    setup_status: setupStatus,
     first_run_hint: firstRunHint,
     fresh_install_hint: firstRunHint,
     next_commands: doctorNextCommands(checks.vault_path.path, doctorClient),

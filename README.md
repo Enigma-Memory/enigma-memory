@@ -53,6 +53,7 @@ enigma doctor --bundle "$HOME/.enigma/bundle.json"
 enigma drive health --bundle "$HOME/.enigma/bundle.json"
 enigma status --bundle "$HOME/.enigma/bundle.json"
 ```
+If `doctor` is red on a fresh install, read `setup_status.state`: `setup_needed` means run the included `setup_status.next_command`; `attention_needed` means a real local install/config issue remains.
 
 Preview a single client before writing:
 

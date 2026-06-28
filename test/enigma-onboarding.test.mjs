@@ -397,6 +397,10 @@ test('doctor reports first-run diagnostics without echoing local paths', async (
     assert.equal(summary.vault_path.parent, '<bundle-dir>');
     assert.equal(summary.vault_path.writable, true);
     assert.equal(summary.ok, false);
+    assert.equal(summary.setup_status.state, 'setup_needed');
+    assert.equal(summary.setup_status.setup_needed, true);
+    assert.equal(summary.setup_status.next_command, 'enigma setup --bundle "<bundle-path>" --client auto --connect-installed --overwrite');
+    assert.deepEqual(summary.setup_status.reasons, ['bundle_missing']);
     assert.deepEqual(summary.bundle_initialized, {
       ok: false,
       bundle: '<bundle-path>',
@@ -442,6 +446,9 @@ test('doctor is green after bundle initialization when connector config is absen
 
   assert.equal(stdout.includes(dir), false);
   assert.equal(summary.ok, true);
+  assert.equal(summary.setup_status.state, 'ready');
+  assert.equal(summary.setup_status.setup_needed, false);
+  assert.equal(summary.setup_status.next_command, null);
   assert.deepEqual(summary.bundle_initialized, {
     ok: true,
     bundle: '<bundle-path>',
@@ -478,6 +485,9 @@ test('doctor explains connector bundle mismatch as first-run state without local
   assert.equal(stdout.includes(dir), false);
   assert.equal(stdout.includes(staleBundlePath), false);
   assert.equal(summary.ok, false);
+  assert.equal(summary.setup_status.state, 'setup_needed');
+  assert.equal(summary.setup_status.setup_needed, true);
+  assert.deepEqual(summary.setup_status.reasons, ['bundle_missing', 'connector_bundle_env_mismatch']);
   assert.equal(summary.vault_path.path, '<bundle-path>');
   assert.equal(summary.bundle_initialized.ok, false);
   assert.equal(summary.bundle_initialized.reason, 'bundle_missing');
