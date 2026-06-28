@@ -270,6 +270,10 @@ function validateToolArguments(name, args) {
       optionalString(args, 'actor_id', name);
       optionalString(args, 'policy_id', name);
       return args;
+    case 'enigma_next_action':
+      rejectAdditionalProperties(args, new Set(['bundlePath']), name);
+      optionalString(args, 'bundlePath', name);
+      return args;
     case 'enigma_remember':
       rejectAdditionalProperties(args, new Set(['bundlePath', 'text', 'purpose', 'tags', 'metadata']), name);
       optionalString(args, 'bundlePath', name);
@@ -574,6 +578,17 @@ export const toolDescriptors = [
         subject_id: { type: 'string' },
         actor_id: { type: 'string' },
         policy_id: { type: 'string' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'enigma_next_action',
+    description: 'Return the next local Enigma setup action without requiring a bundle to already exist.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        bundlePath: { type: 'string' },
       },
       additionalProperties: false,
     },
@@ -1186,6 +1201,61 @@ export async function enigma_init(input = {}) {
   return bundleSummary(path, bundle, true);
 }
 
+export async function enigma_next_action(input = {}) {
+  input = validateToolArguments('enigma_next_action', input);
+  const path = bundlePath(input);
+  const claimBoundaries = {
+    local_enigma_status_only: true,
+    raw_memory_returned: false,
+    local_paths_redacted: true,
+    provider_deletion_proof: false,
+    model_forgetting_proof: false,
+    hosted_saas_live: false,
+  };
+  if (!(await fileExists(path))) {
+    return {
+      ok: true,
+      schema: 'enigma.next_action.v1',
+      state: 'setup_needed',
+      bundle: '<bundle-path>',
+      primary_action: {
+        id: 'run_enigma_init',
+        label: 'Create Memory Drive',
+        tool: 'enigma_init',
+      },
+      follow_up: {
+        id: 'check_next_action',
+        label: 'Check next action again',
+        tool: 'enigma_next_action',
+      },
+      issue_codes: ['bundle_missing'],
+      claim_boundaries: claimBoundaries,
+    };
+  }
+  const { vault, passport } = await loadState(path);
+  const activeCount = vault.activeAddresses instanceof Set ? vault.activeAddresses.size : 0;
+  const tombstoneCount = vault.tombstones instanceof Map ? vault.tombstones.size : 0;
+  const receiptCount = Array.isArray(vault.receipts) ? vault.receipts.length : 0;
+  const hasMemory = activeCount > 0;
+  return {
+    ok: true,
+    schema: 'enigma.next_action.v1',
+    state: hasMemory ? 'ready_for_app_connection' : 'needs_first_memory',
+    bundle: '<bundle-path>',
+    passport_ref: `enigma://passport/${passport.passport_id}`,
+    primary_action: hasMemory
+      ? { id: 'connect_ai_app', label: 'Connect an AI app', tool: 'tools/list' }
+      : { id: 'remember_or_import_first_memory', label: 'Remember or import first memory', tool: 'enigma_remember' },
+    lanes: {
+      memory_drive: { status: 'ready', label: 'Memory Drive exists' },
+      import_sandbox: { status: 'ready', label: 'Import Sandbox ready' },
+      memory_inventory: { status: hasMemory ? 'has_memory' : 'empty', active_count: activeCount, tombstone_count: tombstoneCount },
+      proof_activity: { status: receiptCount > 0 ? 'has_receipts' : 'empty', receipt_count: receiptCount },
+    },
+    claim_boundaries: claimBoundaries,
+  };
+}
+
 export async function enigma_remember(input = {}) {
   input = validateToolArguments('enigma_remember', input);
   const path = bundlePath(input);
@@ -1405,6 +1475,7 @@ export async function enigma_settlement_batch(input = {}) {
 
 
 export const handlers = Object.freeze({
+  enigma_next_action,
   enigma_init,
   enigma_remember,
   enigma_search,
@@ -1632,6 +1703,7 @@ export default {
   promptDescriptors,
   handlers,
   enigma_init,
+  enigma_next_action,
   enigma_remember,
   enigma_search,
   enigma_context_pack,

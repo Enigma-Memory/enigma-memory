@@ -21,6 +21,10 @@ npm install -g enigma-memory && enigma setup --client auto --connect-installed -
 
 The generated server entry uses command `enigma-mcp`, no args, and `ENIGMA_BUNDLE` pointing at the local bundle. Existing sibling MCP servers are preserved.
 
+## Next action
+
+`enigma_next_action` is safe before setup. If the bundle is missing it returns `enigma.next_action.v1` with `state:"setup_needed"` and the `enigma_init` tool as the next action instead of throwing. After setup it points the client at `enigma_remember`/import or app-connection work, while keeping paths and raw memory out of the response.
+
 ## Grant-gated context
 
 `enigma_context_pack` can require a Memory Controller grant before returning local context. Pass `require_grant:true` with `grant` or `grants`; pass `revoked_grant_refs` to make stale active grants fail closed. Missing, expired, revoked, or mismatched grants return `enigma.context_pack_recall_blocked.v1` with `context_pack_returned:false` and no memory payload.

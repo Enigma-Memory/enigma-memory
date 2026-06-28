@@ -411,6 +411,7 @@ Tools from `toolDescriptors` and `handlers`:
 | `enigma_init` | none | `bundlePath`, `tenant_id`, `subject_id`, `actor_id`, `policy_id` | Bundle summary with path, schema, counts, and whether it was created. |
 | `enigma_remember` | `text` | `bundlePath`, `purpose`, `tags`, `metadata` | `{ ok: true, memory_addr, receipt_id }`. The local vault stores private memory; public receipts must not contain raw memory plaintext. |
 | `enigma_search` | none | `bundlePath`, `query`, `memory_addr`, `purpose`, `limit` (`1..50`) | Search results or recalled memory plus retrieval receipts. |
+| `enigma_next_action` | none | `bundlePath` | `enigma.next_action.v1` with setup-needed or first-run next action. Missing bundles do not throw; output stays local/status-only and redacts paths/raw memory. |
 | `enigma_context_pack` | none | `bundlePath`, `query`, `purpose`, `limit` (`1..50`), `memory_addresses`, optional `require_grant`, `grant`, `grants`, `revoked_grant_refs`, `app_ref`, `purpose_ref`, `memory_zone_ref`, `policy_ref` | Context pack with active local memories and retrieval/injection receipt metadata. With `require_grant:true`, missing, revoked, or mismatched consent returns `enigma.context_pack_recall_blocked.v1` and does not return private context. |
 | `enigma_delete` | `memory_addr` | `bundlePath`, `reason` | `{ ok: true, memory_addr, receipt_id }` for Enigma state tombstone only. |
 | `enigma_verify_receipts` | none | `bundlePath`, `bundle` | Same verifier report as `verifyBundle`. |

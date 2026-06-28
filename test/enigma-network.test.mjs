@@ -478,6 +478,7 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
   assert.equal(list.id, 'tools');
   const names = list.result.tools.map((tool) => tool.name);
   assert.ok(names.includes('enigma_init'));
+  assert.ok(names.includes('enigma_next_action'));
   assert.ok(names.includes('enigma_remember'));
   assert.ok(names.includes('enigma_search'));
   assert.ok(names.includes('enigma_context_pack'));
@@ -496,6 +497,11 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
   const tempRoot = process.env.TEMP ?? process.env.TMP ?? '.';
   const dir = `${tempRoot}/enigma-network-${process.pid}-${Date.now()}`;
   const bundlePath = `${dir}/bundle.json`;
+    const missingNext = await callTool('next-missing-bundle', 'enigma_next_action', { bundlePath });
+    assert.equal(missingNext.result.schema, 'enigma.next_action.v1');
+    assert.equal(missingNext.result.state, 'setup_needed');
+    assert.equal(missingNext.result.primary_action.tool, 'enigma_init');
+    assert.doesNotMatch(JSON.stringify(missingNext.response), new RegExp(dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   try {
     const { resolve } = await import('node:path');
     const initialized = await callTool('init', 'enigma_init', { bundlePath });
@@ -507,6 +513,11 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
     assert.ok(initialized.result.bundlePath.endsWith('bundle.json'));
     assert.equal(typeof initialized.result.vault_id, 'string');
     assert.ok(initialized.result.vault_id.length > 0);
+
+    const emptyNext = await callTool('next-empty-bundle', 'enigma_next_action', { bundlePath });
+    assert.equal(emptyNext.result.state, 'needs_first_memory');
+    assert.equal(emptyNext.result.primary_action.tool, 'enigma_remember');
+    assert.equal(emptyNext.result.lanes.memory_inventory.status, 'empty');
 
     const secretText = 'network plaintext sentinel must not leak';
     const remembered = await callTool('remember', 'enigma_remember', {
@@ -521,6 +532,12 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
     assert.ok(remembered.result.memory_addr.length > 0);
     assert.equal(typeof remembered.result.receipt_id, 'string');
     assert.doesNotMatch(JSON.stringify(remembered.response), /network plaintext sentinel/);
+
+    const populatedNext = await callTool('next-populated-bundle', 'enigma_next_action', { bundlePath });
+    assert.equal(populatedNext.result.state, 'ready_for_app_connection');
+    assert.equal(populatedNext.result.primary_action.id, 'connect_ai_app');
+    assert.equal(populatedNext.result.lanes.memory_inventory.active_count, 1);
+    assert.doesNotMatch(JSON.stringify(populatedNext.response), /network plaintext sentinel/);
 
     const searched = await callTool('search', 'enigma_search', { bundlePath, query: 'plaintext sentinel', limit: 1 });
     assert.ok(Array.isArray(searched.result.memories));
