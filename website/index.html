@@ -23,15 +23,23 @@
   </header>
 
   <main>
-    <section class="hero">
-      <span class="eyebrow">Local-first memory for the AI apps you already use</span>
-      <h1>Your AI memory, kept in your own local vault.</h1>
-      <p>Start with the desktop app and first-run wizard. Enigma creates a local vault, previews supported app connections, and avoids Node, terminal, or JSON setup on the default path.</p>
-      <div class="cta-row">
-        <a class="btn btn-primary" href="./download.html">Download the desktop app</a>
-        <a class="btn btn-secondary" href="./launch-status.html">Check launch status</a>
+    <section class="hero hero--split">
+      <div class="hero__copy">
+        <span class="eyebrow">Local-first memory for the AI apps you already use</span>
+        <h1>Your AI memory, kept in your own local vault.</h1>
+        <p>Open Enigma, create a Memory Drive, connect Claude or Cursor, paste starter memories, and check proof activity from one desktop screen. No terminal or MCP JSON on the default path.</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="./download.html">Download the desktop app</a>
+          <a class="btn btn-secondary" href="./setup.html">See the 3-minute setup</a>
+        </div>
+        <p class="trust-note">Public launch signing is still tracked openly. Use signed desktop builds when available; current unsigned builds are labeled for testing and development, not general consumer install.</p>
       </div>
-      <p class="trust-note">Public launch signing is still tracked openly. Use signed desktop builds when available; current unsigned builds are labeled for testing and development, not general consumer install.</p>
+      <aside class="hero-panel" aria-label="Enigma setup snapshot">
+        <div class="hero-panel__row"><span>Memory Drive</span><strong>local</strong></div>
+        <div class="hero-panel__row"><span>Claude connector</span><strong>testable</strong></div>
+        <div class="hero-panel__row"><span>Import Sandbox</span><strong>preview first</strong></div>
+        <div class="hero-panel__row"><span>Proof Activity</span><strong>raw text hidden</strong></div>
+      </aside>
     </section>
 
     <section class="content-section" aria-labelledby="path-heading">
@@ -49,6 +57,12 @@
           <h3>3. Connect an AI app</h3>
           <p>Choose a supported app, preview the connection, and let that app ask Enigma for memory only when you allow that use.</p>
         </article>
+      </div>
+      <div class="path-strip" aria-label="No-friction setup path">
+        <div><strong>Start</strong><span>Open the desktop app.</span></div>
+        <div><strong>Connect</strong><span>Test Claude, Cursor, or another supported app locally.</span></div>
+        <div><strong>Import</strong><span>Preview text memories before writing the vault.</span></div>
+        <div><strong>Prove</strong><span>Show local receipt counts without raw memory.</span></div>
       </div>
     </section>
 
