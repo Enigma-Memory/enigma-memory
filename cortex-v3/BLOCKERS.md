@@ -32,7 +32,7 @@
 - ✅ **QA smoke scenarios + support playbooks** added in `docs/public-launch/`.
 - ✅ **Release/build pipeline** added: Tauri bundle config, GitHub Actions `desktop-build.yml`, Ed25519 update-manifest signer, release evidence generator.
 - ✅ **Opt-in crash reporting** implemented: redacted panic reports written locally; upload only after explicit opt-in. No memory, wallet, or path data included.
-- ⚠️ **Signed installers and code signing** require external Apple Developer / Microsoft signing identities.
+- 🔄 **Signed installers and code signing** — Azure Artifact Signing and Apple Developer setup in progress; scaffolding at `docs/public-launch/code-signing-setup.md` and `.github/workflows/desktop-release.yml`.
 ## Notes
 
 Use this file to track progress against blockers.

@@ -21,12 +21,11 @@
 - Diagnostics preview/export with forbidden-field rejection and user approval.
 - Update-check card that fetches signed manifest and shows current/available versions without auto-download.
 - Opt-in crash reporting: panic hook writes redacted report to disk; user controls whether pending reports are uploaded. No memory, wallet, or path data is included.
-
-### Release pipeline
-- Tauri v2 bundle config for Windows (NSIS) and macOS (app/dmg).
-- GitHub Actions `.github/workflows/desktop-build.yml` for cross-platform debug/self-signed builds.
-- Ed25519 signed update manifest script (`scripts/sign-update-manifest.mjs`) with verify round-trip.
 - Release evidence generator (`scripts/release-evidence-desktop.mjs`) dry-run tested.
+- Code-signing setup guide: `docs/public-launch/code-signing-setup.md`.
+- Signed release workflow: `.github/workflows/desktop-release.yml` with conditional Azure (Windows) and Apple (macOS) signing placeholders.
+
+### Connectors
 
 ### Connectors
 - Cross-platform connector engine with OS-agnostic path resolution.
@@ -44,11 +43,8 @@
 
 | Item | Why it matters | Owner / path to close |
 |---|---|---|
-| Signed Windows installer / MSIX | Public launch definition of done requires signed distribution. | Obtain Microsoft Store/Partner Center identity or trusted code-signing certificate. |
-| Signed/macOS notarized app | Gatekeeper will block unsigned apps. | Active Apple Developer Program + Developer ID certs + notarization credential. |
-| End-to-end smoke tests on clean Windows/macOS | Proves consumer path works without developer tools. | Run manual QA matrix or CI runners with signed installers. |
-| External security audit | Blocks public launch per claim boundary. | Hire auditor, complete checklist in `specs/security-audit-checklist.md`. |
-| Mainnet custody and funding | On-chain programs are currently devnet-only. | Configure `SOLANA_MAINNET_WALLET` and multisig custody. |
+| Signed Windows installer / MSIX | Public launch definition of done requires signed distribution. | Complete Azure Artifact Signing identity validation and add repository secrets; workflow ready. |
+| Signed/macOS notarized app | Gatekeeper will block unsigned apps. | Enroll in Apple Developer Program, add certificates/secrets to repo. |
 
 ---
 
