@@ -5,22 +5,32 @@
 // app, vault, connectors, and local services.
 
 import { createHash } from 'node:crypto';
-import { readFile, readdir, stat, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { verifyPublicSafeArtifact } from '../packages/core/src/index.js';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const ROOT = path.resolve(path.dirname(SCRIPT_PATH), '..');
+export const CLEAN_MACHINE_SMOKE_SCHEMA = 'enigma.clean_machine_smoke.v1';
+const DEFAULT_MANIFEST_URL = 'https://enigmamemory.com/releases/desktop/manifest.json';
+const STATUS_VALUES = new Set(['pass', 'fail', 'skip']);
+const LOCAL_PATH_RE = /(?:[A-Za-z]:[\\/](?:Users|Windows|ProgramData|Program Files)[\\/][^\s<>|?*]+|\/(?:Users|home|tmp|var|opt|usr|etc|private|Volumes)\/[^\s<>]*)/u;
 
 function scenario(id, name, status, evidence = {}) {
+  if (!STATUS_VALUES.has(status)) throw new Error(`unsupported smoke status: ${status}`);
   return { scenario_id: id, name, status, evidence };
 }
 
-function publicSafePath(p) {
-  if (typeof p !== 'string') return '';
-  const home = os.homedir();
-  return p.replace(home, '~').replace(/^[A-Za-z]:\\Users\\[^\\]+/g, '~');
+export function publicSafePath(p, fallback = '<local-path>') {
+  if (typeof p !== 'string' || p.length === 0) return fallback;
+  const normalizedHome = os.homedir().replace(/\\/g, '/');
+  const normalized = p.replace(/\\/g, '/');
+  if (path.isAbsolute(p) || /^[A-Za-z]:[\\/]/u.test(p)) return fallback;
+  if (normalizedHome && normalized.startsWith(normalizedHome)) return fallback;
+  if (LOCAL_PATH_RE.test(p) || LOCAL_PATH_RE.test(normalized)) return fallback;
+  return normalized;
 }
 
 async function fileExists(p) {
@@ -53,12 +63,12 @@ async function checkInstalledApp() {
 
   const exists = await fileExists(appPath);
   if (!exists) {
-    return scenario('SMOKE-INSTALL-001', 'Desktop app binary installed', 'fail', { expected: publicSafePath(appPath) });
+    return scenario('SMOKE-INSTALL-001', 'Desktop app binary installed', 'fail', { expected: publicSafePath(appPath, '<app-binary-path>') });
   }
 
   const stats = await stat(appPath);
   return scenario('SMOKE-INSTALL-001', 'Desktop app binary installed', 'pass', {
-    path_label: publicSafePath(appPath),
+    path_label: publicSafePath(appPath, '<app-binary-path>'),
     size_bytes: stats.size,
     modified_at: stats.mtime.toISOString(),
   });
@@ -77,20 +87,21 @@ async function checkVaultExists() {
 
   const exists = await fileExists(vaultDir);
   if (!exists) {
-    return scenario('SMOKE-VAULT-001', 'Local vault directory exists', 'fail', { expected: publicSafePath(vaultDir) });
+    return scenario('SMOKE-VAULT-001', 'Local vault directory exists', 'fail', { expected: publicSafePath(vaultDir, '<vault-dir>') });
   }
 
-  const files = [];
+  let entryCount = 0;
   try {
     const entries = await readdir(vaultDir);
-    for (const entry of entries.slice(0, 20)) files.push(entry);
+    entryCount = entries.filter((entry) => typeof entry === 'string' && entry.length > 0).length;
   } catch {
     // ignore
   }
 
   return scenario('SMOKE-VAULT-001', 'Local vault directory exists', 'pass', {
-    path_label: publicSafePath(vaultDir),
-    entries: files,
+    path_label: publicSafePath(vaultDir, '<vault-dir>'),
+    entry_count: entryCount,
+    entries_redacted: true,
   });
 }
 
@@ -113,14 +124,17 @@ async function checkConnectorConfig() {
 
   const config = await readJsonSafe(configPath);
   if (!config || typeof config !== 'object') {
-    return scenario('SMOKE-CONNECTOR-001', 'Claude Desktop config exists', 'fail', { reason: 'unreadable config' });
+    return scenario('SMOKE-CONNECTOR-001', 'Claude Desktop config exists', 'fail', {
+      reason: 'unreadable config',
+      path_label: publicSafePath(configPath, '<client-config-path>'),
+    });
   }
 
   const mcpServers = config.mcpServers || {};
   const enigmaKeys = Object.keys(mcpServers).filter((k) => k.toLowerCase().includes('enigma'));
 
   return scenario('SMOKE-CONNECTOR-001', 'Claude Desktop config exists', 'pass', {
-    path_label: publicSafePath(configPath),
+    path_label: publicSafePath(configPath, '<client-config-path>'),
     enigma_servers: enigmaKeys,
     total_servers: Object.keys(mcpServers).length,
   });
@@ -130,6 +144,12 @@ async function checkEngineService() {
   try {
     const response = await fetch('http://127.0.0.1:8787/health');
     const body = await response.text();
+    if (!response.ok) {
+      return scenario('SMOKE-ENGINE-001', 'Local engine service responds', 'fail', {
+        status: response.status,
+        body_hash: createHash('sha256').update(body).digest('hex').slice(0, 16),
+      });
+    }
     return scenario('SMOKE-ENGINE-001', 'Local engine service responds', 'pass', {
       status: response.status,
       body_hash: createHash('sha256').update(body).digest('hex').slice(0, 16),
@@ -140,20 +160,21 @@ async function checkEngineService() {
 }
 
 async function checkUpdateManifest() {
-  const manifestUrl = process.env.UPDATER_MANIFEST_URL || 'https://enigmamemory.com/releases/desktop/manifest.json';
+  const manifestUrl = process.env.UPDATER_MANIFEST_URL || DEFAULT_MANIFEST_URL;
+  const urlLabel = manifestUrl === DEFAULT_MANIFEST_URL ? DEFAULT_MANIFEST_URL : '<custom-updater-manifest-url>';
   try {
     const response = await fetch(manifestUrl);
     if (!response.ok) {
-      return scenario('SMOKE-UPDATE-001', 'Update manifest reachable', 'fail', { status: response.status });
+      return scenario('SMOKE-UPDATE-001', 'Update manifest reachable', 'fail', { url_label: urlLabel, status: response.status });
     }
     const manifest = await response.json();
     return scenario('SMOKE-UPDATE-001', 'Update manifest reachable', 'pass', {
-      url: manifestUrl,
+      url_label: urlLabel,
       version: manifest.version ?? null,
       platforms: Object.keys(manifest.platforms || {}),
     });
   } catch (err) {
-    return scenario('SMOKE-UPDATE-001', 'Update manifest reachable', 'fail', { reason: err.message });
+    return scenario('SMOKE-UPDATE-001', 'Update manifest reachable', 'fail', { url_label: urlLabel, reason_code: 'fetch_failed', error_hash: createHash('sha256').update(String(err?.message ?? err)).digest('hex').slice(0, 16) });
   }
 }
 
@@ -181,7 +202,7 @@ async function checkDiagnosticsBundle() {
   });
 }
 
-async function runSmoke() {
+export async function runSmoke() {
   const scenarios = await Promise.all([
     checkInstalledApp(),
     checkVaultExists(),
@@ -194,8 +215,8 @@ async function runSmoke() {
   const counts = { pass: 0, fail: 0, skip: 0 };
   for (const s of scenarios) counts[s.status] += 1;
 
-  return {
-    schema: 'enigma.clean_machine_smoke.v1',
+  const report = {
+    schema: CLEAN_MACHINE_SMOKE_SCHEMA,
     generated_at: new Date().toISOString(),
     app_version: '0.1.18',
     platform: os.platform(),
@@ -208,6 +229,9 @@ async function runSmoke() {
     },
     scenarios,
   };
+  const safety = verifyPublicSafeArtifact(report);
+  if (!safety.ok) throw new Error(`clean-machine smoke report is not public-safe: ${safety.errors.join('; ')}`);
+  return report;
 }
 
 function usage() {
@@ -233,14 +257,18 @@ async function main() {
   const output = json ? JSON.stringify(report, null, 2) : JSON.stringify(report, null, 2);
 
   if (outPath) {
-    await writeFile(path.resolve(outPath), `${output}\n`, 'utf8');
+    const resolved = path.resolve(outPath);
+    await mkdir(path.dirname(resolved), { recursive: true });
+    await writeFile(resolved, `${output}\n`, 'utf8');
   }
   console.log(output);
 
   process.exitCode = 0;
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exitCode = 1;
-});
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
+  main().catch((err) => {
+    process.stdout.write(`${JSON.stringify({ schema: CLEAN_MACHINE_SMOKE_SCHEMA, ok: false, error: { code: 'CLEAN_MACHINE_SMOKE_ERROR', message: err.message } }, null, 2)}\n`);
+    process.exitCode = 1;
+  });
+}
