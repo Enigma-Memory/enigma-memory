@@ -287,6 +287,13 @@ function validateToolArguments(name, args) {
         'max_estimated_tokens',
         'price_per_million_tokens',
         'currency',
+        'require_grant',
+        'grant',
+        'grants',
+        'app_ref',
+        'memory_zone_ref',
+        'policy_ref',
+        'purpose_ref',
       ]), name);
       optionalString(args, 'bundlePath', name);
       optionalString(args, 'query', name);
@@ -297,6 +304,13 @@ function validateToolArguments(name, args) {
       optionalNonNegativeNumber(args, 'max_estimated_tokens', name);
       optionalNonNegativeNumber(args, 'price_per_million_tokens', name);
       optionalString(args, 'currency', name);
+      optionalBoolean(args, 'require_grant', name);
+      optionalStrictObject(args, 'grant', CONSENT_GRANT_ARTIFACT_KEYS, name);
+      optionalStrictObjectArray(args, 'grants', CONSENT_GRANT_ARTIFACT_KEYS, name);
+      optionalString(args, 'app_ref', name);
+      optionalString(args, 'memory_zone_ref', name);
+      optionalString(args, 'purpose_ref', name);
+      optionalString(args, 'policy_ref', name);
       return args;
     case 'enigma_delete':
       rejectAdditionalProperties(args, new Set(['bundlePath', 'memory_addr', 'reason']), name);
@@ -597,6 +611,13 @@ export const toolDescriptors = [
         max_estimated_tokens: { type: 'number', minimum: 0 },
         price_per_million_tokens: { type: 'number', minimum: 0 },
         currency: { type: 'string' },
+        require_grant: { type: 'boolean' },
+        grant: CONSENT_GRANT_JSON_SCHEMA,
+        grants: { type: 'array', items: CONSENT_GRANT_JSON_SCHEMA },
+        app_ref: { type: 'string' },
+        memory_zone_ref: { type: 'string' },
+        purpose_ref: { type: 'string' },
+        policy_ref: { type: 'string' },
       },
       additionalProperties: false,
     },
@@ -1186,10 +1207,52 @@ export async function enigma_search(input = {}) {
   return { memories: pack.memories ?? [], receipts: pack.retrieval_receipts ?? pack.receipts ?? [] };
 }
 
+function contextRecallScope(input) {
+  return {
+    app_ref: input.app_ref ?? 'ref:app:mcp-client',
+    purpose_ref: input.purpose_ref ?? 'ref:purpose:mcp_context_pack',
+    operation: 'recall_context',
+    memory_zone_ref: input.memory_zone_ref ?? 'ref:zone:default',
+    policy_ref: input.policy_ref ?? 'ref:policy:mcp-context',
+  };
+}
+
+function contextRecallDecision(input, candidateCount) {
+  return createRecallVetoDecision({
+    grant: input.grant,
+    grants: input.grants,
+    ...contextRecallScope(input),
+    candidate_count: candidateCount,
+  });
+}
+
+function blockedContextPack(decision) {
+  return assertMemoryControllerPublicSafe({
+    schema: 'enigma.context_pack_recall_blocked.v1',
+    ok: false,
+    context_pack_returned: false,
+    memory_count: 0,
+    recall_veto: decision,
+    private_payload_returned: false,
+    claim_boundaries: {
+      local_only: true,
+      provider_deletion_proof: false,
+      model_forgetting_proof: false,
+      hosted_saas_live: false,
+    },
+  });
+}
+
 export async function enigma_context_pack(input = {}) {
   input = validateToolArguments('enigma_context_pack', input);
   const path = bundlePath(input);
   const { vault, passport } = await loadState(path);
+  const grantRequired = input.require_grant === true;
+  const grantProvided = input.grant !== undefined || input.grants !== undefined;
+  if (grantRequired) {
+    const preflightDecision = contextRecallDecision(input, 0);
+    if (preflightDecision.safe_to_share !== true) return blockedContextPack(preflightDecision);
+  }
   const pack = compileContextPack({
     vault,
     passport,
@@ -1202,6 +1265,12 @@ export async function enigma_context_pack(input = {}) {
     limit: Number(input.limit ?? 8),
     memory_addresses: input.memory_addresses,
   });
+  if (grantRequired || grantProvided) {
+    pack.memory_controller = {
+      context_pack_returned: true,
+      recall_veto: contextRecallDecision(input, Array.isArray(pack.memories) ? pack.memories.length : 0),
+    };
+  }
   await persistState(path, vault);
   return pack;
 }

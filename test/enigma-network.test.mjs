@@ -530,6 +530,46 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
     assert.ok(context.result.memories.length >= 1);
     assert.ok(Array.isArray(context.result.retrieval_receipts ?? context.result.receipts));
 
+    const blockedContext = await callTool('context-pack-blocked-by-grant', 'enigma_context_pack', {
+      bundlePath,
+      query: 'plaintext sentinel',
+      purpose: 'integration_test',
+      limit: 1,
+      require_grant: true,
+      app_ref: 'ref:app:mcp-test',
+      purpose_ref: 'ref:purpose:integration-test',
+      memory_zone_ref: 'ref:zone:default',
+    });
+    assert.equal(blockedContext.result.schema, 'enigma.context_pack_recall_blocked.v1');
+    assert.equal(blockedContext.result.context_pack_returned, false);
+    assert.equal(blockedContext.result.recall_veto.safe_to_share, false);
+    assert.doesNotMatch(JSON.stringify(blockedContext.result), /network plaintext sentinel/);
+
+    const grant = await callTool('context-pack-consent-grant', 'enigma_consent_grant', {
+      app_ref: 'ref:app:mcp-test',
+      purpose_ref: 'ref:purpose:integration-test',
+      operation: 'recall_context',
+      memory_zone_ref: 'ref:zone:default',
+      issued_at: '2026-06-28T12:00:00.000Z',
+      expires_at: '2026-06-28T12:05:00.000Z',
+    });
+    const gatedContext = await callTool('context-pack-allowed-by-grant', 'enigma_context_pack', {
+      bundlePath,
+      query: 'plaintext sentinel',
+      purpose: 'integration_test',
+      limit: 1,
+      require_grant: true,
+      grant: grant.result,
+      app_ref: 'ref:app:mcp-test',
+      purpose_ref: 'ref:purpose:integration-test',
+      memory_zone_ref: 'ref:zone:default',
+    });
+    assert.ok(Array.isArray(gatedContext.result.memories));
+    assert.ok(gatedContext.result.memories.length >= 1);
+    assert.equal(gatedContext.result.memory_controller.context_pack_returned, true);
+    assert.equal(gatedContext.result.memory_controller.recall_veto.safe_to_share, true);
+    assert.deepEqual(gatedContext.result.memory_controller.recall_veto.grant_refs, [grant.result.grant_ref]);
+
     const optimizedContext = await callTool('optimized-context-pack', 'enigma_context_pack', {
       bundlePath,
       query: 'plaintext sentinel',
