@@ -637,3 +637,29 @@ test('status plain output reports counters without JSON or local paths', async (
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('drive health plain output reports health without JSON or local paths', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-drive-health-plain-'));
+  const bundlePath = join(dir, 'bundle.json');
+  const outDir = join(dir, 'out');
+  try {
+    const setupIo = makeIo();
+    assert.equal(await main(['setup', '--bundle', bundlePath, '--out-dir', outDir, '--overwrite'], setupIo.io), 0, setupIo.stderr());
+
+    const io = makeIo();
+    assert.equal(await main(['drive', 'health', '--bundle', bundlePath, '--plain'], io.io), 0, io.stderr());
+    const stdout = io.stdout();
+
+    assert.match(stdout, /^Enigma drive health\n/);
+    assert.match(stdout, /Status: /);
+    assert.match(stdout, /Score: /);
+    assert.match(stdout, /Receipt coverage: /);
+    assert.match(stdout, /Proof network: /);
+    assert.match(stdout, /Boundary: local Memory Drive health only/);
+    assert.doesNotMatch(stdout, /^\s*\{/);
+    assert.equal(stdout.includes(dir), false);
+    assert.equal(stdout.includes(bundlePath), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

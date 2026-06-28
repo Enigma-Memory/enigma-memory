@@ -2030,6 +2030,36 @@ function printStatusSummary(report, flags, io) {
   else print(report, io);
 }
 
+function renderDriveHealthPlain(report) {
+  const metrics = report.metrics ?? {};
+  const actions = [];
+  for (const metric of Object.values(metrics)) {
+    if (!metric || !Array.isArray(metric.recommended_actions)) continue;
+    for (const action of metric.recommended_actions) {
+      if (typeof action === 'string' && !actions.includes(action)) actions.push(action);
+      if (actions.length >= 2) break;
+    }
+    if (actions.length >= 2) break;
+  }
+  const proofReady = report.proof_network_ready?.eligible_for_anchor_batch === true ? 'eligible' : 'blocked';
+  const lines = [
+    'Enigma drive health',
+    `Status: ${report.overall_status ?? 'unknown'}`,
+    `Score: ${report.overall_score ?? 'unknown'}`,
+    `Receipt coverage: ${metrics.receipt_coverage?.status ?? 'unknown'}`,
+    `Connector health: ${metrics.connector_health?.status ?? 'unknown'}`,
+    `Proof network: ${proofReady}`,
+  ];
+  for (const action of actions) lines.push(`Next: ${action}`);
+  lines.push('Boundary: local Memory Drive health only; no raw memory, local paths, provider deletion, model behavior, hosted service, or live-chain claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printDriveHealthReport(report, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderDriveHealthPlain(report));
+  else print(report, io);
+}
+
 function renderNextActionPlain(action) {
   const lines = [
     'Enigma next',
@@ -2234,7 +2264,7 @@ async function driveHealthCommand(flags, io) {
   const report = createMemoryDriveHealthReport({ vault, passport, benchmarkSummary, connectorSummary, replicas, latestAnchorBatchRef, now });
   const outPath = getFlag(flags, ['out']);
   if (outPath) await writeJson(outPath, report);
-  print(report, io);
+  printDriveHealthReport(report, flags, io);
   return 0;
 }
 
@@ -4054,6 +4084,7 @@ function usage() {
         '--replicas <path>': 'Optional JSON file of replica root reports for sync fork risk.',
         '--latest-anchor-batch-ref <ref>': 'Optional public-safe proof-network anchor batch ref for receipt coverage.',
         '--out <path>': 'Write the JSON report to a file in addition to stdout.',
+        '--plain': 'Print a human-readable health summary instead of JSON. Alias: --text or --format text.',
       },
       boundary: 'Computed locally from public-safe counters, roots, receipt metadata, tombstones, and derived/context-pack refs only. No network or chain calls; transaction_submitted and raw_memory_on_chain are always false. It is local operational evidence, not provider-deletion, model-forgetting, compliance, or live-chain-settlement proof.',
     },
