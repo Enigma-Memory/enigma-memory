@@ -29,7 +29,12 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["msi", "nsis", "dmg", "app"],
+    "targets": [
+      "msi",
+      "nsis",
+      "dmg",
+      "app"
+    ],
     "icon": [
       "icons/icon.ico",
       "icons/icon.png"
@@ -58,9 +63,18 @@
       "entitlements": null,
       "exceptionDomain": null,
       "dmg": {
-        "appPosition": { "x": 192, "y": 128 },
-        "applicationFolderPosition": { "x": 448, "y": 128 },
-        "windowSize": { "width": 660, "height": 400 }
+        "appPosition": {
+          "x": 192,
+          "y": 128
+        },
+        "applicationFolderPosition": {
+          "x": 448,
+          "y": 128
+        },
+        "windowSize": {
+          "width": 660,
+          "height": 400
+        }
       },
       "signingIdentity": null,
       "providerShortName": null
@@ -70,8 +84,10 @@
     "updater": {
       "active": true,
       "dialog": true,
-      "endpoints": ["{{env:UPDATER_MANIFEST_URL}}"],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk0MUEyMTY0RUE4N0M3MkIKUldRRjlUa3drZzRlL3Jab05Ea1l6N1E3aVRSMkt3a0IrZ3F3R0Zqa2hhd1I3d1RMcjBYYkxLUjEK"
+      "endpoints": [
+        "{{env:UPDATER_MANIFEST_URL}}"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY5NjM1QjMxNDU5RkUzMDEKUldRQjQ1OUZNVnRqYWJYSFFRb2xYRW9ObDJpZzRCd0UvbUJZQzVuR1R6TXk3bXZwaEFwWVN5NlUK"
     }
   }
 }

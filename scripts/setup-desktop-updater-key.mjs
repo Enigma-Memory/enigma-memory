@@ -5,7 +5,7 @@
 // committed to the repository.
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -15,7 +15,12 @@ const TAURI_DIR = path.join(ROOT, 'apps', 'desktop-tauri');
 const CONFIG_PATH = path.join(TAURI_DIR, 'tauri.conf.json');
 
 function run(cmd, args, options = {}) {
-  return execFileSync(cmd, args, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], ...options });
+  const isWindows = process.platform === 'win32';
+  return execFileSync(isWindows ? 'cmd' : cmd, isWindows ? ['/c', cmd, ...args] : args, {
+    encoding: 'utf8',
+    stdio: ['pipe', 'pipe', 'pipe'],
+    ...options,
+  });
 }
 
 function ensureTauriCli() {
@@ -28,18 +33,23 @@ function ensureTauriCli() {
 }
 
 function generateKeyPair() {
-  const privateKeyPath = path.join(TAURI_DIR, 'tauri-signing-private-key');
+  const privateKeyPath = 'tauri-signing-private-key';
   const publicKeyPath = `${privateKeyPath}.pub`;
 
-  // tauri signer generate writes private key to file and prints public key to stdout.
-  run('npx', ['@tauri-apps/cli', 'signer', 'generate', '-w', privateKeyPath, '-p', publicKeyPath], {
+  // Run from the Tauri directory so relative paths land inside it.
+  run('npx', ['@tauri-apps/cli', 'signer', 'generate', '--ci', '-w', privateKeyPath, '-p', publicKeyPath], {
     cwd: TAURI_DIR,
   });
 
-  const privateKey = readFileSync(privateKeyPath, 'utf8').trim();
-  const publicKey = readFileSync(publicKeyPath, 'utf8').trim();
+  const privateKey = readFileSync(path.join(TAURI_DIR, privateKeyPath), 'utf8').trim();
+  const publicKey = readFileSync(path.join(TAURI_DIR, publicKeyPath), 'utf8').trim();
 
-  return { privateKey, publicKey, privateKeyPath, publicKeyPath };
+  // Remove the key files so they are never accidentally committed.
+  // The private key is printed to stdout for the operator to store as a secret.
+  try { unlinkSync(path.join(TAURI_DIR, privateKeyPath)); } catch {}
+  try { unlinkSync(path.join(TAURI_DIR, publicKeyPath)); } catch {}
+
+  return { privateKey, publicKey };
 }
 
 function updateConfig(publicKey) {
