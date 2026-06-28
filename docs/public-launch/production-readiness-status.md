@@ -1,6 +1,6 @@
 # Enigma Memory — Production Readiness Status
 
-**Generated:** 2026-06-26
+**Generated:** 2026-06-28
 **Branch:** `memory-boundary-transaction-system`  
 **Goal:** Signed desktop app for general consumers (Windows/macOS), one-button setup, one-click AI app connectors, health/fix-it UI, privacy-safe diagnostics.
 
@@ -23,9 +23,10 @@
 - Opt-in crash reporting: panic hook writes redacted report to disk; user controls whether pending reports are uploaded. No memory, wallet, or path data is included.
 - Release evidence generator (`scripts/release-evidence-desktop.mjs`) dry-run tested.
 - Signed release workflow: `.github/workflows/desktop-release.yml` with conditional Azure (Windows) and Apple (macOS) signing placeholders.
+- Unsigned dry-run workflow: `.github/workflows/desktop-build.yml` mirrors release matrix and passes without signing secrets.
 - Tauri updater signing key: generated and stored as `TAURI_SIGNING_PRIVATE_KEY` GitHub secret; public key committed in `tauri.conf.json`.
-
-### Connectors
+- Docker build environments: `cortex-v3/Dockerfile` (Anchor/Solana/Rust/Node), `apps/desktop-tauri/Dockerfile` (Tauri Linux), and `docker-compose.build.yml`.
+- Clean-machine smoke harness: `scripts/run-clean-machine-smoke.mjs` plus test.
 
 ### Connectors
 - Cross-platform connector engine with OS-agnostic path resolution.
@@ -43,19 +44,19 @@
 
 | Item | Why it matters | Owner / path to close |
 |---|---|---|
-| Signed Windows installer / MSIX | Public launch definition of done requires signed distribution. | Complete Azure Artifact Signing identity validation. Account session confirmed; manual Azure portal sign-in required before automation can continue. |
-| Signed/macOS notarized app | Gatekeeper will block unsigned apps. | Enroll in Apple Developer Program; requires Apple ID credentials and a trusted Apple device for 2FA. |
+| Signed Windows installer / MSIX | Public launch definition of done requires signed distribution. | Complete Azure Artifact Signing setup. Subscription `Azure subscription 1` is active; Artifact Signing account and Public Trust certificate profile creation are in progress. |
+| Signed/macOS notarized app | Gatekeeper will block unsigned apps. | Enroll in Apple Developer Program; see `docs/public-launch/code-signing-setup.md` for fast-track steps and timeline. |
 
 ---
 
 ## Verification run on this commit
 
 - `npm run check` at repo root: **pass**.
-- `npm test` at repo root: **548/548 pass**.
+- `npm test` at repo root: **559/559 pass**.
 - `cargo +1.75.0 check --workspace` in `cortex-v3/`: **pass**.
 - `npm test` in `cortex-v3/node/`: **83/83 pass**.
-- `cargo test` in `apps/desktop-tauri/`: **17/17 pass**.
-- `anchor test` for treasury: not runnable locally; relies on GitHub Actions runner with Solana CLI/Anchor CLI installed.
+- `cargo test` in `apps/desktop-tauri/`: **20/20 pass**.
+- `anchor test` for treasury: not runnable locally; Docker/CI path available via `cortex-v3/Dockerfile` and GitHub Actions.
 
 ---
 
