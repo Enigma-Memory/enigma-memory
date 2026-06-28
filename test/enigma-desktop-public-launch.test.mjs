@@ -66,6 +66,11 @@ test('desktop first-run defaults to Memory Drive home dashboard', async () => {
   assert.equal(model.screens.home.title, 'Memory Drive dashboard');
   assert.equal(model.dashboard.next_action.id, 'create_memory_drive');
   assert.equal(model.dashboard.next_action.label, 'Create Memory Drive');
+  assert.equal(model.dashboard.next_action.schema, 'enigma.desktop.next_action.v1');
+  assert.equal(model.dashboard.next_action.state, 'setup_needed');
+  assert.equal(model.dashboard.next_action.primary_action.id, 'create_memory_drive');
+  assert.equal(model.dashboard.next_action.claim_boundaries.raw_memory_returned, false);
+  assert.equal(model.dashboard.next_action.claim_boundaries.local_paths_returned, false);
   assert.equal(dashboard.memory_drive_status, 'missing');
   assert.ok(model.dashboard.issue_codes.includes('MEMORY_DRIVE_MISSING'));
   assert.equal(model.dashboard.memory_controller.schema, 'enigma.desktop.memory_controller_summary.v1');
@@ -99,6 +104,9 @@ test('desktop create Memory Drive action prepares consumer dashboard without raw
   assert.equal(state.vault.status, 'ready');
   assert.equal(model.dashboard.memory_drive_status, 'ready');
   assert.equal(model.dashboard.next_action.id, 'start_service');
+  assert.equal(model.dashboard.next_action.schema, 'enigma.desktop.next_action.v1');
+  assert.equal(model.dashboard.next_action.state, 'service_needed');
+  assert.match(model.dashboard.next_action.plain_summary, /Start local service/);
   assert.equal(model.dashboard.memory_controller.memory_weather.primary_action.id, 'review_grants');
   assert.equal(model.dashboard.memory_controller.recall_approval.primary_action.id, 'review_recall');
   assert.equal(model.dashboard.memory_controller.recall_approval.secondary_actions[0].label, 'Approve this local recall');
@@ -239,6 +247,10 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(wizard, /deny-recall/);
   assert.match(wizard, /recallReviewOpen = true/);
   assert.doesNotMatch(wizard, /recallReviewed = true/);
+  assert.match(wizard, /One next step/);
+  assert.match(wizard, /dashboardNextAction/);
+  assert.match(wizard, /renderNextActionSection/);
+  assert.match(wizard, /No raw memory, local paths, provider responses, or outside-Enigma control claims/);
   assert.match(wizard, /Import Sandbox/);
   assert.match(wizard, /Preview plain text, Markdown, or provider exports/);
   assert.match(wizard, /duplicate groups/);

@@ -538,6 +538,42 @@ function renderReady() {
   `, 'welcome');
 }
 
+function dashboardNextAction({ serviceRunning, updateAvailable }) {
+  if ((health.memory_drive_status || 'unknown') !== 'ready') {
+    return { label: 'Create Memory Drive', action: 'create-vault-action', reason: 'Create the local encrypted Memory Drive before importing or connecting apps.' };
+  }
+  if (!serviceRunning) {
+    return { label: 'Start engine', action: 'start-service', reason: 'Start the bundled local service so connected apps can talk to Enigma.' };
+  }
+  if (health.offline_ready !== true) {
+    return { label: 'Run health check', action: 'run-health', reason: 'Check local vault, privacy guardrails, and app connection readiness.' };
+  }
+  if (Number(health.connected_app_count ?? 0) === 0) {
+    return { label: 'Connect apps', action: 'detect-clients', reason: 'Find Claude, Cursor, or another supported app and connect it without editing JSON.' };
+  }
+  if (diagnostics?.status === 'needs-review' || diagnostics?.status === 'error') {
+    return { label: 'Run diagnostics', action: 'run-diagnostics', reason: 'Create a public-safe support summary before asking for help.' };
+  }
+  if (updateAvailable) {
+    return { label: 'Check for updates', action: 'check-update', reason: 'A local desktop update may be available.' };
+  }
+  return { label: 'Review proof activity', action: 'run-health', reason: 'Memory Drive is ready. Review receipts and proof status when you want assurance.' };
+}
+
+function renderNextActionSection(action) {
+  return `
+    <section class="dashboard-section next-action" aria-labelledby="next-action-title">
+      <p class="eyebrow">One next step</p>
+      <h2 id="next-action-title">${escapeHtml(action.label)}</h2>
+      <p>${escapeHtml(action.reason)}</p>
+      <p class="note">This is local Enigma status only. No raw memory, local paths, provider responses, or outside-Enigma control claims are shown.</p>
+      <div class="button-row">
+        ${primaryButton(action.label, action.action)}
+      </div>
+    </section>
+  `;
+}
+
 function renderDashboard() {
   const issueTags = (health.issue_codes?.length ? health.issue_codes : ['none']).map(
     (code) => `<li>${escapeHtml(code)}</li>`
@@ -550,6 +586,7 @@ function renderDashboard() {
   const updateAvailable = update?.available_version && update.available_version !== update.current_version;
   const crashEnabled = crashReporting.status?.enabled ?? false;
   const crashPending = crashReporting.status?.pending_count ?? 0;
+  const nextAction = dashboardNextAction({ serviceRunning, updateAvailable });
 
   return renderCard(`
     <p class="eyebrow">Memory health</p>
@@ -567,6 +604,8 @@ function renderDashboard() {
       <dt>Issue codes</dt>
       <ul class="issue-list">${issueTags}</ul>
     </div>
+
+    ${renderNextActionSection(nextAction)}
 
     ${renderMemoryControllerSection()}
     ${renderImportSandboxSection()}

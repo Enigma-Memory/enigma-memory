@@ -1452,29 +1452,47 @@ function collectDashboardIssueCodes(state) {
   return uniqueIssueCodes(codes);
 }
 
+function desktopNextAction(action, state) {
+  return {
+    schema: 'enigma.desktop.next_action.v1',
+    state,
+    ...action,
+    primary_action: { id: action.id, label: action.label, screen: action.screen },
+    plain_summary: `${action.label}: ${action.reason}`,
+    claim_boundaries: {
+      local_desktop_status_only: true,
+      raw_memory_returned: false,
+      local_paths_returned: false,
+      provider_deletion_proof: false,
+      model_forgetting_proof: false,
+      hosted_saas_live: false,
+    },
+  };
+}
+
 function selectMemoryDriveNextAction(input) {
   if (input.memoryDriveStatus !== 'ready' || input.issueCodes.includes('MEMORY_DRIVE_MISSING')) {
-    return { id: 'create_memory_drive', label: 'Create Memory Drive', screen: 'setup', reason: 'Memory Drive has not been created on this device.' };
+    return desktopNextAction({ id: 'create_memory_drive', label: 'Create Memory Drive', screen: 'setup', reason: 'Memory Drive has not been created on this device.' }, 'setup_needed');
   }
   if (input.serviceStatus !== 'running' || input.issueCodes.includes('SERVICE_NOT_RUNNING')) {
-    return { id: 'start_service', label: 'Start local service', screen: 'setup', reason: 'Connected apps need the bundled local service.' };
+    return desktopNextAction({ id: 'start_service', label: 'Start local service', screen: 'setup', reason: 'Connected apps need the bundled local service.' }, 'service_needed');
   }
   if (input.healthStatus !== 'healthy') {
-    return { id: 'fix_health', label: 'Fix Memory Drive health', screen: 'setup', reason: 'Health checks found an issue that can be repaired locally.' };
+    return desktopNextAction({ id: 'fix_health', label: 'Fix Memory Drive health', screen: 'setup', reason: 'Health checks found an issue that can be repaired locally.' }, 'attention_needed');
   }
   if (input.updateStatus === 'available' || input.issueCodes.includes('UPDATE_AVAILABLE')) {
-    return { id: 'install_update', label: 'Install update', screen: 'setup', reason: 'A desktop update is ready.' };
+    return desktopNextAction({ id: 'install_update', label: 'Install update', screen: 'setup', reason: 'A desktop update is ready.' }, 'update_available');
   }
   if (input.diagnosticsStatus === 'needs-review' || input.diagnosticsStatus === 'error') {
-    return { id: 'open_diagnostics', label: 'Open safe support report', screen: 'setup', reason: 'Diagnostics need review before sharing support metadata.' };
+    return desktopNextAction({ id: 'open_diagnostics', label: 'Open safe support report', screen: 'setup', reason: 'Diagnostics need review before sharing support metadata.' }, 'diagnostics_review');
   }
   if (input.proofStatus === 'error' || input.proofStatus === 'needs-review') {
-    return { id: 'review_proof', label: 'Review proof activity', screen: 'verifier', reason: 'Proof activity needs local review.' };
+    return desktopNextAction({ id: 'review_proof', label: 'Review proof activity', screen: 'verifier', reason: 'Proof activity needs local review.' }, 'proof_review');
   }
   if (input.connectedAppCount === 0) {
-    return { id: 'connect_app', label: 'Connect an app', screen: 'clients', reason: 'No connected app has been recorded yet.' };
+    return desktopNextAction({ id: 'connect_app', label: 'Connect an app', screen: 'clients', reason: 'No connected app has been recorded yet.' }, 'ready_for_app_connection');
   }
-  return { id: 'view_proof_activity', label: 'View proof activity', screen: 'verifier', reason: 'Memory Drive is ready.' };
+  return desktopNextAction({ id: 'view_proof_activity', label: 'View proof activity', screen: 'verifier', reason: 'Memory Drive is ready.' }, 'ready');
 }
 
 function selectMemoryControllerSummary(input) {
