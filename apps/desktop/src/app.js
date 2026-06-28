@@ -1513,7 +1513,11 @@ function selectMemoryControllerSummary(input) {
       status: 'ask',
       label: 'Waiting for your approval',
       summary: 'Not shared until you approve.',
-      primary_action: { id: 'review_recall', label: 'Review recall' }
+      primary_action: { id: 'review_recall', label: 'Review recall' },
+      secondary_actions: [
+        { id: 'approve_recall', label: 'Approve this local recall' },
+        { id: 'deny_recall', label: 'Keep not shared' }
+      ]
     },
     private_memory_bubble: {
       status: 'closed',

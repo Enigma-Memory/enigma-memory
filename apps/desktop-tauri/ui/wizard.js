@@ -45,7 +45,8 @@ let serviceStatus = {};
 let serviceLogs = [];
 let controllerUi = {
   grantsReviewed: false,
-  recallReviewed: false,
+  recallDecision: 'ask',
+  recallReviewOpen: false,
   privateBubbleOpen: false,
   privateBubbleTouched: false,
 };
@@ -87,9 +88,17 @@ async function mockInvoke(cmd, args = {}) {
             label: controllerUi.grantsReviewed ? 'App permissions reviewed locally' : 'Connected apps must ask first',
           },
           recall_veto_decision: {
-            decision: controllerUi.recallReviewed ? 'allow' : 'ask',
-            label: controllerUi.recallReviewed ? 'Approved for this local request' : 'Waiting for your approval',
-            share_status: controllerUi.recallReviewed ? 'Safe to share after your approval' : 'Not shared until you approve',
+            decision: controllerUi.recallDecision,
+            label: controllerUi.recallDecision === 'allow'
+              ? 'Approved for this local request'
+              : controllerUi.recallDecision === 'deny'
+                ? 'Kept not shared locally'
+                : 'Waiting for your approval',
+            share_status: controllerUi.recallDecision === 'allow'
+              ? 'Approved only for this local request'
+              : controllerUi.recallDecision === 'deny'
+                ? 'Not shared for this local request'
+                : 'Not shared until you approve',
           },
           private_memory_bubble: {
             status: controllerUi.privateBubbleOpen ? 'open' : 'closed',
@@ -251,9 +260,19 @@ function getMemoryControllerView() {
   };
   const weatherAction = controllerActionFrom(controllerUi.grantsReviewed ? 'open_private_bubble' : weather.next_action || source.next_action, weatherStatus);
   const grantStatus = controllerUi.grantsReviewed ? (connectedCount > 0 ? 'active' : 'missing') : controllerStatus(grant.status || health.consent_grant_status || (connectedCount > 0 ? 'active' : 'missing'), ['active', 'expired', 'revoked', 'missing'], connectedCount > 0 ? 'active' : 'missing');
-  const recallDecision = controllerUi.recallReviewed ? 'allow' : controllerStatus(recall.decision || health.recall_decision || 'ask', ['allow', 'ask', 'deny'], 'ask');
+  const localRecallDecision = controllerUi.recallDecision && controllerUi.recallDecision !== 'ask' ? controllerUi.recallDecision : undefined;
+  const recallDecision = localRecallDecision || controllerStatus(recall.decision || health.recall_decision || 'ask', ['allow', 'ask', 'deny'], 'ask');
   const rawBubbleStatus = controllerUi.privateBubbleTouched ? (controllerUi.privateBubbleOpen ? 'open' : 'closed') : bubble.status || (controllerUi.privateBubbleOpen ? 'open' : 'closed');
   const bubbleStatus = controllerStatus(rawBubbleStatus, ['open', 'closed', 'kept', 'discarded', 'expired'], controllerUi.privateBubbleOpen ? 'open' : 'closed');
+  const recallReviewOpen = controllerUi.recallReviewOpen === true;
+  const recallPrimaryAction = recallReviewOpen
+    ? recallDecision === 'allow'
+      ? { label: 'Keep not shared', action: 'deny-recall' }
+      : { label: 'Approve this local recall', action: 'approve-recall' }
+    : { label: 'Review recall', action: 'review-recall' };
+  const recallSecondaryActions = recallReviewOpen && recallDecision !== 'deny'
+    ? [{ label: 'Keep not shared', action: 'deny-recall' }]
+    : [];
 
   return {
     weather: {
@@ -270,9 +289,10 @@ function getMemoryControllerView() {
     },
     recall: {
       status: recallDecision,
-      label: safePublicLabel(controllerUi.recallReviewed ? 'Approved for this local request' : recall.label, recallDecision === 'allow' ? 'Approved for this local request' : recallDecision === 'deny' ? 'Recall blocked locally' : 'Waiting for your approval'),
-      summary: safePublicLabel(controllerUi.recallReviewed ? 'Safe to share after your approval.' : recall.share_status || recall.summary, recallDecision === 'allow' ? 'Safe to share after your approval.' : 'Not shared until you approve.'),
-      action: { label: 'Review recall', action: 'review-recall' },
+      label: safePublicLabel(localRecallDecision === 'allow' ? 'Approved for this local request' : localRecallDecision === 'deny' ? 'Kept not shared locally' : recall.label, recallDecision === 'allow' ? 'Approved for this local request' : recallDecision === 'deny' ? 'Kept not shared locally' : recallReviewOpen ? 'Reviewing local recall' : 'Waiting for your approval'),
+      summary: safePublicLabel(localRecallDecision === 'allow' ? 'Approved only for this local request.' : localRecallDecision === 'deny' ? 'Not shared for this local request.' : recall.share_status || recall.summary, recallDecision === 'allow' ? 'Approved only for this local request.' : recallDecision === 'deny' ? 'Not shared for this local request.' : recallReviewOpen ? 'Review is open. Nothing is shared until you choose Approve.' : 'Not shared until you approve.'),
+      action: recallPrimaryAction,
+      secondary_actions: recallSecondaryActions,
     },
     bubble: {
       status: bubbleStatus,
@@ -286,6 +306,9 @@ function getMemoryControllerView() {
 }
 
 function renderControllerTile(title, item) {
+  const secondaryActions = Array.isArray(item.secondary_actions)
+    ? item.secondary_actions.map((action) => secondaryButton(action.label, action.action)).join('')
+    : '';
   return `
     <div class="controller-tile">
       <div class="controller-tile__heading">
@@ -293,7 +316,10 @@ function renderControllerTile(title, item) {
         <span class="status-pill ${escapeHtml(item.status)}">${escapeHtml(item.label)}</span>
       </div>
       <dd>${escapeHtml(item.summary)}</dd>
-      ${primaryButton(item.action.label, item.action.action)}
+      <div class="controller-tile__actions">
+        ${primaryButton(item.action.label, item.action.action)}
+        ${secondaryActions}
+      </div>
     </div>
   `;
 }
@@ -865,9 +891,21 @@ async function handleAction(event) {
       setStatus('Private memory bubble closed locally. Nothing has been shared.');
       return;
     case 'review-recall':
-      controllerUi.recallReviewed = true;
+      controllerUi.recallReviewOpen = true;
       render();
-      setStatus('Recall reviewed. Memory remains not shared unless you approve the local decision.');
+      setStatus('Recall review opened. Nothing has been shared.');
+      return;
+    case 'approve-recall':
+      controllerUi.recallDecision = 'allow';
+      controllerUi.recallReviewOpen = false;
+      render();
+      setStatus('Recall approved for this local request only.');
+      return;
+    case 'deny-recall':
+      controllerUi.recallDecision = 'deny';
+      controllerUi.recallReviewOpen = false;
+      render();
+      setStatus('Recall kept not shared for this local request.');
       return;
     default:
       return;

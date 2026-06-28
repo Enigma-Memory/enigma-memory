@@ -72,6 +72,8 @@ test('desktop first-run defaults to Memory Drive home dashboard', async () => {
   assert.equal(model.dashboard.memory_controller.memory_weather.label, 'Needs review');
   assert.equal(model.dashboard.memory_controller.app_permissions.label, 'No app has permission yet');
   assert.equal(model.dashboard.memory_controller.recall_approval.summary, 'Not shared until you approve.');
+  assert.equal(model.dashboard.memory_controller.recall_approval.secondary_actions[0].id, 'approve_recall');
+  assert.equal(model.dashboard.memory_controller.recall_approval.secondary_actions[1].id, 'deny_recall');
   assert.equal(model.dashboard.memory_controller.private_memory_bubble.primary_action.id, 'open_private_bubble');
   assertControllerPrimitiveContracts(model.dashboard.memory_controller);
 });
@@ -94,6 +96,8 @@ test('desktop create Memory Drive action prepares consumer dashboard without raw
   assert.equal(model.dashboard.next_action.id, 'start_service');
   assert.equal(model.dashboard.memory_controller.memory_weather.primary_action.id, 'review_grants');
   assert.equal(model.dashboard.memory_controller.recall_approval.primary_action.id, 'review_recall');
+  assert.equal(model.dashboard.memory_controller.recall_approval.secondary_actions[0].label, 'Approve this local recall');
+  assert.equal(model.dashboard.memory_controller.recall_approval.secondary_actions[1].label, 'Keep not shared');
   assertControllerPrimitiveContracts(model.dashboard.memory_controller);
   assertPublicSafe(model.dashboard);
 });
@@ -124,6 +128,7 @@ test('desktop dashboard exposes one primary fix-it action', async () => {
   assert.equal(Array.isArray(dashboard.memory_controller.memory_weather.primary_action), false);
   assert.equal(dashboard.memory_controller.app_permissions.primary_action.id, 'review_grants');
   assert.equal(dashboard.memory_controller.recall_approval.primary_action.id, 'review_recall');
+  assert.equal(dashboard.memory_controller.recall_approval.secondary_actions[0].id, 'approve_recall');
   assertControllerPrimitiveContracts(dashboard.memory_controller);
   assert.equal(dashboard.memory_controller.private_memory_bubble.primary_action.id, 'open_private_bubble');
   assert.ok(dashboard.issue_codes.includes('DIAGNOSTICS_STALE'));
@@ -171,6 +176,7 @@ test('desktop public dashboard omits raw memory, prompts, transcripts, tokens, p
   assert.equal(dashboard.memory_controller.memory_weather.status, 'sunny');
   assert.equal(dashboard.memory_controller.app_permissions.status, 'missing');
   assert.equal(dashboard.memory_controller.recall_approval.summary, 'Not shared until you approve.');
+  assert.equal(dashboard.memory_controller.recall_approval.secondary_actions[1].id, 'deny_recall');
   assertControllerPrimitiveContracts(dashboard.memory_controller);
   assert.equal(model.screens.diagnostics.safe_summary.length, 1);
   assert.deepEqual(model.screens.diagnostics.safe_summary, ['Local service reachable']);
@@ -220,14 +226,19 @@ test('desktop Tauri dashboard exposes Memory Controller consumer controls', asyn
   assert.match(wizard, /open-private-bubble/);
   assert.match(wizard, /close-private-bubble/);
   assert.match(wizard, /review-recall/);
+  assert.match(wizard, /approve-recall/);
+  assert.match(wizard, /deny-recall/);
+  assert.match(wizard, /recallReviewOpen = true/);
+  assert.doesNotMatch(wizard, /recallReviewed = true/);
   assert.match(help, /just-in-time consent/i);
   assert.match(help, /Setup has six short steps/i);
   assert.match(wizard, /Read it like a traffic light/i);
   assert.match(help, /Read the section like a traffic light/i);
-  assert.match(help, /recall stays not shared/i);
+  assert.match(help, /Review alone never shares memory/i);
   assert.match(help, /local review space/i);
   assert.match(styles, /memory-controller-grid/);
   assert.match(styles, /memory-controller__plain-language/);
+  assert.match(styles, /controller-tile__actions/);
   assert.doesNotMatch(ui, /provider-side control/i);
   assert.doesNotMatch(ui, /provider deletion/i);
   assert.doesNotMatch(ui, /model forgetting|make a model forget/i);

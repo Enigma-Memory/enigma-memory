@@ -428,7 +428,13 @@ p {
   line-height: 1.45;
 }
 
-.controller-tile .primary {
+.controller-tile__actions {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.controller-tile .primary,
+.controller-tile .secondary {
   width: 100%;
   justify-content: center;
 }

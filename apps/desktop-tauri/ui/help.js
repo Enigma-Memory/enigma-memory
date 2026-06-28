@@ -46,7 +46,7 @@ const HELP_ARTICLES = {
       <p>Memory Weather is the plain-language status for what Enigma can share right now: clear, needs review, or sharing paused.</p>
       <p>Read the section like a traffic light: clear means local checks found no issue and you still approve each app request, needs review means check permissions, and sharing paused means fix the warning before Enigma shares local context.</p>
       <p>App permissions use just-in-time consent. A connected app or MCP client may ask for local memory, but Enigma shows the decision before sharing context.</p>
-      <p>Recall approval lets you veto a specific memory recall. Until you approve, the recall stays not shared.</p>
+      <p>Recall approval has two steps: review the local decision first, then explicitly approve this one recall or keep it not shared. Review alone never shares memory.</p>
       <p>A private memory bubble is a local review space for draft memory. Opening or closing it controls the local bubble only; provider records and model behavior require provider-side evidence.</p>
     `,
   },
