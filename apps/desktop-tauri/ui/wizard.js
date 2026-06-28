@@ -34,6 +34,7 @@ let clients = [];
 let health = {};
 let diagnostics = {};
 let update = {};
+let crashReporting = {};
 let serviceStatus = {};
 let serviceLogs = [];
 let busy = false;
@@ -99,6 +100,13 @@ async function mockInvoke(cmd, args = {}) {
       return { memory_drive_status: 'ready' };
     case 'shutdown_service':
       return 'service stopped';
+    case 'get_crash_reporting_status':
+      return crashReporting.status || { enabled: false, endpoint: 'https://enigmamemory.com/telemetry/crash', pending_count: 0 };
+    case 'set_crash_reporting_enabled':
+      crashReporting.status = { ...crashReporting.status, enabled: args.enabled };
+      return { enabled: args.enabled };
+    case 'submit_pending_crash_reports':
+      return { submitted: crashReporting.status?.pending_count || 0, failed: 0, remaining: 0 };
     default:
       return null;
   }
@@ -263,6 +271,8 @@ function renderDashboard() {
   const logsText = serviceLogs?.length ? serviceLogs.slice(-5).join('\n') : 'No logs yet.';
   const updateStatus = update?.status || 'unknown';
   const updateAvailable = update?.available_version && update.available_version !== update.current_version;
+  const crashEnabled = crashReporting.status?.enabled ?? false;
+  const crashPending = crashReporting.status?.pending_count ?? 0;
 
   return renderCard(`
     <p class="eyebrow">Memory health</p>
@@ -310,6 +320,16 @@ function renderDashboard() {
         ${updateAvailable ? ` <span class="status-pill warning">Update available</span>` : ''}</p>
       <div class="button-row">
         ${primaryButton('Check for updates', 'check-update')}
+      </div>
+    </div>
+
+    <div class="dashboard-section">
+      <h2>Crash reporting</h2>
+      <p>Help improve Enigma by sending redacted crash summaries. No memory, wallet, or path data is ever included.</p>
+      <p class="note">Status: <strong>${crashEnabled ? 'Opted in' : 'Opted out'}</strong> · Pending reports: ${escapeHtml(String(crashPending))}</p>
+      <div class="button-row">
+        ${primaryButton(crashEnabled ? 'Opt out' : 'Opt in', 'toggle-crash-reporting')}
+        ${crashPending > 0 ? secondaryButton('Send pending reports', 'submit-crash-reports') : ''}
       </div>
     </div>
 
@@ -437,10 +457,12 @@ async function handleAction(event) {
       render();
       return;
     }
-    case 'go-dashboard':
+    case 'go-dashboard': {
       currentStep = 6;
+      crashReporting.status = await call('get_crash_reporting_status');
       render();
       return;
+    }
     case 'shutdown': {
       busy = true;
       setStatus('Shutting down...');
@@ -509,6 +531,27 @@ async function handleAction(event) {
       busy = false;
       render();
       setStatus(update.status === 'available' ? 'An update is available.' : 'App is up to date.');
+      return;
+    }
+    case 'toggle-crash-reporting': {
+      busy = true;
+      const next = !(crashReporting.status?.enabled ?? false);
+      setStatus(next ? 'Opting in...' : 'Opting out...');
+      await call('set_crash_reporting_enabled', { enabled: next });
+      crashReporting.status = await call('get_crash_reporting_status');
+      busy = false;
+      render();
+      setStatus(next ? 'Crash reporting enabled.' : 'Crash reporting disabled.');
+      return;
+    }
+    case 'submit-crash-reports': {
+      busy = true;
+      setStatus('Sending pending crash reports...');
+      const result = await call('submit_pending_crash_reports');
+      crashReporting.status = await call('get_crash_reporting_status');
+      busy = false;
+      render();
+      setStatus(`Sent ${result.submitted} report(s). ${result.remaining} remaining.`);
       return;
     }
     default:

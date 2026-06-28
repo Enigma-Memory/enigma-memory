@@ -1,3 +1,4 @@
+pub mod crash;
 pub mod diagnostics;
 pub mod service;
 pub mod update;

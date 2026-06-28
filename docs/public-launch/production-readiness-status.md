@@ -17,10 +17,10 @@
 ### Desktop app
 - `apps/desktop-tauri/` Tauri v2 scaffold with consumer onboarding wizard.
 - Six-step wizard: Welcome, Create private vault, Find apps, Connect apps, Health check, Ready.
-- Health dashboard UI with `memory_drive_status`, `connected_app_count`, `proof_status`, `update_status`, `diagnostics_status`, `offline_ready`, and `issue_codes`.
 - Tauri commands wired to bundled Enigma engine sidecar via `ServiceHandle`: spawns engine process, captures stdout/stderr, bounded restart on crash, clean shutdown.
 - Diagnostics preview/export with forbidden-field rejection and user approval.
 - Update-check card that fetches signed manifest and shows current/available versions without auto-download.
+- Opt-in crash reporting: panic hook writes redacted report to disk; user controls whether pending reports are uploaded. No memory, wallet, or path data is included.
 
 ### Release pipeline
 - Tauri v2 bundle config for Windows (NSIS) and macOS (app/dmg).

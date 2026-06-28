@@ -69,6 +69,8 @@ fn resolve_cli_path_from_exe() -> Option<PathBuf> {
 }
 
 pub fn run() {
+    commands::crash::init_panic_hook();
+
     let config = build_config();
     let service_config = default_sidecar_config(&config);
     let service = Arc::new(ServiceHandle::new(service_config));
@@ -97,6 +99,9 @@ pub fn run() {
             commands::diagnostics::get_diagnostics,
             commands::diagnostics::export_diagnostics,
             commands::update::check_update,
+            commands::crash::get_crash_reporting_status,
+            commands::crash::set_crash_reporting_enabled,
+            commands::crash::submit_pending_crash_reports,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
