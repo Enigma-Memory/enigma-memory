@@ -172,7 +172,8 @@ impl FileSystem for RealFileSystem {
     }
 
     fn copy(&self, from: &Path, to: &Path) -> io::Result<()> {
-        std::fs::copy(from, to).map(|_| ())
+        std::fs::copy(from, to)?;
+        Ok(())
     }
 
     fn rename(&self, from: &Path, to: &Path) -> io::Result<()> {
@@ -484,7 +485,7 @@ impl ConnectorEngine {
             restart_guidance: profile.restart_guidance,
         };
 
-        match read_json_config(&*self.fs, &config_path) {
+        match read_json_config(self.fs.as_ref(), &config_path) {
             Ok((false, _)) => Ok(base),
             Ok((true, Some(config))) => {
                 let state = installed_state(&config, &profile, ctx, &ConnectOptions::default());
@@ -589,7 +590,7 @@ impl ConnectorEngine {
             // Malformed config: safest fix is restore the latest Enigma backup.
             let profile = build_profile(client, ctx);
             let config_path = resolve_config_path(&profile, ctx, None);
-            let latest = find_latest_backup(&*self.fs, &config_path)?;
+            let latest = find_latest_backup(self.fs.as_ref(), &config_path)?;
             let plan = self.rollback_internal(client, ctx, &RollbackOptions {
                 backup_path: Some(latest),
                 confirmed: opts.confirmed,
@@ -655,7 +656,7 @@ impl ConnectorEngine {
         let config_path = resolve_config_path(&profile, ctx, None);
         let backup_path = match &opts.backup_path {
             Some(p) => p.clone(),
-            None => find_latest_backup(&*self.fs, &config_path)?,
+            None => find_latest_backup(self.fs.as_ref(), &config_path)?,
         };
         if !self.fs.exists(&backup_path) {
             return Err(ConnectorError::NoBackup);
@@ -695,7 +696,7 @@ impl ConnectorEngine {
         let config_path = resolve_config_path(&profile, ctx, None);
         let mut details = Vec::new();
 
-        let (parse_ok, entry_present, entry_correct, bundle_ok) = match read_json_config(&*self.fs, &config_path) {
+        let (parse_ok, entry_present, entry_correct, bundle_ok) = match read_json_config(self.fs.as_ref(), &config_path) {
             Ok((false, _)) => {
                 details.push("Config file does not exist.".to_string());
                 (true, false, false, self.fs.exists(&ctx.bundle_path))
@@ -759,14 +760,14 @@ impl ConnectorEngine {
     ) -> Result<Plan, ConnectorError> {
         let profile = build_profile(client, ctx);
         let config_path = resolve_config_path(&profile, ctx, opts.config_path_override.as_deref());
-        let (exists, existing_config) = read_json_config(&*self.fs, &config_path)?;
+        let (exists, existing_config) = read_json_config(self.fs.as_ref(), &config_path)?;
         let existing = existing_config.unwrap_or_else(|| Value::Object(Map::new()));
         let server_entry = build_server_entry(ctx, opts);
         let next_config = apply_server(&existing, &profile, profile.server_name, &server_entry)?;
         let changed = existing != next_config;
         let dry_run = opts.dry_run;
         let raw_backup_path = if exists && changed && allocate_backup {
-            Some(unused_backup_path(&*self.fs, &config_path, ctx)?)
+            Some(unused_backup_path(self.fs.as_ref(), &config_path, ctx)?)
         } else {
             None
         };
@@ -810,13 +811,13 @@ impl ConnectorEngine {
     ) -> Result<Plan, ConnectorError> {
         let profile = build_profile(client, ctx);
         let config_path = resolve_config_path(&profile, ctx, opts.config_path_override.as_deref());
-        let (exists, existing_config) = read_json_config(&*self.fs, &config_path)?;
+        let (exists, existing_config) = read_json_config(self.fs.as_ref(), &config_path)?;
         let existing = existing_config.unwrap_or_else(|| Value::Object(Map::new()));
         let next_config = remove_server(&existing, &profile, profile.server_name);
         let changed = existing != next_config;
         let dry_run = opts.dry_run;
         let raw_backup_path = if exists && changed && allocate_backup {
-            Some(unused_backup_path(&*self.fs, &config_path, ctx)?)
+            Some(unused_backup_path(self.fs.as_ref(), &config_path, ctx)?)
         } else {
             None
         };
@@ -872,10 +873,8 @@ impl ConnectorEngine {
         let temp_path = config_path.with_file_name(temp_name);
         let result = (|| -> Result<(), ConnectorError> {
             self.fs.write(&temp_path, plan.generated_json.as_bytes())?;
-            if let Some(backup) = &raw_backup {
-                if self.fs.exists(&config_path) {
-                    self.fs.copy(&config_path, backup)?;
-                }
+            if let Some(backup) = raw_backup.as_ref().filter(|_| self.fs.exists(&config_path)) {
+                self.fs.copy(&config_path, backup)?;
             }
             self.fs.rename(&temp_path, &config_path)?;
             Ok(())
@@ -936,10 +935,10 @@ fn apply_server(
 
 fn remove_server(config: &Value, profile: &ClientProfile, server_name: &str) -> Value {
     let mut next = config.clone();
-    if let Some(container) = ensure_container(&mut next, &profile.server_container_path, false) {
-        if let Some(map) = container.as_object_mut() {
-            map.remove(server_name);
-        }
+    if let Some(map) =
+        ensure_container(&mut next, &profile.server_container_path, false).and_then(Value::as_object_mut)
+    {
+        map.remove(server_name);
     }
     next
 }
@@ -951,10 +950,11 @@ fn ensure_container<'a>(value: &'a mut Value, path: &[&str], create: bool) -> Op
             return None;
         }
         let map = cursor.as_object_mut().unwrap();
-        if !map.contains_key(*segment) {
-            if !create {
-                return None;
-            }
+        let missing = !map.contains_key(*segment);
+        if missing && !create {
+            return None;
+        }
+        if missing {
             map.insert((*segment).to_string(), Value::Object(Map::new()));
         }
         cursor = map.get_mut(*segment).unwrap();
@@ -1153,7 +1153,8 @@ fn unused_backup_path(
 
 fn backup_id_from_path(path: &Path) -> Option<String> {
     path.file_stem()
-        .and_then(|s| s.to_str().map(|s| s.to_string()))
+        .and_then(std::ffi::OsStr::to_str)
+        .map(str::to_string)
 }
 
 fn find_latest_backup(
@@ -1170,8 +1171,9 @@ fn find_latest_backup(
     let mut candidates: Vec<PathBuf> = Vec::new();
     if let Ok(entries) = std::fs::read_dir(parent) {
         for entry in entries.flatten() {
-            let name = entry.file_name().to_string_lossy().into_owned();
-            if name.starts_with(&prefix) {
+            let entry_file_name = entry.file_name();
+            let name = entry_file_name.to_string_lossy();
+            if name.starts_with(prefix.as_str()) {
                 candidates.push(entry.path());
             }
         }
@@ -1195,25 +1197,29 @@ fn build_planned_writes(input: PlannedWritesInput<'_>) -> Vec<PlannedWrite> {
     if input.dry_run || !input.changed {
         return Vec::new();
     }
-    let mut writes = Vec::with_capacity(2);
-    if let (true, Some(bp)) = (input.exists, input.backup_path) {
-        writes.push(PlannedWrite {
-            kind: "backup",
-            path: redact_path(bp, "backup", input.ctx.redact_paths),
-            content_preview: None,
-        });
-    }
     let preview = input
         .next_config
         .get("mcpServers")
         .and_then(|s| s.get("enigma"))
+        .and_then(|e| serde_json::to_string(e).ok())
         .map(|_| "Enigma MCP server entry".to_string());
-    writes.push(PlannedWrite {
+    let write = PlannedWrite {
         kind: "write",
         path: redact_path(input.config_path, input.label, input.ctx.redact_paths),
         content_preview: preview,
-    });
-    writes
+    };
+
+    match (input.exists, input.backup_path) {
+        (true, Some(bp)) => vec![
+            PlannedWrite {
+                kind: "backup",
+                path: redact_path(bp, "backup", input.ctx.redact_paths),
+                content_preview: None,
+            },
+            write,
+        ],
+        _ => vec![write],
+    }
 }
 
 fn redact_path(path: &Path, label: &str, redact: bool) -> String {
@@ -1239,7 +1245,7 @@ fn redact_error_message(message: &str, config_path: &Path, ctx: &EngineContext) 
     .collect();
     let mut redacted = message.to_string();
     for candidate in candidates {
-        redacted = redacted.replace(&candidate, "[redacted:path]");
+        redacted = redacted.replace(candidate.as_str(), "[redacted:path]");
     }
     redacted.replace("[redacted:path]", "[redacted:config_path]")
 }
@@ -1250,7 +1256,7 @@ fn resolve_config_path(
     override_path: Option<&Path>,
 ) -> PathBuf {
     override_path
-        .map(|p| p.to_path_buf())
+        .map(Path::to_path_buf)
         .unwrap_or_else(|| profile.default_config_path.clone())
 }
 
@@ -1622,6 +1628,12 @@ mod tests {
         assert!(!s.contains("C:\\"));
         assert!(!s.contains("/home/"));
         assert!(!s.contains("/Users/"));
-        assert_eq!(manifest.get("public_safety").unwrap().get("local_absolute_path_included").unwrap().as_bool(), Some(false));
+        let local_paths_included = manifest
+            .get("public_safety")
+            .unwrap()
+            .get("local_absolute_path_included")
+            .unwrap()
+            .as_bool();
+        assert_eq!(local_paths_included, Some(false));
     }
 }

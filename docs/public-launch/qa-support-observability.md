@@ -20,7 +20,21 @@ Claim boundary: all checks prove Enigma-controlled local setup, local vault beha
 
 ## Automated smoke matrix
 
-Automated smoke should run on clean Windows and macOS runners or disposable VMs. It should drive the desktop app through public UI or stable app automation hooks, not private developer-only shortcuts. Every scenario must record only pass/fail, app version, OS family/version bucket, issue code, and redacted state summaries.
+Automated smoke should run on clean Windows and macOS runners or disposable VMs. It should drive the desktop app through public UI or stable app automation hooks, not private developer-only shortcuts. Every scenario must record only the allowed scenario status, app version, OS family/version bucket, issue code, and redacted state summaries.
+
+### Automated public beta QA matrix runner
+
+Run `node scripts/run-public-beta-qa-matrix.mjs --json` from the repository root to print the public-safe matrix report, or add `--out <relative-report-path>` to write the same JSON report. The report schema is `enigma.public_beta_qa_matrix.v1`; evidence references must stay relative or opaque and must not include raw memory, prompts, transcripts, credentials, account IDs, customer identifiers, provider responses, signing secrets, private owner names, or local absolute paths.
+
+Scenario status values are limited to `pass`, `fail`, `blocked`, `missing`, and `pending`:
+
+- `pass` means the automated local/static slice has public-safe evidence for that scenario.
+- `fail` means the runner found a concrete local violation that must be fixed before the scenario can pass.
+- `blocked` means an external/manual prerequisite is not satisfied, such as PR approval/merge, published package availability, signing identity readiness, signed Windows/macOS artifacts, notarization/stapling, reviewer approval, clean-machine manual QA, or support dry run.
+- `missing` means the required repo evidence or artifact is absent.
+- `pending` means the scenario is defined but the relevant evidence has not been collected yet.
+
+The automated matrix is a hold/block reporter, not a public readiness substitute. It can prove local readiness slices and privacy-safe evidence shape; it cannot prove clean Windows/macOS installs, real code-signing/notarization, npm publication, merged release approval, reviewer approval, support readiness, or production installer trust. Public beta remains held unless the automated report, the manual install matrix, release-owner checklist, support dry run, and Advisor decision all agree that the selected channel is ready.
 
 | Scenario | Windows beta | macOS beta | GA pass bar |
 | --- | --- | --- | --- |
@@ -63,22 +77,23 @@ Manual QA must include at least these real-world states before public beta:
 
 ## Required scenario catalog
 
-These are the minimum scenario IDs QA and support should use consistently in automation, manual testing, diagnostics, release notes, and support playbooks. A beta build may ship only if every `BETA-*` scenario passes on both Windows and macOS for the selected beta channel. A GA build may ship only if every `BETA-*` and `GA-*` scenario passes on every supported Windows and macOS version.
+These are the minimum scenario IDs QA and support should use consistently in automation, manual testing, diagnostics, release notes, and support playbooks. The automated runner covers the `BETA-*` IDs below and reports `blocked`, `missing`, or `pending` where evidence is not yet available; those statuses hold public beta instead of implying readiness. A beta build may ship only if every applicable `BETA-*` scenario is `pass` for the selected channel and the manual install/support/release-owner gates also pass. GA also requires the `GA-*` scenarios across every supported Windows and macOS version.
 
 | ID | Scenario | Beta pass condition | GA pass condition |
 | --- | --- | --- | --- |
-| `BETA-INSTALL-001` | Fresh desktop install | App installs, opens, and reaches first-run without terminal, Node, or JSON editing. | Same on every supported OS/version/channel combination. |
+| `BETA-INSTALL-001` | Fresh desktop install | App installs, opens, and reaches first-run without terminal, Node, or JSON editing on clean Windows and macOS beta targets. | Same on every supported OS/version/channel combination. |
 | `BETA-FIRST-001` | Fresh first run | Wizard creates/detects the local vault, detects clients, offers connect, then shows health. | Resume works after app restart, OS restart, and update interruption. |
-| `BETA-CLIENT-001` | No client installed | App reports no detected supported clients as a non-blocking state. | Same state has clear education and no false failure telemetry. |
-| `BETA-CLIENT-002` | One supported client installed | User approves connect; only the Enigma connector entry changes; backup is made if a config changes. | Connect, repair, disconnect, and reconnect are idempotent. |
-| `BETA-CLIENT-003` | Existing unrelated MCP settings | Enigma preserves unrelated settings and sibling MCP servers. | Recovery can restore pre-change config from Enigma-created backup. |
+| `BETA-CLIENT-CLAUDE-001` | Claude Desktop connect | User approves Claude connect; only the Enigma connector entry changes; unrelated settings are preserved and backup/rollback evidence exists when a config changes. | Connect, repair, disconnect, and reconnect are idempotent across supported Claude versions. |
 | `BETA-PROOF-001` | Proof summary | App generates a local proof/receipt summary with explicit scope limits and no forbidden fields. | Export/verify UX has stable schema labels and offline verification guidance. |
-| `BETA-OFFLINE-001` | Offline launch | App launches, shows local health, and defers network-dependent actions. | Returning online retries only user-approved actions. |
-| `BETA-CONFIG-001` | Corrupted Enigma app config | App detects corruption, offers safe reset/restore, and emits a support code. | Recovery works after failed update, partial uninstall, and app crash. |
-| `BETA-CONFIG-002` | Corrupted third-party client config | App asks before repair and does not overwrite unrelated settings. | Repair/restore path is reversible and documented in support tooling. |
+| `BETA-OFFLINE-001` | Offline launch | App launches, shows local health, and defers network-dependent actions without hosted/provider readiness claims. | Returning online retries only user-approved actions. |
+| `BETA-CONFIG-001` | Config recovery | App detects malformed Enigma or supported-client config, offers safe reset/restore, preserves unrelated settings, and emits a support code. | Repair/restore path is reversible and documented in support tooling. |
 | `BETA-DIAG-001` | Diagnostic bundle preview | User can generate, preview, delete, and choose whether to share a local-only redacted bundle. | Support tooling rejects bundles with forbidden fields. |
 | `BETA-CRASH-001` | Crash before opt-in | App records a local crash marker only; nothing is uploaded. | Restart recovery and one-time report approval work consistently. |
-| `GA-UPDATE-001` | Successful update | Update preserves vault, app config, and connector settings. | Signature verification, failed-update rollback, and metadata kill switch are proven. |
+| `BETA-SIGNING-WINDOWS-001` | Windows signing evidence | Selected Windows beta artifact has public-safe signing/distribution evidence and observed trust-prompt notes. | Windows stable channel evidence covers every supported version/architecture. |
+| `BETA-SIGNING-MACOS-001` | macOS signing/notarization evidence | Selected macOS beta artifact has Developer ID signing, notarization, stapling, and observed Gatekeeper evidence. | macOS stable channel evidence covers every supported version/architecture. |
+| `BETA-UPDATE-001` | Beta update/rollback evidence | Update verification rejects unsigned/wrong-channel/downgrade payloads and failed update leaves the app/vault recoverable. | Signature verification, failed-update rollback, and metadata kill switch are proven across supported channels. |
+| `BETA-NPM-001` | npm package availability evidence | Public package version required by the beta path is published and installable; local source version alone is not enough. | Registry evidence covers stable version and documented install path. |
+| `BETA-MERGE-001` | Release approval/merge evidence | Release PR approval, merge, reviewer approval, and public-safe evidence packet refs are recorded. | Final release approval covers GA artifacts, release notes, and claim-boundary review. |
 | `GA-UNINSTALL-001` | Default uninstall | App binaries are removed; user data is kept by default. | Reinstall detects kept vault and offers reconnect. |
 | `GA-UNINSTALL-002` | Explicit full removal | Destructive removal requires explicit confirmation and removes only Enigma-owned app data/connectors. | No app helper, updater, launch item, or Enigma connector remains unless the user chose to keep it. |
 | `GA-PRIVACY-001` | Telemetry controls | Telemetry/crash reporting can be enabled only by explicit opt-in and can be disabled. | View, export, delete, retention, and public-safe field allowlists are implemented and reviewed. |
@@ -104,13 +119,13 @@ These scripts are written as user actions, not terminal procedures. They are sui
 5. Close and reopen the app.
 6. Expected: the dashboard shows local vault health, connector state, and next recommended action; reopening does not restart or duplicate setup.
 
-### `BETA-CLIENT-002` client connect
+### `BETA-CLIENT-CLAUDE-001` Claude Desktop connect
 
-1. Prepare a supported client with an existing config that includes at least one non-Enigma setting.
-2. From Enigma Memory, choose the detected client and approve connect.
-3. Restart the client if the UI asks for it.
+1. Prepare Claude Desktop with an existing config that includes at least one non-Enigma setting.
+2. From Enigma Memory, choose Claude Desktop and approve connect.
+3. Restart Claude Desktop if the UI asks for it.
 4. Return to Enigma Memory and refresh connector health.
-5. Expected: Enigma connector state is healthy, unrelated client settings remain intact, a backup exists when the config changed, and rerunning connect reports no destructive change.
+5. Expected: Enigma connector state is healthy, unrelated Claude settings remain intact, a backup exists when the config changed, and rerunning connect reports no destructive change.
 
 ### `BETA-PROOF-001` proof output
 
@@ -119,9 +134,9 @@ These scripts are written as user actions, not terminal procedures. They are sui
 3. Open the consumer summary and the advanced details disclosure.
 4. Expected: the summary describes Enigma-controlled local lifecycle evidence, labels scope limits, works without network access, and contains no forbidden private fields.
 
-### `GA-UPDATE-001` update and rollback
+### `BETA-UPDATE-001` update and rollback evidence
 
-1. Install the previous supported build.
+1. Install the previous supported beta build.
 2. Confirm the local vault and connector health are green or have known support codes.
 3. Apply the candidate update through the app UI.
 4. Relaunch the app and re-check vault, connector, proof, and diagnostics surfaces.

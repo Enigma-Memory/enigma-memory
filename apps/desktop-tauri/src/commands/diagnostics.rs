@@ -100,7 +100,7 @@ pub async fn export_diagnostics(
 
     let redacted = redact_paths(&json!(bundle));
     let payload = serde_json::to_string_pretty(&redacted).map_err(|e| e.to_string())?;
-    tokio::fs::write(&out_path, payload)
+    tokio::fs::write(out_path.as_path(), payload)
         .await
         .map_err(|e| format!("failed to write diagnostics file: {e}"))?;
 

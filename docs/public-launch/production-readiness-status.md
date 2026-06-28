@@ -43,8 +43,8 @@
 
 | Item | Why it matters | Owner / path to close |
 |---|---|---|
-| Signed Windows installer / MSIX | Public launch definition of done requires signed distribution. | Complete Azure Artifact Signing identity validation and add repository secrets; workflow ready. |
-| Signed/macOS notarized app | Gatekeeper will block unsigned apps. | Enroll in Apple Developer Program, add certificates/secrets to repo. |
+| Signed Windows installer / MSIX | Public launch definition of done requires signed distribution. | Complete Azure Artifact Signing identity validation. Account session confirmed; manual Azure portal sign-in required before automation can continue. |
+| Signed/macOS notarized app | Gatekeeper will block unsigned apps. | Enroll in Apple Developer Program; requires Apple ID credentials and a trusted Apple device for 2FA. |
 
 ---
 

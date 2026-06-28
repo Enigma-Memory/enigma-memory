@@ -205,9 +205,8 @@ impl ServiceHandle {
         });
     }
 
-    fn spawn_watcher(self: Arc<Self>, mut child: Child, stop_rx: oneshot::Receiver<()>) {
+    fn spawn_watcher(self: Arc<Self>, mut child: Child, mut stop_rx: oneshot::Receiver<()>) {
         tokio::spawn(async move {
-            let mut stop_rx = stop_rx;
             let result = tokio::select! {
                 biased;
                 _ = &mut stop_rx => {
@@ -316,7 +315,7 @@ fn current_epoch_millis() -> u64 {
 /// Redact absolute paths and credential-like tokens from a log line.
 pub fn redact_log(line: &str) -> String {
     let out = log_path_regex().replace_all(line, "<path>");
-    log_token_regex().replace_all(&out, "<token>").into_owned()
+    log_token_regex().replace_all(out.as_ref(), "<token>").into_owned()
 }
 
 fn log_path_regex() -> &'static Regex {

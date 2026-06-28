@@ -221,17 +221,17 @@ pub struct McpbHealthOptions {
 }
 
 fn has_passing_evidence(evidence: &Value) -> bool {
-    evidence.as_bool() == Some(true)
-        || evidence.get("passed").and_then(Value::as_bool) == Some(true)
-        || evidence.get("ok").and_then(Value::as_bool) == Some(true)
-        || evidence.get("status").and_then(Value::as_str) == Some("passed")
+    matches!(evidence.as_bool(), Some(true))
+        || matches!(evidence.get("passed").and_then(Value::as_bool), Some(true))
+        || matches!(evidence.get("ok").and_then(Value::as_bool), Some(true))
+        || matches!(evidence.get("status").and_then(Value::as_str), Some("passed"))
 }
 
 fn has_failing_evidence(evidence: &Value) -> bool {
-    evidence.as_bool() == Some(false)
-        || evidence.get("passed").and_then(Value::as_bool) == Some(false)
-        || evidence.get("ok").and_then(Value::as_bool) == Some(false)
-        || evidence.get("status").and_then(Value::as_str) == Some("failed")
+    matches!(evidence.as_bool(), Some(false))
+        || matches!(evidence.get("passed").and_then(Value::as_bool), Some(false))
+        || matches!(evidence.get("ok").and_then(Value::as_bool), Some(false))
+        || matches!(evidence.get("status").and_then(Value::as_str), Some("failed"))
 }
 
 pub fn create_claude_desktop_mcpb_health(options: McpbHealthOptions) -> Value {
@@ -329,5 +329,20 @@ mod tests {
         });
         assert_eq!(health.get("status").unwrap().as_str().unwrap(), "ready");
         assert!(health.get("ready").unwrap().as_bool().unwrap());
+    }
+
+    #[test]
+    fn mcpb_health_failed_test_requires_repair() {
+        let health = create_claude_desktop_mcpb_health(McpbHealthOptions {
+            mcpb_installed: true,
+            test_evidence: Some(Value::Bool(false)),
+            ..Default::default()
+        });
+        assert_eq!(
+            health.get("status").unwrap().as_str().unwrap(),
+            "repair_required"
+        );
+        assert!(!health.get("ready").unwrap().as_bool().unwrap());
+        assert!(!health.get("test_passed").unwrap().as_bool().unwrap());
     }
 }

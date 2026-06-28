@@ -1,4 +1,3 @@
-use crate::AppState;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -79,7 +78,7 @@ impl CrashReportingConfig {
 
     pub fn load() -> Self {
         let path = Self::path();
-        if let Ok(bytes) = fs::read(&path) {
+        if let Ok(bytes) = fs::read(path) {
             serde_json::from_slice(&bytes).unwrap_or_default()
         } else {
             Self::default()
@@ -89,7 +88,7 @@ impl CrashReportingConfig {
     pub fn save(&self) -> Result<(), String> {
         let path = Self::path();
         fs::create_dir_all(path.parent().expect("crash config parent")).map_err(|e| e.to_string())?;
-        fs::write(&path, serde_json::to_string_pretty(self).map_err(|e| e.to_string())?)
+        fs::write(path, serde_json::to_string_pretty(self).map_err(|e| e.to_string())?)
             .map_err(|e| e.to_string())
     }
 }
@@ -129,9 +128,9 @@ fn rand_seed() -> u32 {
 
 fn write_pending_report(report: &CrashReport) -> Result<PathBuf, String> {
     let dir = crash_reports_dir();
-    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    fs::create_dir_all(dir.as_path()).map_err(|e| e.to_string())?;
     let path = dir.join(format!("crash-{}.json", report.report_id));
-    fs::write(&path, serde_json::to_string_pretty(report).map_err(|e| e.to_string())?)
+    fs::write(path.as_path(), serde_json::to_string_pretty(report).map_err(|e| e.to_string())?)
         .map_err(|e| e.to_string())?;
     Ok(path)
 }
@@ -167,9 +166,13 @@ pub fn init_panic_hook() {
 #[tauri::command]
 pub async fn get_crash_reporting_status() -> Result<Value, String> {
     let config = CrashReportingConfig::load();
+    let endpoint = config
+        .endpoint
+        .as_deref()
+        .map_or_else(default_endpoint, std::borrow::ToOwned::to_owned);
     Ok(json!({
         "enabled": config.enabled,
-        "endpoint": config.endpoint.as_deref().unwrap_or(&default_endpoint()),
+        "endpoint": endpoint,
         "pending_count": list_pending_reports().len(),
     }))
 }
@@ -222,11 +225,11 @@ pub async fn submit_pending_crash_reports() -> Result<Value, String> {
 
 fn list_pending_reports() -> Vec<PathBuf> {
     let dir = crash_reports_dir();
-    fs::read_dir(&dir)
+    fs::read_dir(dir)
         .ok()
         .map(|iter| {
-            iter.filter_map(|e| e.ok())
-                .map(|e| e.path())
+            iter.filter_map(Result::ok)
+                .map(|entry| entry.path())
                 .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("json"))
                 .collect()
         })
