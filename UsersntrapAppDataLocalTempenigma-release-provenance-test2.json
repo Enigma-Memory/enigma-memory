@@ -1,0 +1,1244 @@
+{
+  "schema": "enigma.release_provenance.v1",
+  "evidence": {
+    "kind": "local_checksum_provenance",
+    "claim_boundary": "Local checksum/SBOM-style package evidence only; unsigned and not a registry, cloud, git, or compliance attestation.",
+    "external_credentials_required": false,
+    "git_required": false,
+    "signed": false,
+    "registry_attestation": false
+  },
+  "package": {
+    "name": "enigma-memory",
+    "version": "0.1.18",
+    "type": "module",
+    "engines": {
+      "node": ">=24"
+    },
+    "bin": {
+      "enigma": "apps/cli/bin/enigma.mjs",
+      "enigma-gateway": "apps/gateway/bin/enigma-gateway.mjs",
+      "enigma-mcp": "packages/mcp-server/bin/enigma-mcp.mjs",
+      "enigma-native-host": "apps/native-host/bin/enigma-native-host.mjs",
+      "enigma-relay": "apps/relay/bin/enigma-relay.mjs",
+      "enigma-verify": "apps/verifier/bin/enigma-verify.mjs"
+    },
+    "bins": {
+      "enigma": "apps/cli/bin/enigma.mjs",
+      "enigma-gateway": "apps/gateway/bin/enigma-gateway.mjs",
+      "enigma-mcp": "packages/mcp-server/bin/enigma-mcp.mjs",
+      "enigma-native-host": "apps/native-host/bin/enigma-native-host.mjs",
+      "enigma-relay": "apps/relay/bin/enigma-relay.mjs",
+      "enigma-verify": "apps/verifier/bin/enigma-verify.mjs"
+    },
+    "exports": {
+      ".": "./packages/core/src/index.js",
+      "./adapters": "./packages/adapters/src/index.js",
+      "./boundary": "./packages/boundary/src/index.js",
+      "./connectors": "./packages/connectors/src/index.js",
+      "./controller": "./packages/controller/src/index.js",
+      "./core": "./packages/core/src/index.js",
+      "./desktop": "./apps/desktop/src/app.js",
+      "./desktop/tray": "./apps/desktop/src/tray.js",
+      "./enterprise": "./packages/enterprise/src/index.js",
+      "./gateway": "./apps/gateway/src/server.mjs",
+      "./hosted-cloud": "./packages/hosted-cloud/src/index.js",
+      "./importers": "./packages/importers/src/index.js",
+      "./mcp-server": "./packages/mcp-server/src/index.js",
+      "./mesh": "./packages/mesh/src/index.js",
+      "./metering": "./packages/metering/src/index.js",
+      "./optimizer": "./packages/optimizer/src/index.js",
+      "./package.json": "./package.json",
+      "./passport": "./packages/passport/src/index.js",
+      "./proof-network": "./packages/proof-network/src/index.js",
+      "./relay": "./apps/relay/src/server.mjs",
+      "./settlement": "./packages/settlement/src/index.js",
+      "./storage": "./packages/storage/src/index.js",
+      "./vault": "./packages/vault/src/index.js"
+    },
+    "scripts": {
+      "benchmark:datasets": "node scripts/download-standard-benchmarks.mjs",
+      "benchmark:memory-suite": "node scripts/run-memory-benchmarks.mjs",
+      "benchmark:proof-release": "node scripts/build-benchmark-proof-release.mjs",
+      "benchmark:standard": "node scripts/run-standard-memory-benchmarks.mjs",
+      "boundary": "node harnesses/boundary-sim/boundary_harness.mjs",
+      "browser:extension:package": "node scripts/package-browser-extension.mjs",
+      "build:cortex-v3:docker": "node scripts/build-cortex-v3-in-docker.mjs",
+      "build:cortex-v3:docker:compose": "docker compose -f docker-compose.build.yml run --rm cortex-v3-build anchor build --no-idl",
+      "build:desktop:docker": "docker compose -f docker-compose.build.yml run --rm desktop-tauri-build cargo tauri build",
+      "check": "node scripts/check.mjs",
+      "clean-machine-smoke": "node scripts/run-clean-machine-smoke.mjs --json",
+      "cloudflare:ops": "node scripts/cloudflare-ops.mjs",
+      "cloudflare:pages:deploy": "node scripts/stage-cloudflare-pages-artifact.mjs --site ../enigma-deploy --out .enigma/cloudflare-pages/enigmamemory.com && node scripts/cloudflare-ops.mjs pages deploy --site .enigma/cloudflare-pages/enigmamemory.com --project-name enigma-memory --execute",
+      "cloudflare:pages:dry-run": "node scripts/stage-cloudflare-pages-artifact.mjs --site ../enigma-deploy --out .enigma/cloudflare-pages/enigmamemory.com && node scripts/cloudflare-ops.mjs pages deploy --site .enigma/cloudflare-pages/enigmamemory.com --project-name enigma-memory",
+      "cloudflare:pages:packet": "node scripts/build-cloudflare-pages-release-packet.mjs",
+      "cloudflare:pages:stage": "node scripts/stage-cloudflare-pages-artifact.mjs --site ../enigma-deploy --out .enigma/cloudflare-pages/enigmamemory.com",
+      "cloudflare:pages:verify": "node scripts/cloudflare-ops.mjs pages verify --url https://enigmamemory.com/ --project-name enigma-memory --domain enigmamemory.com --cloudflare-live required",
+      "cloudflare:token-policy": "node scripts/build-cloudflare-token-policy.mjs",
+      "cloudflare:token-request": "node scripts/build-cloudflare-token-request.mjs",
+      "demo:assets": "node scripts/build-demo-assets.mjs",
+      "infrastructure:readiness": "node scripts/infrastructure-readiness.mjs",
+      "installer:assets": "node scripts/build-installer-assets.mjs",
+      "memory:benchmark": "node scripts/memory-optimization-benchmark.mjs",
+      "production:acceptance": "node scripts/validate-operator-acceptance.mjs",
+      "production:acceptance:packet": "node scripts/build-operator-acceptance-packet.mjs",
+      "production:acceptance:template": "node -e \"console.log('Template: .enigma/operator-acceptance-packet.template.json'); console.log('Sample fill: node scripts/fill-operator-acceptance-packet.mjs --template .enigma/operator-acceptance-packet.template.json --overrides .enigma/operator-acceptance-packet.example-overrides.json --out operator-acceptance-packet.json --validate');\"",
+      "production:backend-env": "node scripts/build-production-backend-env-kit.mjs",
+      "production:backend-smoke": "node scripts/run-backend-readiness-smoke.mjs",
+      "production:backup-drill": "node scripts/validate-backup-restore-drill.mjs",
+      "production:cloudflare-credentials": "node scripts/validate-cloudflare-credentials.mjs",
+      "production:dependencies": "node scripts/build-production-dependency-report.mjs",
+      "production:edge-backend": "node scripts/build-edge-backend-workers.mjs",
+      "production:edge-deploy": "node scripts/deploy-edge-backend-workers.mjs",
+      "production:edge-live": "node scripts/collect-edge-backend-bootstrap-evidence.mjs",
+      "production:evidence-starter": "node scripts/build-operator-evidence-starter.mjs",
+      "production:goal-audit": "node scripts/build-goal-completion-audit.mjs",
+      "production:handoff": "node scripts/build-production-handoff-packet.mjs",
+      "production:hosted-api-key": "node scripts/build-hosted-api-key-lifecycle.mjs",
+      "production:hosted-collect": "node scripts/collect-hosted-backend-live-evidence.mjs",
+      "production:hosted-customer": "node scripts/build-hosted-customer-lifecycle.mjs",
+      "production:hosted-live": "node scripts/validate-hosted-backend-live.mjs",
+      "production:hosted-probe": "node scripts/build-hosted-probe-worker.mjs",
+      "production:incident-drill": "node scripts/validate-incident-drill.mjs",
+      "production:kms": "node scripts/validate-kms-custody.mjs",
+      "production:legal": "node scripts/validate-legal-compliance-approval.mjs",
+      "production:live-monitor": "node scripts/monitor-live-endpoints.mjs",
+      "production:live-monitor:dry-run": "node scripts/monitor-live-endpoints.mjs --dry-run",
+      "production:live-monitor:help": "node scripts/monitor-live-endpoints.mjs --help",
+      "production:manifest": "node scripts/build-production-readiness-manifest.mjs",
+      "production:manifests": "node scripts/validate-production-manifests.mjs",
+      "production:monitoring": "node scripts/validate-monitoring-alerting.mjs",
+      "production:network": "node scripts/validate-network-access-policy.mjs",
+      "production:orchestration": "node scripts/build-ai-orchestration-plan.mjs",
+      "production:ref-draft": "node scripts/build-hosted-ref-draft.mjs",
+      "production:settlement": "node scripts/validate-service-settlement.mjs",
+      "production:site": "node scripts/validate-public-site-security.mjs",
+      "production:sla": "node scripts/validate-support-sla.mjs",
+      "production:status": "node scripts/build-production-status-board.mjs",
+      "production:storage": "node scripts/build-production-storage-migration.mjs",
+      "production:storage-bootstrap": "node scripts/cloudflare-storage-bootstrap.mjs",
+      "production:tenant-policy": "node scripts/validate-tenant-policy-approval.mjs",
+      "production:threat-model": "node scripts/validate-security-threat-model.mjs",
+      "production:unblocker": "node scripts/build-production-unblocker.mjs",
+      "production:usage": "node scripts/validate-usage-metering.mjs",
+      "production:whitepaper": "node scripts/validate-whitepaper-claims.mjs",
+      "production:worker-inspect": "node scripts/validate-cloudflare-worker-inspect.mjs",
+      "production:workplan": "node scripts/build-production-workplan.mjs",
+      "proof:packet": "node scripts/build-proof-network-packet.mjs",
+      "provenance:local": "node scripts/release-provenance.mjs",
+      "public-beta-qa": "node scripts/run-public-beta-qa-matrix.mjs --json",
+      "registry:verify": "node scripts/verify-registry-install.mjs",
+      "release:audit": "node scripts/release-audit.mjs",
+      "review:packet": "node scripts/build-review-packet.mjs",
+      "secret-scan": "node scripts/scan-secrets.mjs",
+      "simulate:production": "node scripts/simulate-production-env.mjs",
+      "test": "node --test test/*.test.mjs",
+      "wait:backend": "node scripts/wait-for-backend-ready.mjs"
+    }
+  },
+  "counts": {
+    "files": 217,
+    "file_count": 217,
+    "specs": 39,
+    "spec_count": 39,
+    "tests": 83,
+    "test_count": 83
+  },
+  "file_count": 217,
+  "spec_count": 39,
+  "test_count": 83,
+  "ci_workflow": {
+    "path": ".github/workflows/ci.yml",
+    "bytes": 1012,
+    "sha256": "sha256:7324c33b6e325291b3f54b2dc1e1392d7a709676bd1756c2ed8c9fe6c728ea05"
+  },
+  "public_site_manifest": null,
+  "root_hash": "sha256:00805d5e3749bd244520fd8ffe489b035226e7e232aed2d2e7033c8f6f68d8d4",
+  "files": [
+    {
+      "path": "LICENSE",
+      "bytes": 8973,
+      "sha256": "sha256:b7b3d3f8a667a0e1f2da72594c7f1f7384cfe85f8286d7429ac40d6a5880fccf"
+    },
+    {
+      "path": "README.md",
+      "bytes": 8023,
+      "sha256": "sha256:c19a9a989cae014516ce4fa210c868732fca4bad4a7e6fd8bb273f37fb851148"
+    },
+    {
+      "path": "apps/browser-extension/manifest.json",
+      "bytes": 1135,
+      "sha256": "sha256:d67f3aae4a0b3c4e216c13be7d73e84f78f702d8220caecbfb3826d4b073a536"
+    },
+    {
+      "path": "apps/browser-extension/src/background.js",
+      "bytes": 2788,
+      "sha256": "sha256:78b5eec91ae206d9aa42d5c5bc9f734c7b2aed81f45a15c41baa4a0ded1fdfa3"
+    },
+    {
+      "path": "apps/browser-extension/src/content-script.js",
+      "bytes": 24025,
+      "sha256": "sha256:afc074a6ea0f56f5ec37559128389834f3aa8d90fbe488309b0ae0a32c593b2b"
+    },
+    {
+      "path": "apps/browser-extension/src/native-bridge.js",
+      "bytes": 10773,
+      "sha256": "sha256:8f6947963a608516240ff75c2698eb2cee0350e8d9daae56d6631d25697dede0"
+    },
+    {
+      "path": "apps/cli/bin/enigma.mjs",
+      "bytes": 156514,
+      "sha256": "sha256:28da151eb7d50ff16d21fe986e551c0a341795e6bddcb4adee45ab7d23450e9a"
+    },
+    {
+      "path": "apps/desktop/src/app.js",
+      "bytes": 75552,
+      "sha256": "sha256:9f6f1b1805b9501878b4aeed6943374f369b38fa8f059358f2f679384d2aec82"
+    },
+    {
+      "path": "apps/desktop/src/index.html",
+      "bytes": 79550,
+      "sha256": "sha256:bdcbd6a5327c09bedbf17b02f8f0a3935c141c05d98761a1a786ec252a602249"
+    },
+    {
+      "path": "apps/desktop/src/styles.css",
+      "bytes": 6501,
+      "sha256": "sha256:8d783e2cc6e45db6ea5f84be1892db8ce3434f82f2d93216a39f0015b359deb9"
+    },
+    {
+      "path": "apps/desktop/src/tray.js",
+      "bytes": 9212,
+      "sha256": "sha256:6721b83ef2205cc8b949c055d09778df263e826fc65385900e73ba02fb6e65ef"
+    },
+    {
+      "path": "apps/gateway/bin/enigma-gateway.mjs",
+      "bytes": 1737,
+      "sha256": "sha256:048d60e58af9f152223fee749755a03b1e854c3158ba9cc479a65d8e2c489733"
+    },
+    {
+      "path": "apps/gateway/src/server.mjs",
+      "bytes": 56142,
+      "sha256": "sha256:422a3561bee286c81c85ce7042f6bc78c6a8e80462b6b849b9bae327269ab648"
+    },
+    {
+      "path": "apps/native-host/README.md",
+      "bytes": 14323,
+      "sha256": "sha256:a36703ebc4391243b0dac885ea107a66820d9934ee423109f3ea6e98f46e0dbb"
+    },
+    {
+      "path": "apps/native-host/bin/enigma-native-host.mjs",
+      "bytes": 20727,
+      "sha256": "sha256:b71876198cc2a1560972f510439fe093fbc490ba968044f4c4b5ae8a92e3c324"
+    },
+    {
+      "path": "apps/native-host/manifests/com.enigma.native_host.chrome.json",
+      "bytes": 289,
+      "sha256": "sha256:08d0338ad4ffc994ab72045549720d6c36601166937ae5a842be1530a5b4216b"
+    },
+    {
+      "path": "apps/native-host/manifests/com.enigma.native_host.edge.json",
+      "bytes": 287,
+      "sha256": "sha256:843521e708042b08be108208d5000fc068d57af9d5abe52bb151a8f4bbd3d180"
+    },
+    {
+      "path": "apps/native-host/manifests/com.enigma.native_host.firefox.json",
+      "bytes": 273,
+      "sha256": "sha256:439393e419dfcc5a334e6398fc5c6607a97a93ed3a9cffd59a768aa07e65c395"
+    },
+    {
+      "path": "apps/relay/bin/enigma-relay.mjs",
+      "bytes": 1668,
+      "sha256": "sha256:0bbca6ee1712b2fa203d86b68b7f8c44768e6dd61b073fd6beb6a7c5cc263406"
+    },
+    {
+      "path": "apps/relay/src/server.mjs",
+      "bytes": 63486,
+      "sha256": "sha256:26e1fc26a0b3e5f96965f208b632ebec2615f2a487c11256f65e521f2e95bccd"
+    },
+    {
+      "path": "apps/verifier/bin/enigma-verify.mjs",
+      "bytes": 9297,
+      "sha256": "sha256:676a6b87a4226668d53659efe48bda8008d8bc0dcb67d565ff1161b98c430942"
+    },
+    {
+      "path": "deploy/SIMULATION.md",
+      "bytes": 7924,
+      "sha256": "sha256:943896feeacbb1658293a1e1397cbabbef4065d59c77fa814b8a11e7ce805bcd"
+    },
+    {
+      "path": "deploy/docker-compose.local-production-simulation.yml",
+      "bytes": 10377,
+      "sha256": "sha256:75e3d1fb836978a3d77c8b6dcbc0b8a35425d10e681edfd2802bb1df57194a3c"
+    },
+    {
+      "path": "deploy/docker-compose.production.example.yml",
+      "bytes": 8181,
+      "sha256": "sha256:7f00fa4265c9354c6aecf495837316b4786dea032df579e1602abfa2640133da"
+    },
+    {
+      "path": "deploy/kms-mock.mjs",
+      "bytes": 2228,
+      "sha256": "sha256:2148467f27d51c43800fdcf4804a4eee09936717019cb4c285fccde69d002903"
+    },
+    {
+      "path": "deploy/kubernetes/enigma-backend.example.yaml",
+      "bytes": 18117,
+      "sha256": "sha256:e680e46ae9af03c6859e9a37dd92d93a0bb9ed2ceb603caeaf19fb3a2a274893"
+    },
+    {
+      "path": "deploy/nginx.local-production-simulation.conf",
+      "bytes": 956,
+      "sha256": "sha256:3511470df8db410b81c25706a2c67dfcd9af0139452a790bf34bcb0325b47771"
+    },
+    {
+      "path": "deploy/siem-mock.mjs",
+      "bytes": 1803,
+      "sha256": "sha256:fe9f3615c972f76b75ed855a46448e63bca7704946a5900e658b1c774097401e"
+    },
+    {
+      "path": "docs/GENERAL_PUBLIC_LAUNCH_GOAL.md",
+      "bytes": 6953,
+      "sha256": "sha256:4730271f1ad762b4a07fd92c590b677e7039bcbef1c1b140bc63b79d0f36dac4"
+    },
+    {
+      "path": "docs/GENERAL_PUBLIC_LAUNCH_WORKPLAN.md",
+      "bytes": 11694,
+      "sha256": "sha256:412c2d33dcf8bafc237be1595bf977d44ce1d407ea096f7cbbbd10abdf7fd0d6"
+    },
+    {
+      "path": "docs/MEMORY_BOUNDARY_TRANSACTION_GOAL.md",
+      "bytes": 6012,
+      "sha256": "sha256:ca0f5b5133624f60ae7f7512e8e000d62f370fee3b48c3bceaf8c3ac9bbb862c"
+    },
+    {
+      "path": "docs/WORKFLOWZ_FRICTIONLESS_GOAL.md",
+      "bytes": 18786,
+      "sha256": "sha256:b42226a624d676237aa914a86f7110e2ce4d4617fe963fc8f52e425cd3dc0d40"
+    },
+    {
+      "path": "docs/benchmark-attestation-network.md",
+      "bytes": 24245,
+      "sha256": "sha256:75136fdf865e1b4d4587171ed48182d45b33f4b5a6598a44cd48a5481e762b0b"
+    },
+    {
+      "path": "docs/benchmark-reproducibility.md",
+      "bytes": 31617,
+      "sha256": "sha256:168d2422ba0e379ec1129a38781a8ebb632663efc654a8e626ed8519b4e8dc22"
+    },
+    {
+      "path": "docs/blockchain-only-mechanisms.md",
+      "bytes": 25750,
+      "sha256": "sha256:a16ca1ca57217039cc927406528c32417c182f8e181a8bab85bf1a23c777873d"
+    },
+    {
+      "path": "docs/browser-extension-install.md",
+      "bytes": 8056,
+      "sha256": "sha256:90ceeef10636c81d8690a9e9cab4d7e97c47a1aa1fd9caa4714bbdc784b43571"
+    },
+    {
+      "path": "docs/client-connectors.md",
+      "bytes": 13572,
+      "sha256": "sha256:f5995885070d4cec586c0b160f0330786c63d94fcd543d4656852909940ecf6e"
+    },
+    {
+      "path": "docs/demo-proof-network.md",
+      "bytes": 10692,
+      "sha256": "sha256:3223b84ed7f998141d513c280be6f101899fa43ab4c4b12758e287b519194840"
+    },
+    {
+      "path": "docs/developer-ecosystem.md",
+      "bytes": 14200,
+      "sha256": "sha256:ee4018d60fc4dc83e1287a610d8b70c73d70409e6cb5571c290e520dae0ae294"
+    },
+    {
+      "path": "docs/developer-proof-quickstart.md",
+      "bytes": 13124,
+      "sha256": "sha256:0c18a6d1f22b9ba404c5b2dc8fe43d78d8e8f28e615a111a1bb2d64e3fa2b5d3"
+    },
+    {
+      "path": "docs/enigma-memory-ready-conformance.md",
+      "bytes": 23007,
+      "sha256": "sha256:c64118f43fa97260408330f2052385d55c8f55baa2d969c6e49af8c256f4c9bf"
+    },
+    {
+      "path": "docs/enterprise-proof-control-plane.md",
+      "bytes": 25268,
+      "sha256": "sha256:7a0ee75afbb0272196fc1837e854ee9ae1488fc06f3eb8751a1457ec0421b24b"
+    },
+    {
+      "path": "docs/hosted-cloud-product.md",
+      "bytes": 12935,
+      "sha256": "sha256:d400591609c82064fb1759018c8e7770e88bc2e6c0c2dc5ad50da6657b205f73"
+    },
+    {
+      "path": "docs/install-anywhere.md",
+      "bytes": 23723,
+      "sha256": "sha256:55311ccea91cf3466dbcb857b5a0819be717ff25a8fd06e9a992c84f5e7ec16d"
+    },
+    {
+      "path": "docs/installers-and-desktop.md",
+      "bytes": 5310,
+      "sha256": "sha256:2790fafd0fac94abdb9ba4487943f46eea12572690c31124ec67bf1adca56cfd"
+    },
+    {
+      "path": "docs/market-category-narrative.md",
+      "bytes": 22583,
+      "sha256": "sha256:7ff8345ed957cb646cf235379e570564e2579e9f380ab622f124cbec78e21c0c"
+    },
+    {
+      "path": "docs/memory-benchmarks.md",
+      "bytes": 17676,
+      "sha256": "sha256:59a984c978f39150acdfa5168b498b872e55be524e130360df9b53e085762653"
+    },
+    {
+      "path": "docs/memory-drive-health-model.md",
+      "bytes": 31131,
+      "sha256": "sha256:eeb211ead4b7220e282a2f38641a361b8ba784aa66716f8350c8fc9b3abd1696"
+    },
+    {
+      "path": "docs/memory-drive-strategy.md",
+      "bytes": 25652,
+      "sha256": "sha256:7a5515dcffd1181344372fb5ef18b5e408baa45c0ae6d013ccd9708afb75d4d9"
+    },
+    {
+      "path": "docs/memory-passport-standard.md",
+      "bytes": 32802,
+      "sha256": "sha256:66f2bc9ca7d852fcb7bca5d5804b34eb09f9e5274d1af4f6df747f583e189e2d"
+    },
+    {
+      "path": "docs/novelty-invention-candidates.md",
+      "bytes": 20150,
+      "sha256": "sha256:793acd6122c4e5a2238b970d3a78e687031870dc9529c4b371fab15bf20a7d46"
+    },
+    {
+      "path": "docs/privacy-ledger-model.md",
+      "bytes": 21781,
+      "sha256": "sha256:0ae4039f31e0600d322faa94ff218ef5202f3176c047ffb334f690aabe5d7295"
+    },
+    {
+      "path": "docs/proof-network-build-notes.md",
+      "bytes": 15162,
+      "sha256": "sha256:02ed8307d5d3b826a9fa0a9be64ec249018de96916d1d996213cce92f8e6a50c"
+    },
+    {
+      "path": "docs/proof-network-claim-boundaries.md",
+      "bytes": 24514,
+      "sha256": "sha256:5d88a54a2be4692bd7ea28de946dd14a9de95a8f6325330793e8d3bc8ab24d5e"
+    },
+    {
+      "path": "docs/proof-network-dashboard-spec.md",
+      "bytes": 37463,
+      "sha256": "sha256:a51d936d9d5979e6bb0e0671f3ce33e567278ee39467bd0176677d166504ed1d"
+    },
+    {
+      "path": "docs/proof-network-glossary.md",
+      "bytes": 3087,
+      "sha256": "sha256:73465dbe7abb627f5cc36365bf409194f9de96e37efa5856e14a4c2bf187caca"
+    },
+    {
+      "path": "docs/proof-network-launch-plan.md",
+      "bytes": 28686,
+      "sha256": "sha256:097c90d9210e78fb95093dade9163f9cee35170e33a311eb1bd2740231b2b289"
+    },
+    {
+      "path": "docs/proof-network-operator-protocol.md",
+      "bytes": 33564,
+      "sha256": "sha256:46bc579582e911dbb1551338ec63bdb4a349a070f43bd35b555f0e520ba6178d"
+    },
+    {
+      "path": "docs/proof-network-roadmap.md",
+      "bytes": 33763,
+      "sha256": "sha256:e888429e61970218e1d80ed385f5da5a8db95a6c1b27c16b6ba4542a1e570eb6"
+    },
+    {
+      "path": "docs/proof-network-test-plan.md",
+      "bytes": 16258,
+      "sha256": "sha256:fdfc20239549c34033da91376302e05ea8c88af90d22afb0cbfdb75a97d5a4e0"
+    },
+    {
+      "path": "docs/proof-network-threat-model.md",
+      "bytes": 19640,
+      "sha256": "sha256:a3ea9813f16f8b7b46ea5d3647d4a4e96024a7b5a38c600f31205fec237a60f9"
+    },
+    {
+      "path": "docs/proof-network.md",
+      "bytes": 19962,
+      "sha256": "sha256:d909c811615145b2a84e12d560002229d5354f2a5aaeddd69129aedd722887cf"
+    },
+    {
+      "path": "docs/public-launch/ADVISOR.md",
+      "bytes": 45611,
+      "sha256": "sha256:865beece055a106d9b60d8cb84e66a39731d28512157e407a0cf7e7add20adc1"
+    },
+    {
+      "path": "docs/public-launch/code-signing-setup.md",
+      "bytes": 9770,
+      "sha256": "sha256:584e18627fed975730e708aad059fc6ff52c73b2c4fe7ae95cec0dfd05c5f727"
+    },
+    {
+      "path": "docs/public-launch/consumer-onboarding-ux.md",
+      "bytes": 27935,
+      "sha256": "sha256:bb71bdef48869c8acd1b7ac39f3436cbf17a63e788930d732be738366f9015a6"
+    },
+    {
+      "path": "docs/public-launch/desktop-app-plan.md",
+      "bytes": 24991,
+      "sha256": "sha256:cd1a3e005a634fb69033d1530bef6e362735a39f09e900d6c65e0093260c9c52"
+    },
+    {
+      "path": "docs/public-launch/mainnet-custody-plan.md",
+      "bytes": 20070,
+      "sha256": "sha256:6ed938b810b1572e5668a6ca4e26e6643e869278a5eea2734c47f70dc8a7ef80"
+    },
+    {
+      "path": "docs/public-launch/one-click-connectors.md",
+      "bytes": 29601,
+      "sha256": "sha256:add9740eb930c35ba10ad0e324be18ff18fc97bc0355f4375e28a8d64b29f7cc"
+    },
+    {
+      "path": "docs/public-launch/production-readiness-status.md",
+      "bytes": 4059,
+      "sha256": "sha256:6bec36b5a29fd3ec6a3ba91daf2b9c2c54cd32c5ec75f3183ef97a5ccb56750b"
+    },
+    {
+      "path": "docs/public-launch/public-launch-docs.md",
+      "bytes": 31405,
+      "sha256": "sha256:630dc1773504466cdf1ddc5e7e9f603e414459e651b688df0f32150835a93d42"
+    },
+    {
+      "path": "docs/public-launch/qa-smoke-scenarios.md",
+      "bytes": 6454,
+      "sha256": "sha256:f30fde14274d4c66fec710a461f0d414add32fb306afc44a891b48671a8c43a3"
+    },
+    {
+      "path": "docs/public-launch/qa-support-observability.md",
+      "bytes": 40953,
+      "sha256": "sha256:9c07251477d578590657fcfac738884fedcad7cc66d3a05d72db6d7310be40f9"
+    },
+    {
+      "path": "docs/public-launch/release-owner-checklist.md",
+      "bytes": 11201,
+      "sha256": "sha256:dcc80c1bccfb9ea82d63fc46dda87c8da10cb4252cec8b0baeb6620f5cf6a461"
+    },
+    {
+      "path": "docs/public-launch/security-audit-checklist.md",
+      "bytes": 11408,
+      "sha256": "sha256:9ef26841c11ef126c12e8308eb02377532ae7bbaaa2c67a38caf96104a01a303"
+    },
+    {
+      "path": "docs/public-launch/security-audit-rfp.md",
+      "bytes": 16465,
+      "sha256": "sha256:2a24465e69860bc0784a2547d9470d602e3897422fe79b3ad5ae421b58a7fe51"
+    },
+    {
+      "path": "docs/public-launch/support-playbooks.md",
+      "bytes": 16859,
+      "sha256": "sha256:c004b2369d0291aa626b41038ae58ce25229341c38106d0d70f88df393a0b6b0"
+    },
+    {
+      "path": "docs/public-launch/trust-signing-release.md",
+      "bytes": 20481,
+      "sha256": "sha256:6f73d74553a94a8846b371e2e60111e3d2d2f1d81ab390611d62a47a9746dd10"
+    },
+    {
+      "path": "docs/public-launch/workflowz-execution-roadmap.md",
+      "bytes": 20961,
+      "sha256": "sha256:ef137381d54ed0d4f3693fea0e7893e7bf8dc305a479e5da0b4f5b28df366789"
+    },
+    {
+      "path": "docs/sdk-api.md",
+      "bytes": 14115,
+      "sha256": "sha256:98e8b277a24a3cafe9bfff561dfd8bd5f49755d5473ac1e1f227a17db6e62fda"
+    },
+    {
+      "path": "docs/solana-devnet-acceptance.md",
+      "bytes": 20503,
+      "sha256": "sha256:4a91598b858fe5bd7b645665095ec794c56aaa3e10d18cabf9198b2859bb2956"
+    },
+    {
+      "path": "docs/solana-proof-rail.md",
+      "bytes": 27841,
+      "sha256": "sha256:597ca5e5eaa31eb077212535e972201d81df081ff0273e82fff4a2b520f49238"
+    },
+    {
+      "path": "examples/ci/github-actions.yml",
+      "bytes": 5111,
+      "sha256": "sha256:4ba766f25e7efd41db183cbf4e53ad878471e217c4303255f7a6dd824f829517"
+    },
+    {
+      "path": "examples/node-basic-memory.mjs",
+      "bytes": 2433,
+      "sha256": "sha256:6b9258d3da1f3297e3396afb14d114b84f32d8db32f5ce806b2d57eea73fa4b1"
+    },
+    {
+      "path": "examples/proof-network-anchor.json",
+      "bytes": 1379,
+      "sha256": "sha256:574e58e94805e9d3c3f14981786790e40ab9d84df0625ab62c2ec1cc73993b0e"
+    },
+    {
+      "path": "examples/proof-network-attestation.json",
+      "bytes": 1269,
+      "sha256": "sha256:26063f8ab9cde7ce01d90122bab2e60c0df6435596d428f9c25461f837015b8c"
+    },
+    {
+      "path": "examples/proof-network-grant.json",
+      "bytes": 1142,
+      "sha256": "sha256:0e9c433a9802effa7f00160813c92d2a4fc427f6eef0eec4b214366f70cbc345"
+    },
+    {
+      "path": "examples/proof-network-packet.json",
+      "bytes": 2623,
+      "sha256": "sha256:c6da2de930d263218ef82c8a2bb7bab89652ea41c1fbce0a02aef2a27496cb1e"
+    },
+    {
+      "path": "package.json",
+      "bytes": 15279,
+      "sha256": "sha256:37345324ec73d45005585a959454efd3b78b58a3e6839de8c75468773b4910f3"
+    },
+    {
+      "path": "packages/adapters/PACKAGE_CONTRACT.md",
+      "bytes": 1593,
+      "sha256": "sha256:3c93dd3cb5d78e965198285ad93d69c86e732b9d10c43021ddc34b2f28017a4d"
+    },
+    {
+      "path": "packages/adapters/src/index.js",
+      "bytes": 7912,
+      "sha256": "sha256:51ddc05ac0f55ec7a6cba80c9226a59629fc21ec4ded8932ff17ec339bd78179"
+    },
+    {
+      "path": "packages/boundary/src/index.js",
+      "bytes": 18076,
+      "sha256": "sha256:c6871204e6824ed88b3633e469417f2ecd2b29589e0d8f16075c95e283ef7483"
+    },
+    {
+      "path": "packages/connectors/src/index.js",
+      "bytes": 42358,
+      "sha256": "sha256:545679ff4c4f8492237b9406d6a2a3c23950babc346d6c5ff2f80ed86463516a"
+    },
+    {
+      "path": "packages/controller/PACKAGE_CONTRACT.md",
+      "bytes": 1767,
+      "sha256": "sha256:fb37149fecb355e4835e34af87f28e3b40880bf03d60b6643bf88ef8931c0ba8"
+    },
+    {
+      "path": "packages/controller/src/index.js",
+      "bytes": 25333,
+      "sha256": "sha256:7e98380bedc558357dc09bfd83447139ffde81e07a3789c70ff221ae5e34e9ca"
+    },
+    {
+      "path": "packages/core/src/index.js",
+      "bytes": 56011,
+      "sha256": "sha256:a48ade627e01d3fc850481c72767c302fea0a171a6faa834dfc0d77e068f350f"
+    },
+    {
+      "path": "packages/enterprise/src/index.js",
+      "bytes": 23110,
+      "sha256": "sha256:cbefb79cc836f49331bb61e75d6d1d8e49bc0368dfb2996dae8c541d81e8f4ff"
+    },
+    {
+      "path": "packages/hosted-cloud/src/index.js",
+      "bytes": 99923,
+      "sha256": "sha256:a3ac9736372d16476d364de062c32b9571741aef93344b9ea3c1a7515aa4b11b"
+    },
+    {
+      "path": "packages/importers/src/index.js",
+      "bytes": 57018,
+      "sha256": "sha256:20d0804f9d675c784a7f42a00eecf1eb49fe875656ddf5f96e446e0b66850a9d"
+    },
+    {
+      "path": "packages/mcp-server/README.md",
+      "bytes": 1020,
+      "sha256": "sha256:ae3e92c2230d847b2054d376018164bfacbe044ba203cb421cc57bb1f80c60c7"
+    },
+    {
+      "path": "packages/mcp-server/bin/enigma-mcp.mjs",
+      "bytes": 478,
+      "sha256": "sha256:e8628808aeb82f3798da8ac70f63b2faf5f5d16d2774e1a7ad7f3ecf1714444c"
+    },
+    {
+      "path": "packages/mcp-server/src/index.js",
+      "bytes": 48568,
+      "sha256": "sha256:b7f7e6811dd0f1a61c8455a5dc3796d4a33e02368577a7a321d39b98dc8eee36"
+    },
+    {
+      "path": "packages/mesh/src/index.js",
+      "bytes": 26719,
+      "sha256": "sha256:f7f85f1c3e326719613c67bd3f6512eae555b914d021fb5864983ce143703e6f"
+    },
+    {
+      "path": "packages/metering/PACKAGE_CONTRACT.md",
+      "bytes": 1022,
+      "sha256": "sha256:33707dc2eae265ff4a80f5aa67a0b7b3c721fb68fe6297db7a0e61e786b25b7f"
+    },
+    {
+      "path": "packages/metering/src/index.js",
+      "bytes": 11587,
+      "sha256": "sha256:96f55b95dd80f1674df57189c6aaf4d9843c114f64fa9d566561838a5c632fed"
+    },
+    {
+      "path": "packages/optimizer/src/index.js",
+      "bytes": 27962,
+      "sha256": "sha256:61f9e8eb9637865fa29b64bcbc15947604602325e1a09a1b0f915a7b5b4d3cf1"
+    },
+    {
+      "path": "packages/passport/src/index.js",
+      "bytes": 83321,
+      "sha256": "sha256:55168f3359e31408adfa33782cca44ef9d456a9dc742baf491d36121754a0459"
+    },
+    {
+      "path": "packages/proof-network/src/index.js",
+      "bytes": 37887,
+      "sha256": "sha256:568f3951cc408e2f4203dab10e0c16bdf1c6ace119aeb25af41dfc5a6df2a5c6"
+    },
+    {
+      "path": "packages/settlement/PACKAGE_CONTRACT.md",
+      "bytes": 1659,
+      "sha256": "sha256:c5c34f89c8ac503310cd42f2dc0ee79f880e6b4a1f750a6d2e60a0d5dd5c50c8"
+    },
+    {
+      "path": "packages/settlement/src/index.js",
+      "bytes": 20944,
+      "sha256": "sha256:6e2cd54b6d6497c9d0a91be8a52ffd10e2753f5c9df58e76a60210aa7f790bb3"
+    },
+    {
+      "path": "packages/storage/PACKAGE_CONTRACT.md",
+      "bytes": 1312,
+      "sha256": "sha256:83cde3c981719f934608716c3b68605f3e46868344034baf5b499e1e75bb21e7"
+    },
+    {
+      "path": "packages/storage/src/index.js",
+      "bytes": 18529,
+      "sha256": "sha256:7ca45bdf4979f729f322877decaa285e334a5fe9e798888c76a045c97deeb542"
+    },
+    {
+      "path": "packages/vault/src/index.js",
+      "bytes": 46011,
+      "sha256": "sha256:2e9ff55505a693bce78f2a193e2ac4e1b423b22ca02df4d14630f4cfe6c83fe5"
+    },
+    {
+      "path": "scripts/build-ai-orchestration-plan.mjs",
+      "bytes": 13039,
+      "sha256": "sha256:fe6a194e76bd117c0673dad1d4c3782a3276aa00462af5b67915a65f0a4250b9"
+    },
+    {
+      "path": "scripts/build-benchmark-proof-release.mjs",
+      "bytes": 22016,
+      "sha256": "sha256:29f9d0ccfd88e382056a8134353cb88f99e7e8114ca6d98f808fa7a16d248ef6"
+    },
+    {
+      "path": "scripts/build-cloudflare-pages-release-packet.mjs",
+      "bytes": 13759,
+      "sha256": "sha256:736cfe77e39968d30f897f082f31fa2ec04529fd9f0faecd2a575ac839637b4b"
+    },
+    {
+      "path": "scripts/build-cloudflare-token-policy.mjs",
+      "bytes": 13247,
+      "sha256": "sha256:fcb387432431ae94c3c95d64a62d761ec59c4c8b90d7d750a6cd5faa217ead6b"
+    },
+    {
+      "path": "scripts/build-cloudflare-token-request.mjs",
+      "bytes": 13930,
+      "sha256": "sha256:0de9cdca4c80622456ae3fc39b0124fdadcb8c6ddbcf22131a961c61f8bd74c0"
+    },
+    {
+      "path": "scripts/build-demo-assets.mjs",
+      "bytes": 9718,
+      "sha256": "sha256:cdf466bfdeefb3ed833b0f4b9f3cf5d98cbde3b85368aa607b72e8db503ec872"
+    },
+    {
+      "path": "scripts/build-edge-backend-workers.mjs",
+      "bytes": 16730,
+      "sha256": "sha256:5ee8ddebe8fe43863b86d3bf50192f613db2d5a7630eb2c29fabaf12c12c4bc5"
+    },
+    {
+      "path": "scripts/build-goal-completion-audit.mjs",
+      "bytes": 21763,
+      "sha256": "sha256:2663d57a16aaaa2ef4a62a8df004bb9ce04ee30ace671f9a4fecbc650a690f58"
+    },
+    {
+      "path": "scripts/build-hosted-api-key-lifecycle.mjs",
+      "bytes": 13216,
+      "sha256": "sha256:9d4435f623239159ed1b6374ed3547e64e6765ffa3357c420344a527277a35b9"
+    },
+    {
+      "path": "scripts/build-hosted-customer-lifecycle.mjs",
+      "bytes": 19330,
+      "sha256": "sha256:de8fb9e48bedc2a8f136f3d233d3fe5d60c0ad6b100f1f382ebe7092d7209aa6"
+    },
+    {
+      "path": "scripts/build-hosted-probe-worker.mjs",
+      "bytes": 8537,
+      "sha256": "sha256:11dd8d4f05f4bf53cd899d0f2f84921b26de3d76d3ee89acc193e6829523e9c1"
+    },
+    {
+      "path": "scripts/build-installer-assets.mjs",
+      "bytes": 15392,
+      "sha256": "sha256:e0322407638e0fbed66e21565a29350e5ce2a7839eb60fea12f37688863f6059"
+    },
+    {
+      "path": "scripts/build-operator-acceptance-packet.mjs",
+      "bytes": 12931,
+      "sha256": "sha256:e6be1d66d0fd9a9de81d932b89c3acbe38eeed8029a53e3e41a163323da7f4c1"
+    },
+    {
+      "path": "scripts/build-operator-evidence-starter.mjs",
+      "bytes": 30553,
+      "sha256": "sha256:797118036500fc2f68b36bfaa467a450f986abcc8ac3fd0f8de1224bbc1ddb90"
+    },
+    {
+      "path": "scripts/build-production-backend-env-kit.mjs",
+      "bytes": 19893,
+      "sha256": "sha256:869be2784234b7f369a3476204c613d793d2d014229d675d024e23a7013fa96e"
+    },
+    {
+      "path": "scripts/build-production-dependency-report.mjs",
+      "bytes": 21586,
+      "sha256": "sha256:050479fbce251dca42d58fd47bd62448016831f1fa010aab30cfd917f09c4c50"
+    },
+    {
+      "path": "scripts/build-production-handoff-packet.mjs",
+      "bytes": 26294,
+      "sha256": "sha256:375d53ee966a5c5333dd71a1140916c5da42cb3c12be781bcb6eb4d259e5004a"
+    },
+    {
+      "path": "scripts/build-production-readiness-manifest.mjs",
+      "bytes": 12500,
+      "sha256": "sha256:4b964c5028ee20c8fbec2f4835f5ba71be0d2a88d09e7093f4f19bce10bbd685"
+    },
+    {
+      "path": "scripts/build-production-status-board.mjs",
+      "bytes": 14766,
+      "sha256": "sha256:49e86cb87a4e6daa4d4069691d7316937c95864a9edd32caa8fc5cf2fe37c058"
+    },
+    {
+      "path": "scripts/build-production-storage-migration.mjs",
+      "bytes": 3447,
+      "sha256": "sha256:101d72e477fd37ffb876caedf3ea724008478075a40172f3b73c1509e0a08255"
+    },
+    {
+      "path": "scripts/build-production-unblocker.mjs",
+      "bytes": 24559,
+      "sha256": "sha256:1cb3efba84474d09a7ff9e5e759555eb588ac9626fe0cbde5572ea7efce98626"
+    },
+    {
+      "path": "scripts/build-production-workplan.mjs",
+      "bytes": 18205,
+      "sha256": "sha256:9c481c920093be317b4506e1fde08c78202cfe3bdc6be9073cba80317da749bd"
+    },
+    {
+      "path": "scripts/build-proof-network-packet.mjs",
+      "bytes": 9217,
+      "sha256": "sha256:8f0988fcf749c966d23f883bc29c1295635df9e28a7c06e022ca7fa0d8f8f8f2"
+    },
+    {
+      "path": "scripts/build-review-packet.mjs",
+      "bytes": 23315,
+      "sha256": "sha256:b4140cc81d369fddf6665b3c16ca25886363665250b0cc158d2844fec7882f18"
+    },
+    {
+      "path": "scripts/check.mjs",
+      "bytes": 18926,
+      "sha256": "sha256:816de261ae78043f89d163b74e2e9783dc8cbdfe66fe28eb6b4a6a1687b41ef1"
+    },
+    {
+      "path": "scripts/cloudflare-ops.mjs",
+      "bytes": 72103,
+      "sha256": "sha256:afee0063c21013bb7d4a88733654d6af92f9bd168f068f68d002a3c4728ae8ff"
+    },
+    {
+      "path": "scripts/cloudflare-secret-env.mjs",
+      "bytes": 4708,
+      "sha256": "sha256:8462a4ff5c8f0da52111a81402cf1de6098e251cfb52c1defcbc75c81bc943d3"
+    },
+    {
+      "path": "scripts/collect-hosted-backend-live-evidence.mjs",
+      "bytes": 13525,
+      "sha256": "sha256:5ca0b12764aae290704d8a088558565e8916af2895b5c9c38d9ef1e404f2f905"
+    },
+    {
+      "path": "scripts/download-standard-benchmarks.mjs",
+      "bytes": 14926,
+      "sha256": "sha256:7e2c351a57262f07d4cc45d77d709ce5815273a120106e25b5fcc9267811e566"
+    },
+    {
+      "path": "scripts/infrastructure-readiness.mjs",
+      "bytes": 40413,
+      "sha256": "sha256:b1d12e48b6a98c92e59fa6863af23af5224103627b8fc394d731142a098e3922"
+    },
+    {
+      "path": "scripts/install-enigma-local.mjs",
+      "bytes": 10349,
+      "sha256": "sha256:9ebf5dc0c8a9d43fd8f5aafbf196f65f9828b086a3377e60e0dce09a63ba00cb"
+    },
+    {
+      "path": "scripts/memory-optimization-benchmark.mjs",
+      "bytes": 9251,
+      "sha256": "sha256:7922932cb51697eebdbbfe584d24d9c330ec250f65395514044619ef63603a42"
+    },
+    {
+      "path": "scripts/monitor-live-endpoints.mjs",
+      "bytes": 15435,
+      "sha256": "sha256:a72f1bee64f2177f9ba4773d790721028793d77bcb5ba7a90ad5003e28017d45"
+    },
+    {
+      "path": "scripts/package-browser-extension.mjs",
+      "bytes": 19825,
+      "sha256": "sha256:441d623ca6b3f32d4ca6a12a9ebf5592fd003a1f7459d8f63da58033dd4afb43"
+    },
+    {
+      "path": "scripts/release-audit.mjs",
+      "bytes": 250939,
+      "sha256": "sha256:3f8f6f33ca214c59a20d0cc69a824f2d9bac381dd8947179ad5b97152a79ddc3"
+    },
+    {
+      "path": "scripts/release-evidence-desktop.mjs",
+      "bytes": 8338,
+      "sha256": "sha256:1a6cba49262012191bce26c97f5192b26cddd8fe001f33effd1e9d609fa634d7"
+    },
+    {
+      "path": "scripts/release-provenance.mjs",
+      "bytes": 9332,
+      "sha256": "sha256:965125d21e5f347a8cd51a7559bf6c95f8bf5e6178e441bb56b263046db51e40"
+    },
+    {
+      "path": "scripts/run-backend-readiness-smoke.mjs",
+      "bytes": 8881,
+      "sha256": "sha256:91e51293e3cd211891d902cfaa29fa0d94f9065048378e34d8414d25f584edc8"
+    },
+    {
+      "path": "scripts/run-memory-benchmarks.mjs",
+      "bytes": 35283,
+      "sha256": "sha256:5745c3cae184c1f9d53acd6b329d621213bce6daef0d2b5437e687acb9e51f5f"
+    },
+    {
+      "path": "scripts/run-standard-memory-benchmarks.mjs",
+      "bytes": 55034,
+      "sha256": "sha256:cb7b7fd0160099389be7a2dba1012d4ab8c1c6a3f04cacd09236b30348189e33"
+    },
+    {
+      "path": "scripts/scan-secrets.mjs",
+      "bytes": 4613,
+      "sha256": "sha256:944f79d82f06111a6b3ef73f93d9120e0731cadb7d5027d6a4999af16fa68852"
+    },
+    {
+      "path": "scripts/sign-update-manifest.mjs",
+      "bytes": 7218,
+      "sha256": "sha256:73a7ea2d393b4b1a1baabc555781a03c4e9e7d089df6297880f0a6090b831d0b"
+    },
+    {
+      "path": "scripts/simulate-production-env.mjs",
+      "bytes": 9627,
+      "sha256": "sha256:928ef327cc71d3f9b2520a4952e82727cb5e3c90e75f78864c7990de934a4831"
+    },
+    {
+      "path": "scripts/stage-cloudflare-pages-artifact.mjs",
+      "bytes": 5414,
+      "sha256": "sha256:bbddb24cf672c2334ab30c5e823dfe8c12ed038dadcd5f2e84bd5126689bb56b"
+    },
+    {
+      "path": "scripts/validate-backup-restore-drill.mjs",
+      "bytes": 9182,
+      "sha256": "sha256:4923dc08ccc59d8c7e6a09346291ac6a090362b3cd0eac83a71b377dc09a95c9"
+    },
+    {
+      "path": "scripts/validate-cloudflare-credentials.mjs",
+      "bytes": 5032,
+      "sha256": "sha256:0ea4199f1855e1b65dff50a94e8f07c903b1efaaf0c93984da1af4a2f8769006"
+    },
+    {
+      "path": "scripts/validate-cloudflare-worker-inspect.mjs",
+      "bytes": 10253,
+      "sha256": "sha256:3211853c8b09c0aee1d2780c3441988e8f66d7c1b99636dee3c97c927dead93c"
+    },
+    {
+      "path": "scripts/validate-domain-tls.mjs",
+      "bytes": 12937,
+      "sha256": "sha256:aef78476faf9b15631f0c973eff0421c9a3366b406b47dfd3feb924c0c247870"
+    },
+    {
+      "path": "scripts/validate-hosted-backend-live.mjs",
+      "bytes": 15061,
+      "sha256": "sha256:7308bde50bb9e59156c67900ad08c7d7cf948f59e364eb44a998739188fe13d5"
+    },
+    {
+      "path": "scripts/validate-incident-drill.mjs",
+      "bytes": 10683,
+      "sha256": "sha256:14b017d6eca1cc4bb3cb81937d1ea7d57660f4fba7894d4db3d03cafa05083a3"
+    },
+    {
+      "path": "scripts/validate-kms-custody.mjs",
+      "bytes": 11072,
+      "sha256": "sha256:0b1822cce1362ea41f230ae2d9b4fed592e8e426a22126059afdd32fc3c338a0"
+    },
+    {
+      "path": "scripts/validate-legal-compliance-approval.mjs",
+      "bytes": 12779,
+      "sha256": "sha256:2e516360dcb386832e041ce4c4d63578d2952ae37af3c189859dcda54d88464c"
+    },
+    {
+      "path": "scripts/validate-monitoring-alerting.mjs",
+      "bytes": 12131,
+      "sha256": "sha256:2f3c2d4cd32712db1bbf05f51e6bf84190f45e65c8d820c7ac430f3d98bf24c5"
+    },
+    {
+      "path": "scripts/validate-network-access-policy.mjs",
+      "bytes": 13697,
+      "sha256": "sha256:3b40ff7f2d6112c1c32affd0043eb59c2903479a3c3fb1bf6f3c44e586659f16"
+    },
+    {
+      "path": "scripts/validate-operator-acceptance.mjs",
+      "bytes": 13446,
+      "sha256": "sha256:01938f106a6ffe57dc37917752e63d45cb6b50f97b9b0fb2243d957adcfaefd6"
+    },
+    {
+      "path": "scripts/validate-production-manifests.mjs",
+      "bytes": 20479,
+      "sha256": "sha256:b3f3abd77b3e0b6af9bd83990ef581163d772bfa130da375b7d4b33190967e0c"
+    },
+    {
+      "path": "scripts/validate-public-site-security.mjs",
+      "bytes": 10767,
+      "sha256": "sha256:c19c9ef0fe967ada4f62fc03e7a6cbfac620ad7dae15608cf46cc5e871df66fe"
+    },
+    {
+      "path": "scripts/validate-security-threat-model.mjs",
+      "bytes": 12317,
+      "sha256": "sha256:d2d7af7b8ee2920212150b9e03c47652da373745bf06827257c1e5637385bbb3"
+    },
+    {
+      "path": "scripts/validate-service-settlement.mjs",
+      "bytes": 15583,
+      "sha256": "sha256:bbcfbcb251b310e6f4a8dd2d6b1b7393a8f1f37e128dcb0bab945d0035c42cc1"
+    },
+    {
+      "path": "scripts/validate-support-sla.mjs",
+      "bytes": 8839,
+      "sha256": "sha256:dd5c084e8781b673de2ccafb041f12b31603b15e3dcc111075d2426335995d27"
+    },
+    {
+      "path": "scripts/validate-tenant-policy-approval.mjs",
+      "bytes": 12428,
+      "sha256": "sha256:8b99aed77348ed6523cd9651ad50cc56541bb850d9724673bf6cf10e26a49860"
+    },
+    {
+      "path": "scripts/validate-usage-metering.mjs",
+      "bytes": 11777,
+      "sha256": "sha256:60fa184c5768ce4ea7d9ecef4d9d92e2a7db7ff5518d262c5a253d4af156d0fc"
+    },
+    {
+      "path": "scripts/validate-whitepaper-claims.mjs",
+      "bytes": 8116,
+      "sha256": "sha256:16498b638c25debb8c4e54ce66ea4f67ca19085acd8b550fc9ae6584c7647b34"
+    },
+    {
+      "path": "scripts/verify-registry-install.mjs",
+      "bytes": 17216,
+      "sha256": "sha256:6c43399e3601880b0e93990092f10f15f054684714bfdf4d28127e3b19db3296"
+    },
+    {
+      "path": "scripts/wait-for-backend-ready.mjs",
+      "bytes": 3373,
+      "sha256": "sha256:d2c5b896e6f478df1583534d6d091c1f32afe6770ae0cc7eca8cc6fc1f1dbc40"
+    },
+    {
+      "path": "specs/antibody-pack-v1.schema.json",
+      "bytes": 3385,
+      "sha256": "sha256:7828a0484fb4be8d670627bdd933dac6a31b4a0a408fc9761f69f107a9ef9a18"
+    },
+    {
+      "path": "specs/antigen-envelope-v1.schema.json",
+      "bytes": 2501,
+      "sha256": "sha256:bf8ff38425240bcaea862d4f87be02d3e5ce531bb61666c419b1f32edb5f0d75"
+    },
+    {
+      "path": "specs/boundary-manifest-v1.schema.json",
+      "bytes": 1581,
+      "sha256": "sha256:1ac1ecf04d9355c3a294d8a1cfd823f6c87d77c0d795e2be454b89b9badcee61"
+    },
+    {
+      "path": "specs/capsule-v1.schema.json",
+      "bytes": 2364,
+      "sha256": "sha256:1598083a2184b215c1d718369ad5d4e24612a5c761623fca082617fae97e9f9a"
+    },
+    {
+      "path": "specs/claim-boundary-manifest-v1.schema.json",
+      "bytes": 1342,
+      "sha256": "sha256:cce651b114d8958f1aae1feb36ae17cdf69221d543e16dc0a45c40aca1f617b2"
+    },
+    {
+      "path": "specs/claim-ledger-v1.schema.json",
+      "bytes": 9606,
+      "sha256": "sha256:273584bea3495d36ae50a083240d2ab1a5815fe5354e24a27bb46927621cff3a"
+    },
+    {
+      "path": "specs/connector-profile-v1.schema.json",
+      "bytes": 1956,
+      "sha256": "sha256:13ae38756fc9c97d072580af5302a7b46676e412c1087a13b8405a82a5a72d3a"
+    },
+    {
+      "path": "specs/context-passport-v1.schema.json",
+      "bytes": 1951,
+      "sha256": "sha256:f5700a10cdbcc0d87d513920cba645ee8654383233533f1748d2246c8ac3827f"
+    },
+    {
+      "path": "specs/deletion-tombstone-v1.schema.json",
+      "bytes": 1779,
+      "sha256": "sha256:48ed2b19a320485fb7a4b28ddc3675f1412ec01b056dd7fe28a4276296f32866"
+    },
+    {
+      "path": "specs/enterprise-policy-v1.schema.json",
+      "bytes": 3021,
+      "sha256": "sha256:036a15c6b9f686440bb87d2e35141c18f27d875c9fc13a0fa89fb7b737c088f1"
+    },
+    {
+      "path": "specs/evidence-packet-v1.schema.json",
+      "bytes": 6357,
+      "sha256": "sha256:cb404b82fc7bec0fd31b999e13737705ede75d8bd66f01fb1edcc236545c6833"
+    },
+    {
+      "path": "specs/gateway-request-v1.schema.json",
+      "bytes": 1288,
+      "sha256": "sha256:c66fdfe928a1e3cc8b7feb92f545ec6fe620437bd7c783176eb9e1e37127a013"
+    },
+    {
+      "path": "specs/goal-completion-audit-v1.schema.json",
+      "bytes": 2585,
+      "sha256": "sha256:57ec1a1bb688ed3899ab214b050660f33e96796f8c17661c95951ee880a1667e"
+    },
+    {
+      "path": "specs/hosted-backend-live-evidence-v1.schema.json",
+      "bytes": 5628,
+      "sha256": "sha256:c34cfd12893b9ab4386e6ae3b9295fdc90de236f014941fe5cc91652afa0fdfb"
+    },
+    {
+      "path": "specs/immune-scan-report-v1.schema.json",
+      "bytes": 3882,
+      "sha256": "sha256:d49481134d13b3bfbe7c2ca4d8651b55eded2a15c34ffd04bb787d2920a5202e"
+    },
+    {
+      "path": "specs/import-report-v1.schema.json",
+      "bytes": 7538,
+      "sha256": "sha256:a1dd731dacba574e670eb49e5c62a3972ba5575cc04a12ff4e903f7dd91f0f85"
+    },
+    {
+      "path": "specs/infrastructure-readiness-manifest-v1.schema.json",
+      "bytes": 6157,
+      "sha256": "sha256:064cfb5bf3cc192d0ae460ec98c7ebad1186fc2ce0625882909700340a1a89da"
+    },
+    {
+      "path": "specs/lifecycle-receipt-log-v1.schema.json",
+      "bytes": 2475,
+      "sha256": "sha256:b6be1d2b08fc7374345a795988db987389d6e41631f5a827be7267c50ce2cd83"
+    },
+    {
+      "path": "specs/memory-atom-v1.schema.json",
+      "bytes": 2164,
+      "sha256": "sha256:58e736407e6c1540ce8d008a3b754f5f4f34d66f06450cd955d057622adbf812"
+    },
+    {
+      "path": "specs/memory-controller-grant-v1.schema.json",
+      "bytes": 3331,
+      "sha256": "sha256:40267cd1df481b251cfe6c63ded479c3e907152ede4660f440eb6529fa57ad76"
+    },
+    {
+      "path": "specs/memory-event-v1.schema.json",
+      "bytes": 1570,
+      "sha256": "sha256:f031ed1643d685cec3fc74b818c2e011f393361b43fcaa7822b5887c6d193c06"
+    },
+    {
+      "path": "specs/memory-weather-report-v1.schema.json",
+      "bytes": 4521,
+      "sha256": "sha256:db071e638dbe3e2cfd3f002aaa082c694a535879d744a4929d996c09231cc0b7"
+    },
+    {
+      "path": "specs/mesh-node-v1.schema.json",
+      "bytes": 6212,
+      "sha256": "sha256:000abc3007e1a9dab6c85f8c42319b51f6f999fdbbf195487e7e24956fb66b4d"
+    },
+    {
+      "path": "specs/passport-v1.schema.json",
+      "bytes": 2127,
+      "sha256": "sha256:b6aade86089058d41aa5bbb43a1eb965dca03d7d295f4008ef4b6d86e0b7aae2"
+    },
+    {
+      "path": "specs/production-handoff-packet-v1.schema.json",
+      "bytes": 5633,
+      "sha256": "sha256:a3e3834331c53716f1e1814a299b83cc3eee553977d380621922d043e1021411"
+    },
+    {
+      "path": "specs/proof-network-anchor-batch-v1.schema.json",
+      "bytes": 4302,
+      "sha256": "sha256:d942f88140d42860cc77b662979d4e411db8e4f60139ed3ccc2e2d575b1fa8cc"
+    },
+    {
+      "path": "specs/proof-network-benchmark-attestation-v1.schema.json",
+      "bytes": 3754,
+      "sha256": "sha256:89af2d7d32d1e59a82d7efb86936f085fd8f63b2a7021edb58f5c9471a1cc162"
+    },
+    {
+      "path": "specs/proof-network-capability-grant-v1.schema.json",
+      "bytes": 4372,
+      "sha256": "sha256:2856bf6f6184627d82e7a4cbf607cdba0866327ed88d6525ea9e19ade902d1f2"
+    },
+    {
+      "path": "specs/proof-network-packet-v1.schema.json",
+      "bytes": 5888,
+      "sha256": "sha256:f368041e8a05db7e40ebc1b4c1b262b74a2752a21e67ea20b0cd9b0431e236f8"
+    },
+    {
+      "path": "specs/proof-of-non-use-v1.schema.json",
+      "bytes": 2272,
+      "sha256": "sha256:7aab3bc5886eb1884876dd3bfdf0f415be90ea08440657c70376eed2e339db9c"
+    },
+    {
+      "path": "specs/public-launch-evidence-ledger-v1.schema.json",
+      "bytes": 6810,
+      "sha256": "sha256:5ded9c00da38269493302bf2639f54b729883bae918f97930f4fe42f5dfd3432"
+    },
+    {
+      "path": "specs/quarantine-record-v1.schema.json",
+      "bytes": 4535,
+      "sha256": "sha256:4696689c878e019117acf3728d4886889a5bc2d65397274642ecf91a5dfc5526"
+    },
+    {
+      "path": "specs/recall-veto-decision-v1.schema.json",
+      "bytes": 3962,
+      "sha256": "sha256:51749313d55e41b14ebc01baed6aff75580174fecad44401ccc123ff63d3c11d"
+    },
+    {
+      "path": "specs/receipt-v1.schema.json",
+      "bytes": 2105,
+      "sha256": "sha256:596468a2490d61e97c17936ceb7ff9b69bd53c27ef3efdcef1eb7005184763db"
+    },
+    {
+      "path": "specs/relay-record-v1.schema.json",
+      "bytes": 1441,
+      "sha256": "sha256:52a38f7653f304cccf697273554860a7e9b4c3a8b7bf6ea960cdec99e7b8a592"
+    },
+    {
+      "path": "specs/scoped-memory-bubble-v1.schema.json",
+      "bytes": 2999,
+      "sha256": "sha256:6f2b40a762e060a191d4823a74bac577336815d3fe7551747780b07467b1af99"
+    },
+    {
+      "path": "specs/state-checkpoint-v1.schema.json",
+      "bytes": 1933,
+      "sha256": "sha256:f7c37713fdadaf2793415950d63e04253cf5270bf13f1cc4a8d2b34277e04766"
+    },
+    {
+      "path": "specs/trust-bundle-v1.schema.json",
+      "bytes": 2370,
+      "sha256": "sha256:c5a3f17366a2627bc440bfd1a202657677c9cb57bfe8c60c5be20083a7016c75"
+    },
+    {
+      "path": "specs/trust-card-v1.schema.json",
+      "bytes": 4191,
+      "sha256": "sha256:27c23cf82b1f7e6659bd77912683df6fc5219e1c1975f48b1d97f75f715b7902"
+    },
+    {
+      "path": "templates/mcp-client-config.json",
+      "bytes": 145,
+      "sha256": "sha256:ae8c314cd67f437a448e3e03252082207c1fa124f4d5f61d5d961d4b5a648fb6"
+    }
+  ]
+}
