@@ -874,6 +874,19 @@ fn support_summary_export_path(config: &DesktopConfig) -> std::path::PathBuf {
         .join(file_name)
 }
 
+fn proof_activity_export_path(config: &DesktopConfig) -> std::path::PathBuf {
+    let file_name = format!(
+        "enigma-proof-activity-{}.json",
+        Utc::now().format("%Y%m%dT%H%M%SZ")
+    );
+    config
+        .bundle_path
+        .parent()
+        .map(std::path::Path::to_path_buf)
+        .unwrap_or_else(std::env::temp_dir)
+        .join(file_name)
+}
+
 #[tauri::command]
 pub async fn get_support_summary(state: tauri::State<'_, AppState>) -> Result<Value, String> {
     build_support_summary(&state.config).await
@@ -911,6 +924,35 @@ pub async fn export_support_summary(
 #[tauri::command]
 pub async fn get_proof_activity(state: tauri::State<'_, AppState>) -> Result<Value, String> {
     Ok(proof_activity_summary(&state.config).await)
+}
+
+#[tauri::command]
+pub async fn export_proof_activity(
+    state: tauri::State<'_, AppState>,
+    approve: bool,
+) -> Result<Value, String> {
+    if !approve {
+        return Err("User approval is required before exporting proof activity.".to_string());
+    }
+    let activity = proof_activity_summary(&state.config).await;
+    let out_path = proof_activity_export_path(&state.config);
+    if let Some(parent) = out_path.parent() {
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(redact_command_error)?;
+    }
+    let payload = serde_json::to_string_pretty(&activity).map_err(redact_command_error)?;
+    tokio::fs::write(out_path.as_path(), payload)
+        .await
+        .map_err(redact_command_error)?;
+    Ok(json!({
+        "exported": true,
+        "schema": "enigma.desktop_proof_activity_export.v1",
+        "path": "<proof-activity-file>",
+        "local_paths_hidden": true,
+        "raw_memory_hidden": true,
+        "shareable_by_default": false,
+    }))
 }
 
 #[tauri::command]

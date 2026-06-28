@@ -226,6 +226,15 @@ async function mockInvoke(cmd, args = {}) {
           hosted_saas_live: false,
         },
       };
+    case 'export_proof_activity':
+      return {
+        exported: true,
+        schema: 'enigma.desktop_proof_activity_export.v1',
+        path: '<proof-activity-file>',
+        local_paths_hidden: true,
+        raw_memory_hidden: true,
+        shareable_by_default: false,
+      };
     case 'rollback_client_config': {
       const c = clients.find((c) => c.id === args.id);
       if (c) c.status = 'ready';
@@ -664,6 +673,7 @@ function renderProofActivitySection() {
   const tombstoneCount = activity.tombstoned_memory_count ?? 0;
   const verifierStatus = activity.verifier_status || 'not_run';
   const evidenceStatus = activity.evidence_status || 'local_counts_and_roots_only';
+  const exported = activity.exported?.schema === 'enigma.desktop_proof_activity_export.v1';
   return `
     <section class="dashboard-section proof-activity" aria-labelledby="proof-activity-title">
       <p class="eyebrow">Proof Activity</p>
@@ -676,8 +686,10 @@ function renderProofActivitySection() {
         <div class="metric"><dt>Verifier</dt><dd>${escapeHtml(verifierStatus)}</dd></div>
       </div>
       <p class="note">Evidence status: ${escapeHtml(evidenceStatus)}. This is Enigma-controlled local evidence only; it does not prove outside-provider changes or model behavior changes.</p>
+      ${exported ? `<p class="note">Proof activity export ready. File location is hidden in this view.</p>` : ''}
       <div class="button-row">
         ${primaryButton('Refresh proof activity', 'refresh-proof-activity')}
+        <button type="button" class="secondary" data-action="export-proof-activity" ${activity.schema ? '' : 'disabled'}>Export proof activity</button>
       </div>
     </section>
   `;
@@ -1165,6 +1177,24 @@ async function handleAction(event) {
       busy = false;
       render();
       setStatus('Proof activity refreshed without exposing raw memory.');
+      return;
+    }
+    case 'export-proof-activity': {
+      if (!proofActivity?.schema) {
+        setStatus('Refresh proof activity before exporting it.');
+        return;
+      }
+      if (!confirm('Export a public-safe proof activity JSON file? No raw memory or local paths will be included.')) {
+        return;
+      }
+      busy = true;
+      setStatus('Exporting public-safe proof activity...');
+      const exported = await call('export_proof_activity', { approve: true });
+      proofActivity = { ...proofActivity, exported };
+      health.proof_activity = proofActivity;
+      busy = false;
+      render();
+      setStatus('Proof activity exported. The file location is hidden in this view.');
       return;
     }
     case 'go-health':

@@ -293,10 +293,16 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(wizard, /Proof Activity/);
   assert.match(wizard, /What Enigma can prove locally/);
   assert.match(wizard, /refresh-proof-activity/);
+  assert.match(wizard, /export-proof-activity/);
+  assert.match(wizard, /Export proof activity/);
+  assert.match(wizard, /Proof activity exported/);
   assert.match(wizard, /enigma\.desktop_proof_activity\.v1/);
   assert.match(tauriService, /pub async fn get_proof_activity/);
   assert.match(tauriService, /local_counts_and_roots_only/);
+  assert.match(tauriService, /pub async fn export_proof_activity/);
+  assert.match(tauriService, /enigma\.desktop_proof_activity_export\.v1/);
   assert.match(tauriLib, /commands::service::get_proof_activity/);
+  assert.match(tauriLib, /commands::service::export_proof_activity/);
   assert.match(wizard, /Support summary/);
   assert.match(wizard, /Shareable status without private memory/);
   assert.match(wizard, /collect-support-summary/);

@@ -98,6 +98,7 @@ pub fn run() {
             commands::service::get_support_summary,
             commands::service::export_support_summary,
             commands::service::get_proof_activity,
+            commands::service::export_proof_activity,
             commands::service::get_health,
             commands::service::shutdown_service,
             commands::diagnostics::get_diagnostics,
