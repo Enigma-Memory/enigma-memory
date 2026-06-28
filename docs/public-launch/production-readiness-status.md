@@ -39,14 +39,14 @@
 - Claude `.mcpb` manifest helper aligns with MCPB manifest `0.3` fields (`server.type: "node"`, `server.entry_point`, `server.mcp_config`, `user_config`) and remains public-safe.
 - Deterministic Claude `.mcpb` package builder is available as both `enigma claude-mcpb package` and `npm run claude:mcpb:package`; it creates a reviewable package with `manifest.json` and local Enigma MCP node runtime source, performs no install, provider launch, network call, or config write, and redacts the output path in reports.
 - Claude `.mcpb` packages include a minimal root `package.json` with `type: "module"` for Node ESM scope; they do not copy repo scripts, dependency lists, local paths, secrets, provider responses, or memory content.
-- Backup, rollback, repair, disconnect, and local test flows with JSON-preserving config writes.
+- Backup, rollback, repair, disconnect, and local test flows with JSON-preserving config writes; `enigma connect --plain` and `enigma disconnect --plain` give path-redacted human-readable config summaries.
 - Desktop connector cards expose a local "Test connection" action that checks config parse, Enigma entry correctness, bundle reachability, and restart guidance without launching provider apps.
 
 ### Docs and website
 - Desktop-first `README.md`.
 - Updated `docs/install-anywhere.md`.
 - Static `website/` pages: home, download, setup, help hub, install/connect/troubleshooting guides, privacy, proofs, FAQ, and developer CLI appendix. Home/download pages now present a consumer setup path, local trust boundary, Import Sandbox, Proof Activity, and unsigned-build caveat without claiming signed public release.
-- CLI-first fallback is still supported for power users: `enigma setup --plain`, `enigma doctor --plain`, and `enigma next --plain` give one-screen, path-redacted next actions instead of JSON.
+- CLI-first fallback is still supported for power users: `enigma quickstart --plain`, `enigma setup --plain`, `enigma connect --plain`, `enigma disconnect --plain`, `enigma doctor --plain`, and `enigma next --plain` give one-screen, path-redacted next actions instead of JSON.
 
 ---
 
@@ -67,11 +67,11 @@
 
 - `npm run check` at repo root: **pass**.
 - `npm run secret-scan` at repo root: **pass**.
-- `npm test` at repo root: **612/612 pass**.
+- `npm test` at repo root: **613/613 pass**.
 - `npm pack --dry-run` at repo root: **pass** (`enigma-memory-0.1.18.tgz` dry-run output).
 - `npm run public-beta-qa` at repo root: **hold**, `21 blocked / 0 missing`, required public beta version `0.1.19`.
 - `cargo test` in `apps/desktop-tauri/`: **23/23 pass**.
-- PR #60 latest checks after commit `f1a0be1`: Anchor Build and Test **pass**, Package gates Ubuntu **pass**, Package gates Windows **pass**.
+- PR #60 latest checks after commit `0fdb604`: Anchor Build and Test **pass**, Package gates Ubuntu **pass**, Package gates Windows **pass**.
 
 ---
 
