@@ -1,4 +1,6 @@
 > **Status:** A Microsoft account session was found in Microsoft Edge on the user's workstation. Azure Artifact Signing setup is being attempted through that signed-in session. If the session expires, sign in to https://portal.azure.com/ before continuing.
+>
+> **Tauri updater key status:** `TAURI_SIGNING_PRIVATE_KEY` has been generated and stored as a GitHub secret. The matching public key is committed in `apps/desktop-tauri/tauri.conf.json`.
 
 # Code Signing Setup for Public Launch
 
@@ -34,7 +36,7 @@ This guide lists the two external signing paths required for a frictionless publ
 - `AZURE_CODESIGN_CERT_PROFILE_NAME`
 - `AZURE_CODESIGN_ENDPOINT` (e.g. `https://eus.codesigning.azure.net`)
 
-**CI integration:** See `.github/workflows/desktop-build.yml` (commented signing steps).
+**CI integration:** See `.github/workflows/desktop-release.yml` (conditional signing steps).
 
 ## macOS — Apple Developer Program + Notarization
 
@@ -63,14 +65,20 @@ This guide lists the two external signing paths required for a frictionless publ
 
 ## Tauri updater signing
 
-The desktop app already generates a Tauri updater private key with:
+`TAURI_SIGNING_PRIVATE_KEY` has been generated and stored as a GitHub secret. The matching public key is committed in `apps/desktop-tauri/tauri.conf.json`.
+
+To rotate the key in the future, run:
 
 ```bash
-cd apps/desktop-tauri
-npm run tauri signer generate
+node scripts/setup-desktop-updater-key.mjs
 ```
 
-Store the private key as `TAURI_SIGNING_PRIVATE_KEY` and the password as `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` in GitHub secrets. The public key should be embedded in `tauri.conf.json`.
+The helper will:
+1. Generate a new Ed25519 key pair via `tauri signer generate`.
+2. Update `apps/desktop-tauri/tauri.conf.json` with the new public key.
+3. Print the private key to stdout and delete the key files from disk.
+
+Never commit the private key.
 
 ## External blockers
 
