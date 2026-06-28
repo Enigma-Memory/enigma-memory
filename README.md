@@ -55,6 +55,14 @@ enigma status --bundle "$HOME/.enigma/bundle.json"
 ```
 If `doctor` is red on a fresh install, read `setup_status.state`: `setup_needed` means run the included `setup_status.next_command`; `attention_needed` means a real local install/config issue remains.
 
+Optional instant-value import preview:
+
+```sh
+enigma import text --file ./memories.md --complete
+```
+
+This prints a public-safe preview/receipt only. Raw notes stay local and nothing is written to the vault unless an explicit import path is approved.
+
 Preview a single client before writing:
 
 ```sh

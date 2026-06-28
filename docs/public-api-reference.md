@@ -35,7 +35,7 @@ Use package subpath exports for public module imports:
 | `enigma-memory/controller` | `./controller` | `packages/controller/src/index.js` | stable local/package | `createConsentGrant`, `verifyConsentGrant`, `createRecallVetoDecision`, `createPrivateMemoryBubble`, `closePrivateMemoryBubble`, `createMemoryWeatherReport`, `assertMemoryControllerPublicSafe`, and public-safe JSON schemas for Memory Controller artifacts. |
 | `enigma-memory/mcp-server` | `./mcp-server` | `packages/mcp-server/src/index.js` | stable local/package | `toolDescriptors`, `resourceDescriptors`, `promptDescriptors`, `handlers`, memory tools, `enigma_immune_ingress`, Memory Controller tools (`enigma_memory_weather`, `enigma_recall_veto`, `enigma_consent_grant`, `enigma_private_bubble`), `enigma_meter_usage`, settlement tools, `enigma_passport_summary_resource`, `enigma_standard_memory_prompt`, `createMcpImmuneIngressReport`, `assertMcpImmuneIngressPublicSafe`, `handleJsonRpcRequest`, `startStdioServer`, `default`. |
 | `enigma-memory/connectors` | `./connectors` | `packages/connectors/src/index.js` | stable local/package | `supportedClients`, `platformDefaultConfigPath`, `getClientProfile`, `renderMcpConfig`, `connectClient`, `disconnectClient`, `detectClientConnector`, `detectConnectors`, `doctorConnectors`, `planConnectWizard`, `createConnectorTrustCard`, `createConnectorTrustCards`, `runConnectorDemo`. |
-| `enigma-memory/importers` | `./importers` | `packages/importers/src/index.js` | stable local/package | `importChatGptExport`, `importClaudeMemory`, `importMem0Export`, `importLettaAgentFile`, `importLangGraphStore`, `importZepGraphitiExport`, `createImportPreview`, `createImmuneIngressReport`, `quarantineImmuneIngressCandidates`, `assertImmuneIngressPublicSafe`, `exportEnigmaCapsule`, `importEnigmaCapsule`, `runImporterDemo`, `default`. |
+| `enigma-memory/importers` | `./importers` | `packages/importers/src/index.js` | stable local/package | `importTextMemoryList`, `importChatGptExport`, `importClaudeMemory`, `importMem0Export`, `importLettaAgentFile`, `importLangGraphStore`, `importZepGraphitiExport`, `createImportPreview`, `createImmuneIngressReport`, `quarantineImmuneIngressCandidates`, `assertImmuneIngressPublicSafe`, `exportEnigmaCapsule`, `importEnigmaCapsule`, `runImporterDemo`, `default`. |
 | `enigma-memory/mesh` | `./mesh` | `packages/mesh/src/index.js` | stable local/package | `createMeshNode`, `createCapsuleManifest`, `verifyCapsuleManifest`, `createWitnessCheckpoint`, `verifyWitnessCheckpoint`, `createRelayStore`, `pushRelayRecord`, `pullRelayRecord`, `createFederationGrant`, `verifyFederationGrant`, `runMeshDemo`, `default`. |
 | `enigma-memory/enterprise` | `./enterprise` | `packages/enterprise/src/index.js` | stable local/package | `createEnterprisePolicy`, `evaluateEnterprisePolicy`, `minimizeEnterpriseEvaluation`, `minimizeEnterprisePolicy`, `createGatewayDecision`, `verifyGatewayDecision`, `exportSiemEvent`, `runEnterpriseDemo`, `default`. |
 | `enigma-memory/optimizer` | `./optimizer` | `packages/optimizer/src/index.js` | stable local/package | `MEMORY_OPTIMIZATION_PRODUCT_THESIS`, `MEMORY_OPTIMIZATION_PLAN_SCHEMA`, `MEMORY_ACCESS_RECEIPT_SCHEMA`, `estimateTextTokens`, `estimateTokenCost`, `createMemoryOptimizationPlan`, `createMemoryAccessReceipt`, `assertNoRawMemoryOutput`. |
@@ -347,6 +347,7 @@ The service endpoint tables below document the existing package/source HTTP API,
 
 Importer source names accepted by `enigma import <source>`:
 
+- `text`, `txt`, `markdown`, `md`, `text-list`, `text_list`
 - `chatgpt`, `chatgpt-export`, `chatgpt_export`
 - `claude`, `claude-memory`, `claude_memory`
 - `mem0`, `mem0-export`, `mem0_export`
@@ -354,7 +355,7 @@ Importer source names accepted by `enigma import <source>`:
 - `langgraph`, `langgraph-store`, `langgraph_store`
 - `zep`, `graphiti`, `zep-graphiti`, `zep_graphiti`, `zep_graphiti_export`
 
-`enigma import <source>` requires `--file`/`--source-file`/`--path` or a positional file, accepts `--out` and `--now`, and writes candidates into a local vault only when `--write-vault --bundle <path>` is supplied.
+`enigma import <source>` requires `--file`/`--source-file`/`--path` or a positional file, accepts `--out`, `--now`, and for curated text `--complete`, and writes candidates into a local vault only when `--write-vault --bundle <path>` is supplied. Default output is a public-safe preview/receipt, not raw candidate text.
 
 Capsule commands:
 
@@ -520,6 +521,7 @@ Module: `enigma-memory/importers`. These functions normalize local export files 
 
 | Function | Source type | CLI sources | Output |
 | --- | --- | --- | --- |
+| `importTextMemoryList(input, options)` | `curated_text` | `text`, `txt`, `markdown`, `md`, `text-list`, `text_list` | `enigma.import_report.v1` for local curated `.txt`/`.md` lists or structured `memories`/`items`; public previews return counts, commitments, actions, and receipts without raw memory text. |
 | `importChatGptExport(input, options)` | `chatgpt_export` | `chatgpt`, `chatgpt-export`, `chatgpt_export` | `enigma.import_report.v1` with source refs, limitations, confidence, completeness flags, candidates, and optional vault writes. |
 | `importClaudeMemory(input, options)` | `claude_memory` | `claude`, `claude-memory`, `claude_memory` | Same import report shape. |
 | `importMem0Export(input, options)` | `mem0_export` | `mem0`, `mem0-export`, `mem0_export` | Same import report shape. |

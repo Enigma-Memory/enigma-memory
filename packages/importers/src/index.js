@@ -100,6 +100,17 @@ function textLines(value) {
     .filter(Boolean);
 }
 
+function curatedTextLines(value) {
+  if (typeof value !== 'string') return [];
+  return value
+    .split(/\r?\n/)
+    .map((line) => line
+      .replace(/^\s*(?:[-*+]|\d+[.)]|\[[ xX]\])\s+/u, '')
+      .replace(/^\s{0,3}#{1,6}\s+/u, '')
+      .trim())
+    .filter((line) => line.length > 0 && !/^[-*_]{3,}$/u.test(line));
+}
+
 function firstString(record, names) {
   if (!isRecord(record)) return '';
   for (const name of names) {
@@ -800,6 +811,56 @@ function pathsFromMapping(mapping) {
   return paths;
 }
 
+export function importTextMemoryList(input, options = {}) {
+  const parsed = parseMaybeJson(input);
+  const sourceType = 'curated_text';
+  const explicitComplete = options.complete === true || (isRecord(parsed) && explicitCompleteness(parsed) === true);
+  const limitations = collectLimitations(parsed, explicitComplete ? [] : [
+    'Curated text imports are local user-provided notes with unknown completeness unless --complete or an explicit complete flag is supplied',
+    'Each non-empty line is treated as a separate memory candidate unless the file is structured JSON with memories/items'
+  ]);
+  const candidates = [];
+  const completeInput = isRecord(parsed)
+    ? parsed
+    : {
+      text: typeof parsed === 'string' ? parsed : stringValue(parsed),
+      complete: options.complete === true ? true : undefined,
+    };
+  const explicitItems = [
+    ...asArray(isRecord(parsed) ? parsed.memories : undefined),
+    ...asArray(isRecord(parsed) ? parsed.memory : undefined),
+    ...asArray(isRecord(parsed) ? parsed.items : undefined),
+    ...asArray(isRecord(parsed) ? parsed.notes : undefined),
+  ];
+  if (explicitItems.length > 0) {
+    explicitItems.forEach((item, index) => {
+      const content = firstString(item, ['memory', 'content', 'text', 'value', 'summary', 'note']) || stringValue(item);
+      addCandidate(candidates, {
+        importer: 'importTextMemoryList',
+        sourceType,
+        content,
+        source_refs: [sourceRef(sourceType, `items/${index}`, item?.id ?? item?.memory_id ?? item?.key, item)],
+        limitations,
+        confidence: item?.confidence ?? options.confidence ?? 'user_confirmed',
+        kind: item?.kind ?? 'fact',
+        metadata: { ...(isRecord(item) ? item : {}), curated_text: true }
+      });
+    });
+  } else {
+    curatedTextLines(stringValue(completeInput.text ?? parsed)).forEach((line, index) => addCandidate(candidates, {
+      importer: 'importTextMemoryList',
+      sourceType,
+      content: line,
+      source_refs: [sourceRef(sourceType, `lines/${index}`, undefined, line)],
+      limitations,
+      confidence: options.confidence ?? 'user_confirmed',
+      kind: 'curated_note',
+      metadata: { curated_text: true, line_index: index }
+    }));
+  }
+  return reportFrom('importTextMemoryList', sourceType, completeInput, candidates, limitations, options);
+}
+
 export function importChatGptExport(input, options = {}) {
   const parsed = parseMaybeJson(input);
   const sourceType = 'chatgpt_export';
@@ -1464,6 +1525,7 @@ export function runImporterDemo(options = {}) {
 }
 
 export default {
+  importTextMemoryList,
   importChatGptExport,
   importClaudeMemory,
   importMem0Export,

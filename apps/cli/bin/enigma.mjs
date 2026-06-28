@@ -13,7 +13,7 @@ import { startStdioServer } from '../../../packages/mcp-server/src/index.js';
 import { runMeshDemo } from '../../../packages/mesh/src/index.js';
 import { runEnterpriseDemo } from '../../../packages/enterprise/src/index.js';
 import { connectClient, disconnectClient, doctorConnectors, getClientProfile, planConnectWizard, renderMcpConfig, supportedClients } from '../../../packages/connectors/src/index.js';
-import { createImportPreview, exportEnigmaCapsule, importChatGptExport, importClaudeMemory, importEnigmaCapsule, importLangGraphStore, importLettaAgentFile, importMem0Export, importZepGraphitiExport } from '../../../packages/importers/src/index.js';
+import { createImportPreview, exportEnigmaCapsule, importChatGptExport, importClaudeMemory, importEnigmaCapsule, importLangGraphStore, importLettaAgentFile, importMem0Export, importTextMemoryList, importZepGraphitiExport } from '../../../packages/importers/src/index.js';
 import * as relayServer from '../../relay/src/server.mjs';
 import * as gatewayServer from '../../gateway/src/server.mjs';
 import { verifyBundle } from '../../verifier/bin/enigma-verify.mjs';
@@ -92,6 +92,12 @@ const CROSS_MODEL_CLAIM_BOUNDARIES = Object.freeze({
 const PACKAGE_JSON_URL = new URL('../../../package.json', import.meta.url);
 const SPECS_URL = new URL('../../../specs/', import.meta.url);
 const IMPORTERS = Object.freeze({
+  text: importTextMemoryList,
+  txt: importTextMemoryList,
+  markdown: importTextMemoryList,
+  md: importTextMemoryList,
+  'text-list': importTextMemoryList,
+  text_list: importTextMemoryList,
   chatgpt: importChatGptExport,
   'chatgpt-export': importChatGptExport,
   chatgpt_export: importChatGptExport,
@@ -2446,6 +2452,7 @@ export async function importCommand(source, flags, io, positionalFile = undefine
   const options = {};
   const now = getFlag(flags, ['now']);
   if (now && now !== true) options.now = String(now);
+  if (booleanFlag(flags, ['complete', 'curated-complete', 'curatedComplete'], false)) options.complete = true;
   const bundlePath = resolve(String(getFlag(flags, ['bundle'], DEFAULT_BUNDLE)));
   let vault;
   if (getFlag(flags, ['write-vault'], false) === true) {

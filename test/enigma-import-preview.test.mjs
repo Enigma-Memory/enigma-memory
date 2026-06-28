@@ -7,6 +7,7 @@ import {
   createImportPreview,
   importChatGptExport,
   importClaudeMemory,
+  importTextMemoryList,
 } from '../packages/importers/src/index.js';
 import { main } from '../apps/cli/bin/enigma.mjs';
 
@@ -98,6 +99,26 @@ test('import preview exposes approve action only when every candidate is ready',
   assert.equal(preview.preview_receipt.review_before_import_count, 0);
 });
 
+test('text memory list importer supports curated txt and markdown without provider caveats', () => {
+  const report = importTextMemoryList('- Prefers local-only memory\n2. Wants receipts before sharing\n# Project note', {
+    now: NOW,
+    complete: true,
+  });
+  const preview = createImportPreview(report, { now: NOW });
+
+  assert.equal(report.schema, 'enigma.import_report.v1');
+  assert.equal(report.importer, 'importTextMemoryList');
+  assert.equal(report.source_type, 'curated_text');
+  assert.equal(report.complete, true);
+  assert.equal(report.recognized_candidate_count, 3);
+  assert.equal(report.memory_candidates[0].content, 'Prefers local-only memory');
+  assert.equal(report.memory_candidates[1].content, 'Wants receipts before sharing');
+  assert.equal(report.memory_candidates[2].content, 'Project note');
+  assert.equal(preview.import_decision, 'ready_for_import');
+  assert.equal(preview.primary_action.id, 'approve_import');
+  assert.equal(JSON.stringify(preview).includes('Prefers local-only memory'), false);
+});
+
 test('import preview handles empty input as a safe preview-only artifact', () => {
   const preview = createImportPreview(null, { now: NOW });
 
@@ -149,4 +170,24 @@ test('CLI import prints a public-safe preview and redacts local paths', async ()
   assert.equal(stdout.includes(PRIVATE_MEMORY), false);
   assert.equal(stdout.includes(dir), false);
   assert.equal(rawReport.memory_candidates[0].content, PRIVATE_MEMORY);
+});
+
+test('CLI text import previews curated notes without raw note output', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-import-text-preview-cli-'));
+  const source = join(dir, 'memories.md');
+  const note = 'Prefers import previews before vault writes';
+  await writeFile(source, `- ${note}\n`, 'utf8');
+
+  const io = makeIo();
+  assert.equal(await main(['import', 'text', '--file', source, '--complete'], io.io), 0, io.stderr());
+  const stdout = io.stdout();
+  const preview = io.json();
+
+  assert.equal(preview.schema, 'enigma.import_preview.v1');
+  assert.deepEqual(preview.source_types, ['curated_text']);
+  assert.equal(preview.import_decision, 'ready_for_import');
+  assert.equal(preview.primary_action.id, 'approve_import');
+  assert.equal(preview.vault_write_performed, false);
+  assert.equal(stdout.includes(note), false);
+  assert.equal(stdout.includes(dir), false);
 });

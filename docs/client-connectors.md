@@ -460,8 +460,13 @@ Expected behavior: the response lists Enigma tools (`enigma_init`, `enigma_remem
 
 ## Import/export commands for migrations
 
-Import a source export into an Enigma report:
+Preview a curated text/Markdown memory list first. This prints a public-safe preview and receipt; it does not write the vault unless you later approve an import path:
 
+```sh
+enigma import text --file ./memories.md --complete
+```
+
+Import a provider/source export into an Enigma report:
 ```sh
 enigma import chatgpt --file ./chatgpt-export.json --out ./enigma-import-report.json
 enigma import claude --file ./claude-memory.json --out ./enigma-import-report.json
