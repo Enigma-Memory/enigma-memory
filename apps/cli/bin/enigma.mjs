@@ -1671,7 +1671,8 @@ async function rememberCommand(flags, io) {
     metadata: parseJson(getFlag(flags, ['metadata']), {}),
   });
   await persistState(bundlePath, vault, { passphrase: getFlag(flags, ['passphrase']) });
-  print({ ok: true, memory_addr: result.memory_addr, receipt_id: result.receipt?.receipt_id }, io);
+  const output = { ok: true, memory_addr: result.memory_addr, receipt_id: result.receipt?.receipt_id };
+  printMemoryLifecycleResult(output, 'remember', flags, io);
   return 0;
 }
 
@@ -1686,7 +1687,8 @@ async function updateCommand(flags, io) {
     metadata: parseJson(getFlag(flags, ['metadata']), {}),
   });
   await persistState(bundlePath, vault, { passphrase: getFlag(flags, ['passphrase']) });
-  print({ ok: true, old_memory_addr: result.old_memory_addr, memory_addr: result.memory_addr, receipt_id: result.receipt?.receipt_id }, io);
+  const output = { ok: true, old_memory_addr: result.old_memory_addr, memory_addr: result.memory_addr, receipt_id: result.receipt?.receipt_id };
+  printMemoryLifecycleResult(output, 'update', flags, io);
   return 0;
 }
 
@@ -1700,7 +1702,8 @@ async function deleteCommand(flags, io) {
     reason: getFlag(flags, ['reason'], 'user_delete'),
   });
   await persistState(bundlePath, vault, { passphrase: getFlag(flags, ['passphrase']) });
-  print({ ok: true, memory_addr: result.memory_addr, receipt_id: result.receipt?.receipt_id }, io);
+  const output = { ok: true, memory_addr: result.memory_addr, receipt_id: result.receipt?.receipt_id };
+  printMemoryLifecycleResult(output, 'delete', flags, io);
   return 0;
 }
 
@@ -2056,6 +2059,26 @@ async function statusCommand(flags, io) {
   const report = passportStatusReport({ bundlePath, stored, vault, passport });
   printStatusSummary(report, flags, io);
   return 0;
+}
+
+function renderMemoryLifecyclePlain(result, operation) {
+  const lines = [
+    `Enigma ${operation}`,
+    `Status: ${result.ok ? 'Ready' : 'Needs attention'}`,
+    `Memory: ${result.memory_addr ? `enigma://memory/${result.memory_addr}` : '<memory-ref>'}`,
+  ];
+  if (result.old_memory_addr) lines.push(`Previous: enigma://memory/${result.old_memory_addr}`);
+  if (result.receipt_id) lines.push(`Receipt: ${result.receipt_id}`);
+  if (operation === 'remember') lines.push('Next: enigma search --bundle <bundle-path> --query <text>');
+  else if (operation === 'update') lines.push('Next: enigma context --bundle <bundle-path> --query <text>');
+  else if (operation === 'delete') lines.push('Next: enigma drive health --bundle <bundle-path>');
+  lines.push('Boundary: local Enigma memory lifecycle only; no raw memory, local paths, provider deletion, model behavior, or hosted service claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printMemoryLifecycleResult(result, operation, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderMemoryLifecyclePlain(result, operation));
+  else print(result, io);
 }
 
 function nextPlainRequested(flags) {
@@ -4030,6 +4053,7 @@ function usage() {
       '--text <text>': 'Inline local memory text. Avoid for private content because argv can be logged by process tooling. Alias: --memory-text.',
       '--text-file <path>': 'Read local memory text from a file so private smoke input is not exposed in shell argv. Aliases: --memory-file, --textFile, --memoryFile.',
       '--importance <0-1>': 'Optional numeric importance/priority in [0,1]; higher values rank the memory higher in optimized context. Alias: --priority.',
+      '--plain': 'Print a human-readable memory lifecycle receipt instead of JSON for remember, update, or delete. Alias: --text or --format text.',
     },
     context_options: {
       '--query <text>': 'Local query. When non-empty, only query-relevant active memories are returned by default. Alias: --q.',

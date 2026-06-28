@@ -93,6 +93,68 @@ test('search ranks relevant active memories and redacts plaintext by default', a
   };
 }));
 
+test('memory lifecycle plain output is readable, persistent, and redacted', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-memory-lifecycle-plain-'));
+  try {
+    const bundlePath = join(dir, 'bundle.json');
+    const init = await runCli(['init', '--bundle', bundlePath, '--subject', 'subject-lifecycle-plain']);
+    assert.equal(init.code, 0);
+
+    const remembered = await runCliText([
+      'remember',
+      '--bundle', bundlePath,
+      '--text', 'remember lifecycle private canary',
+      '--plain',
+    ]);
+    assert.equal(remembered.code, 0);
+    assert.match(remembered.stdout, /^Enigma remember\n/);
+    assert.match(remembered.stdout, /Status: Ready/);
+    assert.match(remembered.stdout, /Memory: enigma:\/\/memory\//);
+    assert.match(remembered.stdout, /Receipt: /);
+    assert.match(remembered.stdout, /Next: enigma search --bundle <bundle-path> --query <text>/);
+    assert.match(remembered.stdout, /Boundary: local Enigma memory lifecycle only/);
+    assert.doesNotMatch(remembered.stdout, /^\s*\{/);
+    assert.doesNotMatch(remembered.stdout, /remember lifecycle private canary/);
+    assert.equal(remembered.stdout.includes(dir), false);
+
+    const rememberedAddr = remembered.stdout.match(/Memory: enigma:\/\/memory\/(\S+)/)?.[1];
+    assert.equal(typeof rememberedAddr, 'string');
+
+    const updated = await runCliText([
+      'update',
+      '--bundle', bundlePath,
+      '--id', rememberedAddr,
+      '--text', 'updated lifecycle private canary',
+      '--plain',
+    ]);
+    assert.equal(updated.code, 0);
+    assert.match(updated.stdout, /^Enigma update\n/);
+    assert.match(updated.stdout, /Previous: enigma:\/\/memory\//);
+    assert.match(updated.stdout, /Next: enigma context --bundle <bundle-path> --query <text>/);
+    assert.doesNotMatch(updated.stdout, /remember lifecycle private canary|updated lifecycle private canary/);
+    assert.equal(updated.stdout.includes(dir), false);
+
+    const updatedAddr = updated.stdout.match(/Memory: enigma:\/\/memory\/(\S+)/)?.[1];
+    assert.equal(typeof updatedAddr, 'string');
+
+    const deleted = await runCliText([
+      'delete',
+      '--bundle', bundlePath,
+      '--id', updatedAddr,
+      '--reason', 'lifecycle-plain-test',
+      '--format', 'text',
+    ]);
+    assert.equal(deleted.code, 0);
+    assert.match(deleted.stdout, /^Enigma delete\n/);
+    assert.match(deleted.stdout, /Next: enigma drive health --bundle <bundle-path>/);
+    assert.match(deleted.stdout, /Boundary: local Enigma memory lifecycle only/);
+    assert.doesNotMatch(deleted.stdout, /remember lifecycle private canary|updated lifecycle private canary/);
+    assert.equal(deleted.stdout.includes(dir), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('search includes plaintext only with explicit include-content opt-in', async () => withBundle(async (vault) => {
   remember({
     vault,

@@ -46,7 +46,7 @@
 - Desktop-first `README.md`.
 - Updated `docs/install-anywhere.md`.
 - Static `website/` pages: home, download, setup, help hub, install/connect/troubleshooting guides, privacy, proofs, FAQ, and developer CLI appendix. Home/download pages now present a consumer setup path, local trust boundary, Import Sandbox, Proof Activity, and unsigned-build caveat without claiming signed public release.
-- CLI-first fallback is still supported for power users: `enigma quickstart --plain`, `enigma setup --plain`, `enigma connect --plain`, `enigma disconnect --plain`, `enigma import --plain`, `enigma import rollback --plain`, `enigma status --plain`, `enigma drive health --plain`, `enigma support summary --plain`, `enigma doctor --plain`, and `enigma next --plain` give one-screen, path-redacted summaries instead of JSON.
+- CLI-first fallback is still supported for power users: `enigma quickstart --plain`, `enigma setup --plain`, `enigma remember --plain`, `enigma update --plain`, `enigma delete --plain`, `enigma search --plain`, `enigma context --plain`, `enigma connect --plain`, `enigma disconnect --plain`, `enigma import --plain`, `enigma import rollback --plain`, `enigma status --plain`, `enigma drive health --plain`, `enigma support summary --plain`, `enigma doctor --plain`, and `enigma next --plain` give one-screen, path-redacted summaries instead of JSON or raw-memory output.
 
 ---
 
@@ -63,15 +63,16 @@
 
 ---
 
-## Verification run on this commit
+## Verification run for latest local public-readiness slice
 
+- `node --check apps/cli/bin/enigma.mjs` at repo root: **pass**.
+- `node --test test/enigma-search-status.test.mjs` at repo root: **10/10 pass**.
 - `npm run check` at repo root: **pass**.
 - `npm run secret-scan` at repo root: **pass**.
-- `npm test` at repo root: **616/616 pass**.
+- `npm test` at repo root: **617/617 pass**.
 - `npm pack --dry-run` at repo root: **pass** (`enigma-memory-0.1.18.tgz` dry-run output).
 - `npm run public-beta-qa` at repo root: **hold**, `21 blocked / 0 missing`, required public beta version `0.1.19`.
-- `cargo test` in `apps/desktop-tauri/`: **23/23 pass**.
-- PR #60 latest checks after commit `d0f8c06`: Anchor Build and Test **pass**, Package gates Ubuntu **pass**, Package gates Windows **pass**.
+- Hosted PR checks must still pass after each pushed branch commit; local gates do not replace PR approval/merge or signing evidence.
 
 ---
 
