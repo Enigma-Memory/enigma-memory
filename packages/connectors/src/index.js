@@ -824,6 +824,58 @@ function publicReasonCodes(values) {
   return uniqueSortedStrings(values.filter((value) => /^[a-z0-9_.:-]+$/i.test(String(value))));
 }
 
+function claudeDesktopMcpbPrimaryAction(status) {
+  const actions = {
+    not_installed: {
+      id: 'install_mcpb',
+      label: 'Install Claude extension',
+      description: 'Open the Enigma Claude extension package in Claude Desktop and confirm install.',
+      kind: 'user_action',
+    },
+    mcpb_ready: {
+      id: 'restart_claude',
+      label: 'Restart Claude Desktop',
+      description: 'Fully quit and reopen Claude Desktop, then test the Enigma connection.',
+      kind: 'user_action',
+    },
+    restart_required: {
+      id: 'restart_claude',
+      label: 'Restart Claude Desktop',
+      description: 'Fully quit and reopen Claude Desktop, then test the Enigma connection.',
+      kind: 'user_action',
+    },
+    testing: {
+      id: 'wait_for_connection_test',
+      label: 'Wait for connection test',
+      description: 'Keep Claude Desktop open while Enigma verifies the local bridge.',
+      kind: 'status',
+    },
+    ready: {
+      id: 'open_claude_desktop',
+      label: 'Open Claude Desktop',
+      description: 'Claude Desktop is connected to the local Enigma bridge.',
+      kind: 'status',
+    },
+    repair_required: {
+      id: 'repair_claude_extension',
+      label: 'Repair Claude connection',
+      description: 'Use Enigma repair to reinstall the extension handoff or switch to the consented fallback path.',
+      kind: 'repair',
+    },
+    advanced_fallback: {
+      id: 'use_advanced_config_fallback',
+      label: 'Use advanced config fallback',
+      description: 'Review and approve the manual MCP config fallback only if the extension path is unavailable.',
+      kind: 'advanced',
+    },
+  };
+  return {
+    ...actions[status],
+    writes_config: false,
+    public_safe: true,
+  };
+}
+
 export function createClaudeDesktopMcpbHealth(options = {}) {
   const testEvidence = options.testEvidence ?? options.test_evidence;
   const mcpbInstalled = options.mcpbInstalled === true
@@ -849,6 +901,7 @@ export function createClaudeDesktopMcpbHealth(options = {}) {
   else if (testPassed) status = 'ready';
   else status = 'mcpb_ready';
 
+  const primaryAction = claudeDesktopMcpbPrimaryAction(status);
   return {
     ok: status === 'ready',
     schema: CLAUDE_DESKTOP_MCPB_HEALTH_SCHEMA,
@@ -869,6 +922,8 @@ export function createClaudeDesktopMcpbHealth(options = {}) {
       : [],
     advanced_fallback: advancedFallback,
     automatic_config_write: false,
+    primary_action: primaryAction,
+    next_action_id: primaryAction.id,
     claim_boundary: claudeDesktopMcpbClaimBoundary(),
   };
 }

@@ -98,6 +98,9 @@ test('Claude Desktop mcpb health fails closed until test evidence exists', () =>
   const missing = createClaudeDesktopMcpbHealth();
   assert.equal(missing.status, 'not_installed');
   assert.equal(missing.connected, false);
+  assert.equal(missing.primary_action.id, 'install_mcpb');
+  assert.equal(missing.next_action_id, 'install_mcpb');
+  assert.equal(missing.primary_action.writes_config, false);
 
   const installed = createClaudeDesktopMcpbHealth({ mcpbInstalled: true });
   assert.equal(installed.status, 'mcpb_ready');
@@ -105,14 +108,18 @@ test('Claude Desktop mcpb health fails closed until test evidence exists', () =>
   assert.equal(installed.connected, false);
   assert.equal(installed.ok, false);
   assert.equal(installed.test_evidence_present, false);
+  assert.equal(installed.primary_action.id, 'restart_claude');
+  assert.equal(installed.next_action_id, 'restart_claude');
 
   const restart = createClaudeDesktopMcpbHealth({ mcpbInstalled: true, restartRequired: true });
   assert.equal(restart.status, 'restart_required');
   assert.equal(restart.connected, false);
+  assert.equal(restart.primary_action.id, 'restart_claude');
 
   const testing = createClaudeDesktopMcpbHealth({ mcpbInstalled: true, testing: true });
   assert.equal(testing.status, 'testing');
   assert.equal(testing.connected, false);
+  assert.equal(testing.primary_action.id, 'wait_for_connection_test');
 
   const failed = createClaudeDesktopMcpbHealth({
     mcpbInstalled: true,
@@ -125,6 +132,7 @@ test('Claude Desktop mcpb health fails closed until test evidence exists', () =>
   assert.equal(failed.ok, false);
   assert.equal(failed.test_evidence_present, true);
   assertPublicSafe(failed);
+  assert.equal(failed.primary_action.id, 'repair_claude_extension');
 
   const ready = createClaudeDesktopMcpbHealth({ mcpbInstalled: true, testEvidence: { status: 'passed' } });
   assert.equal(ready.status, 'ready');
@@ -132,8 +140,10 @@ test('Claude Desktop mcpb health fails closed until test evidence exists', () =>
   assert.equal(ready.test_evidence_present, true);
   assert.equal(ready.ok, true);
   assert.equal(ready.ready, true);
+  assert.equal(ready.primary_action.id, 'open_claude_desktop');
 
   const advanced = createClaudeDesktopMcpbHealth({ advancedFallback: true, mcpbInstalled: true, testEvidence: true });
   assert.equal(advanced.status, 'advanced_fallback');
   assert.equal(advanced.connected, false);
+  assert.equal(advanced.primary_action.id, 'use_advanced_config_fallback');
 });

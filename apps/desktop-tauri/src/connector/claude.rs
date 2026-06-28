@@ -234,6 +234,61 @@ fn has_failing_evidence(evidence: &Value) -> bool {
         || matches!(evidence.get("status").and_then(Value::as_str), Some("failed"))
 }
 
+fn mcpb_primary_action(status: &str) -> Value {
+    let (id, label, description, kind) = match status {
+        "not_installed" => (
+            "install_mcpb",
+            "Install Claude extension",
+            "Open the Enigma Claude extension package in Claude Desktop and confirm install.",
+            "user_action",
+        ),
+        "mcpb_ready" | "restart_required" => (
+            "restart_claude",
+            "Restart Claude Desktop",
+            "Fully quit and reopen Claude Desktop, then test the Enigma connection.",
+            "user_action",
+        ),
+        "testing" => (
+            "wait_for_connection_test",
+            "Wait for connection test",
+            "Keep Claude Desktop open while Enigma verifies the local bridge.",
+            "status",
+        ),
+        "ready" => (
+            "open_claude_desktop",
+            "Open Claude Desktop",
+            "Claude Desktop is connected to the local Enigma bridge.",
+            "status",
+        ),
+        "repair_required" => (
+            "repair_claude_extension",
+            "Repair Claude connection",
+            "Use Enigma repair to reinstall the extension handoff or switch to the consented fallback path.",
+            "repair",
+        ),
+        "advanced_fallback" => (
+            "use_advanced_config_fallback",
+            "Use advanced config fallback",
+            "Review and approve the manual MCP config fallback only if the extension path is unavailable.",
+            "advanced",
+        ),
+        _ => (
+            "review_claude_connection",
+            "Review Claude connection",
+            "Review the Claude Desktop connection state.",
+            "status",
+        ),
+    };
+    serde_json::json!({
+        "id": id,
+        "label": label,
+        "description": description,
+        "kind": kind,
+        "writes_config": false,
+        "public_safe": true,
+    })
+}
+
 pub fn create_claude_desktop_mcpb_health(options: McpbHealthOptions) -> Value {
     let mcpb_installed = options.mcpb_installed;
     let advanced_fallback = options.advanced_fallback;
@@ -276,6 +331,13 @@ pub fn create_claude_desktop_mcpb_health(options: McpbHealthOptions) -> Value {
         Vec::new()
     };
 
+    let primary_action = mcpb_primary_action(status);
+    let next_action_id = primary_action
+        .get("id")
+        .and_then(Value::as_str)
+        .unwrap_or("review_claude_connection")
+        .to_string();
+
     serde_json::json!({
         "ok": status == "ready",
         "schema": "enigma.claude_desktop_mcpb_health.v1",
@@ -300,6 +362,8 @@ pub fn create_claude_desktop_mcpb_health(options: McpbHealthOptions) -> Value {
         "test_passed": test_passed,
         "ready_requires_test_evidence": true,
         "repair_reasons": reasons,
+        "primary_action": primary_action,
+        "next_action_id": next_action_id,
         "advanced_fallback": advanced_fallback,
         "automatic_config_write": false,
         "claim_boundary": claim_boundary(),
@@ -317,6 +381,19 @@ mod tests {
             ..Default::default()
         });
         assert_eq!(health.get("status").unwrap().as_str().unwrap(), "mcpb_ready");
+        assert_eq!(
+            health
+                .get("primary_action")
+                .and_then(|action| action.get("id"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "restart_claude"
+        );
+        assert_eq!(
+            health.get("next_action_id").unwrap().as_str().unwrap(),
+            "restart_claude"
+        );
         assert!(!health.get("ready").unwrap().as_bool().unwrap());
     }
 
@@ -329,6 +406,15 @@ mod tests {
         });
         assert_eq!(health.get("status").unwrap().as_str().unwrap(), "ready");
         assert!(health.get("ready").unwrap().as_bool().unwrap());
+        assert_eq!(
+            health
+                .get("primary_action")
+                .and_then(|action| action.get("id"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "open_claude_desktop"
+        );
     }
 
     #[test]
@@ -343,6 +429,15 @@ mod tests {
             "repair_required"
         );
         assert!(!health.get("ready").unwrap().as_bool().unwrap());
+        assert_eq!(
+            health
+                .get("primary_action")
+                .and_then(|action| action.get("id"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "repair_claude_extension"
+        );
         assert!(!health.get("test_passed").unwrap().as_bool().unwrap());
     }
 }

@@ -139,7 +139,7 @@ The Claude-first public helper is `createClaudeDesktopMcpbManifest()`. It emits 
 
 `createClaudeDesktopMcpbConnectionPlan()` defines the desktop state order as `detect -> preview -> consent -> install_handoff -> restart -> test -> ready`. The default Claude path is an extension install handoff: Enigma does not write Claude config automatically for the `.mcpb` path. The bridge pairing contract is current-OS-user scoped and keeps pairing secrets, raw local service endpoints, and local paths out of the manifest and support exports. Manual JSON remains an advanced fallback only and requires explicit user selection plus the normal consent/backup rules.
 
-`createClaudeDesktopMcpbHealth()` reports only `not_installed`, `mcpb_ready`, `restart_required`, `testing`, `ready`, `repair_required`, or `advanced_fallback`. It must fail closed: installed-but-untested extensions are `mcpb_ready`, not connected, and `ready` requires positive test evidence.
+`createClaudeDesktopMcpbHealth()` reports only `not_installed`, `mcpb_ready`, `restart_required`, `testing`, `ready`, `repair_required`, or `advanced_fallback`. It must fail closed: installed-but-untested extensions are `mcpb_ready`, not connected, and `ready` requires positive test evidence. Every health state includes a public-safe `primary_action` and `next_action_id` so the desktop can show one clear user action without local paths, raw config, logs, or JSON editing.
 
 #### Connect
 
