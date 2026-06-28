@@ -37,7 +37,7 @@
 - Cross-platform connector engine with OS-agnostic path resolution.
 - Per-client modules: Claude Desktop (`.mcpb` manifest + config fallback), Cursor, Kimi Code, VS Code/Cline, Roo, OpenCode, Generic MCP.
 - Claude `.mcpb` manifest helper aligns with MCPB manifest `0.3` fields (`server.type: "node"`, `server.entry_point`, `server.mcp_config`, `user_config`) and remains public-safe.
-- Deterministic Claude `.mcpb` package builder (`npm run claude:mcpb:package`) creates a reviewable package with `manifest.json` and local Enigma MCP node runtime source; it performs no install, provider launch, network call, or config write.
+- Deterministic Claude `.mcpb` package builder is available as both `enigma claude-mcpb package` and `npm run claude:mcpb:package`; it creates a reviewable package with `manifest.json` and local Enigma MCP node runtime source, performs no install, provider launch, network call, or config write, and redacts the output path in reports.
 - Claude `.mcpb` packages include a minimal root `package.json` with `type: "module"` for Node ESM scope; they do not copy repo scripts, dependency lists, local paths, secrets, provider responses, or memory content.
 - Backup, rollback, repair, disconnect, and local test flows with JSON-preserving config writes.
 - Desktop connector cards expose a local "Test connection" action that checks config parse, Enigma entry correctness, bundle reachability, and restart guidance without launching provider apps.
@@ -67,11 +67,11 @@
 
 - `npm run check` at repo root: **pass**.
 - `npm run secret-scan` at repo root: **pass**.
-- `npm test` at repo root: **610/610 pass**.
+- `npm test` at repo root: **611/611 pass**.
 - `npm pack --dry-run` at repo root: **pass** (`enigma-memory-0.1.18.tgz` dry-run output).
 - `npm run public-beta-qa` at repo root: **hold**, `21 blocked / 0 missing`, required public beta version `0.1.19`.
 - `cargo test` in `apps/desktop-tauri/`: **23/23 pass**.
-- PR #60 latest checks after commit `fd18d8d`: Anchor Build and Test **pass**, Package gates Ubuntu **pass**, Package gates Windows **pass**.
+- PR #60 latest checks after commit `2c3c833`: Anchor Build and Test **pass**, Package gates Ubuntu **pass**, Package gates Windows **pass**.
 
 ---
 
