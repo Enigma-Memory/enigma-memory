@@ -51,6 +51,10 @@ MCP-compatible clients can inspect tool annotations and schema descriptions duri
 | `enigma_recall_veto` | Decide whether a recall is approved, needs approval, or is not shared before context leaves Enigma. | Decision `allow`, `ask`, or `deny`; reason codes; candidate counts; `safe_to_share`; policy/proof/receipt refs. |
 | `enigma_private_bubble` | Open or close a temporary private memory bubble. | Bubble ref, status label, expiry bucket, item/promotion counts, close outcome, and receipt refs. |
 
+`enigma_context_pack` and the CLI `enigma context` command can require a matching consent grant before returning context. When `require_grant` / `--require-grant` is set and no active grant matches the app ref, purpose ref, operation, memory-zone ref, expiry, and policy boundary, Enigma returns `enigma.context_pack_recall_blocked.v1` with a recall veto and `context_pack_returned:false` instead of compiling or printing context.
+
+For CLI-only smoke tests, create a public-safe grant with `enigma controller grant --app-ref ref:app:<id> --purpose-ref ref:purpose:cli_context --memory-zone-ref ref:zone:default --out grant.json`, then pass it to `enigma context --require-grant --grant-file grant.json`. The grant file contains opaque refs and receipt/proof refs only; it is not proof that a provider deleted, forgot, or withheld anything outside Enigma.
+
 ## Frictionless launch behavior
 
 Memory Controller should reduce launch friction, not add a permission wall.

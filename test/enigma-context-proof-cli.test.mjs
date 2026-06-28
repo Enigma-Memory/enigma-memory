@@ -59,3 +59,70 @@ test('start is a no-friction quickstart alias', async () => {
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('context --require-grant fails closed until matching controller grant is supplied', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-context-grant-cli-'));
+  const bundle = join(dir, 'bundle.json');
+  const grantFile = join(dir, 'grant.json');
+  try {
+    const quickstart = makeIo();
+    assert.equal(await main(['quickstart', '--bundle', bundle, '--overwrite'], quickstart.io), 0, quickstart.stderr());
+
+    const blocked = makeIo();
+    assert.equal(await main(['context', '--bundle', bundle, '--query', 'local proof bundle', '--proof', '--require-grant'], blocked.io), 0, blocked.stderr());
+    const blockedOutput = blocked.json();
+    assert.equal(blockedOutput.schema, 'enigma.context_pack_recall_blocked.v1');
+    assert.equal(blockedOutput.context_pack_returned, false);
+    assert.equal(blockedOutput.recall_veto.safe_to_share, false);
+    assert.deepEqual(blockedOutput.recall_veto.reason_codes, ['grant_missing']);
+    assert.equal(blocked.stdout().includes('Enigma quickstart demo memory'), false);
+    assert.equal(blocked.stdout().includes(dir), false);
+
+    const grant = makeIo();
+    assert.equal(await main([
+      'controller',
+      'grant',
+      '--app-ref',
+      'ref:app:cli-test',
+      '--purpose-ref',
+      'ref:purpose:cli_context',
+      '--memory-zone-ref',
+      'ref:zone:default',
+      '--out',
+      grantFile,
+    ], grant.io), 0, grant.stderr());
+    const grantOutput = grant.json();
+    assert.equal(grantOutput.schema, 'enigma.memory_controller_grant.v1');
+    assert.equal(grantOutput.app_ref, 'ref:app:cli-test');
+    assert.deepEqual(grantOutput.operations, ['recall_context']);
+
+    const allowed = makeIo();
+    assert.equal(await main([
+      'context',
+      '--bundle',
+      bundle,
+      '--query',
+      'local proof bundle',
+      '--proof',
+      '--require-grant',
+      '--grant-file',
+      grantFile,
+      '--app-ref',
+      'ref:app:cli-test',
+      '--purpose-ref',
+      'ref:purpose:cli_context',
+      '--memory-zone-ref',
+      'ref:zone:default',
+    ], allowed.io), 0, allowed.stderr());
+    const allowedOutput = allowed.json();
+    assert.equal(allowedOutput.schema, 'enigma.context_proof_bundle.v1');
+    assert.equal(allowedOutput.context_pack_summary.memory_count > 0, true);
+    assert.equal(allowedOutput.memory_controller.context_pack_returned, true);
+    assert.equal(allowedOutput.memory_controller.recall_veto.safe_to_share, true);
+    assert.deepEqual(allowedOutput.memory_controller.recall_veto.grant_refs, [grantOutput.grant_ref]);
+    assert.equal(allowed.stdout().includes('Enigma quickstart demo memory'), false);
+    assert.equal(allowed.stdout().includes(dir), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

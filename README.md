@@ -98,6 +98,15 @@ Use `--mcp-command` (alias `--command`) when a GUI app cannot find shell-install
 
 Memory Controller MCP clients use `enigma_memory_weather`, `enigma_consent_grant`, `enigma_recall_veto`, and `enigma_private_bubble` for public-safe Memory Weather, app permissions, recall approval / not-shared decisions, and private memory bubbles. These tools fail closed and return decision artifacts and refs only, not raw memory.
 
+For grant-gated local context, create an opaque consent grant and require it before context is returned:
+
+```sh
+enigma controller grant --app-ref ref:app:cli --purpose-ref ref:purpose:cli_context --memory-zone-ref ref:zone:default --out grant.json
+enigma context --bundle "$HOME/.enigma/bundle.json" --query "project context" --require-grant --grant-file grant.json --proof
+```
+
+If the grant is missing, expired, revoked, or scoped to the wrong app/purpose/zone, Enigma returns `enigma.context_pack_recall_blocked.v1` with `context_pack_returned:false`.
+
 ### Connect clients
 
 Supported connector profiles are:

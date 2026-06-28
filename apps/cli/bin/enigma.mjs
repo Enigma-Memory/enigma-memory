@@ -8,6 +8,7 @@ import { pathToFileURL } from 'node:url';
 import { createVault, remember, recall, updateMemory, deleteMemory, exportBundle, decryptKeyring, KEYRING_ENCRYPTED_TYPE } from '../../../packages/vault/src/index.js';
 import { createPassport, compileContextPack, createContextPassport, createProofOfNonUse, createMemoryDriveHealthReport } from '../../../packages/passport/src/index.js';
 import { runBoundarySimulation } from '../../../packages/boundary/src/index.js';
+import { assertMemoryControllerPublicSafe, createConsentGrant, createRecallVetoDecision } from '../../../packages/controller/src/index.js';
 import { startStdioServer } from '../../../packages/mcp-server/src/index.js';
 import { runMeshDemo } from '../../../packages/mesh/src/index.js';
 import { runEnterpriseDemo } from '../../../packages/enterprise/src/index.js';
@@ -203,6 +204,38 @@ function print(value, io) {
 
 async function readJson(path) {
   return JSON.parse(await readFile(path, 'utf8'));
+}
+
+function rawFlagValues(flags, names) {
+  const value = getFlag(flags, names);
+  if (value === undefined || value === true || value === '') return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+async function parseJsonFlagValue(value, label) {
+  if (value === undefined || value === true || value === '') throw new Error(`Missing required --${label}.`);
+  return JSON.parse(String(value));
+}
+
+async function readJsonFlagValue(value, label) {
+  if (value === undefined || value === true || value === '') throw new Error(`Missing required --${label}.`);
+  return readJson(resolve(String(value)));
+}
+
+function pushGrantArtifacts(target, artifact, label) {
+  if (Array.isArray(artifact)) {
+    target.push(...artifact);
+    return;
+  }
+  if (artifact && Array.isArray(artifact.grants)) {
+    target.push(...artifact.grants);
+    return;
+  }
+  if (artifact && typeof artifact === 'object') {
+    target.push(artifact);
+    return;
+  }
+  throw new Error(`--${label} must be a grant object, grant array, or object with grants array.`);
 }
 
 async function memoryTextFromFlags(flags) {
@@ -1605,6 +1638,56 @@ async function deleteCommand(flags, io) {
   return 0;
 }
 
+function contextRecallScopeFromFlags(flags) {
+  return {
+    app_ref: getFlag(flags, ['app-ref', 'appRef'], 'ref:app:cli'),
+    purpose_ref: getFlag(flags, ['purpose-ref', 'purposeRef'], 'ref:purpose:cli_context'),
+    operation: 'recall_context',
+    memory_zone_ref: getFlag(flags, ['memory-zone-ref', 'memoryZoneRef'], 'ref:zone:default'),
+    policy_ref: getFlag(flags, ['policy-ref', 'policyRef'], 'ref:policy:cli-context'),
+  };
+}
+
+async function contextGrantInputsFromFlags(flags) {
+  const grants = [];
+  for (const value of rawFlagValues(flags, ['grant'])) pushGrantArtifacts(grants, await parseJsonFlagValue(value, 'grant'), 'grant');
+  for (const value of rawFlagValues(flags, ['grants'])) pushGrantArtifacts(grants, await parseJsonFlagValue(value, 'grants'), 'grants');
+  for (const value of rawFlagValues(flags, ['grant-file', 'grantFile'])) pushGrantArtifacts(grants, await readJsonFlagValue(value, 'grant-file'), 'grant-file');
+  for (const value of rawFlagValues(flags, ['grants-file', 'grantsFile'])) pushGrantArtifacts(grants, await readJsonFlagValue(value, 'grants-file'), 'grants-file');
+  return {
+    grant: grants[0],
+    grants: grants.slice(1),
+    grantProvided: grants.length > 0,
+  };
+}
+
+function contextRecallDecisionFromFlags(flags, grantInputs, candidateCount) {
+  return createRecallVetoDecision({
+    grant: grantInputs.grant,
+    grants: grantInputs.grants,
+    ...contextRecallScopeFromFlags(flags),
+    candidate_count: candidateCount,
+    now: getFlag(flags, ['now']),
+  });
+}
+
+function blockedCliContextPack(decision) {
+  return assertMemoryControllerPublicSafe({
+    schema: 'enigma.context_pack_recall_blocked.v1',
+    ok: false,
+    context_pack_returned: false,
+    memory_count: 0,
+    recall_veto: decision,
+    private_payload_returned: false,
+    claim_boundaries: {
+      local_only: true,
+      provider_deletion_proof: false,
+      model_forgetting_proof: false,
+      hosted_saas_live: false,
+    },
+  });
+}
+
 async function contextCommand(flags, io) {
   const bundlePath = resolve(String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE)));
   const { vault, passport } = await loadState(bundlePath, { passphrase: getFlag(flags, ['passphrase']) });
@@ -1614,6 +1697,15 @@ async function contextCommand(flags, io) {
     || String(query).trim().length > 0;
   const includeUnrelated = booleanFlag(flags, ['include-unrelated', 'includeUnrelated', 'no-strict-relevance', 'noStrictRelevance'], false);
   const strictRelevance = String(query).trim().length > 0 && !includeUnrelated;
+  const grantInputs = await contextGrantInputsFromFlags(flags);
+  const grantRequired = booleanFlag(flags, ['require-grant', 'requireGrant'], false);
+  if (grantRequired) {
+    const preflightDecision = contextRecallDecisionFromFlags(flags, grantInputs, 0);
+    if (preflightDecision.safe_to_share !== true) {
+      print(blockedCliContextPack(preflightDecision), io);
+      return 0;
+    }
+  }
   const pack = compileContextPack({
     vault,
     passport,
@@ -1626,6 +1718,12 @@ async function contextCommand(flags, io) {
     price_per_million_tokens: parseOptionalNumber(getFlag(flags, ['price-per-million-tokens', 'pricePerMillionTokens'])),
     currency: getFlag(flags, ['currency']),
   });
+  if (grantRequired || grantInputs.grantProvided) {
+    pack.memory_controller = {
+      context_pack_returned: true,
+      recall_veto: contextRecallDecisionFromFlags(flags, grantInputs, Array.isArray(pack.memories) ? pack.memories.length : 0),
+    };
+  }
   await persistState(bundlePath, vault, { passphrase: getFlag(flags, ['passphrase']) });
   const withProof = booleanFlag(flags, ['proof', 'with-proof', 'withProof'], false);
   const output = withProof
@@ -1634,6 +1732,7 @@ async function contextCommand(flags, io) {
       schema: 'enigma.context_proof_bundle.v1',
       context_pack_ref: contextPackPublicDigest(pack),
       context_pack_summary: publicContextPackSummary(pack),
+      memory_controller: pack.memory_controller,
       context_passport: createContextPassport({ contextPack: pack, passport, vault, query, now: getFlag(flags, ['now']) }),
       proof_of_non_use: createProofOfNonUse({ contextPack: pack, passport, vault, query, now: getFlag(flags, ['now']) }),
       claim_boundaries: {
@@ -3080,6 +3179,33 @@ export async function settlementBatchCommand(flags, io, positionalFile) {
   return 0;
 }
 
+export async function controllerGrantCommand(flags, io) {
+  const operations = parseList(getFlag(flags, ['operations']));
+  const memoryZoneRefs = parseList(getFlag(flags, ['memory-zone-refs', 'memoryZoneRefs']));
+  const proofRefs = parseList(getFlag(flags, ['proof-refs', 'proofRefs']));
+  const receiptRefs = parseList(getFlag(flags, ['receipt-refs', 'receiptRefs']));
+  const grant = createConsentGrant({
+    app_ref: getFlag(flags, ['app-ref', 'appRef'], 'ref:app:cli'),
+    purpose_ref: getFlag(flags, ['purpose-ref', 'purposeRef'], 'ref:purpose:cli_context'),
+    operation: operations.length === 0 ? getFlag(flags, ['operation'], 'recall_context') : undefined,
+    operations: operations.length === 0 ? undefined : operations,
+    memory_zone_ref: memoryZoneRefs.length === 0 ? getFlag(flags, ['memory-zone-ref', 'memoryZoneRef'], 'ref:zone:default') : undefined,
+    memory_zone_refs: memoryZoneRefs.length === 0 ? undefined : memoryZoneRefs,
+    issued_at: getFlag(flags, ['issued-at', 'issuedAt', 'now']),
+    expires_at: getFlag(flags, ['expires-at', 'expiresAt']),
+    ttl_seconds: parseOptionalNumber(getFlag(flags, ['ttl-seconds', 'ttlSeconds'])),
+    status: getFlag(flags, ['status']),
+    grant_ref: getFlag(flags, ['grant-ref', 'grantRef']),
+    policy_ref: getFlag(flags, ['policy-ref', 'policyRef'], 'ref:policy:cli-context'),
+    proof_refs: proofRefs.length === 0 ? undefined : proofRefs,
+    receipt_refs: receiptRefs.length === 0 ? undefined : receiptRefs,
+  });
+  const out = getFlag(flags, ['out']);
+  if (out && out !== true) await writeJson(resolve(String(out)), grant);
+  print(grant, io);
+  return 0;
+}
+
 function humanUsage() {
   return `Enigma Memory CLI — local-first AI Memory Passport
 
@@ -3136,6 +3262,7 @@ function usage() {
       'delete',
       'context',
       'search',
+      'controller grant',
       'status',
       'passport status',
       'export',
@@ -3192,6 +3319,19 @@ function usage() {
       '--max-estimated-tokens <n>': 'Token budget for the optimized context pack.',
       '--price-per-million-tokens <n>': 'Pricing input for cost estimates.',
       '--currency <code>': 'Currency for cost estimates. Defaults to USD.',
+      '--require-grant': 'Fail closed with enigma.context_pack_recall_blocked.v1 unless a matching Memory Controller grant is supplied.',
+      '--grant-file <path>': 'Read a public-safe consent grant JSON file. Repeatable. Alias: --grantFile.',
+      '--grant <json>': 'Inline public-safe consent grant JSON for non-private automation.',
+      '--app-ref/--purpose-ref/--memory-zone-ref <ref>': 'Opaque scope refs checked against supplied grants.',
+    },
+    controller_options: {
+      'controller grant': 'Create a public-safe Memory Controller consent grant for local context recall.',
+      '--app-ref <ref>': 'Opaque connected-app ref. Defaults to ref:app:cli.',
+      '--purpose-ref <ref>': 'Opaque purpose ref. Defaults to ref:purpose:cli_context.',
+      '--operation <id>': 'Grant operation. Defaults to recall_context.',
+      '--memory-zone-ref <ref>': 'Opaque memory zone ref. Defaults to ref:zone:default.',
+      '--ttl-seconds <n>': 'Grant lifetime in seconds when --expires-at is omitted.',
+      '--out <path>': 'Write the grant JSON for later enigma context --require-grant --grant-file use.',
     },
     search_options: {
       '--query <text>': 'Required local query. Output redacts the query and memory plaintext by default. Alias: --q.',
@@ -3359,14 +3499,14 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     }
     return 0;
   }
-  const twoPartCommands = ['boundary', 'mcp', 'mesh', 'enterprise', 'capsule', 'relay', 'gateway', 'connect', 'disconnect', 'import', 'native-host', 'meter', 'settlement', 'chain', 'demo', 'passport', 'drive'];
+  const twoPartCommands = ['boundary', 'mcp', 'mesh', 'enterprise', 'capsule', 'relay', 'gateway', 'connect', 'disconnect', 'import', 'native-host', 'meter', 'settlement', 'chain', 'demo', 'passport', 'drive', 'controller'];
   const flags = parseArgs(twoPartCommands.includes(command) ? argv.slice(2) : argv.slice(1));
   const positionalFile = optionalPositional(argv[2]);
   if (command === 'help') {
     io.stdout.write(`${humanUsage()}\n`);
     return 0;
   }
-  if ((command === 'chain' && (!subcommand || subcommand === '--help' || subcommand === '-h' || flags.has('help'))) || ((flags.has('help') || argv.includes('-h')) && (command === 'init' || command === 'setup' || command === 'start' || command === 'quickstart' || command === 'test-drive' || command === 'search' || command === 'status' || (command === 'passport' && subcommand === 'status') || ((command === 'relay' || command === 'gateway') && (subcommand === 'serve' || subcommand === 'demo')) || (command === 'native-host' && (subcommand === 'manifest' || subcommand === 'install-plan')) || (command === 'demo' && subcommand === 'cross-model') || (command === 'drive' && subcommand === 'health')))) {
+  if ((command === 'chain' && (!subcommand || subcommand === '--help' || subcommand === '-h' || flags.has('help'))) || ((flags.has('help') || argv.includes('-h')) && (command === 'init' || command === 'setup' || command === 'start' || command === 'quickstart' || command === 'test-drive' || command === 'search' || command === 'context' || command === 'status' || (command === 'passport' && subcommand === 'status') || ((command === 'relay' || command === 'gateway') && (subcommand === 'serve' || subcommand === 'demo')) || (command === 'native-host' && (subcommand === 'manifest' || subcommand === 'install-plan')) || (command === 'demo' && subcommand === 'cross-model') || (command === 'drive' && subcommand === 'health') || (command === 'controller' && subcommand === 'grant')))) {
     print(usage(), io);
     return 0;
   }
@@ -3387,6 +3527,7 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     if (command === 'delete') return await deleteCommand(flags, io);
     if (command === 'context') return await contextCommand(flags, io);
     if (command === 'search') return await searchCommand(flags, io);
+    if (command === 'controller' && subcommand === 'grant') return await controllerGrantCommand(flags, io);
     if (command === 'status') return await statusCommand(flags, io);
     if (command === 'passport' && subcommand === 'status') return await statusCommand(flags, io);
     if (command === 'drive' && subcommand === 'health') return await driveHealthCommand(flags, io);
