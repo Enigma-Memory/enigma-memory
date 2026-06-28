@@ -161,3 +161,9 @@ Tauri reads these environment variables to sign and notarize the DMG automatical
 * **Identity verification via Apple Developer app:** Requires iPhone/iPad or a modern Mac.
 * **Creating/exporting Developer ID certificates:** Requires a Mac (Keychain Access / Xcode).
 * **Notarization (`notarytool`):** Requires a Mac running macOS; GitHub Actions `macos-latest` runners satisfy this.
+
+## External blockers
+
+* Apple Developer Program enrollment typically takes 1–5 business days for individuals and 1–4 weeks for organizations; organizations may also need up to 5 business days to obtain a D-U-N-S Number.
+* Azure Artifact Signing identity verification usually takes minutes to hours but requires a mobile device for document/selfie capture.
+* Both paths require payment or an active subscription.
