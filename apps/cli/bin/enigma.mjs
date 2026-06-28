@@ -13,7 +13,7 @@ import { startStdioServer } from '../../../packages/mcp-server/src/index.js';
 import { runMeshDemo } from '../../../packages/mesh/src/index.js';
 import { runEnterpriseDemo } from '../../../packages/enterprise/src/index.js';
 import { connectClient, disconnectClient, doctorConnectors, getClientProfile, planConnectWizard, renderMcpConfig, supportedClients } from '../../../packages/connectors/src/index.js';
-import { createImportPreview, exportEnigmaCapsule, importChatGptExport, importClaudeMemory, importEnigmaCapsule, importLangGraphStore, importLettaAgentFile, importMem0Export, importTextMemoryList, importZepGraphitiExport } from '../../../packages/importers/src/index.js';
+import { createImportBatchReceipt, createImportPreview, exportEnigmaCapsule, importChatGptExport, importClaudeMemory, importEnigmaCapsule, importLangGraphStore, importLettaAgentFile, importMem0Export, importTextMemoryList, importZepGraphitiExport } from '../../../packages/importers/src/index.js';
 import * as relayServer from '../../relay/src/server.mjs';
 import * as gatewayServer from '../../gateway/src/server.mjs';
 import { verifyBundle } from '../../verifier/bin/enigma-verify.mjs';
@@ -2465,6 +2465,7 @@ export async function importCommand(source, flags, io, positionalFile = undefine
   const out = getFlag(flags, ['out']);
   const reportOut = out && out !== true ? resolve(String(out)) : undefined;
   if (reportOut) await writeJson(reportOut, report);
+  const batchReceipt = vault ? createImportBatchReceipt(report, options) : undefined;
   const preview = createImportPreview(report, options);
   print({
     ...preview,
@@ -2472,6 +2473,7 @@ export async function importCommand(source, flags, io, positionalFile = undefine
     source_file_redacted: true,
     bundle: vault ? publicPathDisplay(bundlePath, 'bundle-path') : undefined,
     vault_write_performed: Boolean(vault),
+    import_batch_receipt: batchReceipt,
     raw_report_written: Boolean(reportOut),
     report_out: reportOut ? publicPathDisplay(reportOut, 'out') : undefined,
     claim_boundaries: {

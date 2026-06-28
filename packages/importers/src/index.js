@@ -603,6 +603,73 @@ function reportFrom(importer, sourceType, input, candidates, baseLimitations, op
   };
 }
 
+function publicWriteRef(write, index) {
+  return `ref:import-write:${shortHash({
+    index,
+    candidate_id: write?.candidate_id,
+    memory_addr: write?.memory_addr,
+    receipt_hash: write?.receipt_hash,
+    event_id: write?.event_id,
+  })}`;
+}
+
+function importBatchReceiptWrites(reports) {
+  const writes = [];
+  let index = 0;
+  for (const report of reports) {
+    const reportRef = `ref:import-report:${report.report_id ?? shortHash({ index, report })}`;
+    for (const write of asArray(report.vault_writes).filter(isRecord)) {
+      const writeRef = publicWriteRef(write, index);
+      writes.push({
+        write_ref: writeRef,
+        report_ref: reportRef,
+        candidate_ref: `ref:import-candidate:${String(write.candidate_id ?? `candidate_${index}`).replace(/[^A-Za-z0-9._~:@#?=&%+-]/gu, '_')}`,
+        memory_addr_commitment: rootOf(write.memory_addr ?? ''),
+        receipt_hash: typeof write.receipt_hash === 'string' ? write.receipt_hash : rootOf(write.receipt ?? writeRef),
+        ...(typeof write.event_id === 'string' ? { event_commitment: rootOf(write.event_id) } : {}),
+      });
+      index += 1;
+    }
+  }
+  return writes;
+}
+
+export function createImportBatchReceipt(input, options = {}) {
+  const reports = normalizeReportsForPreview(input);
+  const reportRefs = reports.map((report, index) => `ref:import-report:${report.report_id ?? shortHash({ index, report })}`);
+  const writes = importBatchReceiptWrites(reports);
+  const writeRefs = writes.map((write) => write.write_ref);
+  const generatedAt = nowFrom(options);
+  const batchId = `batch_${shortHash({ reportRefs, writeRefs, generated_at: generatedAt })}`;
+  return {
+    schema: 'enigma.import_batch_receipt.v1',
+    batch_id: batchId,
+    generated_at: generatedAt,
+    report_count: reports.length,
+    write_count: writes.length,
+    report_refs: reportRefs,
+    writes,
+    roots: {
+      report_root: new MerkleSet(reportRefs).root(),
+      write_root: new MerkleSet(writeRefs).root(),
+      memory_addr_commitment_root: new MerkleSet(writes.map((write) => write.memory_addr_commitment)).root(),
+      receipt_hash_root: new MerkleSet(writes.map((write) => write.receipt_hash)).root(),
+    },
+    rollback_boundary: {
+      local_vault_writes_identified: writes.length > 0,
+      raw_memory_required_in_public_receipt: false,
+      tombstone_or_undo_requires_local_vault_access: true,
+    },
+    claim_boundaries: {
+      local_enigma_vault_only: true,
+      raw_memory_returned: false,
+      provider_deletion_proof: false,
+      model_forgetting_proof: false,
+      hosted_saas_live: false,
+    },
+  };
+}
+
 function normalizeReportsForPreview(input) {
   if (Array.isArray(input)) return input.filter(isRecord);
   if (!isRecord(input)) return [];
@@ -1587,6 +1654,7 @@ export default {
   quarantineImmuneIngressCandidates,
   assertImmuneIngressPublicSafe,
   createImportPreview,
+  createImportBatchReceipt,
   exportEnigmaCapsule,
   importEnigmaCapsule,
   runImporterDemo

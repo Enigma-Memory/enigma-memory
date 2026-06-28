@@ -4,6 +4,7 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
+  createImportBatchReceipt,
   createImportPreview,
   importChatGptExport,
   importClaudeMemory,
@@ -214,4 +215,42 @@ test('CLI text import previews curated notes without raw note output', async () 
   assert.equal(preview.vault_write_performed, false);
   assert.equal(stdout.includes(note), false);
   assert.equal(stdout.includes(dir), false);
+});
+
+test('CLI text import with write-vault returns sanitized batch receipt', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-import-text-write-cli-'));
+  const bundle = join(dir, 'bundle.json');
+  const source = join(dir, 'memories.md');
+  const note = 'Vault write receipt should hide this note';
+  await writeFile(source, `- ${note}\n`, 'utf8');
+
+  const quickstart = makeIo();
+  assert.equal(await main(['quickstart', '--bundle', bundle, '--overwrite'], quickstart.io), 0, quickstart.stderr());
+
+  const io = makeIo();
+  assert.equal(await main(['import', 'text', '--file', source, '--complete', '--write-vault', '--bundle', bundle], io.io), 0, io.stderr());
+  const stdout = io.stdout();
+  const preview = io.json();
+
+  assert.equal(preview.vault_write_performed, true);
+  assert.equal(preview.import_batch_receipt.schema, 'enigma.import_batch_receipt.v1');
+  assert.equal(preview.import_batch_receipt.write_count, 1);
+  assert.equal(preview.import_batch_receipt.writes[0].write_ref.startsWith('ref:import-write:'), true);
+  assert.equal(preview.import_batch_receipt.writes[0].memory_addr_commitment.startsWith('sha256:'), true);
+  assert.equal(preview.import_batch_receipt.writes[0].receipt_hash.startsWith('sha256:'), true);
+  assert.equal(preview.import_batch_receipt.claim_boundaries.raw_memory_returned, false);
+  assert.equal(preview.import_batch_receipt.rollback_boundary.tombstone_or_undo_requires_local_vault_access, true);
+  assert.equal(stdout.includes(note), false);
+  assert.equal(stdout.includes(dir), false);
+});
+
+test('import batch receipt handles preview-only reports without raw content', () => {
+  const report = importTextMemoryList('- Receipt preview only', { now: NOW, complete: true });
+  const receipt = createImportBatchReceipt(report, { now: NOW });
+  const serialized = JSON.stringify(receipt);
+
+  assert.equal(receipt.schema, 'enigma.import_batch_receipt.v1');
+  assert.equal(receipt.write_count, 0);
+  assert.equal(receipt.claim_boundaries.raw_memory_returned, false);
+  assert.equal(serialized.includes('Receipt preview only'), false);
 });
