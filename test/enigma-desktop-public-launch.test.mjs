@@ -146,9 +146,9 @@ test('desktop unknown public-launch action fails closed', async () => {
   });
   const after = renderMemoryDriveDashboard(next);
 
+  assert.equal(next, initial);
   assert.equal(next.sequence, initial.sequence);
   assert.deepEqual(next.memoryDrive, initial.memoryDrive);
   assert.deepEqual(after, before);
-  assert.match(next.notice, /Unknown action/);
   assertPublicSafe(after);
 });

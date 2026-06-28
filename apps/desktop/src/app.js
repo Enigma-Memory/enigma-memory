@@ -204,7 +204,7 @@ export function desktopReducer(state = createDesktopState(), action = {}) {
     case 'draft/set':
       return setDraftState(state, action);
     default:
-      return withNotice(state, 'Unknown action was rejected.');
+      return state;
   }
 }
 
@@ -537,8 +537,8 @@ if (typeof globalThis !== 'undefined') {
 }
 
 function selectScreen(state, screen) {
-  if (!isKnownScreen(screen)) return withNotice(state, 'Unknown screen path rejected.');
-  return { ...state, activeScreen: screen, notice: 'Desktop shell state is operational evidence only. It is not cryptographic proof.' };
+  if (!isKnownScreen(screen)) return state;
+  return { ...state, activeScreen: screen, notice: 'Memory Drive is local operational evidence only. Receipts and verifier output remain the proof path.' };
 }
 
 function startMcpState(state, action) {
@@ -1000,7 +1000,7 @@ function shutdownDesktopState(state, action) {
 
 function setDraftState(state, action) {
   const name = cleanString(action.name);
-  if (!Object.prototype.hasOwnProperty.call(state.drafts, name)) return withNotice(state, 'Unknown draft field rejected.');
+  if (!Object.prototype.hasOwnProperty.call(state.drafts, name)) return state;
   return { ...state, drafts: { ...state.drafts, [name]: String(action.value ?? '') } };
 }
 
