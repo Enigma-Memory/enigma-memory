@@ -291,6 +291,13 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(tauriService, /pub async fn get_proof_activity/);
   assert.match(tauriService, /local_counts_and_roots_only/);
   assert.match(tauriLib, /commands::service::get_proof_activity/);
+  assert.match(wizard, /Support summary/);
+  assert.match(wizard, /Shareable status without private memory/);
+  assert.match(wizard, /collect-support-summary/);
+  assert.match(wizard, /get_support_summary/);
+  assert.match(tauriService, /pub async fn get_support_summary/);
+  assert.match(tauriService, /enigma\.desktop_support_summary_surface\.v1/);
+  assert.match(tauriLib, /commands::service::get_support_summary/);
   assert.match(help, /just-in-time consent/i);
   assert.match(help, /Setup has six short steps/i);
   assert.match(wizard, /Read it like a traffic light/i);

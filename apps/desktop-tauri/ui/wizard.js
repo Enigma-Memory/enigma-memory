@@ -61,6 +61,7 @@ let importSandbox = {
   pendingText: '',
 };
 let proofActivity = {};
+let supportSummary = {};
 
 let busy = false;
 
@@ -262,6 +263,39 @@ async function mockInvoke(cmd, args = {}) {
         claim_boundaries: { raw_memory_printed: false, provider_deletion_proof: false, model_forgetting_proof: false },
       };
     }
+    case 'get_support_summary':
+      return {
+        ok: true,
+        schema: 'enigma.support_summary.v1',
+        support_code: 'ref:support-summary:mock',
+        setup_status: { state: 'ready', reasons: [] },
+        next_action: { id: 'open_status', label: 'Open status' },
+        diagnostics: {
+          bundle_initialized_ok: true,
+          connector_summary: { ready: clients.filter((c) => c.status === 'connected').length, needs_repair: 0 },
+        },
+        issue_codes: [],
+        redaction: {
+          raw_memory_included: false,
+          prompts_included: false,
+          transcripts_included: false,
+          credentials_included: false,
+          provider_responses_included: false,
+          local_paths_redacted: true,
+        },
+        claim_boundaries: {
+          local_enigma_status_only: true,
+          provider_deletion_proof: false,
+          model_forgetting_proof: false,
+          hosted_saas_live: false,
+        },
+        desktop_surface: {
+          schema: 'enigma.desktop_support_summary_surface.v1',
+          local_paths_hidden: true,
+          raw_memory_hidden: true,
+          shareable_by_default: false,
+        },
+      };
     case 'get_diagnostics':
       return { status: 'passed', summary: 'Local checks completed.', issue_codes: [] };
     case 'export_diagnostics':
@@ -614,6 +648,32 @@ function renderProofActivitySection() {
   `;
 }
 
+function renderSupportSummarySection() {
+  const summary = supportSummary?.schema ? supportSummary : {};
+  const setupState = summary.setup_status?.state || 'not collected';
+  const issueCount = Array.isArray(summary.issue_codes) ? summary.issue_codes.length : 0;
+  const nextLabel = summary.next_action?.label || 'Collect support summary';
+  const supportCode = summary.support_code || 'not collected';
+  return `
+    <section class="dashboard-section support-summary" aria-labelledby="support-summary-title">
+      <p class="eyebrow">Support summary</p>
+      <h2 id="support-summary-title">Shareable status without private memory</h2>
+      <p>Collect a public-safe support summary with setup state, issue count, next action, and redaction flags. It never includes raw memory, prompts, transcripts, credentials, provider responses, or local paths.</p>
+      <div class="dashboard-grid">
+        <div class="metric"><dt>Setup state</dt><dd>${escapeHtml(setupState)}</dd></div>
+        <div class="metric"><dt>Issue codes</dt><dd>${escapeHtml(String(issueCount))}</dd></div>
+        <div class="metric"><dt>Next action</dt><dd>${escapeHtml(nextLabel)}</dd></div>
+        <div class="metric"><dt>Support code</dt><dd>${escapeHtml(supportCode)}</dd></div>
+      </div>
+      <p class="note">Local Enigma status only. Summary sharing is explicit; Enigma does not claim outside-provider changes, model behavior changes, or hosted service readiness.</p>
+      <div class="button-row">
+        ${primaryButton('Collect support summary', 'collect-support-summary')}
+      </div>
+    </section>
+  `;
+}
+
+
 function renderVault() {
   return renderCard(`
     <p class="eyebrow">Step 2 of 6 · Private vault</p>
@@ -810,6 +870,7 @@ function renderDashboard() {
         ${secondaryButton('Export bundle', 'export-diagnostics')}
       </div>
     </div>
+    ${renderSupportSummarySection()}
 
     <div class="dashboard-section">
       <h2>Update check</h2>
@@ -1118,6 +1179,15 @@ async function handleAction(event) {
       busy = false;
       render();
       setStatus(diagnostics.summary || 'Diagnostics collected.');
+      return;
+    }
+    case 'collect-support-summary': {
+      busy = true;
+      setStatus('Collecting public-safe support summary...');
+      supportSummary = await call('get_support_summary');
+      busy = false;
+      render();
+      setStatus('Support summary collected without raw memory or local paths.');
       return;
     }
     case 'export-diagnostics': {

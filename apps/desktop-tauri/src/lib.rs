@@ -94,6 +94,7 @@ pub fn run() {
             commands::service::rollback_client_config,
             commands::service::preview_import_text,
             commands::service::approve_import_text,
+            commands::service::get_support_summary,
             commands::service::get_proof_activity,
             commands::service::get_health,
             commands::service::shutdown_service,

@@ -758,6 +758,31 @@ pub async fn rollback_client_config(
 }
 
 #[tauri::command]
+pub async fn get_support_summary(state: tauri::State<'_, AppState>) -> Result<Value, String> {
+    let bundle = state.config.bundle_path.to_string_lossy();
+    let mut summary = run_cli(
+        &state.config,
+        &[
+            "support",
+            "summary",
+            "--bundle",
+            &bundle,
+            "--client",
+            "generic-mcp",
+        ],
+    )
+    .await
+    .map_err(redact_command_error)?;
+    summary["desktop_surface"] = json!({
+        "schema": "enigma.desktop_support_summary_surface.v1",
+        "local_paths_hidden": true,
+        "raw_memory_hidden": true,
+        "shareable_by_default": false,
+    });
+    Ok(summary)
+}
+
+#[tauri::command]
 pub async fn get_proof_activity(state: tauri::State<'_, AppState>) -> Result<Value, String> {
     Ok(proof_activity_summary(&state.config).await)
 }
