@@ -50,6 +50,11 @@ async function readJsonSafe(p) {
   }
 }
 
+async function packageVersion() {
+  const pkg = await readJsonSafe(path.join(ROOT, 'package.json'));
+  return typeof pkg?.version === 'string' && pkg.version.trim() ? pkg.version : 'unknown';
+}
+
 async function checkInstalledApp() {
   const platform = os.platform();
   let appPath = null;
@@ -218,7 +223,7 @@ export async function runSmoke() {
   const report = {
     schema: CLEAN_MACHINE_SMOKE_SCHEMA,
     generated_at: new Date().toISOString(),
-    app_version: '0.1.18',
+    app_version: await packageVersion(),
     platform: os.platform(),
     arch: os.arch(),
     os_release: os.release(),

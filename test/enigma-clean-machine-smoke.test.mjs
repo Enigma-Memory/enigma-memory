@@ -25,6 +25,8 @@ test('clean-machine smoke report is public-safe even when local checks fail', as
     const serialized = JSON.stringify(report);
 
     assert.equal(report.schema, CLEAN_MACHINE_SMOKE_SCHEMA);
+    const pkg = JSON.parse(await readFile('package.json', 'utf8'));
+    assert.equal(report.app_version, pkg.version);
     assert.equal(report.summary.total, 6);
     assert.equal(report.summary.healthy, report.summary.counts.fail === 0);
     assert.doesNotMatch(serialized, /C:\\Users\\|\/home\/|\/tmp\/|AppData\\Local/i);
