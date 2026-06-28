@@ -79,6 +79,16 @@ test('search ranks relevant active memories and redacts plaintext by default', a
       assert.match(json.results[0].memory_ref, /^enigma:\/\/memory\//);
       assert.ok(json.results[0].access_receipt_ref || json.results[0].access_receipt_id);
       assert.doesNotMatch(stdout, /deployment phoenix region fixture plaintext canary|breakfast oatmeal fixture plaintext canary/);
+
+      const plain = await runCliText(['search', '--bundle', bundlePath, '--query', 'deployment phoenix region', '--limit', '2', '--plain']);
+      assert.equal(plain.code, 0);
+      assert.match(plain.stdout, /^Enigma search\n/);
+      assert.match(plain.stdout, /Results: 1/);
+      assert.match(plain.stdout, /Plaintext: redacted/);
+      assert.match(plain.stdout, /Boundary: local Enigma search only/);
+      assert.doesNotMatch(plain.stdout, /^\s*\{/);
+      assert.doesNotMatch(plain.stdout, /deployment phoenix region fixture plaintext canary|breakfast oatmeal fixture plaintext canary/);
+      assert.equal(plain.stdout.includes(bundlePath), false);
     },
   };
 }));

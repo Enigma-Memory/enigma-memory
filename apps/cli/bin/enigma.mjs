@@ -1887,6 +1887,29 @@ function memorySearchReport({ bundlePath, vault, query, limit, includeContent = 
   };
 }
 
+function renderSearchPlain(report) {
+  const lines = [
+    'Enigma search',
+    `Results: ${report.result_count ?? 0}`,
+    `Limit: ${report.limit ?? 0}`,
+    `Strict relevance: ${report.strict_relevance ? 'on' : 'off'}`,
+    `Plaintext: ${report.results?.some((item) => item.content_redacted === false) ? 'included by explicit opt-in' : 'redacted'}`,
+  ];
+  const results = Array.isArray(report.results) ? report.results.slice(0, 3) : [];
+  for (let index = 0; index < results.length; index += 1) {
+    const item = results[index];
+    lines.push(`Result ${index + 1}: score ${item.score ?? 0}, kind ${item.kind ?? 'memory'}, ref ${item.memory_ref ?? '<memory-ref>'}`);
+  }
+  lines.push('Boundary: local Enigma search only; no raw memory by default, local paths, provider deletion, model behavior, hosted service, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printSearchReport(report, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderSearchPlain(report));
+  else print(report, io);
+}
+
+
 async function searchCommand(flags, io) {
   const bundlePath = resolve(String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE)));
   const query = String(requireFlag(flags, ['query', 'q'], 'query'));
@@ -1895,7 +1918,7 @@ async function searchCommand(flags, io) {
   const includeContent = getFlag(flags, ['include-content', 'includeContent']) === true || getFlag(flags, ['include-content', 'includeContent']) === 'true';
   const includeUnrelated = booleanFlag(flags, ['include-unrelated', 'includeUnrelated', 'no-strict-relevance', 'noStrictRelevance'], false);
   const { vault } = await loadState(bundlePath, { passphrase: getFlag(flags, ['passphrase']) });
-  print(memorySearchReport({
+  const report = memorySearchReport({
     bundlePath,
     vault,
     query,
@@ -1903,7 +1926,8 @@ async function searchCommand(flags, io) {
     includeContent,
     includeUnrelated,
     now: getFlag(flags, ['now'], '2026-01-01T00:00:00.000Z'),
-  }), io);
+  });
+  printSearchReport(report, flags, io);
   return 0;
 }
 
@@ -4016,6 +4040,7 @@ function usage() {
       '--json': 'Reserved for explicit JSON output; CLI output is JSON by default.',
       '--include-content': 'Opt in to returning plaintext local memory content in the JSON result.',
       '--include-unrelated': 'Escape hatch: include memories with no query token overlap. Alias: --no-strict-relevance.',
+      '--plain': 'Print a human-readable search summary instead of JSON. Alias: --text or --format text.',
     },
     status_options: {
       'enigma status --bundle <path>': 'Show local Memory Passport counts, roots, owner display fields, connector readiness, and next commands.',
