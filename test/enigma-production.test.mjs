@@ -2081,6 +2081,15 @@ test('connector dry-run connect and disconnect produce parseable MCP config JSON
     assert.equal(cliConnectResult.ok, true);
     const cliConnectConfig = JSON.parse(cliConnectResult.generatedJson);
     assert.equal(cliConnectConfig.mcpServers?.enigma?.command, 'enigma-mcp');
+
+    const cliConnectPlain = makeIo();
+    assert.equal(await main(['connect', 'generic-mcp', '--bundle', bundlePath, '--config', cliConfigPath, '--dry-run', '--plain'], cliConnectPlain.io), 0, cliConnectPlain.stderr());
+    assert.match(cliConnectPlain.stdout(), /^Enigma connect\n/);
+    assert.match(cliConnectPlain.stdout(), /Client: generic-mcp/);
+    assert.match(cliConnectPlain.stdout(), /Config: <client-config-path>/);
+    assert.match(cliConnectPlain.stdout(), /Boundary: local client config only/);
+    assert.doesNotMatch(cliConnectPlain.stdout(), /^\s*\{/);
+    assert.equal(cliConnectPlain.stdout().includes(dir), false);
     await writeFile(cliConfigPath, cliConnectResult.generatedJson, 'utf8');
 
     const cliDisconnect = makeIo();
@@ -2088,6 +2097,14 @@ test('connector dry-run connect and disconnect produce parseable MCP config JSON
     const cliDisconnectResult = cliDisconnect.json();
     assert.equal(cliDisconnectResult.ok, true);
     const cliDisconnectConfig = JSON.parse(cliDisconnectResult.generatedJson);
+
+    const cliDisconnectPlain = makeIo();
+    assert.equal(await main(['disconnect', 'generic-mcp', '--config', cliConfigPath, '--dry-run', '--plain'], cliDisconnectPlain.io), 0, cliDisconnectPlain.stderr());
+    assert.match(cliDisconnectPlain.stdout(), /^Enigma disconnect\n/);
+    assert.match(cliDisconnectPlain.stdout(), /Client: generic-mcp/);
+    assert.match(cliDisconnectPlain.stdout(), /Config: <client-config-path>/);
+    assert.doesNotMatch(cliDisconnectPlain.stdout(), /^\s*\{/);
+    assert.equal(cliDisconnectPlain.stdout().includes(dir), false);
     assert.equal(cliDisconnectConfig.mcpServers?.enigma, undefined);
   });
 });

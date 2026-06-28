@@ -2096,6 +2096,28 @@ function printDoctorSummary(summary, flags, io) {
   else print(summary, io);
 }
 
+function renderConnectorPlain(result) {
+  const action = result.action === 'disconnect' ? 'disconnect' : 'connect';
+  const title = action === 'disconnect' ? 'Enigma disconnect' : 'Enigma connect';
+  const lines = [
+    title,
+    `Status: ${result.ok ? 'Ready' : 'Needs attention'}`,
+    `Client: ${result.client_id ?? 'unknown'}`,
+    `Mode: ${result.dryRun ? 'dry run' : 'write'}`,
+    `Change: ${result.changed ? 'planned' : 'not needed'}`,
+    'Config: <client-config-path>',
+  ];
+  if (result.dryRun && action === 'connect') lines.push(`Next: enigma connect ${result.client_id ?? '<client>'} --bundle <bundle-path>`);
+  if (result.dryRun && action === 'disconnect') lines.push(`Next: enigma disconnect ${result.client_id ?? '<client>'}`);
+  lines.push('Boundary: local client config only; no provider launch, provider deletion, model behavior, hosted service, raw memory, or local paths.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printConnectorResult(result, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderConnectorPlain(result));
+  else print(result, io);
+}
+
 function printNextAction(action, flags, io) {
   if (nextPlainRequested(flags)) io.stdout.write(renderNextActionPlain(action));
   else print(action, io);
@@ -2771,14 +2793,14 @@ export async function installCommand(flags, io) {
 export async function connectCommand(client, flags, io) {
   if (!client) throw new Error('Missing required client.');
   const result = await connectClient(client, connectorOptions(flags));
-  print(result, io);
+  printConnectorResult(result, flags, io);
   return result.ok ? 0 : 1;
 }
 
 export async function disconnectCommand(client, flags, io) {
   if (!client) throw new Error('Missing required client.');
   const result = await disconnectClient(client, connectorOptions(flags, false));
-  print(result, io);
+  printConnectorResult(result, flags, io);
   return result.ok ? 0 : 1;
 }
 
@@ -4024,6 +4046,13 @@ function usage() {
       '--port <port>': `Bind port. Defaults to ${DEFAULT_RELAY_PORT} for relay and ${DEFAULT_GATEWAY_PORT} for gateway.`,
       '--state-file <path>': 'Load and persist local relay/gateway demo state as JSON.',
       '--once': 'Start, report the listening address, persist state when configured, then close.',
+    },
+    connector_options: {
+      'enigma connect <client> --bundle <path>': 'Plan or write local MCP client config for the selected app.',
+      'enigma disconnect <client>': 'Plan or write local removal of the Enigma MCP entry from the selected app config.',
+      '--dry-run': 'Preview config changes without writing files.',
+      '--mcp-command <command>': 'MCP server command to write. Defaults to enigma-mcp; GUI apps may need an absolute path.',
+      '--plain': 'Print a human-readable config summary instead of JSON. Alias: --text or --format text.',
     },
     kimi_code: {
       gui_path_note: 'GUI-launched Kimi Code may not inherit your shell PATH; pass --mcp-command with an absolute enigma-mcp path when needed.',
