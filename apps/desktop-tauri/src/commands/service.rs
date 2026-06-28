@@ -533,6 +533,36 @@ pub async fn repair_client_config(
 }
 
 #[tauri::command]
+pub async fn test_client_config(
+    _state: tauri::State<'_, AppState>,
+    id: String,
+) -> Result<Value, String> {
+    use crate::connector::engine::{ConnectorEngine, EngineContext, TestOptions};
+
+    let client = parse_public_client_id(&id)?;
+    let ctx = EngineContext::from_env().map_err(redact_command_error)?;
+    let engine = ConnectorEngine::new();
+    let result = engine
+        .test(client, &ctx, &TestOptions::default())
+        .map_err(redact_command_error)?;
+    let summary = public_test_summary(&result);
+
+    Ok(json!({
+        "id": client.as_str(),
+        "ok": result.ok,
+        "status": if result.ok { "test-passed" } else { "repair-required" },
+        "test_result_summary": summary,
+        "test": summary,
+        "claim_boundaries": {
+            "local_config_only": true,
+            "provider_launched": false,
+            "provider_deletion_proof": false,
+            "model_forgetting_proof": false,
+        },
+    }))
+}
+
+#[tauri::command]
 pub async fn rollback_client_config(
     _state: tauri::State<'_, AppState>,
     id: String,

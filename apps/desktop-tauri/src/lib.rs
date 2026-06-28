@@ -45,9 +45,7 @@ fn build_config() -> DesktopConfig {
 
     let update_manifest_url = std::env::var("UPDATER_MANIFEST_URL")
         .or_else(|_| std::env::var("ENIGMA_UPDATE_URL"))
-        .unwrap_or_else(|_| {
-            "https://enigmamemory.com/releases/desktop/manifest.json".to_string()
-        });
+        .unwrap_or_else(|_| "https://enigmamemory.com/releases/desktop/manifest.json".to_string());
 
     DesktopConfig {
         version,
@@ -79,10 +77,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
-        .manage(AppState {
-            service,
-            config,
-        })
+        .manage(AppState { service, config })
         .invoke_handler(tauri::generate_handler![
             commands::service::start_service,
             commands::service::stop_service,
@@ -95,6 +90,7 @@ pub fn run() {
             commands::service::connect_client,
             commands::service::disconnect_client,
             commands::service::repair_client_config,
+            commands::service::test_client_config,
             commands::service::rollback_client_config,
             commands::service::get_health,
             commands::service::shutdown_service,

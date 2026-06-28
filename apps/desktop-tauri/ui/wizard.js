@@ -25,6 +25,7 @@ const CLIENT_COPY = {
   'repair-required': { badge: 'Repair needed', body: 'Safe reset can reapply only the Enigma connector entry while preserving unrelated MCP settings.' },
   malformed: { badge: 'Malformed config', body: 'This app\'s MCP settings look malformed. Restore an Enigma-managed backup or use safe reset to reapply the Enigma entry.' },
   'rollback-available': { badge: 'Backup ready', body: 'Rollback can restore the latest Enigma-managed backup without showing config JSON or local paths.' },
+  'test-passed': { badge: 'Test passed', body: 'Local connector config is present and points at the Enigma bundle. Provider apps may still need a restart.' },
   skipped: { badge: 'Skipped', body: 'This app will not use Enigma yet.' },
   error: { badge: 'Needs attention', body: 'Enigma can try a public-safe repair without displaying config contents.' },
 };
@@ -134,6 +135,17 @@ async function mockInvoke(cmd, args = {}) {
       const c = clients.find((c) => c.id === args.id);
       if (c) c.status = 'restart-needed';
       return { id: args.id, status: 'restart-needed', action: 'safe-reset', public_safe: true };
+    }
+    case 'test_client_config': {
+      const c = clients.find((c) => c.id === args.id);
+      if (c) c.status = 'connected';
+      return {
+        id: args.id,
+        ok: true,
+        status: 'test-passed',
+        test_result_summary: { ok: true, parse_ok: true, entry_present: true, entry_correct: true, bundle_ok: true, restart_needed: false },
+        claim_boundaries: { local_config_only: true, provider_launched: false },
+      };
     }
     case 'rollback_client_config': {
       const c = clients.find((c) => c.id === args.id);
@@ -385,6 +397,7 @@ function renderClientActions(client, status) {
     return `
       <button type="button" class="client-primary" data-action="repair" data-id="${id}">Repair connection</button>
       <button type="button" class="link" data-action="rollback" data-id="${id}">Rollback</button>
+      <button type="button" class="link" data-action="test-connection" data-id="${id}">Test connection</button>
     `;
   }
   if (status === 'rollback-available') {
@@ -397,6 +410,7 @@ function renderClientActions(client, status) {
     return `
       <button type="button" class="client-primary" data-action="disconnect" data-id="${id}">Disconnect</button>
       <button type="button" class="link" data-action="repair" data-id="${id}">Repair connection</button>
+      <button type="button" class="link" data-action="test-connection" data-id="${id}">Test connection</button>
       <button type="button" class="link" data-action="rollback" data-id="${id}">Rollback</button>
     `;
   }
@@ -785,6 +799,17 @@ async function handleAction(event) {
         pending: 'Disconnecting...',
         success: 'Connection removed. Unrelated MCP settings were preserved.',
         failure: 'Disconnect could not complete. No config details were shown.',
+      });
+      return;
+    }
+    case 'test-connection': {
+      const id = event.currentTarget.dataset.id;
+      await runClientCommand({
+        command: 'test_client_config',
+        args: { id },
+        pending: 'Testing local connector...',
+        success: 'Local connector test complete. If the app is open, restart it before using the connection.',
+        failure: 'Connector test could not complete. No config details were shown.',
       });
       return;
     }

@@ -23,6 +23,10 @@ async function readDesktopUiFile(name) {
   return readFile(new URL(`../apps/desktop-tauri/ui/${name}`, import.meta.url), 'utf8');
 }
 
+async function readDesktopTauriSource(name) {
+  return readFile(new URL(`../apps/desktop-tauri/src/${name}`, import.meta.url), 'utf8');
+}
+
 async function readWebsiteFile(name) {
   return readFile(new URL(`../website/${name}`, import.meta.url), 'utf8');
 }
@@ -225,10 +229,12 @@ test('desktop unknown public-launch action fails closed', async () => {
 });
 
 test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consumer controls', async () => {
-  const [wizard, help, styles] = await Promise.all([
+  const [wizard, help, styles, tauriService, tauriLib] = await Promise.all([
     readDesktopUiFile('wizard.js'),
     readDesktopUiFile('help.js'),
     readDesktopUiFile('styles.css'),
+    readDesktopTauriSource('commands/service.rs'),
+    readDesktopTauriSource('lib.rs'),
   ]);
   const ui = `${wizard}\n${help}\n${styles}`;
 
@@ -260,6 +266,12 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(wizard, /duplicate groups/);
   assert.match(wizard, /batch receipt/);
   assert.match(wizard, /rollback receipt/);
+  assert.match(wizard, /test-connection/);
+  assert.match(wizard, /test_client_config/);
+  assert.match(wizard, /Local connector test complete/);
+  assert.match(tauriService, /pub async fn test_client_config/);
+  assert.match(tauriService, /provider_launched": false/);
+  assert.match(tauriLib, /commands::service::test_client_config/);
   assert.match(help, /just-in-time consent/i);
   assert.match(help, /Setup has six short steps/i);
   assert.match(wizard, /Read it like a traffic light/i);
