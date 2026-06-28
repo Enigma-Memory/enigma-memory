@@ -49,6 +49,7 @@ For the no-global-install path, run `npx --yes --package enigma-memory enigma qu
 ## General public launch buildout
 
 The consumer-ready target is a signed desktop app with bundled runtime, one-button local vault setup, one-click client connections, health/fix-it UI, signed updates, public-safe diagnostics, and desktop-first docs. The implementation goal and phase plan are in [`docs/GENERAL_PUBLIC_LAUNCH_GOAL.md`](docs/GENERAL_PUBLIC_LAUNCH_GOAL.md) and [`docs/GENERAL_PUBLIC_LAUNCH_WORKPLAN.md`](docs/GENERAL_PUBLIC_LAUNCH_WORKPLAN.md).
+For the Workflowz goal, Advisor gate, and execution roadmap, see [`docs/WORKFLOWZ_FRICTIONLESS_GOAL.md`](docs/WORKFLOWZ_FRICTIONLESS_GOAL.md), [`docs/public-launch/ADVISOR.md`](docs/public-launch/ADVISOR.md), and [`docs/public-launch/workflowz-execution-roadmap.md`](docs/public-launch/workflowz-execution-roadmap.md).
 
 ## Enigma Proof Network
 

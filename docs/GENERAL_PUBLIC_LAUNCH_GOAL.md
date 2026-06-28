@@ -109,6 +109,9 @@ Not yet built for public consumer launch:
 The full buildout is decomposed into these plan documents:
 
 - `docs/GENERAL_PUBLIC_LAUNCH_WORKPLAN.md`
+- [`docs/WORKFLOWZ_FRICTIONLESS_GOAL.md`](WORKFLOWZ_FRICTIONLESS_GOAL.md)
+- [`docs/public-launch/ADVISOR.md`](public-launch/ADVISOR.md)
+- [`docs/public-launch/workflowz-execution-roadmap.md`](public-launch/workflowz-execution-roadmap.md)
 - `docs/public-launch/desktop-app-plan.md`
 - `docs/public-launch/consumer-onboarding-ux.md`
 - `docs/public-launch/one-click-connectors.md`

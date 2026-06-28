@@ -14,6 +14,9 @@ Each phase must finish with local verification evidence before the next phase st
 
 - `docs/GENERAL_PUBLIC_LAUNCH_GOAL.md`
 - `docs/GENERAL_PUBLIC_LAUNCH_WORKPLAN.md`
+- [`docs/WORKFLOWZ_FRICTIONLESS_GOAL.md`](WORKFLOWZ_FRICTIONLESS_GOAL.md)
+- [`docs/public-launch/ADVISOR.md`](public-launch/ADVISOR.md)
+- [`docs/public-launch/workflowz-execution-roadmap.md`](public-launch/workflowz-execution-roadmap.md)
 - Public launch plan slice docs under `docs/public-launch/`
 - Package file inclusion for these docs
 
