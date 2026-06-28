@@ -1754,6 +1754,36 @@ function blockedCliContextPack(decision) {
   });
 }
 
+function renderContextPlain(output) {
+  const schema = output?.schema ?? 'enigma.context_pack.v1';
+  const memoryCount = output?.context_pack_summary?.memory_count
+    ?? output?.memory_count
+    ?? (Array.isArray(output?.memories) ? output.memories.length : 0);
+  const receiptCount = output?.context_pack_summary?.receipt_count
+    ?? output?.receipt_count
+    ?? (Array.isArray(output?.receipts) ? output.receipts.length : 0);
+  const returned = output?.context_pack_returned === false ? 'blocked' : 'returned';
+  const controller = output?.recall_veto ?? output?.memory_controller?.recall_veto;
+  const lines = [
+    'Enigma context',
+    `Status: ${output?.ok === false ? 'Needs attention' : 'Ready'}`,
+    `Context: ${returned}`,
+    `Schema: ${schema}`,
+    `Memories: ${memoryCount}`,
+    `Receipts: ${receiptCount}`,
+  ];
+  if (schema === 'enigma.context_proof_bundle.v1') lines.push('Proof: context passport and non-use proof included');
+  if (controller?.decision) lines.push(`Controller: ${controller.decision}`);
+  if (Array.isArray(controller?.reason_codes) && controller.reason_codes.length > 0) lines.push(`Reason: ${controller.reason_codes.join(', ')}`);
+  lines.push('Boundary: local Enigma context only; no raw memory in plain output, local paths, provider deletion, model behavior, or hosted service claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printContextOutput(output, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderContextPlain(output));
+  else print(output, io);
+}
+
 async function contextCommand(flags, io) {
   const bundlePath = resolve(String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE)));
   const { vault, passport } = await loadState(bundlePath, { passphrase: getFlag(flags, ['passphrase']) });
@@ -1768,7 +1798,7 @@ async function contextCommand(flags, io) {
   if (grantRequired || grantInputs.grantProvided) {
     const preflightDecision = contextRecallDecisionFromFlags(flags, grantInputs, 0);
     if (preflightDecision.safe_to_share !== true) {
-      print(blockedCliContextPack(preflightDecision), io);
+      printContextOutput(blockedCliContextPack(preflightDecision), flags, io);
       return 0;
     }
   }
@@ -1787,7 +1817,7 @@ async function contextCommand(flags, io) {
   if (grantRequired || grantInputs.grantProvided) {
     const recallVeto = contextRecallDecisionFromFlags(flags, grantInputs, Array.isArray(pack.memories) ? pack.memories.length : 0);
     if (recallVeto.safe_to_share !== true) {
-      print(blockedCliContextPack(recallVeto), io);
+      printContextOutput(blockedCliContextPack(recallVeto), flags, io);
       return 0;
     }
     pack.memory_controller = {
@@ -1816,7 +1846,7 @@ async function contextCommand(flags, io) {
     : pack;
   const out = getFlag(flags, ['out']);
   if (out && out !== true) await writeJson(resolve(String(out)), output);
-  print(output, io);
+  printContextOutput(output, flags, io);
   return 0;
 }
 
@@ -4012,6 +4042,7 @@ function usage() {
       '--currency <code>': 'Currency for cost estimates. Defaults to USD.',
       '--proof': 'Return public-safe context proof bundle instead of selected memory plaintext. Aliases: --with-proof, --withProof.',
       '--out <path>': 'Write the context or proof JSON to a local file.',
+      '--plain': 'Print a human-readable context/proof summary instead of JSON or memory plaintext. Alias: --text or --format text.',
       '--require-grant': 'Fail closed with enigma.context_pack_recall_blocked.v1 unless a matching Memory Controller grant is supplied.',
       '--grant-file <path>': 'Read a public-safe consent grant JSON file. Repeatable. Alias: --grantFile.',
       '--grant <json>': 'Inline public-safe consent grant JSON for non-private automation.',

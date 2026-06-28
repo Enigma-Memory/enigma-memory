@@ -40,6 +40,16 @@ test('context --proof emits passport and non-use proof without context plaintext
     assert.equal(output.context_pack_summary.memory_count > 0, true);
     assert.equal(proof.stdout().includes('Enigma quickstart demo memory'), false);
     assert.equal(proof.stdout().includes(dir), false);
+
+    const plain = makeIo();
+    assert.equal(await main(['context', '--bundle', bundle, '--query', 'local proof bundle', '--proof', '--plain'], plain.io), 0, plain.stderr());
+    assert.match(plain.stdout(), /^Enigma context\n/);
+    assert.match(plain.stdout(), /Status: Ready/);
+    assert.match(plain.stdout(), /Proof: context passport and non-use proof included/);
+    assert.match(plain.stdout(), /Boundary: local Enigma context only/);
+    assert.doesNotMatch(plain.stdout(), /^\s*\{/);
+    assert.equal(plain.stdout().includes('Enigma quickstart demo memory'), false);
+    assert.equal(plain.stdout().includes(dir), false);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -78,6 +88,16 @@ test('context --require-grant fails closed until matching controller grant is su
     assert.deepEqual(blockedOutput.recall_veto.reason_codes, ['grant_missing']);
     assert.equal(blocked.stdout().includes('Enigma quickstart demo memory'), false);
     assert.equal(blocked.stdout().includes(dir), false);
+
+    const blockedPlain = makeIo();
+    assert.equal(await main(['context', '--bundle', bundle, '--query', 'local proof bundle', '--proof', '--require-grant', '--plain'], blockedPlain.io), 0, blockedPlain.stderr());
+    assert.match(blockedPlain.stdout(), /^Enigma context\n/);
+    assert.match(blockedPlain.stdout(), /Context: blocked/);
+    assert.match(blockedPlain.stdout(), /Controller: ask/);
+    assert.match(blockedPlain.stdout(), /Reason: grant_missing/);
+    assert.doesNotMatch(blockedPlain.stdout(), /^\s*\{/);
+    assert.equal(blockedPlain.stdout().includes('Enigma quickstart demo memory'), false);
+    assert.equal(blockedPlain.stdout().includes(dir), false);
 
     const grant = makeIo();
     assert.equal(await main([
