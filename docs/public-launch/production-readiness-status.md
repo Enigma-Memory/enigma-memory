@@ -44,7 +44,7 @@
 
 | Item | Why it matters | Owner / path to close |
 |---|---|---|
-| Signed Windows installer / MSIX | Public launch definition of done requires signed distribution. | Complete Azure Artifact Signing setup. Subscription `Azure subscription 1` is active; Artifact Signing account and Public Trust certificate profile creation are in progress. |
+| Signed Windows installer / MSIX | Public launch definition of done requires signed distribution. | Upgrade or switch Azure to an Artifact Signing-eligible paid subscription. Portal creation for `Azure subscription 1` was rejected as free/trial/sponsored before account creation, identity validation, or Public Trust profile setup could proceed. |
 | Signed/macOS notarized app | Gatekeeper will block unsigned apps. | Enroll in Apple Developer Program; see `docs/public-launch/code-signing-setup.md` for fast-track steps and timeline. |
 
 ---

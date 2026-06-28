@@ -25,13 +25,13 @@
     <section class="hero">
       <span class="eyebrow">Updates</span>
       <h1>How Enigma Memory checks for updates.</h1>
-      <p>Update checks use a signed release feed. Enigma never downloads or installs an update without your approval.</p>
+      <p>Update checks use the official release feed. Enigma never downloads or installs an update without your approval.</p>
     </section>
 
     <section class="content-section" aria-labelledby="how-heading">
       <h2 id="how-heading">How update checks work</h2>
-      <p>Enigma Memory checks the official release feed over HTTPS. The feed lists the latest version, release notes, and cryptographic signatures for each supported platform.</p>
-      <p>Before any update is offered, Enigma verifies the signature on the release metadata and the installer package. If verification fails, the update is not offered and the app reports a verification issue in the health dashboard.</p>
+      <p>Enigma Memory checks the official release feed over HTTPS. The feed lists the latest version, release notes, and platform details for supported desktop builds.</p>
+      <p>Before an update is offered, Enigma checks the release information required by the app. If verification fails, the update is not offered and the app reports a verification issue in the health dashboard.</p>
 
       <div class="boundary-callout">
         <strong>Boundary note:</strong> Update checks do not send your memory contents, prompts, wallet information, or local file paths to the update server.
@@ -50,7 +50,7 @@
 
     <section class="content-section" aria-labelledby="available-heading">
       <h2 id="available-heading">What "update available" means</h2>
-      <p>When Enigma says an update is available, a newer signed release exists for your platform. The message includes the new version number and a short summary of what changed.</p>
+      <p>When Enigma says an update is available, a newer release exists for your platform in the official feed. The message includes the new version number and a short summary of what changed.</p>
       <p>Seeing "update available" does not change the app or your vault. The update is downloaded and installed only after you approve it.</p>
     </section>
 
@@ -58,6 +58,9 @@
       <h2 id="approval-heading">No automatic downloads</h2>
       <p>Enigma does not download or install updates in the background. You choose whether to update and when.</p>
       <p>You can also disable automatic update checks in <strong>Settings</strong> &gt; <strong>General</strong>. When disabled, Enigma only checks for updates when you click <strong>Check for updates</strong> manually.</p>
+    </section>
+    <section class="content-section">
+      <p><a href="./index.html">Back to help hub</a></p>
     </section>
   </main>
 
@@ -76,7 +79,9 @@
         <ul>
           <li><a href="./index.html">Help hub</a></li>
           <li><a href="./install.html">Install guide</a></li>
+          <li><a href="./connect-apps.html">Connect apps</a></li>
           <li><a href="./troubleshooting.html">Troubleshooting</a></li>
+          <li><a href="./support-safe-sharing.html">Safe support sharing</a></li>
         </ul>
       </div>
       <div>

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="What is safe to share with Enigma Memory support, and what should stay private.">
+  <title>What is safe to share with support</title>
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="site-logo" href="../index.html">Enigma Memory</a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="../download.html">Download</a>
+        <a href="../setup.html">How it works</a>
+        <a href="../privacy.html">Privacy</a>
+        <a href="./index.html">Help</a>
+        <a href="../faq.html">FAQ</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <span class="eyebrow">Support safety</span>
+      <h1>What is safe to share with Enigma support.</h1>
+      <p>Use sanitized diagnostics and support codes. Keep memory content, prompts, transcripts, credentials, account IDs, and local paths private.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="safe-heading">
+      <h2 id="safe-heading">Safe to share</h2>
+      <ul>
+        <li>The Enigma Memory app version.</li>
+        <li>Your operating-system family and version, such as Windows 11 or macOS 15.</li>
+        <li>The visible support code or sanitized error code shown by Enigma.</li>
+        <li>Connector ID, client name, and whether the client was detected, connected, or waiting for restart.</li>
+        <li>Health status labels, update status labels, and public-safe proof refs.</li>
+        <li>Crash report counts and the crash-reporting opt-in state.</li>
+      </ul>
+    </section>
+
+    <section class="content-section" aria-labelledby="private-heading">
+      <h2 id="private-heading">Do not share</h2>
+      <ul>
+        <li>Raw memory text, imported notes, prompts, transcripts, or provider responses.</li>
+        <li>Credentials, access tokens, private keys, recovery phrases, wallet data, or account IDs.</li>
+        <li>Complete client configuration files or manual MCP JSON copied from your machine.</li>
+        <li>Local file paths, vault locations, folder screenshots that reveal user names, or terminal output with paths.</li>
+        <li>Full logs, stack traces, heap dumps, screenshots of memory contents, or screenshots of provider conversations.</li>
+      </ul>
+
+      <div class="boundary-callout">
+        <strong>Boundary note:</strong> Enigma support does not need private memory contents to troubleshoot install, connection, update, crash-reporting, or health-dashboard issues.
+      </div>
+    </section>
+
+    <section class="content-section" aria-labelledby="screenshots-heading">
+      <h2 id="screenshots-heading">Before sending screenshots</h2>
+      <ol>
+        <li>Prefer the in-app support code or health summary over a screenshot.</li>
+        <li>If a screenshot is necessary, crop it to the Enigma status message and remove surrounding desktop, file browser, terminal, or AI chat content.</li>
+        <li>Do not send screenshots that show raw memory, prompts, transcripts, account pages, or file locations.</li>
+      </ol>
+    </section>
+
+    <section class="content-section" aria-labelledby="where-heading">
+      <h2 id="where-heading">Where this applies</h2>
+      <ul>
+        <li><a href="./troubleshooting/installer-blocked.html">Installer blocked</a>: share OS family, installer channel, and the visible support code.</li>
+        <li><a href="./troubleshooting/vault-not-ready.html">Vault not ready</a>: share the health status and whether setup or repair was interrupted.</li>
+        <li><a href="./troubleshooting/client-not-detected.html">AI app not detected</a>: share the client name, connector ID, app version, and support code.</li>
+        <li><a href="./update-check.html">Update checks</a>: share the current version, offered version, and update status label.</li>
+        <li><a href="./crash-reporting-opt-in.html">Crash reporting</a>: share whether crash reporting is on and how many pending reports Enigma shows.</li>
+      </ul>
+    </section>
+    <section class="content-section">
+      <p><a href="./index.html">Back to help hub</a></p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer__inner">
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="../download.html">Download</a></li>
+          <li><a href="../setup.html">How it works</a></li>
+          <li><a href="../privacy.html">Privacy</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Support</h4>
+        <ul>
+          <li><a href="./index.html">Help hub</a></li>
+          <li><a href="./install.html">Install guide</a></li>
+          <li><a href="./connect-apps.html">Connect apps</a></li>
+          <li><a href="./troubleshooting.html">Troubleshooting</a></li>
+          <li><a href="./support-safe-sharing.html">Safe support sharing</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Developers</h4>
+        <ul>
+          <li><a href="../developers/cli.html">CLI appendix</a></li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

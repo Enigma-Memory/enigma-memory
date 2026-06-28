@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Current Enigma Memory public launch status: code signing, notarization, and expected timeline for signed desktop installers.">
+  <meta name="description" content="Current Enigma Memory public launch status: Azure subscription, Artifact Signing/Public Trust, Apple notarization, and unsigned build boundaries.">
   <title>Public Launch Status — Enigma Memory</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -13,6 +13,7 @@
       <a class="site-logo" href="./index.html">Enigma Memory</a>
       <nav class="site-nav" aria-label="Primary">
         <a href="./download.html">Download</a>
+        <a href="./launch-status.html">Launch status</a>
         <a href="./setup.html">How it works</a>
         <a href="./privacy.html">Privacy</a>
         <a href="./help/index.html">Help</a>
@@ -25,12 +26,12 @@
     <section class="hero">
       <span class="eyebrow">Public launch</span>
       <h1>Launch status and code-signing timeline.</h1>
-      <p>Enigma Memory is ready for daily use. The remaining public-launch blocker is distributing signed desktop installers for Windows and macOS. This page tracks where we are and what comes next.</p>
+      <p>The desktop-first flow is the public-launch target, but general consumer release is still blocked by signed Windows and macOS installers. Azure Artifact Signing now requires an eligible paid subscription before Public Trust setup can continue; Apple notarization is not complete.</p>
       <div class="cta-row">
         <a class="btn btn-primary" href="#status">See current status</a>
         <a class="btn btn-secondary" href="./download.html">Go to downloads</a>
       </div>
-      <p class="trust-note">This page is public-safe: no account IDs, secrets, or internal paths are shown.</p>
+      <p class="trust-note">This page is public-safe: private account details, restricted signing material, and internal locations are omitted.</p>
     </section>
 
     <section class="content-section" id="status" aria-labelledby="status-heading">
@@ -38,18 +39,22 @@
       <div class="card-grid">
         <article class="card">
           <h3>Tauri updater key</h3>
-          <p>Configured. The updater signing key is stored as a repository secret and the matching public key is committed in the desktop app configuration, so future auto-updates can be verified.</p>
+          <span class="status-label status-label--ready">Configured</span>
+          <p>Configured. The updater signing key has a protected repository custody path and the matching public key is committed in the desktop app configuration, so future auto-updates can be verified after release signing is complete.</p>
         </article>
         <article class="card">
           <h3>Azure subscription</h3>
-          <p>Active. A paid Azure subscription is available for Artifact Signing. Identity validation is the next step before a trusted signing certificate can be issued.</p>
+          <span class="status-label status-label--pending">Upgrade required</span>
+          <p>Blocked. Azure Portal rejected the current subscription for Artifact Signing because free, trial, and sponsored subscriptions are not eligible. Upgrade or switch to an eligible paid subscription before creating the signing account.</p>
         </article>
         <article class="card">
-          <h3>Azure Artifact Signing account</h3>
-          <p>Pending. The subscription is ready, but the Artifact Signing account and Public Trust identity validation still need to be completed in the Azure portal.</p>
+          <h3>Azure Artifact Signing / Public Trust</h3>
+          <span class="status-label status-label--pending">Blocked</span>
+          <p>Blocked before account creation. After an eligible paid subscription is available, the Artifact Signing account, Public Trust identity validation, and certificate profile still need to be completed before trusted Windows signing can be claimed.</p>
         </article>
         <article class="card">
           <h3>Apple Developer enrollment</h3>
+          <span class="status-label status-label--pending">Pending</span>
           <p>Pending. Enrollment in the Apple Developer Program is required before macOS Developer ID certificates, signing, and notarization can be completed.</p>
         </article>
       </div>
@@ -62,14 +67,14 @@
           <span class="step__number">1</span>
           <div class="step__content">
             <h3>Windows signed installer</h3>
-            <p>Blocked on Azure identity validation. Once validation passes and a Public Trust certificate profile is created, the CI workflow can produce a signed Windows installer. Identity validation typically takes minutes to hours, but it requires a mobile device for document and selfie capture.</p>
+            <p>Blocked on Azure subscription eligibility first, then Artifact Signing identity validation. Azure rejected the current subscription as free/trial/sponsored; after an eligible paid subscription is available, Public Trust validation typically takes minutes to hours and requires a mobile device for document and selfie capture.</p>
           </div>
         </li>
         <li class="step">
           <span class="step__number">2</span>
           <div class="step__content">
             <h3>macOS signed and notarized installer</h3>
-            <p>Blocked on Apple Developer Program enrollment. After enrollment, Developer ID Application and Installer certificates must be created, exported, and added to repository secrets; then CI can sign, notarize, and staple the macOS build. Enrollment review usually takes 1–5 business days for individuals and 1–4 weeks for organizations.</p>
+            <p>Blocked on Apple Developer Program enrollment. After enrollment, Developer ID Application and Installer certificates must be created, exported, and added to the protected release-signing environment; then CI can sign, notarize, and staple the macOS build. Enrollment review usually takes 1–5 business days for individuals and 1–4 weeks for organizations.</p>
           </div>
         </li>
         <li class="step">
@@ -86,8 +91,8 @@
       <h2 id="consumer-heading">What you can do today</h2>
       <p>Until signed installers are ready, you have two paths:</p>
       <ul>
-        <li><strong>Wait for the signed build:</strong> Subscribe to release notifications or check back on this page. The download page will be updated as soon as signed Windows and macOS installers are available.</li>
-        <li><strong>Use current development builds:</strong> Unsigned builds are published automatically from GitHub Actions. These are suitable for testing and development, but your operating system may show a security warning because the binaries are not yet signed. Only download builds from the official repository.</li>
+        <li><strong>Wait for the signed build:</strong> This is the recommended consumer path. The download page will switch to signed Windows and macOS installers only after signing evidence exists.</li>
+        <li><strong>Use current development builds:</strong> Unsigned builds may be available from official Enigma release channels for testing and development. They are not the general consumer install, and your operating system may show a security warning because the binaries are not yet signed.</li>
       </ul>
       <p>Do not bypass security warnings for installers from sources you do not trust.</p>
       <div class="cta-row">

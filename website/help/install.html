@@ -25,7 +25,7 @@
     <section class="hero">
       <span class="eyebrow">Install guide</span>
       <h1>Install Enigma Memory like a desktop app.</h1>
-      <p>Download, open, and approve the signed installer. Enigma handles the local runtime and vault setup.</p>
+      <p>Download from the official Enigma page, open the desktop installer, and let the first-run wizard create your local vault.</p>
     </section>
 
     <section class="content-section" aria-labelledby="desktop-heading">
@@ -34,17 +34,17 @@
       <h3><a href="./install/macos.html">macOS</a></h3>
       <ol>
         <li>Download the macOS installer from the <a href="../download.html">download page</a>.</li>
-        <li>Open the signed, notarized disk image or package.</li>
-        <li>Drag Enigma Memory into Applications, or run the installer.</li>
+        <li>Open the disk image or package from the official Enigma download channel.</li>
+        <li>Drag Enigma Memory into Applications, or run the installer package.</li>
         <li>Open Enigma Memory. The first-run setup creates your local vault.</li>
       </ol>
 
       <h3><a href="./install/windows.html">Windows</a></h3>
       <ol>
         <li>Download the Windows installer from the <a href="../download.html">download page</a>.</li>
-        <li>Run the signed installer.</li>
-        <li>If Windows SmartScreen appears, click More info, then Run anyway.</li>
-        <li>Open Enigma Memory. The first-run setup creates your local vault.</li>
+        <li>Run the installer from the official Enigma download channel.</li>
+        <li>If Windows SmartScreen appears, cancel the prompt and check the <a href="../launch-status.html">launch status</a>. General consumers should wait for a signed build marked ready for public install.</li>
+        <li>Open Enigma Memory after the installer completes. The first-run setup creates your local vault.</li>
       </ol>
 
       <h3>Linux</h3>
@@ -61,13 +61,13 @@
 
     <section class="content-section" aria-labelledby="blocked-heading">
       <h2 id="blocked-heading">If your system blocks the installer</h2>
-      <p>Operating systems sometimes warn about apps downloaded from the web. Use signing-safe guidance:</p>
+      <p>Operating systems sometimes warn about apps downloaded from the web. Do not bypass those warnings by default.</p>
       <ul>
-        <li><strong>macOS Gatekeeper:</strong> Right-click the installer, choose Open, then confirm.</li>
-        <li><strong>Windows SmartScreen:</strong> Click More info, then Run anyway, if the installer came from an Enigma distribution channel.</li>
-        <li><strong>Linux:</strong> Check the package signature or checksum with your distribution tools.</li>
+        <li><strong>Recommended for consumers:</strong> Stop, check the <a href="../launch-status.html">launch status</a>, and wait for a signed build marked ready for public install.</li>
+        <li><strong>Testing-only:</strong> If you are validating a pre-launch build from an official Enigma channel, use the OS-specific steps in the <a href="./troubleshooting/installer-blocked.html">installer blocked</a> article.</li>
+        <li><strong>Linux:</strong> Check the package signature or checksum with your distribution tools before opening the package.</li>
       </ul>
-      <p>Do not bypass security warnings for installers from unknown sources. See the <a href="./troubleshooting/installer-blocked.html">installer blocked</a> article for more details.</p>
+      <p>Never continue past a warning for installers from unknown sources, unofficial mirrors, email attachments, or copied links.</p>
     </section>
 
     <section class="content-section">
@@ -76,6 +76,9 @@
         <p>This is the advanced developer path. For the default consumer experience, use the desktop app above.</p>
         <p>If you want the command-line engine instead, see the <a href="../developers/cli.html">CLI appendix</a> for npm install, Node requirements, setup commands, and source checkout.</p>
       </details>
+    </section>
+    <section class="content-section">
+      <p><a href="./index.html">Back to help hub</a></p>
     </section>
   </main>
 
@@ -94,7 +97,9 @@
         <ul>
           <li><a href="./index.html">Help hub</a></li>
           <li><a href="./install.html">Install guide</a></li>
+          <li><a href="./connect-apps.html">Connect apps</a></li>
           <li><a href="./troubleshooting.html">Troubleshooting</a></li>
+          <li><a href="./support-safe-sharing.html">Safe support sharing</a></li>
         </ul>
       </div>
       <div>

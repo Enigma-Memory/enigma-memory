@@ -37,6 +37,7 @@ RUN apt-get update && apt-get install -y \
     protobuf-compiler \
     libprotobuf-dev \
     curl \
+    bzip2 \
     ca-certificates \
     git \
     && rm -rf /var/lib/apt/lists/*
@@ -52,10 +53,15 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
     && rustup component add rustfmt clippy \
     && rm -rf ${CARGO_HOME}/registry/cache/*
 
-# Install Solana CLI.
+# Install Solana CLI from the pinned GitHub release artifact. This avoids the
+# release.solana.com install script, which intermittently fails from Docker on
+# Windows with TLS EOF/SYSCALL errors.
 RUN mkdir -p /usr/local/solana \
-    && sh -c "$(curl -sSfL https://release.solana.com/v${SOLANA_VERSION}/install)" \
-    && mv /root/.local/share/solana/install/active_release/bin /usr/local/solana/bin
+    && curl -fL --retry 5 --retry-all-errors \
+      "https://github.com/solana-labs/solana/releases/download/v${SOLANA_VERSION}/solana-release-x86_64-unknown-linux-gnu.tar.bz2" \
+      -o /tmp/solana-release.tar.bz2 \
+    && tar -xjf /tmp/solana-release.tar.bz2 --strip-components=1 -C /usr/local/solana \
+    && rm /tmp/solana-release.tar.bz2
 
 # Install Anchor CLI.
 RUN cargo install --git https://github.com/coral-xyz/anchor --tag v${ANCHOR_VERSION} anchor-cli --locked \

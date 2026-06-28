@@ -25,16 +25,17 @@
     <section class="hero">
       <span class="eyebrow">Install guide</span>
       <h1>Install Enigma Memory on macOS.</h1>
-      <p>Download the signed, notarized installer, open it, and let the first-run wizard create your local vault. No terminal or Node install is required.</p>
+      <p>Download the macOS desktop installer from the official Enigma page, open it, and let the first-run wizard create your local vault. No terminal or Node install is required.</p>
     </section>
 
     <section class="content-section" aria-labelledby="steps-heading">
       <h2 id="steps-heading">macOS install steps</h2>
       <ol>
         <li>Download the macOS installer from the <a href="../../download.html">download page</a>.</li>
-        <li>Open the signed, notarized disk image or package.</li>
-        <li>Drag Enigma Memory into Applications, or run the installer package.</li>
-        <li>Open Enigma Memory from Applications. The first-run wizard creates your local vault.</li>
+        <li>Open the disk image or package from the official Enigma download channel.</li>
+        <li>Follow the installer prompts, or drag Enigma Memory into Applications when the disk image asks you to.</li>
+        <li>If macOS says the app cannot be verified, stop and check the <a href="../../launch-status.html">launch status</a>. General consumers should wait for a signed build marked ready for public install.</li>
+        <li>Open Enigma Memory from Applications after install. The first-run wizard creates your local vault.</li>
       </ol>
 
       <div class="boundary-callout">
@@ -44,12 +45,12 @@
 
     <section class="content-section" aria-labelledby="blocked-heading">
       <h2 id="blocked-heading">If macOS blocks the installer</h2>
-      <p>macOS Gatekeeper may warn about apps downloaded from the web. If the installer came from an Enigma distribution channel:</p>
+      <p>macOS Gatekeeper may warn about apps downloaded from the web. Do not continue past it by default.</p>
       <ul>
-        <li>Right-click the installer or app and choose <strong>Open</strong>.</li>
-        <li>Click <strong>Open</strong> in the dialog to confirm.</li>
+        <li><strong>Recommended for consumers:</strong> Stop, check the <a href="../../launch-status.html">launch status</a>, and wait for a signed build marked ready for public install.</li>
+        <li><strong>Testing-only:</strong> If you are validating a pre-launch build from an official Enigma channel, right-click the installer or app, choose <strong>Open</strong>, then confirm.</li>
       </ul>
-      <p>Do not bypass security warnings for installers from unknown sources. See the <a href="../troubleshooting/installer-blocked.html">installer blocked</a> article for more details.</p>
+      <p>Do not bypass security warnings for unknown publishers, unofficial mirrors, email attachments, or copied links. See the <a href="../troubleshooting/installer-blocked.html">installer blocked</a> article for more details.</p>
     </section>
 
     <section class="content-section">
@@ -58,6 +59,9 @@
         <p>This is the advanced developer path. For the default consumer experience, use the desktop app above.</p>
         <p>If you want the command-line engine instead, see the <a href="../../developers/cli.html">CLI appendix</a> for npm install, Node requirements, setup commands, and source checkout.</p>
       </details>
+    </section>
+    <section class="content-section">
+      <p><a href="../index.html">Back to help hub</a></p>
     </section>
   </main>
 
@@ -76,7 +80,9 @@
         <ul>
           <li><a href="../index.html">Help hub</a></li>
           <li><a href="../install.html">Install guide</a></li>
+          <li><a href="../connect-apps.html">Connect apps</a></li>
           <li><a href="../troubleshooting.html">Troubleshooting</a></li>
+          <li><a href="../support-safe-sharing.html">Safe support sharing</a></li>
         </ul>
       </div>
       <div>

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Enigma Memory — public-safe desktop release evidence packet generator.
-// Produces artifact hashes, manifest hash, manifest signature status, signing
-// identity placeholders, blockers, and next steps. Never reads signing keys or
-// local bundle data.
+// Produces artifact hashes, manifest signature status, signing identity evidence,
+// updater public-key provenance, blockers, and next steps. Never reads signing
+// keys or local bundle data.
 
 import { createHash, randomBytes } from 'node:crypto';
 import fs from 'node:fs';
@@ -14,6 +14,7 @@ import { verifyManifestSignature } from './sign-update-manifest.mjs';
 const SCHEMA = 'enigma.desktop_release_evidence.v1';
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const ROOT = path.resolve(path.dirname(SCRIPT_PATH), '..');
+const DEFAULT_TAURI_CONFIG = path.join(ROOT, 'apps', 'desktop-tauri', 'tauri.conf.json');
 
 const SECRET_RE = /(?:bearer\s+[A-Za-z0-9._~+/=-]+|ghp_[A-Za-z0-9_]{16,}|npm_[A-Za-z0-9_-]{24,}|api[_-]?key\s*[=:]|password\s*[=:]|token\s*[=:])/iu;
 const WINDOWS_ABSOLUTE_RE = /[A-Za-z]:[\\/](?:Users|tmp|Temp|Windows|ProgramData|Program Files)[\\/]/u;
@@ -37,8 +38,8 @@ Options:
 
 Generates a public-safe desktop release evidence packet. Dry-run is the default;
 use --write to persist the evidence file. When no signed installers are present,
-the packet records placeholder/missing entries so the script can run without
-real release artifacts.
+the packet records missing entries so the script can run before real release
+artifacts exist.
 `;
 }
 
@@ -178,6 +179,50 @@ function readManifest(manifestPath) {
   };
 }
 
+function readUpdaterConfig(configPath = DEFAULT_TAURI_CONFIG) {
+  const full = path.resolve(configPath || DEFAULT_TAURI_CONFIG);
+  const configPathPublic = publicArtifactPath(full);
+  const base = {
+    config_path: configPathPublic,
+    config_present: false,
+    active: null,
+    dialog: null,
+    endpoint_count: 0,
+    public_key: null,
+    public_key_present: false,
+    key_algorithm: 'ed25519',
+    key_custody: 'CI-secret-only; the private updater key is injected at release time and never written to public evidence.',
+  };
+  if (!fs.existsSync(full)) {
+    return { ...base, status: 'missing_tauri_config' };
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(fs.readFileSync(full, 'utf8'));
+  } catch {
+    return { ...base, config_present: true, status: 'invalid_tauri_config' };
+  }
+  const updater = parsed?.plugins?.updater ?? parsed?.tauri?.updater ?? null;
+  const endpoints = Array.isArray(updater?.endpoints) ? updater.endpoints : [];
+  const publicKey = typeof updater?.pubkey === 'string' && updater.pubkey.trim().length > 0
+    ? updater.pubkey.trim()
+    : null;
+  const sourceField = updater === parsed?.plugins?.updater
+    ? 'plugins.updater.pubkey'
+    : updater === parsed?.tauri?.updater ? 'tauri.updater.pubkey' : null;
+  return {
+    ...base,
+    config_present: true,
+    active: typeof updater?.active === 'boolean' ? updater.active : null,
+    dialog: typeof updater?.dialog === 'boolean' ? updater.dialog : null,
+    endpoint_count: endpoints.length,
+    public_key: publicKey,
+    public_key_present: publicKey !== null,
+    source_field: sourceField,
+    status: publicKey ? 'configured_from_tauri_config' : 'missing_public_key',
+  };
+}
+
 function readManifestSignature(manifestPath, explicitSigPath) {
   if (!manifestPath) {
     return { signature_file_present: false, status: 'no_manifest_path' };
@@ -212,45 +257,44 @@ function readManifestSignature(manifestPath, explicitSigPath) {
 }
 
 function azureSigningEvidence() {
-  const accountName = process.env.AZURE_CODESIGN_ACCOUNT_NAME || null;
-  const certProfileName = process.env.AZURE_CODESIGN_CERT_PROFILE_NAME || null;
-  const endpoint = process.env.AZURE_CODESIGN_ENDPOINT || null;
-  const configured = typeof accountName === 'string' && accountName.length > 0;
+  const accountNamePresent = typeof process.env.AZURE_CODESIGN_ACCOUNT_NAME === 'string' && process.env.AZURE_CODESIGN_ACCOUNT_NAME.length > 0;
+  const certProfileNamePresent = typeof process.env.AZURE_CODESIGN_CERT_PROFILE_NAME === 'string' && process.env.AZURE_CODESIGN_CERT_PROFILE_NAME.length > 0;
+  const endpointPresent = typeof process.env.AZURE_CODESIGN_ENDPOINT === 'string' && process.env.AZURE_CODESIGN_ENDPOINT.length > 0;
+  const configured = accountNamePresent && certProfileNamePresent && endpointPresent;
   return {
     configured,
-    account_name: accountName,
-    cert_profile_name: certProfileName,
-    endpoint,
+    account_name_present: accountNamePresent,
+    cert_profile_name_present: certProfileNamePresent,
+    endpoint_present: endpointPresent,
     client_id_present: typeof process.env.AZURE_CLIENT_ID === 'string' && process.env.AZURE_CLIENT_ID.length > 0,
     tenant_id_present: typeof process.env.AZURE_TENANT_ID === 'string' && process.env.AZURE_TENANT_ID.length > 0,
-    status: configured ? 'configured' : 'pending_azure_setup',
+    status: configured ? 'ci_identity_references_present' : 'pending_azure_setup',
   };
 }
 
 function appleSigningEvidence() {
-  const teamId = process.env.APPLE_TEAM_ID || null;
-  const configured = typeof teamId === 'string' && teamId.length > 0;
+  const teamIdPresent = typeof process.env.APPLE_TEAM_ID === 'string' && process.env.APPLE_TEAM_ID.length > 0;
   return {
-    configured,
-    team_id: teamId,
+    configured: teamIdPresent,
+    team_id_present: teamIdPresent,
     certificate_present: typeof process.env.APPLE_CERTIFICATE === 'string' && process.env.APPLE_CERTIFICATE.length > 0,
-    status: configured ? 'configured' : 'pending_apple_enrollment',
+    status: teamIdPresent ? 'ci_identity_reference_present' : 'pending_apple_enrollment',
   };
 }
 
-function updaterSigningEvidence() {
+function updaterSigningEvidence(configPath) {
+  const evidence = readUpdaterConfig(configPath);
   return {
-    public_key: '<ed25519-public-key-hex-placeholder>',
-    key_custody: 'placeholder: private key loaded from CI secret at release time, never committed',
-    status: 'placeholder: signing key not present in source',
+    ...evidence,
+    configured: evidence.public_key_present,
   };
 }
 
-function signingEvidence() {
+function signingEvidence(options = {}) {
   return {
     windows: azureSigningEvidence(),
     macos: appleSigningEvidence(),
-    updater: updaterSigningEvidence(),
+    updater: updaterSigningEvidence(options.tauriConfigPath),
   };
 }
 
@@ -258,6 +302,8 @@ function recordInstaller(platform, filePath) {
   const method = platform === 'windows' ? 'Azure Artifact Signing' : 'Apple Developer ID + Notary';
   const configured = platform === 'windows'
     ? typeof process.env.AZURE_CODESIGN_ACCOUNT_NAME === 'string' && process.env.AZURE_CODESIGN_ACCOUNT_NAME.length > 0
+      && typeof process.env.AZURE_CODESIGN_CERT_PROFILE_NAME === 'string' && process.env.AZURE_CODESIGN_CERT_PROFILE_NAME.length > 0
+      && typeof process.env.AZURE_CODESIGN_ENDPOINT === 'string' && process.env.AZURE_CODESIGN_ENDPOINT.length > 0
     : typeof process.env.APPLE_TEAM_ID === 'string' && process.env.APPLE_TEAM_ID.length > 0;
   if (!filePath) {
     return {
@@ -305,20 +351,31 @@ function deriveBlockersAndNextSteps({ manifest, manifestSignature, windows, maco
   const blockers = [];
   const nextSteps = [];
 
+  if (!signing.updater.configured) {
+    if (signing.updater.status === 'missing_tauri_config') {
+      blockers.push('Tauri updater config is missing, so the updater public key cannot be evidenced.');
+    } else if (signing.updater.status === 'invalid_tauri_config') {
+      blockers.push('Tauri updater config exists but is not valid JSON, so the updater public key cannot be evidenced.');
+    } else {
+      blockers.push('Tauri updater public key is not configured in tauri.conf.json.');
+    }
+    nextSteps.push('Add the updater public key to apps/desktop-tauri/tauri.conf.json and keep the matching private key under CI-secret-only custody.');
+  }
+
   if (!windows.present) {
     blockers.push('No Windows installer (.exe/.msix) artifact found or provided.');
     nextSteps.push('Build the Windows installer and pass --windows-installer <path>.');
   } else if (!signing.windows.configured) {
-    blockers.push('Windows installer is present but Azure Artifact Signing is not configured in the environment.');
-    nextSteps.push('Set AZURE_CODESIGN_ACCOUNT_NAME, AZURE_CODESIGN_CERT_PROFILE_NAME, and AZURE_CODESIGN_ENDPOINT in CI secrets.');
+    blockers.push('Windows installer is present but CI evidence does not show Azure Artifact Signing identity references.');
+    nextSteps.push('Complete Azure Artifact Signing/Public Trust setup in CI secrets, then provide the signed Windows release artifact.');
   }
 
   if (!macos.present) {
     blockers.push('No macOS installer (.dmg/.pkg) artifact found or provided.');
     nextSteps.push('Build the macOS installer and pass --macos-installer <path>.');
   } else if (!signing.macos.configured) {
-    blockers.push('macOS installer is present but Apple Developer ID Team ID is not configured in the environment.');
-    nextSteps.push('Set APPLE_TEAM_ID and related signing secrets in CI secrets.');
+    blockers.push('macOS installer is present but CI evidence does not show an Apple Developer ID Team ID reference.');
+    nextSteps.push('Store Apple signing credentials in CI secrets, then provide the signed and notarized macOS release artifact.');
   }
 
   if (!manifest) {
@@ -344,8 +401,8 @@ function claimBoundaryChecklist() {
     { id: 'no-secrets-in-source', claim: 'No signing keys, certificates, or tokens are committed to source control.', required: true, status: 'claimed' },
     { id: 'no-raw-memory-in-artifacts', claim: 'Desktop artifacts and manifests do not contain raw memory, prompts, or transcripts.', required: true, status: 'claimed' },
     { id: 'no-absolute-paths', claim: 'Public evidence and manifests do not embed absolute local paths.', required: true, status: 'claimed' },
-    { id: 'signing-placeholders', claim: 'Code-signing identities are placeholders or non-secret CI env names; real secrets are injected only in CI release jobs.', required: true, status: 'claimed' },
-    { id: 'manifest-signed', claim: 'Update manifest is signed with an Ed25519 key before distribution.', required: true, status: 'pending-release' },
+    { id: 'signing-custody', claim: 'Code-signing identities and updater private keys use CI-secret-only custody; public evidence records only public updater keys and non-secret presence booleans.', required: true, status: 'claimed' },
+    { id: 'manifest-signed', claim: 'Update manifest is signed with the configured Ed25519 public key before distribution.', required: true, status: 'pending-release' },
     { id: 'installer-notarized', claim: 'macOS app is notarized and stapled before distribution.', required: true, status: 'pending-real-identity' },
     { id: 'installer-signed-windows', claim: 'Windows installer is signed with a trusted code-signing certificate before distribution.', required: true, status: 'pending-real-identity' },
     { id: 'reproducible-build', claim: 'Release build is reproducible and evidenced by artifact hashes.', required: true, status: 'pending-release' },
@@ -358,7 +415,7 @@ export function buildDesktopReleaseEvidence(options = {}) {
   const manifestSignature = readManifestSignature(options.manifest, options.manifestSig);
   const windows = recordInstaller('windows', options.windowsInstaller);
   const macos = recordInstaller('macos', options.macosInstaller);
-  const signing = signingEvidence();
+  const signing = signingEvidence(options);
   const { blockers, nextSteps } = deriveBlockersAndNextSteps({ manifest, manifestSignature, windows, macos, signing });
   const evidenceId = randomBytes(16).toString('hex');
 
@@ -367,7 +424,7 @@ export function buildDesktopReleaseEvidence(options = {}) {
     evidence_id: evidenceId,
     generated_at: new Date().toISOString(),
     release_version: options.version ?? readPackageVersion(),
-    claim_boundary: 'Public desktop release evidence only. No signing keys, certificates, raw memory, or local paths.',
+    claim_boundary: 'Public desktop release evidence only. No signing keys, certificates, account IDs, raw memory, or local paths.',
     manifest: manifest ? { ...manifest, signature: manifestSignature } : null,
     installers: [windows, macos],
     artifacts,
@@ -378,8 +435,8 @@ export function buildDesktopReleaseEvidence(options = {}) {
     next_steps: nextSteps,
     notes: [
       'This packet is produced by scripts/release-evidence-desktop.mjs and is safe for public release.',
-      'Real signing identities are intentionally omitted; CI release jobs inject them as secrets.',
-      'Installer signature verification is a placeholder until platform-specific signature tools are invoked in CI.',
+      'Real signing secrets are intentionally omitted; CI release jobs inject private keys and certificates as secrets.',
+      'Installer signature verification is pending platform-specific signature tooling in CI.',
     ],
   };
 

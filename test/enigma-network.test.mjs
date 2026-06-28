@@ -483,6 +483,7 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
   assert.ok(names.includes('enigma_search'));
   assert.ok(names.includes('enigma_import_preview'));
   assert.ok(names.includes('enigma_import_approve'));
+  assert.ok(names.includes('enigma_support_summary'));
   const importApproveTool = list.result.tools.find((tool) => tool.name === 'enigma_import_approve');
   assert.deepEqual(importApproveTool.inputSchema.required, ['approved', 'approval_token']);
   assert.ok(names.includes('enigma_context_pack'));
@@ -540,19 +541,25 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
     reviewed: true,
     approval_token: emptyPreview.result.approval_token,
   });
+  const tempRoot = process.env.TEMP ?? process.env.TMP ?? '.';
+  const dir = `${tempRoot}/enigma-network-${process.pid}-${Date.now()}`;
+  const bundlePath = `${dir}/bundle.json`;
+
+  const supportMissing = await callTool('support-missing-bundle', 'enigma_support_summary', { bundlePath });
+  assert.equal(supportMissing.result.schema, 'enigma.support_summary.v1');
+  assert.equal(supportMissing.result.setup_state, 'setup_needed');
+  assert.equal(supportMissing.result.redaction.raw_memory_included, false);
+  assert.doesNotMatch(JSON.stringify(supportMissing.response), new RegExp(dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.equal(emptyApproval.result.schema, 'enigma.import_approval_blocked.v1');
   assert.equal(emptyApproval.result.reason_code, 'empty_import');
   assert.equal(emptyApproval.result.vault_write_performed, false);
   assert.doesNotMatch(JSON.stringify(unapprovedImport.response), /mcp import preview private sentinel/);
 
-  const tempRoot = process.env.TEMP ?? process.env.TMP ?? '.';
-  const dir = `${tempRoot}/enigma-network-${process.pid}-${Date.now()}`;
-  const bundlePath = `${dir}/bundle.json`;
-    const missingNext = await callTool('next-missing-bundle', 'enigma_next_action', { bundlePath });
-    assert.equal(missingNext.result.schema, 'enigma.next_action.v1');
-    assert.equal(missingNext.result.state, 'setup_needed');
-    assert.equal(missingNext.result.primary_action.tool, 'enigma_init');
-    assert.doesNotMatch(JSON.stringify(missingNext.response), new RegExp(dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  const missingNext = await callTool('next-missing-bundle', 'enigma_next_action', { bundlePath });
+  assert.equal(missingNext.result.schema, 'enigma.next_action.v1');
+  assert.equal(missingNext.result.state, 'setup_needed');
+  assert.equal(missingNext.result.primary_action.tool, 'enigma_init');
+  assert.doesNotMatch(JSON.stringify(missingNext.response), new RegExp(dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   try {
     const { resolve } = await import('node:path');
     const initialized = await callTool('init', 'enigma_init', { bundlePath });
@@ -603,7 +610,6 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
     assert.equal(typeof initialized.result.vault_id, 'string');
     assert.ok(initialized.result.vault_id.length > 0);
 
-
     const secretText = 'network plaintext sentinel must not leak';
     const remembered = await callTool('remember', 'enigma_remember', {
       bundlePath,
@@ -631,6 +637,13 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
 
     const context = await callTool('context-pack', 'enigma_context_pack', { bundlePath, query: 'plaintext sentinel', purpose: 'integration_test', limit: 1 });
     assert.ok(Array.isArray(context.result.memories));
+
+    const supportSummary = await callTool('support-populated-bundle', 'enigma_support_summary', { bundlePath });
+    assert.equal(supportSummary.result.schema, 'enigma.support_summary.v1');
+    assert.equal(supportSummary.result.setup_state, 'ready_for_app_connection');
+    assert.equal(supportSummary.result.counts.active_memory_addresses, 2);
+    assert.equal(supportSummary.result.redaction.provider_responses_included, false);
+    assert.doesNotMatch(JSON.stringify(supportSummary.response), /network plaintext sentinel|approved mcp import private note/);
     assert.ok(context.result.memories.length >= 1);
     assert.ok(Array.isArray(context.result.retrieval_receipts ?? context.result.receipts));
 

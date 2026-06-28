@@ -13,6 +13,7 @@
       <a class="site-logo" href="./index.html">Enigma Memory</a>
       <nav class="site-nav" aria-label="Primary">
         <a href="./download.html">Download</a>
+        <a href="./launch-status.html">Launch status</a>
         <a href="./setup.html">How it works</a>
         <a href="./privacy.html">Privacy</a>
         <a href="./help/index.html">Help</a>
@@ -42,8 +43,8 @@
       </article>
 
       <article class="faq-item">
-        <h3>Will the installer be signed?</h3>
-        <p>Yes. Public launch requires a signed Windows installer or Store/MSIX path and a macOS Developer ID signed, notarized, and stapled installer. Until those steps are complete, you may see a security warning.</p>
+        <h3>Are the installers signed today?</h3>
+        <p>Not yet for general public launch. Windows signing is blocked on Azure Artifact Signing/Public Trust completion, and macOS distribution is blocked on Developer ID signing, notarization, and stapling. See <a href="./launch-status.html">launch status</a> before installing.</p>
       </article>
     </section>
 
@@ -52,12 +53,12 @@
 
       <article class="faq-item">
         <h3>Where is my vault?</h3>
-        <p>In an Enigma-controlled local app location shown inside the desktop app. Public docs do not print local absolute paths.</p>
+        <p>In an Enigma-controlled local app location shown inside the desktop app. Public docs do not print machine-specific locations.</p>
       </article>
 
       <article class="faq-item">
-        <h3>Does Enigma delete memory from AI providers?</h3>
-        <p>No. Enigma controls its local vault and context selection; provider deletion requires provider evidence.</p>
+        <h3>Does Enigma control AI provider records?</h3>
+        <p>No. Enigma controls its local vault and the context it offers. Anything a provider stores must be checked through that provider's own controls and evidence.</p>
       </article>
 
       <article class="faq-item">
@@ -76,7 +77,7 @@
 
       <article class="faq-item">
         <h3>Do I have to edit MCP JSON?</h3>
-        <p>No. The desktop app detects installed clients, previews the change, and applies it after you approve. Manual MCP JSON is only in the advanced panel.</p>
+        <p>No. The desktop app detects installed clients, previews the change, and applies it after you approve. Manual MCP JSON is advanced developer and troubleshooting material only.</p>
       </article>
 
       <article class="faq-item">
@@ -95,12 +96,12 @@
 
       <article class="faq-item">
         <h3>What can I safely share with support?</h3>
-        <p>Health status, app version, sanitized error codes, and public-safe proof refs only. Do not send raw memory, prompts, transcripts, credentials, account IDs, or local paths.</p>
+        <p>Health status, app version, sanitized error codes, and public-safe proof refs only. Keep private memory content, conversation text, sign-in material, provider identifiers, and local locations out of support messages.</p>
       </article>
 
       <article class="faq-item">
-        <h3>Does Solana-ready mean on-chain?</h3>
-        <p>No. Solana-ready means prepared for review. On-chain submission requires separate transaction evidence.</p>
+        <h3>Does Solana-ready mean submitted to a chain?</h3>
+        <p>No. Solana-ready means prepared for review. Chain submission requires separate transaction evidence.</p>
       </article>
     </section>
 
@@ -109,7 +110,7 @@
 
       <article class="faq-item">
         <h3>My installer is blocked. What do I do?</h3>
-        <p>See <a href="./help/troubleshooting.html">Troubleshooting</a> for signing-safe guidance. Do not bypass warnings for installers from unknown sources.</p>
+        <p>See <a href="./help/troubleshooting.html">Troubleshooting</a> and <a href="./launch-status.html">Launch status</a> for signing-safe guidance. Do not bypass warnings for installers from unknown sources.</p>
       </article>
 
       <article class="faq-item">
@@ -141,6 +142,7 @@
           <li><a href="./download.html">Download</a></li>
           <li><a href="./setup.html">How it works</a></li>
           <li><a href="./privacy.html">Privacy</a></li>
+          <li><a href="./launch-status.html">Launch status</a></li>
         </ul>
       </div>
       <div>

@@ -1,10 +1,10 @@
-> **Status:** A Microsoft account session was found in Microsoft Edge on the user's workstation. Azure Artifact Signing setup is being attempted through that signed-in session. If the session expires, sign in to https://portal.azure.com/ before continuing.
+> **Status:** A Microsoft account session was found in Microsoft Edge on the user's workstation. Azure Artifact Signing account creation was attempted through that session, but Azure rejected `Azure subscription 1` with: "Artifact Signing is not available for free, trial or sponsored subscriptions. Upgrade to a paid subscription to proceed." Upgrade or switch to an eligible paid subscription before continuing.
 >
 > **Tauri updater key status:** `TAURI_SIGNING_PRIVATE_KEY` has been generated and stored as a GitHub secret. The matching public key is committed in `apps/desktop-tauri/tauri.conf.json`.
 
 # Code Signing Setup for Public Launch
 
-This guide lists the two external signing paths required for a frictionless public desktop launch. Repository scaffolding is in place; only account/certificate setup remains.
+This guide lists the two external signing paths required for a frictionless public desktop launch. Repository scaffolding is in place; subscription eligibility, account setup, and certificate setup remain.
 
 ## Windows — Azure Artifact Signing (formerly Trusted Signing)
 
@@ -166,4 +166,4 @@ Tauri reads these environment variables to sign and notarize the DMG automatical
 
 * Apple Developer Program enrollment typically takes 1–5 business days for individuals and 1–4 weeks for organizations; organizations may also need up to 5 business days to obtain a D-U-N-S Number.
 * Azure Artifact Signing identity verification usually takes minutes to hours but requires a mobile device for document/selfie capture.
-* Both paths require payment or an active subscription.
+* Both paths require payment. Azure Artifact Signing specifically requires an eligible paid Azure subscription; free, trial, and sponsored subscriptions are rejected by the portal.

@@ -278,6 +278,10 @@ function validateToolArguments(name, args) {
       rejectAdditionalProperties(args, new Set(['bundlePath']), name);
       optionalString(args, 'bundlePath', name);
       return args;
+    case 'enigma_support_summary':
+      rejectAdditionalProperties(args, new Set(['bundlePath']), name);
+      optionalString(args, 'bundlePath', name);
+      return args;
     case 'enigma_remember':
       rejectAdditionalProperties(args, new Set(['bundlePath', 'text', 'purpose', 'tags', 'metadata']), name);
       optionalString(args, 'bundlePath', name);
@@ -607,6 +611,17 @@ export const toolDescriptors = [
   {
     name: 'enigma_next_action',
     description: 'Return the next local Enigma setup action without requiring a bundle to already exist.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        bundlePath: { type: 'string' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'enigma_support_summary',
+    description: 'Return a public-safe local support summary without raw memory, paths, prompts, transcripts, credentials, or provider responses.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1311,6 +1326,54 @@ export async function enigma_next_action(input = {}) {
   };
 }
 
+export async function enigma_support_summary(input = {}) {
+  input = validateToolArguments('enigma_support_summary', input);
+  const path = bundlePath(input);
+  const nextAction = await enigma_next_action(input);
+  const bundleExists = await fileExists(path);
+  let counts = null;
+  if (bundleExists) {
+    try {
+      const { vault } = await loadState(path);
+      counts = {
+        active_memory_addresses: vault.activeAddresses instanceof Set ? vault.activeAddresses.size : 0,
+        tombstones: vault.tombstones instanceof Map ? vault.tombstones.size : 0,
+        receipts: Array.isArray(vault.receipts) ? vault.receipts.length : 0,
+      };
+    } catch {
+      counts = null;
+    }
+  }
+  return {
+    ok: nextAction.state !== 'setup_needed',
+    schema: 'enigma.support_summary.v1',
+    bundle: '<bundle-path>',
+    setup_state: nextAction.state,
+    next_action: nextAction.primary_action,
+    lanes: nextAction.lanes ?? null,
+    counts,
+    diagnostics: {
+      bundle_exists: bundleExists,
+      bundle_loadable: counts !== null,
+      tools_available: ['enigma_next_action', 'enigma_import_preview', 'enigma_import_approve', 'enigma_context_pack'],
+    },
+    redaction: {
+      raw_memory_included: false,
+      prompts_included: false,
+      transcripts_included: false,
+      credentials_included: false,
+      provider_responses_included: false,
+      local_paths_redacted: true,
+    },
+    claim_boundaries: {
+      local_enigma_status_only: true,
+      provider_deletion_proof: false,
+      model_forgetting_proof: false,
+      hosted_saas_live: false,
+    },
+  };
+}
+
 export async function enigma_import_preview(input = {}) {
   input = validateToolArguments('enigma_import_preview', input);
   const report = importTextMemoryList(input.text ?? '', {
@@ -1639,6 +1702,7 @@ export async function enigma_settlement_batch(input = {}) {
 
 export const handlers = Object.freeze({
   enigma_next_action,
+  enigma_support_summary,
   enigma_init,
   enigma_remember,
   enigma_import_preview,
@@ -1869,6 +1933,7 @@ export default {
   handlers,
   enigma_init,
   enigma_next_action,
+  enigma_support_summary,
   enigma_remember,
   enigma_import_preview,
   enigma_import_approve,

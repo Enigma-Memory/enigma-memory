@@ -1,6 +1,6 @@
 import { createHash, generateKeyPairSync } from 'node:crypto';
 import { execFile } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import assert from 'node:assert/strict';
@@ -12,6 +12,7 @@ import { signManifest } from '../scripts/sign-update-manifest.mjs';
 const execFileAsync = promisify(execFile);
 const PROJECT_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const SCRIPT = resolve(PROJECT_ROOT, 'scripts', 'release-evidence-desktop.mjs');
+const DEFAULT_TAURI_CONFIG = resolve(PROJECT_ROOT, 'apps', 'desktop-tauri', 'tauri.conf.json');
 
 const SECRET_RE = /(?:bearer\s+[A-Za-z0-9._~+/=-]+|ghp_[A-Za-z0-9_]{16,}|npm_[A-Za-z0-9_-]{24,}|api[_-]?key\s*[=:]|password\s*[=:]|token\s*[=:])/iu;
 const WINDOWS_ABSOLUTE_RE = /[A-Za-z]:[\\/](?:Users|tmp|Temp|Windows|ProgramData|Program Files)[\\/]/u;
@@ -77,9 +78,78 @@ test('buildDesktopReleaseEvidence dry-run emits valid public-safe JSON without a
   assert.equal(record.installers[1].present, false);
   assert.ok(record.blockers.length > 0, 'blockers should list missing artifacts');
   assert.ok(record.next_steps.length > 0, 'next steps should guide artifact provision');
-  assert.ok(record.signing_evidence.windows.status === 'pending_azure_setup' || record.signing_evidence.windows.status === 'configured');
-  assert.ok(record.signing_evidence.macos.status === 'pending_apple_enrollment' || record.signing_evidence.macos.status === 'configured');
+  assert.ok(['pending_azure_setup', 'ci_identity_references_present'].includes(record.signing_evidence.windows.status));
+  assert.ok(['pending_apple_enrollment', 'ci_identity_reference_present'].includes(record.signing_evidence.macos.status));
   assertPublicSafe(record);
+});
+
+test('buildDesktopReleaseEvidence uses repo Tauri updater public key when present', () => {
+  if (!existsSync(DEFAULT_TAURI_CONFIG)) return;
+
+  const tauriConfig = JSON.parse(readFileSync(DEFAULT_TAURI_CONFIG, 'utf8'));
+  const updater = tauriConfig.plugins?.updater ?? tauriConfig.tauri?.updater ?? null;
+  const publicKey = typeof updater?.pubkey === 'string' && updater.pubkey.trim().length > 0
+    ? updater.pubkey.trim()
+    : null;
+  const record = buildDesktopReleaseEvidence({});
+
+  assert.equal(record.signing_evidence.updater.config_path, 'apps/desktop-tauri/tauri.conf.json');
+  assert.equal(record.signing_evidence.updater.public_key, publicKey);
+  assert.equal(record.signing_evidence.updater.configured, publicKey !== null);
+  assert.equal(record.signing_evidence.updater.key_custody, 'CI-secret-only; the private updater key is injected at release time and never written to public evidence.');
+  assertPublicSafe(record);
+});
+
+test('buildDesktopReleaseEvidence reads updater public key evidence from Tauri config', () => {
+  withTempDir((dir) => {
+    const tauriConfigPath = join(dir, 'tauri.conf.json');
+    const publicKey = 'dGVzdC11cGRhdGVyLXB1YmxpYy1rZXk=';
+    writeFileSync(tauriConfigPath, JSON.stringify({
+      plugins: {
+        updater: {
+          active: true,
+          dialog: true,
+          endpoints: ['{{env:UPDATER_MANIFEST_URL}}'],
+          pubkey: publicKey,
+        },
+      },
+    }, null, 2));
+
+    const record = buildDesktopReleaseEvidence({ tauriConfigPath });
+
+    assert.equal(record.signing_evidence.updater.configured, true);
+    assert.equal(record.signing_evidence.updater.status, 'configured_from_tauri_config');
+    assert.equal(record.signing_evidence.updater.config_path, 'tauri.conf.json');
+    assert.equal(record.signing_evidence.updater.source_field, 'plugins.updater.pubkey');
+    assert.equal(record.signing_evidence.updater.public_key, publicKey);
+    assert.equal(record.signing_evidence.updater.endpoint_count, 1);
+    assert.equal(record.signing_evidence.updater.key_custody, 'CI-secret-only; the private updater key is injected at release time and never written to public evidence.');
+    assert.doesNotMatch(JSON.stringify(record.signing_evidence.updater), /placeholder/i);
+    assertPublicSafe(record);
+  });
+});
+
+test('buildDesktopReleaseEvidence blocks release when Tauri updater public key is missing', () => {
+  withTempDir((dir) => {
+    const tauriConfigPath = join(dir, 'tauri.conf.json');
+    writeFileSync(tauriConfigPath, JSON.stringify({
+      plugins: {
+        updater: {
+          active: true,
+          endpoints: ['{{env:UPDATER_MANIFEST_URL}}'],
+        },
+      },
+    }, null, 2));
+
+    const record = buildDesktopReleaseEvidence({ tauriConfigPath });
+
+    assert.equal(record.signing_evidence.updater.configured, false);
+    assert.equal(record.signing_evidence.updater.status, 'missing_public_key');
+    assert.equal(record.signing_evidence.updater.public_key, null);
+    assert.ok(record.blockers.some((blocker) => blocker.includes('Tauri updater public key')));
+    assert.ok(record.next_steps.some((step) => step.includes('apps/desktop-tauri/tauri.conf.json') && step.includes('CI-secret-only')));
+    assertPublicSafe(record);
+  });
 });
 
 test('buildDesktopReleaseEvidence records SHA-256 checksums and signature status for signed installers', async () => {
@@ -128,7 +198,7 @@ test('buildDesktopReleaseEvidence records SHA-256 checksums and signature status
   });
 });
 
-test('buildDesktopReleaseEvidence records Azure and Apple signing evidence from env vars without leaking secrets', async () => {
+test('buildDesktopReleaseEvidence records signing identity presence from env vars without leaking identifiers or secrets', async () => {
   await withTempDirAsync(async (dir) => {
     const previousEnv = { ...process.env };
     process.env.AZURE_CODESIGN_ACCOUNT_NAME = 'enigma-test-account';
@@ -154,20 +224,24 @@ test('buildDesktopReleaseEvidence records Azure and Apple signing evidence from 
       });
 
       assert.equal(record.signing_evidence.windows.configured, true);
-      assert.equal(record.signing_evidence.windows.account_name, 'enigma-test-account');
-      assert.equal(record.signing_evidence.windows.cert_profile_name, 'enigma-test-profile');
-      assert.equal(record.signing_evidence.windows.endpoint, 'https://eus.codesigning.azure.net');
+      assert.equal(record.signing_evidence.windows.account_name_present, true);
+      assert.equal(record.signing_evidence.windows.cert_profile_name_present, true);
+      assert.equal(record.signing_evidence.windows.endpoint_present, true);
       assert.equal(record.signing_evidence.windows.client_id_present, true);
       assert.equal(record.signing_evidence.windows.tenant_id_present, true);
 
       assert.equal(record.signing_evidence.macos.configured, true);
-      assert.equal(record.signing_evidence.macos.team_id, 'TEAM123456');
+      assert.equal(record.signing_evidence.macos.team_id_present, true);
       assert.equal(record.signing_evidence.macos.certificate_present, true);
 
       assert.equal(record.installers[0].signature.configured, true);
       assert.equal(record.installers[1].signature.configured, true);
 
       const serialized = JSON.stringify(record);
+      assert.doesNotMatch(serialized, /enigma-test-account/);
+      assert.doesNotMatch(serialized, /enigma-test-profile/);
+      assert.doesNotMatch(serialized, /eus\.codesigning\.azure\.net/);
+      assert.doesNotMatch(serialized, /TEAM123456/);
       assert.doesNotMatch(serialized, /super-secret-should-not-appear/);
       assert.doesNotMatch(serialized, /client-id-value/);
       assert.doesNotMatch(serialized, /tenant-id-value/);
@@ -183,7 +257,7 @@ test('buildDesktopReleaseEvidence records Azure and Apple signing evidence from 
   });
 });
 
-test('buildDesktopReleaseEvidence uses placeholders when artifacts are missing', () => {
+test('buildDesktopReleaseEvidence records missing entries when artifacts are absent', () => {
   const record = buildDesktopReleaseEvidence({
     windowsInstaller: 'does-not-exist.exe',
     macosInstaller: 'does-not-exist.dmg',

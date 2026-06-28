@@ -217,6 +217,30 @@ h1 {
   font-size: 0.9375rem;
 }
 
+.status-label {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 0 0.75rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.status-label--ready {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.status-label--pending,
+.status-label--testing {
+  background: #fffbeb;
+  color: #92400e;
+}
+
 /* Content sections */
 
 .content-section {

@@ -26,7 +26,7 @@ For the public launch desktop flow, pair this with the [consumer onboarding UX p
 
 Enigma Memory keeps its canonical vault on your device. You choose which AI clients are connected and what context they can use. Connected clients may still have their own logs, retention, and caches outside Enigma control.
 
-Enigma proves facts about Enigma-controlled vault state, receipts, checkpoints, and declared boundary operations. Enigma does not claim that a closed provider deleted internal data, that model weights forgot, or that provider-native memory disappeared.
+Enigma proves facts about Enigma-controlled vault state, receipts, checkpoints, and declared boundary operations. Enigma does not claim facts about a provider's own stored copies, hidden personalization, or model state.
 
 For details, see:
 
@@ -43,20 +43,21 @@ Developers and power users can use the CLI appendix for npm, MCP stdio, source c
 Prerequisites:
 
 - Node.js `>=24`
-- A local filesystem path for the Enigma vault bundle
-- No database, provider credential, cloud credential, hosted Enigma account, or external account for the local setup path
+- A private local bundle file selected by the user
+- No database, provider login, cloud login, hosted Enigma account, or external account for the local setup path
 
 ```sh
 npm install -g enigma-memory
-enigma next --plain --bundle "$HOME/.enigma/bundle.json"
-enigma setup --bundle "$HOME/.enigma/bundle.json" --client auto --connect-installed --overwrite
-enigma doctor --bundle "$HOME/.enigma/bundle.json"
-enigma drive health --bundle "$HOME/.enigma/bundle.json"
-enigma status --bundle "$HOME/.enigma/bundle.json"
+ENIGMA_BUNDLE_FILE="<private-bundle-file>"
+enigma next --plain --bundle "$ENIGMA_BUNDLE_FILE"
+enigma setup --bundle "$ENIGMA_BUNDLE_FILE" --client auto --connect-installed --overwrite
+enigma doctor --bundle "$ENIGMA_BUNDLE_FILE"
+enigma drive health --bundle "$ENIGMA_BUNDLE_FILE"
+enigma status --bundle "$ENIGMA_BUNDLE_FILE"
 ```
 `enigma next --plain` is the simplest first command: it prints one human-readable next step without requiring an existing bundle. `enigma status` includes `first_run_status`: one public-safe setup state, one primary action, and lanes for Memory Drive, Import Sandbox, memory inventory, proof activity, and diagnostics.
 If `doctor` is red on a fresh install, read `setup_status.state`: `setup_needed` means run the included `setup_status.next_command`; `attention_needed` means a real local install/config issue remains.
-For support, use `enigma support summary --bundle "$HOME/.enigma/bundle.json"` and share only that redacted JSON unless support explicitly asks for a private local artifact.
+For support, use `enigma support summary --bundle "$ENIGMA_BUNDLE_FILE"` and share only that redacted JSON unless support explicitly asks for a private local artifact.
 
 Optional instant-value import preview:
 
@@ -81,13 +82,13 @@ Remove `--dry-run` once the preview looks correct.
 Run the Enigma MCP server over stdio:
 
 ```sh
-ENIGMA_BUNDLE="$HOME/.enigma/bundle.json" enigma-mcp
+ENIGMA_BUNDLE="$ENIGMA_BUNDLE_FILE" enigma-mcp
 ```
 
 Or through the CLI:
 
 ```sh
-ENIGMA_BUNDLE="$HOME/.enigma/bundle.json" enigma mcp serve
+ENIGMA_BUNDLE="$ENIGMA_BUNDLE_FILE" enigma mcp serve
 ```
 
 Generic MCP client entry:
@@ -99,7 +100,7 @@ Generic MCP client entry:
       "command": "enigma-mcp",
       "args": [],
       "env": {
-        "ENIGMA_BUNDLE": "/absolute/path/to/.enigma/bundle.json"
+        "ENIGMA_BUNDLE": "<private-bundle-file>"
       }
     }
   }
@@ -114,9 +115,9 @@ For grant-gated local context, create an opaque consent grant and require it bef
 
 ```sh
 enigma controller grant --app-ref ref:app:cli --purpose-ref ref:purpose:cli_context --memory-zone-ref ref:zone:default --out grant.json
-enigma context --bundle "$HOME/.enigma/bundle.json" --query "project context" --require-grant --grant-file grant.json --proof
+enigma context --bundle "$ENIGMA_BUNDLE_FILE" --query "project context" --require-grant --grant-file grant.json --proof
 enigma controller revoke --grant-file grant.json --out grant.revoked.json
-enigma context --bundle "$HOME/.enigma/bundle.json" --query "project context" --require-grant --grant-file grant.revoked.json --proof
+enigma context --bundle "$ENIGMA_BUNDLE_FILE" --query "project context" --require-grant --grant-file grant.revoked.json --proof
 ```
 
 The first context call can return proof-gated context. The final context call fails closed because the revoked grant artifact is supplied. If the grant is missing, expired, revoked, or scoped to the wrong app/purpose/zone, Enigma returns `enigma.context_pack_recall_blocked.v1` with `context_pack_returned:false`. MCP clients can pass `revoked_grant_refs` so stale active grants fail closed locally.
@@ -159,12 +160,12 @@ apps/native-host
 Register host name `com.enigma.native_host` by generating a browser-specific manifest:
 
 ```sh
-enigma native-host manifest --browser chrome --host-path "/absolute/path/to/enigma-native-host" --extension-id "REPLACE_WITH_EXTENSION_ID" --out ./com.enigma.native_host.json
+enigma native-host manifest --browser chrome --host-path "<native-host-executable>" --extension-id "<extension-id>" --out ./com.enigma.native_host.json
 ```
 
-Use `--browser edge` or `--browser firefox` for those browsers. Find unpacked Chrome IDs at `chrome://extensions` > Developer mode > Enigma > Details, Edge IDs at `edge://extensions` > Developer mode > Enigma > Details, and Firefox IDs at `about:debugging#/runtime/this-firefox` or from a stable `browser_specific_settings.gecko.id`/signed add-on ID. The host path must be absolute and point to `enigma-native-host` or a wrapper that sets `ENIGMA_BUNDLE` before launching it.
+Use `--browser edge` or `--browser firefox` for those browsers. Find unpacked Chrome IDs at `chrome://extensions` > Developer mode > Enigma > Details, Edge IDs at `edge://extensions` > Developer mode > Enigma > Details, and Firefox IDs at `about:debugging#/runtime/this-firefox` or from a stable `browser_specific_settings.gecko.id`/signed add-on ID. The host path must point to `enigma-native-host` or a wrapper that sets `ENIGMA_BUNDLE` before launching it.
 
-The native host is inside the local trust boundary: protect the manifest, wrapper, executable, and `ENIGMA_BUNDLE` path from local modification. The extension does not use browser sync storage (`chrome.storage.sync`) at all and requires an explicit user click before inserting Enigma context into a supported provider page. Provider-native memory remains cache only; Enigma receipts do not prove provider deletion or model forgetting.
+The native host is inside the local trust boundary: protect the manifest, wrapper, executable, and `ENIGMA_BUNDLE` path from local modification. The extension does not use browser sync storage (`chrome.storage.sync`) at all and requires an explicit user click before inserting Enigma context into a supported provider page. Provider-side memory remains cache only; Enigma receipts do not prove anything about provider-side stores or model state.
 
 ### Source checkout
 
@@ -173,8 +174,8 @@ Use a source checkout only when you need source-only docs, Docker assets, browse
 ```sh
 git clone https://github.com/Enigma-Memory/enigma-memory.git
 cd enigma-memory
-npm run install:local -- --execute --init-vault --bundle ./.enigma/bundle.json
-enigma doctor --bundle ./.enigma/bundle.json
+npm run install:local -- --execute --init-vault --bundle "$ENIGMA_BUNDLE_FILE"
+enigma doctor --bundle "$ENIGMA_BUNDLE_FILE"
 ```
 
 `install:local` is dry-run unless `--execute` is present. The command above installs the checked-out package globally and creates a local vault bundle.
@@ -182,8 +183,8 @@ enigma doctor --bundle ./.enigma/bundle.json
 ### Export and verify proof artifacts
 
 ```sh
-enigma export --bundle ./.enigma/bundle.json --out ./.enigma/export.json
-enigma verify --export ./.enigma/export.json
+enigma export --bundle "$ENIGMA_BUNDLE_FILE" --out ./enigma-export.json
+enigma verify --export ./enigma-export.json
 ```
 
 Exported proof artifacts contain encrypted/committed vault state and receipt metadata; do not paste raw memory plaintext into relay records, witness checkpoints, SIEM events, public proof artifacts, or shell command lines.
@@ -200,16 +201,16 @@ Enigma can honestly claim:
 
 Enigma cannot honestly claim:
 
-- A closed provider physically deleted all internal copies.
-- A model forgot training, fine-tuning, cache, telemetry, or hidden personalization state.
-- Enigma caused semantic forgetting across model outputs, hidden personalization, embeddings, summaries, caches, or third-party systems outside Enigma state.
-- Imported provider memories are complete unless the source export explicitly proves completeness.
+- Facts about a closed provider's internal copies.
+- Changes to model training, fine-tuning, cache, telemetry, or hidden personalization state.
+- Semantic changes across model outputs, hidden personalization, embeddings, summaries, caches, or third-party systems outside Enigma state.
+- Completeness of imported provider memories unless the source export explicitly proves completeness.
 - A signed memory statement is true in the real world; receipts prove custody and lifecycle, not factual correctness.
 - Token ROI, profit, equity, revenue share, investment return, or token price expectation.
 - Tamper-proof hardware or raw compute superiority.
 - Benchmark leadership without measured repository evidence.
-- Hosted cloud or customer BYOC deployment is live without the required credentials, domain/TLS, production durable storage, KMS/secrets, monitoring, backups, incident ownership, and SIEM/log routing.
-- That a local review packet or local provenance/SBOM output is signed provenance, registry attestation, git/source-control evidence, SLSA level, compliance certification, Docker image digest/runtime evidence, npm publication, hosted/BYOC readiness, or hosted/cloud deployment proof.
+- Hosted cloud or customer BYOC deployment is live without domain/TLS, production durable storage, KMS, monitoring, backups, incident ownership, and SIEM/log routing.
+- That a local review packet or local provenance/SBOM output is signed provenance, registry attestation, source-control evidence, SLSA level, compliance certification, Docker image digest/runtime evidence, npm publication, hosted/BYOC readiness, or hosted/cloud deployment proof.
 
 ## Documentation
 
