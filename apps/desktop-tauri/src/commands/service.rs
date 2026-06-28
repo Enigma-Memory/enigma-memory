@@ -334,6 +334,26 @@ fn log_token_regex() -> &'static Regex {
     })
 }
 
+fn redact_command_error(error: impl std::fmt::Display) -> String {
+    redact_log(&error.to_string())
+}
+
+fn parse_public_client_id(id: &str) -> Result<crate::connector::engine::ClientId, String> {
+    id.parse::<crate::connector::engine::ClientId>()
+        .map_err(|_| "unknown client".to_string())
+}
+
+fn public_test_summary(test: &crate::connector::engine::TestResult) -> Value {
+    json!({
+        "ok": test.ok,
+        "parse_ok": test.parse_ok,
+        "entry_present": test.entry_present,
+        "entry_correct": test.entry_correct,
+        "bundle_ok": test.bundle_ok,
+        "restart_needed": test.restart_needed,
+    })
+}
+
 pub fn default_sidecar_config(config: &DesktopConfig) -> ServiceConfig {
     let args = vec![
         config.cli_path.to_string_lossy().into_owned(),
@@ -455,6 +475,74 @@ pub async fn disconnect_client(
         .disconnect(client, &ctx, &ConnectOptions::confirmed())
         .map_err(|e| e.to_string())?;
     Ok(json!({ "id": id, "status": "ready" }))
+}
+
+#[tauri::command]
+pub async fn repair_client_config(
+    _state: tauri::State<'_, AppState>,
+    id: String,
+) -> Result<Value, String> {
+    use crate::connector::engine::{ConnectOptions, ConnectorEngine, EngineContext};
+
+    let client = parse_public_client_id(&id)?;
+    let ctx = EngineContext::from_env().map_err(redact_command_error)?;
+    let engine = ConnectorEngine::new();
+    let result = engine
+        .repair(client, &ctx, &ConnectOptions::confirmed())
+        .map_err(redact_command_error)?;
+
+    let mut response = json!({
+        "id": client.as_str(),
+        "ok": result.ok,
+        "action": result.action,
+        "status": result.action,
+    });
+
+    if let Some(plan) = result.plan {
+        if !plan.restart_guidance.is_empty() {
+            response["restart_guidance"] = json!(plan.restart_guidance);
+        }
+        response["plan"] = plan.public_preview();
+    }
+
+    if let Some(test) = result.test {
+        let summary = public_test_summary(&test);
+        response["test_result_summary"] = summary.clone();
+        response["test"] = summary;
+    }
+
+    Ok(response)
+}
+
+#[tauri::command]
+pub async fn rollback_client_config(
+    _state: tauri::State<'_, AppState>,
+    id: String,
+) -> Result<Value, String> {
+    use crate::connector::engine::{ConnectorEngine, EngineContext, RollbackOptions};
+
+    let client = parse_public_client_id(&id)?;
+    let ctx = EngineContext::from_env().map_err(redact_command_error)?;
+    let engine = ConnectorEngine::new();
+    let plan = engine
+        .rollback(
+            client,
+            &ctx,
+            &RollbackOptions {
+                backup_path: None,
+                confirmed: true,
+            },
+        )
+        .map_err(redact_command_error)?;
+
+    Ok(json!({
+        "id": client.as_str(),
+        "ok": plan.ok,
+        "action": plan.action,
+        "status": plan.action,
+        "restart_guidance": plan.restart_guidance,
+        "plan": plan.public_preview(),
+    }))
 }
 
 #[tauri::command]

@@ -220,6 +220,18 @@ p {
   margin: 0;
 }
 
+.client-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.client-actions button {
+  white-space: nowrap;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -247,12 +259,19 @@ p {
 
 .status-pill.restart-needed,
 .status-pill.permission-needed,
+.status-pill.repair-required,
+.status-pill.rollback-available,
 .status-pill.warning {
   background: rgba(255, 207, 112, 0.14);
   color: var(--warn);
 }
 
 .status-pill.error {
+  background: rgba(255, 143, 143, 0.14);
+  color: var(--error);
+}
+
+.status-pill.malformed {
   background: rgba(255, 143, 143, 0.14);
   color: var(--error);
 }
@@ -348,6 +367,10 @@ p {
   .client-card {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .client-actions {
+    justify-content: flex-start;
   }
 
   .dashboard-grid {

@@ -1,12 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
+import { buildPublicBetaQaMatrix, buildScenarioRows } from '../scripts/run-public-beta-qa-matrix.mjs';
 
-const execFileAsync = promisify(execFile);
-const PROJECT_ROOT = fileURLToPath(new URL('../', import.meta.url));
+const GENERATED_AT = '2026-06-28T00:00:00.000Z';
 
 const STATUS_VALUES = new Set(['pass', 'fail', 'blocked', 'missing', 'pending']);
 const REQUIRED_SCENARIO_IDS = [
@@ -15,6 +12,7 @@ const REQUIRED_SCENARIO_IDS = [
   'BETA-CLIENT-001',
   'BETA-CLIENT-002',
   'BETA-CLIENT-003',
+  'BETA-CLIENT-CLAUDE-001',
   'BETA-PROOF-001',
   'BETA-OFFLINE-001',
   'BETA-CONFIG-001',
@@ -83,15 +81,7 @@ const EXTERNAL_BLOCKERS = [
 let matrixPromise;
 
 function loadMatrix() {
-  matrixPromise ??= execFileAsync(process.execPath, ['scripts/run-public-beta-qa-matrix.mjs', '--json'], {
-    cwd: PROJECT_ROOT,
-    timeout: 10000,
-    windowsHide: true,
-    maxBuffer: 1024 * 1024,
-  }).then(({ stdout, stderr }) => {
-    assert.equal(stderr, '', 'public beta QA matrix should not emit stderr for expected blockers');
-    return JSON.parse(stdout);
-  });
+  matrixPromise ??= buildPublicBetaQaMatrix({ generated_at: GENERATED_AT });
   return matrixPromise;
 }
 
@@ -104,6 +94,12 @@ function scenarioList(matrix) {
 
 function scenarioId(scenario) {
   return scenario.scenario_id ?? scenario.id;
+}
+
+function scenarioById(scenarios, id) {
+  const found = scenarios.find((scenario) => scenarioId(scenario) === id);
+  assert.ok(found, `missing scenario ${id}`);
+  return found;
 }
 
 function collectKeysAndValues(value, keys = [], strings = []) {
@@ -192,6 +188,62 @@ test('public beta QA matrix reports external production blockers without requiri
   for (const scenario of p9Scenarios) {
     assert.ok(['blocked', 'missing', 'pending', 'fail'].includes(scenario.status), `${scenarioId(scenario)} must not pass without signed release evidence`);
   }
+});
+
+test('config recovery scenarios are blocked once command and UI recovery surfaces exist', () => {
+  const scenarios = buildScenarioRows({
+    tauriConfig: {},
+    serviceCommands: 'offline_ready repair_client_config rollback_client_config malformed backup_path',
+    wizardUi: 'Repair connection Rollback Safe reset restore malformed recovery',
+    updateCommands: '',
+    diagnosticsCommands: '',
+    crashCommands: '',
+    helpUi: '',
+    desktopIndex: '',
+    libCommands: '',
+    desktopReleaseWorkflow: '',
+    npmPublishWorkflow: '',
+    packageVersion: '0.0.0',
+    mcpbManifest: {},
+    mcpbConnectionPlan: {},
+    mcpbHealth: {},
+  });
+
+  const configRecovery = scenarioById(scenarios, 'BETA-CONFIG-001');
+  assert.equal(configRecovery.status, 'blocked');
+  assert.deepEqual(configRecovery.blocker_refs, ['BLOCKER-CLEAN-MACHINE-QA']);
+  assert.deepEqual(configRecovery.issue_codes, ['config-recovery-manual-evidence-missing']);
+  assert.equal(configRecovery.issue_codes.includes('config-recovery-surface-missing'), false);
+
+  const corruptedConfigRecovery = scenarioById(scenarios, 'BETA-CONFIG-002');
+  assert.equal(corruptedConfigRecovery.status, 'blocked');
+  assert.deepEqual(corruptedConfigRecovery.blocker_refs, ['BLOCKER-CLEAN-MACHINE-QA']);
+  assert.deepEqual(corruptedConfigRecovery.issue_codes, ['third-party-config-manual-evidence-missing']);
+  assert.equal(corruptedConfigRecovery.issue_codes.includes('third-party-config-recovery-surface-missing'), false);
+});
+
+test('public beta QA matrix blocks config recovery on clean-machine manual evidence after recovery surfaces exist', async () => {
+  const matrix = await loadMatrix();
+  const scenarios = scenarioList(matrix);
+
+  for (const [id, issueCode] of [
+    ['BETA-CONFIG-001', 'config-recovery-manual-evidence-missing'],
+    ['BETA-CONFIG-002', 'third-party-config-manual-evidence-missing'],
+  ]) {
+    const scenario = scenarioById(scenarios, id);
+    assert.equal(scenario.status, 'blocked');
+    assert.deepEqual(scenario.blocker_refs, ['BLOCKER-CLEAN-MACHINE-QA']);
+    assert.deepEqual(scenario.issue_codes, [issueCode]);
+    assert.equal(scenario.issue_codes.some((code) => code.includes('surface-missing')), false);
+  }
+
+  assert.equal(
+    matrix.blockers.some((blocker) => blocker.blocker_id === 'BLOCKER-CONFIG-RECOVERY-EVIDENCE'),
+    false,
+  );
+
+  assert.equal(matrix.advisor_decision, 'hold');
+  assert.equal(matrix.summary.ready_for_public_beta, false);
 });
 
 test('public beta QA matrix output is public-safe and omits forbidden private fields', async () => {

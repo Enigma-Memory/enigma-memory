@@ -94,6 +94,8 @@ pub fn run() {
             commands::service::detect_clients,
             commands::service::connect_client,
             commands::service::disconnect_client,
+            commands::service::repair_client_config,
+            commands::service::rollback_client_config,
             commands::service::get_health,
             commands::service::shutdown_service,
             commands::diagnostics::get_diagnostics,

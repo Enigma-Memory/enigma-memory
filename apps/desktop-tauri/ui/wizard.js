@@ -17,12 +17,16 @@ const SCREENS = [
 ];
 
 const CLIENT_COPY = {
-  ready: { badge: 'Ready', body: 'Enigma can connect this app now.' },
-  connected: { badge: 'Connected', body: 'This app can ask Enigma for memory.' },
+  ready: { badge: 'Ready', body: 'Enigma can connect this app now. A safe reset is available later if the app config changes.' },
+  connected: { badge: 'Connected', body: 'This app can ask Enigma for memory. Enigma keeps an app-settings backup when it changes its own entry.' },
   'not-installed': { badge: 'Not installed', body: 'No supported install found.' },
   'restart-needed': { badge: 'Restart needed', body: 'Connection is ready. Restart the app to finish.' },
   'permission-needed': { badge: 'Permission needed', body: 'Your system blocked access to this app\'s settings.' },
+  'repair-required': { badge: 'Repair needed', body: 'Safe reset can reapply only the Enigma connector entry while preserving unrelated MCP settings.' },
+  malformed: { badge: 'Malformed config', body: 'This app\'s MCP settings look malformed. Restore an Enigma-managed backup or use safe reset to reapply the Enigma entry.' },
+  'rollback-available': { badge: 'Backup ready', body: 'Rollback can restore the latest Enigma-managed backup without showing config JSON or local paths.' },
   skipped: { badge: 'Skipped', body: 'This app will not use Enigma yet.' },
+  error: { badge: 'Needs attention', body: 'Enigma can try a public-safe repair without displaying config contents.' },
 };
 
 const tauri = window.__TAURI__;
@@ -66,7 +70,8 @@ async function mockInvoke(cmd, args = {}) {
       if (clients.length === 0) {
         clients = [
           { id: 'claude-desktop', name: 'Claude Desktop', status: 'ready' },
-          { id: 'cursor', name: 'Cursor', status: 'not-installed' },
+          { id: 'cursor', name: 'Cursor', status: 'malformed' },
+          { id: 'vscode-cline', name: 'VS Code Cline', status: 'repair-required', rollback_available: true },
         ];
       }
       return clients;
@@ -80,6 +85,16 @@ async function mockInvoke(cmd, args = {}) {
       const c = clients.find((c) => c.id === args.id);
       if (c) c.status = 'ready';
       return c || { id: args.id, name: args.id, status: 'ready' };
+    }
+    case 'repair_client_config': {
+      const c = clients.find((c) => c.id === args.id);
+      if (c) c.status = 'restart-needed';
+      return { id: args.id, status: 'restart-needed', action: 'safe-reset', public_safe: true };
+    }
+    case 'rollback_client_config': {
+      const c = clients.find((c) => c.id === args.id);
+      if (c) c.status = 'ready';
+      return { id: args.id, status: 'ready', action: 'rollback', restored: true, public_safe: true };
     }
     case 'get_diagnostics':
       return { status: 'passed', summary: 'Local checks completed.', issue_codes: [] };
@@ -150,6 +165,83 @@ function secondaryButton(label, action) {
   return `<button type="button" class="secondary" data-action="${escapeHtml(action)}">${escapeHtml(label)}</button>`;
 }
 
+function normalizeClientStatus(client) {
+  const raw = String(client?.status || client?.recommended_action || client?.action || 'not-installed')
+    .replace(/_/g, '-')
+    .toLowerCase();
+  const repairReasons = Array.isArray(client?.repair_reasons)
+    ? client.repair_reasons
+    : Array.isArray(client?.repairReasons)
+      ? client.repairReasons
+      : [];
+  const hasMalformedReason = repairReasons.some((reason) => String(reason).includes('config_json'));
+  if (client?.parse_error || client?.malformed_config || hasMalformedReason || raw === 'config-malformed' || raw === 'malformed-config') {
+    return 'malformed';
+  }
+  if (client?.repair_required || raw === 'repair' || raw === 'repair-needed' || repairReasons.length > 0) return 'repair-required';
+  if (raw === 'already-configured') return 'connected';
+  if (raw === 'connect' || raw === 'missing-client-config') return 'ready';
+  if (raw === 'backup-available' || raw === 'restore-available') return 'rollback-available';
+  if ((client?.rollback_available || client?.backup_available || client?.backup_id) && !CLIENT_COPY[raw]) {
+    return 'rollback-available';
+  }
+  return CLIENT_COPY[raw] ? raw : 'not-installed';
+}
+
+function renderClientActions(client, status) {
+  const id = escapeHtml(client.id);
+  if (status === 'not-installed') {
+    return '<button type="button" class="link" disabled>Unavailable</button>';
+  }
+  if (status === 'malformed') {
+    return `
+      <button type="button" class="client-primary" data-action="rollback" data-id="${id}">Restore backup</button>
+      <button type="button" class="link" data-action="repair" data-id="${id}">Repair connection</button>
+    `;
+  }
+  if (status === 'repair-required') {
+    return `
+      <button type="button" class="client-primary" data-action="repair" data-id="${id}">Repair connection</button>
+      <button type="button" class="link" data-action="rollback" data-id="${id}">Rollback</button>
+    `;
+  }
+  if (status === 'rollback-available') {
+    return `
+      <button type="button" class="client-primary" data-action="rollback" data-id="${id}">Rollback</button>
+      <button type="button" class="link" data-action="repair" data-id="${id}">Repair connection</button>
+    `;
+  }
+  if (status === 'connected') {
+    return `
+      <button type="button" class="client-primary" data-action="disconnect" data-id="${id}">Disconnect</button>
+      <button type="button" class="link" data-action="repair" data-id="${id}">Repair connection</button>
+      <button type="button" class="link" data-action="rollback" data-id="${id}">Rollback</button>
+    `;
+  }
+  const actionLabel = status === 'connected' ? 'Disconnect' : status === 'skipped' ? 'Connect later' : 'Connect';
+  const action = status === 'connected' ? 'disconnect' : 'connect';
+  return `<button type="button" class="link" data-action="${action}" data-id="${id}">${escapeHtml(actionLabel)}</button>`;
+}
+
+function renderClientList(emptyCopy = 'No apps scanned yet.') {
+  return clients.length
+    ? clients.map((client) => {
+        const status = normalizeClientStatus(client);
+        const copy = CLIENT_COPY[status] || CLIENT_COPY.error;
+        return `
+          <div class="client-card">
+            <div class="meta">
+              <div class="name">${escapeHtml(client.name)}</div>
+              <p class="note">${escapeHtml(copy.body)}</p>
+            </div>
+            <span class="status-pill ${escapeHtml(status)}">${escapeHtml(copy.badge)}</span>
+            <div class="client-actions">${renderClientActions(client, status)}</div>
+          </div>
+        `;
+      }).join('')
+    : `<p>${escapeHtml(emptyCopy)}</p>`;
+}
+
 function renderWelcome() {
   return renderCard(`
     <p class="eyebrow">Step 1 of 6 · Welcome</p>
@@ -194,37 +286,25 @@ function renderFindApps() {
 }
 
 function renderConnectApps() {
-  const list = clients.length
-    ? clients.map((client) => {
-        const copy = CLIENT_COPY[client.status] || CLIENT_COPY['not-installed'];
-        const actionLabel = client.status === 'connected' ? 'Disconnect' : client.status === 'skipped' ? 'Connect later' : 'Connect';
-        return `
-          <div class="client-card">
-            <div class="meta">
-              <div class="name">${escapeHtml(client.name)}</div>
-              <p class="note">${escapeHtml(copy.body)}</p>
-            </div>
-            <span class="status-pill ${escapeHtml(client.status)}">${escapeHtml(copy.badge)}</span>
-            <button type="button" class="link" data-action="${client.status === 'connected' ? 'disconnect' : 'connect'}" data-id="${escapeHtml(client.id)}">${escapeHtml(actionLabel)}</button>
-          </div>
-        `;
-      }).join('')
-    : '<p>No apps scanned yet.</p>';
+  const list = renderClientList();
 
-  const hasConnected = clients.some((c) => c.status === 'connected');
+  const hasConnected = clients.some((c) => normalizeClientStatus(c) === 'connected');
   const mainAction = hasConnected ? primaryButton('Run health check', 'go-health') : primaryButton('Continue without apps', 'go-health');
 
   return renderCard(`
     <p class="eyebrow">Step 4 of 6 · Connect apps</p>
     <h1>Connect your AI apps</h1>
     <p>Choose which apps can ask Enigma for memory. You can change this later.</p>
+    <div class="disclosure">
+      If a connector is malformed, Enigma can restore an Enigma-managed backup, run a safe reset to reapply only the Enigma entry, or rollback the last Enigma change. Config JSON and local paths stay hidden.
+    </div>
     <div class="client-list">${list}</div>
     <div class="button-row">
       ${mainAction}
       ${secondaryButton('What does connecting allow?', 'toggle-connection-info')}
     </div>
     <div id="connection-disclosure" class="disclosure hidden">
-      Connected apps can ask Enigma for relevant memory. Enigma still keeps your private vault local. You control which apps are connected.
+      Connected apps can ask Enigma for relevant memory. Repair and rollback preserve unrelated MCP settings and do not alter provider memory.
     </div>
   `, 'connections');
 }
@@ -289,6 +369,12 @@ function renderDashboard() {
     <div class="metric">
       <dt>Issue codes</dt>
       <ul class="issue-list">${issueTags}</ul>
+    </div>
+
+    <div class="dashboard-section">
+      <h2>App connection recovery</h2>
+      <p class="note">Safe reset, restore, and rollback actions recover malformed connector settings without showing config JSON, local paths, or provider responses.</p>
+      <div class="client-list">${renderClientList('Run app detection to see recovery options.')}</div>
     </div>
 
     <div class="dashboard-section">
@@ -361,6 +447,27 @@ function wireEvents() {
   });
 }
 
+async function refreshClientState() {
+  clients = await call('detect_clients');
+  health = await call('get_health');
+}
+
+async function runClientCommand({ command, args, pending, success, failure }) {
+  busy = true;
+  setStatus(pending);
+  try {
+    await call(command, args);
+    await refreshClientState();
+    busy = false;
+    render();
+    setStatus(success);
+  } catch (_) {
+    busy = false;
+    render();
+    setStatus(failure);
+  }
+}
+
 async function handleAction(event) {
   const action = event.currentTarget.dataset.action;
   if (busy) return;
@@ -416,24 +523,52 @@ async function handleAction(event) {
       return;
     case 'connect': {
       const id = event.currentTarget.dataset.id;
-      busy = true;
-      setStatus('Connecting...');
-      await call('connect_client', { id });
-      clients = await call('detect_clients');
-      health = await call('get_health');
-      busy = false;
-      render();
+      await runClientCommand({
+        command: 'connect_client',
+        args: { id },
+        pending: 'Connecting...',
+        success: 'Connection updated. Restart the app if it asks.',
+        failure: 'Connection could not complete. No config details were shown.',
+      });
       return;
     }
     case 'disconnect': {
       const id = event.currentTarget.dataset.id;
-      busy = true;
-      setStatus('Disconnecting...');
-      await call('disconnect_client', { id });
-      clients = await call('detect_clients');
-      health = await call('get_health');
-      busy = false;
-      render();
+      await runClientCommand({
+        command: 'disconnect_client',
+        args: { id },
+        pending: 'Disconnecting...',
+        success: 'Connection removed. Unrelated MCP settings were preserved.',
+        failure: 'Disconnect could not complete. No config details were shown.',
+      });
+      return;
+    }
+    case 'repair': {
+      const id = event.currentTarget.dataset.id;
+      if (!confirm('Safe reset this connection? Enigma will reapply only its connector entry, preserve unrelated MCP settings, and will not alter provider memory.')) {
+        return;
+      }
+      await runClientCommand({
+        command: 'repair_client_config',
+        args: { id },
+        pending: 'Running safe reset...',
+        success: 'Safe reset complete. Restart the app if it asks.',
+        failure: 'Safe reset could not complete. No config details were shown.',
+      });
+      return;
+    }
+    case 'rollback': {
+      const id = event.currentTarget.dataset.id;
+      if (!confirm('Rollback to the latest Enigma-managed backup? Enigma will restore the backup it created, preserve unrelated MCP settings where possible, and will not alter provider memory.')) {
+        return;
+      }
+      await runClientCommand({
+        command: 'rollback_client_config',
+        args: { id },
+        pending: 'Restoring backup...',
+        success: 'Restore rollback complete. Restart the app if it asks.',
+        failure: 'Rollback could not complete. No config details were shown.',
+      });
       return;
     }
     case 'go-health':
@@ -459,6 +594,7 @@ async function handleAction(event) {
     }
     case 'go-dashboard': {
       currentStep = 6;
+      clients = await call('detect_clients');
       crashReporting.status = await call('get_crash_reporting_status');
       render();
       return;
@@ -520,7 +656,7 @@ async function handleAction(event) {
       diagnostics.exported = result;
       busy = false;
       render();
-      setStatus(`Diagnostics exported to ${result.path || 'unknown'}.`);
+      setStatus('Diagnostics bundle exported. The file location is hidden in this view.');
       return;
     }
     case 'check-update': {

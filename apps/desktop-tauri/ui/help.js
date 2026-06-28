@@ -26,7 +26,8 @@ const HELP_ARTICLES = {
     title: 'Connecting AI apps',
     body: `
       <p>Enigma can connect to supported AI clients such as Claude Desktop and Cursor.</p>
-      <p>When you approve a connection, Enigma adds only the Enigma connector entry to that app's settings. Unrelated settings are preserved.</p>
+      <p>When you approve a connection, Enigma adds only the Enigma connector entry to that app's settings. Unrelated MCP settings are preserved.</p>
+      <p>If a client config is malformed, Enigma can restore an Enigma-managed backup or run a safe reset that reapplies the Enigma entry. Rollback and repair do not show config JSON or local file paths.</p>
       <p>Some apps need a restart before they can use Enigma Memory. The app will tell you when.</p>
     `,
   },
@@ -35,7 +36,8 @@ const HELP_ARTICLES = {
     body: `
       <p>The health dashboard shows whether your local vault, connected apps, and privacy checks are ready.</p>
       <p>If something needs attention, Enigma explains the issue and offers a fix-it action. Issue codes are safe to share with support.</p>
-      <p>Local health checks work without network access.</p>
+      <p>Connection recovery can restore an Enigma-managed backup, rollback the last Enigma-managed connector change, or reapply Enigma's entry while preserving unrelated MCP settings.</p>
+      <p>Repair and rollback do not alter provider memory, model behavior, or provider-side logs. Local health checks work without network access.</p>
     `,
   },
   privacy: {
