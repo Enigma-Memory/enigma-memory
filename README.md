@@ -27,6 +27,7 @@ For the public launch desktop flow, pair this with the [consumer onboarding UX p
 Enigma Memory keeps its canonical vault on your device. You choose which AI clients are connected and what context they can use. Connected clients may still have their own logs, retention, and caches outside Enigma control.
 
 Enigma proves facts about Enigma-controlled vault state, receipts, checkpoints, and declared boundary operations. Enigma does not claim facts about a provider's own stored copies, hidden personalization, or model state.
+Enigma does not claim that a closed provider deleted internal data; it only proves declared Enigma-controlled lifecycle events.
 
 For details, see:
 
@@ -165,7 +166,7 @@ enigma native-host manifest --browser chrome --host-path "<native-host-executabl
 
 Use `--browser edge` or `--browser firefox` for those browsers. Find unpacked Chrome IDs at `chrome://extensions` > Developer mode > Enigma > Details, Edge IDs at `edge://extensions` > Developer mode > Enigma > Details, and Firefox IDs at `about:debugging#/runtime/this-firefox` or from a stable `browser_specific_settings.gecko.id`/signed add-on ID. The host path must point to `enigma-native-host` or a wrapper that sets `ENIGMA_BUNDLE` before launching it.
 
-The native host is inside the local trust boundary: protect the manifest, wrapper, executable, and `ENIGMA_BUNDLE` path from local modification. The extension does not use browser sync storage (`chrome.storage.sync`) at all and requires an explicit user click before inserting Enigma context into a supported provider page. Provider-side memory remains cache only; Enigma receipts do not prove anything about provider-side stores or model state.
+The native host is inside the local trust boundary: protect the manifest, wrapper, executable, and `ENIGMA_BUNDLE` path from local modification. The extension does not use browser sync storage (`chrome.storage.sync`) at all and requires an explicit user click before inserting Enigma context into a supported provider page. Provider-native memory remains cache only; Enigma receipts do not prove provider deletion or model forgetting.
 
 ### Source checkout
 
@@ -209,7 +210,7 @@ Enigma cannot honestly claim:
 - Token ROI, profit, equity, revenue share, investment return, or token price expectation.
 - Tamper-proof hardware or raw compute superiority.
 - Benchmark leadership without measured repository evidence.
-- Hosted cloud or customer BYOC deployment is live without domain/TLS, production durable storage, KMS, monitoring, backups, incident ownership, and SIEM/log routing.
+- Hosted cloud or customer BYOC deployment is live without cloud account credentials, domain/TLS, production durable storage, KMS, monitoring, backups, incident ownership, and SIEM/log routing.
 - That a local review packet or local provenance/SBOM output is signed provenance, registry attestation, source-control evidence, SLSA level, compliance certification, Docker image digest/runtime evidence, npm publication, hosted/BYOC readiness, or hosted/cloud deployment proof.
 
 ## Documentation
