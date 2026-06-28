@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Current Enigma Memory public launch status: code signing, notarization, and expected timeline for signed desktop installers.">
+  <title>Public Launch Status — Enigma Memory</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="site-logo" href="./index.html">Enigma Memory</a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="./download.html">Download</a>
+        <a href="./setup.html">How it works</a>
+        <a href="./privacy.html">Privacy</a>
+        <a href="./help/index.html">Help</a>
+        <a href="./faq.html">FAQ</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <span class="eyebrow">Public launch</span>
+      <h1>Launch status and code-signing timeline.</h1>
+      <p>Enigma Memory is ready for daily use. The remaining public-launch blocker is distributing signed desktop installers for Windows and macOS. This page tracks where we are and what comes next.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="#status">See current status</a>
+        <a class="btn btn-secondary" href="./download.html">Go to downloads</a>
+      </div>
+      <p class="trust-note">This page is public-safe: no account IDs, secrets, or internal paths are shown.</p>
+    </section>
+
+    <section class="content-section" id="status" aria-labelledby="status-heading">
+      <h2 id="status-heading">Current status</h2>
+      <div class="card-grid">
+        <article class="card">
+          <h3>Tauri updater key</h3>
+          <p>Configured. The updater signing key is stored as a repository secret and the matching public key is committed in the desktop app configuration, so future auto-updates can be verified.</p>
+        </article>
+        <article class="card">
+          <h3>Azure subscription</h3>
+          <p>Active. A paid Azure subscription is available for Artifact Signing. Identity validation is the next step before a trusted signing certificate can be issued.</p>
+        </article>
+        <article class="card">
+          <h3>Azure Artifact Signing account</h3>
+          <p>Pending. The subscription is ready, but the Artifact Signing account and Public Trust identity validation still need to be completed in the Azure portal.</p>
+        </article>
+        <article class="card">
+          <h3>Apple Developer enrollment</h3>
+          <p>Pending. Enrollment in the Apple Developer Program is required before macOS Developer ID certificates, signing, and notarization can be completed.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="content-section" aria-labelledby="timeline-heading">
+      <h2 id="timeline-heading">Expected timeline</h2>
+      <ol class="steps">
+        <li class="step">
+          <span class="step__number">1</span>
+          <div class="step__content">
+            <h3>Windows signed installer</h3>
+            <p>Blocked on Azure identity validation. Once validation passes and a Public Trust certificate profile is created, the CI workflow can produce a signed Windows installer. Identity validation typically takes minutes to hours, but it requires a mobile device for document and selfie capture.</p>
+          </div>
+        </li>
+        <li class="step">
+          <span class="step__number">2</span>
+          <div class="step__content">
+            <h3>macOS signed and notarized installer</h3>
+            <p>Blocked on Apple Developer Program enrollment. After enrollment, Developer ID Application and Installer certificates must be created, exported, and added to repository secrets; then CI can sign, notarize, and staple the macOS build. Enrollment review usually takes 1–5 business days for individuals and 1–4 weeks for organizations.</p>
+          </div>
+        </li>
+        <li class="step">
+          <span class="step__number">3</span>
+          <div class="step__content">
+            <h3>General consumer release</h3>
+            <p>Once both signed installers are available, the public download page will switch to the signed builds and the launch will be considered ready for general consumers.</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <section class="content-section" aria-labelledby="consumer-heading">
+      <h2 id="consumer-heading">What you can do today</h2>
+      <p>Until signed installers are ready, you have two paths:</p>
+      <ul>
+        <li><strong>Wait for the signed build:</strong> Subscribe to release notifications or check back on this page. The download page will be updated as soon as signed Windows and macOS installers are available.</li>
+        <li><strong>Use current development builds:</strong> Unsigned builds are published automatically from GitHub Actions. These are suitable for testing and development, but your operating system may show a security warning because the binaries are not yet signed. Only download builds from the official repository.</li>
+      </ul>
+      <p>Do not bypass security warnings for installers from sources you do not trust.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="./download.html">Download page</a>
+        <a class="btn btn-secondary" href="https://github.com/Enigma-Memory/enigma-memory/releases">GitHub Releases</a>
+      </div>
+    </section>
+
+    <section class="content-section" aria-labelledby="details-heading">
+      <h2 id="details-heading">Detailed setup notes</h2>
+      <p>For the full code-signing checklist, including Azure Artifact Signing steps and Apple Developer ID certificate export instructions, see the repository documentation:</p>
+      <ul>
+        <li><a href="https://github.com/Enigma-Memory/enigma-memory/blob/main/docs/public-launch/code-signing-setup.md">Code Signing Setup</a></li>
+        <li><a href="https://github.com/Enigma-Memory/enigma-memory/blob/main/docs/public-launch/production-readiness-status.md">Production Readiness Status</a></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer__inner">
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="./download.html">Download</a></li>
+          <li><a href="./setup.html">How it works</a></li>
+          <li><a href="./privacy.html">Privacy</a></li>
+          <li><a href="./launch-status.html">Launch status</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Support</h4>
+        <ul>
+          <li><a href="./help/index.html">Help hub</a></li>
+          <li><a href="./help/install.html">Install guide</a></li>
+          <li><a href="./help/troubleshooting.html">Troubleshooting</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Developers</h4>
+        <ul>
+          <li><a href="./developers/cli.html">CLI appendix</a></li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

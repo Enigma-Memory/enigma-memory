@@ -246,13 +246,22 @@ p {
 }
 
 .status-pill.ready,
-.status-pill.connected {
+.status-pill.connected,
+.status-pill.sunny,
+.status-pill.active,
+.status-pill.allow,
+.status-pill.open {
   background: rgba(126, 226, 168, 0.14);
   color: var(--accent);
 }
 
 .status-pill.not-installed,
-.status-pill.skipped {
+.status-pill.skipped,
+.status-pill.missing,
+.status-pill.closed,
+.status-pill.kept,
+.status-pill.discarded,
+.status-pill.expired {
   background: rgba(154, 163, 173, 0.14);
   color: var(--muted);
 }
@@ -261,12 +270,16 @@ p {
 .status-pill.permission-needed,
 .status-pill.repair-required,
 .status-pill.rollback-available,
-.status-pill.warning {
+.status-pill.warning,
+.status-pill.needs-attention,
+.status-pill.ask {
   background: rgba(255, 207, 112, 0.14);
   color: var(--warn);
 }
 
-.status-pill.error {
+.status-pill.error,
+.status-pill.storm-warning,
+.status-pill.deny {
   background: rgba(255, 143, 143, 0.14);
   color: var(--error);
 }
@@ -351,6 +364,62 @@ p {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+.dashboard-section.memory-controller {
+  background: linear-gradient(135deg, rgba(126, 226, 168, 0.08), rgba(95, 184, 255, 0.06)), var(--surface);
+}
+
+.memory-controller__intro {
+  display: grid;
+  gap: 0.45rem;
+  margin-bottom: 1rem;
+}
+
+.memory-controller__intro .eyebrow,
+.memory-controller__intro p,
+.memory-controller__intro h2 {
+  margin-bottom: 0;
+}
+
+.memory-controller-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 0.85rem;
+  margin: 0;
+}
+
+.controller-tile {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  background: rgba(11, 13, 16, 0.26);
+}
+
+.controller-tile__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.controller-tile dt {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.controller-tile dd {
+  min-height: 2.7rem;
+  margin: 0 0 1rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.controller-tile .primary {
+  width: 100%;
+  justify-content: center;
+}
+
 .hidden {
   display: none !important;
 }
@@ -375,6 +444,14 @@ p {
 
   .dashboard-grid {
     grid-template-columns: 1fr;
+  }
+
+  .memory-controller-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .controller-tile__heading {
+    flex-direction: column;
   }
 }
 .help-button {

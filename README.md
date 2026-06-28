@@ -6,6 +6,7 @@ For most people, start with the signed Enigma Memory desktop app. It creates you
 
 - [Download the desktop app](#download-the-desktop-app)
 - [Read privacy and proof boundaries](#privacy-and-proof-boundaries)
+- [Understand Memory Controller decisions](docs/memory-controller.md)
 
 ## Download the desktop app
 
@@ -15,6 +16,10 @@ For most people, start with the signed Enigma Memory desktop app. It creates you
 4. Enigma creates a local vault, detects installed AI clients, and previews connection changes before applying them.
 
 The desktop app bundles its runtime. Consumers should not install Node or npm for the default path.
+
+The desktop app uses the [Memory Controller](docs/memory-controller.md) to show Memory Weather, app permissions, recall approval, and `safe to share` / `not shared` decisions before Enigma offers context to a connected app.
+
+For the public launch desktop flow, pair this with the [consumer onboarding UX plan](docs/public-launch/consumer-onboarding-ux.md), which keeps app permissions just-in-time and CLI/MCP details secondary.
 
 ## Privacy and proof boundaries
 
@@ -89,6 +94,8 @@ Generic MCP client entry:
 ```
 
 Use `--mcp-command` (alias `--command`) when a GUI app cannot find shell-installed binaries or needs a `.cmd` path on Windows.
+
+Memory Controller MCP clients use `enigma_memory_weather`, `enigma_consent_grant`, `enigma_recall_veto`, and `enigma_private_bubble` for public-safe Memory Weather, app permissions, recall approval / not-shared decisions, and private memory bubbles. These tools fail closed and return decision artifacts and refs only, not raw memory.
 
 ### Connect clients
 
@@ -184,6 +191,8 @@ Enigma cannot honestly claim:
 
 - [`docs/install-anywhere.md`](docs/install-anywhere.md)
 - [`docs/client-connectors.md`](docs/client-connectors.md)
+- [`docs/memory-controller.md`](docs/memory-controller.md)
+- [`docs/public-launch/consumer-onboarding-ux.md`](docs/public-launch/consumer-onboarding-ux.md)
 - [`docs/public-api-reference.md`](docs/public-api-reference.md)
 - [`SECURITY.md`](SECURITY.md)
 - [`docs/security-threat-model.md`](docs/security-threat-model.md)

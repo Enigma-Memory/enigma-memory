@@ -333,6 +333,12 @@ export function renderMemoryDriveDashboard(state = createDesktopState()) {
   const updateStatus = normalizePublicStatus(state.desktopUpdate?.status, ['unknown', 'checking', 'current', 'available', 'installing', 'ready', 'error'], 'unknown');
   const diagnosticsStatus = normalizePublicStatus(state.desktopDiagnostics?.status, ['not-run', 'running', 'ready', 'needs-review', 'error'], 'not-run');
   const offlineReady = memoryDriveStatus === 'ready' && serviceStatus === 'running' && healthStatus === 'healthy';
+  const memoryController = selectMemoryControllerSummary({
+    connectedAppCount,
+    issueCodes,
+    offlineReady,
+    proofStatus
+  });
 
   return {
     schema: 'enigma.desktop.memory_drive_dashboard.v1',
@@ -345,6 +351,7 @@ export function renderMemoryDriveDashboard(state = createDesktopState()) {
     diagnostics_status: diagnosticsStatus,
     offline_ready: offlineReady,
     issue_codes: issueCodes,
+    memory_controller: memoryController,
     next_action: selectMemoryDriveNextAction({
       memoryDriveStatus,
       serviceStatus,
@@ -1468,6 +1475,55 @@ function selectMemoryDriveNextAction(input) {
   return { id: 'view_proof_activity', label: 'View proof activity', screen: 'verifier', reason: 'Memory Drive is ready.' };
 }
 
+function selectMemoryControllerSummary(input) {
+  const weatherStatus = input.proofStatus === 'error' || input.proofStatus === 'needs-review' || input.issueCodes.some((code) => code === 'PROOF_ACTIVITY_ERROR' || code === 'RECALL_REVIEW_REQUIRED')
+    ? 'storm_warning'
+    : input.offlineReady || input.proofStatus === 'checked'
+      ? 'sunny'
+      : 'needs_attention';
+  const weatherLabel = weatherStatus === 'sunny'
+    ? 'Clear'
+    : weatherStatus === 'storm_warning'
+      ? 'Sharing paused'
+      : 'Needs review';
+  const weatherAction = weatherStatus === 'storm_warning'
+    ? { id: 'review_recall', label: 'Review recall' }
+    : weatherStatus === 'needs_attention'
+      ? { id: 'review_grants', label: 'Review app permissions' }
+      : { id: 'open_private_bubble', label: 'Open private bubble' };
+  const permissionStatus = input.connectedAppCount > 0 ? 'active' : 'missing';
+
+  return {
+    schema: 'enigma.desktop.memory_controller_summary.v1',
+    memory_weather: {
+      status: weatherStatus,
+      label: weatherLabel,
+      summary: weatherStatus === 'sunny'
+        ? 'Local checks are clear. Enigma still asks before sharing memory.'
+        : 'Review local decisions before a connected app receives memory.',
+      primary_action: weatherAction
+    },
+    app_permissions: {
+      status: permissionStatus,
+      label: permissionStatus === 'active' ? 'Connected apps must ask first' : 'No app has permission yet',
+      summary: 'App permissions decide which local apps may ask Enigma for context.',
+      primary_action: { id: 'review_grants', label: 'Review app permissions' }
+    },
+    recall_approval: {
+      status: 'ask',
+      label: 'Waiting for your approval',
+      summary: 'Not shared until you approve.',
+      primary_action: { id: 'review_recall', label: 'Review recall' }
+    },
+    private_memory_bubble: {
+      status: 'closed',
+      label: 'Private bubble closed',
+      summary: 'Open a local bubble to review memory before sharing.',
+      primary_action: { id: 'open_private_bubble', label: 'Open private bubble' }
+    }
+  };
+}
+
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
 }
@@ -1553,6 +1609,16 @@ function renderMetric(label, value) {
   return `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`;
 }
 
+function renderMemoryControllerHtml(controller) {
+  const items = [
+    ['Memory Weather', controller.memory_weather],
+    ['App permissions', controller.app_permissions],
+    ['Recall approval', controller.recall_approval],
+    ['Private memory bubble', controller.private_memory_bubble]
+  ];
+  return `<dl class="detail-list">${items.map(([label, item]) => renderMetric(label, `${item.label} · ${item.primary_action.label}`)).join('')}</dl>`;
+}
+
 function renderScreen(id, title, body) {
   return `<section class="screen-card" id="screen-${escapeHtml(id)}"><div class="screen-heading"><p>${escapeHtml(screenLabel(id))}</p><h2>${escapeHtml(title)}</h2></div>${body}</section>`;
 }
@@ -1576,6 +1642,7 @@ function renderHomeScreen(screen) {
         ${renderMetric('Offline ready', dashboard.offline_ready ? 'yes' : 'no')}
       </dl>
     </div>
+    <div class="panel memory-controller-panel"><h3>Memory Controller</h3>${renderMemoryControllerHtml(dashboard.memory_controller)}</div>
     <div class="panel"><h3>Issue codes</h3><ul class="boundary-list">${issues}</ul></div>`);
 }
 
@@ -1586,7 +1653,7 @@ function renderSetupScreen(screen) {
       <div class="panel status-panel">
         <span class="status-pill">${escapeHtml(screen.memory_drive_status)}</span>
         <h3>Memory Drive create or detect</h3>
-        <p>Create the local Memory Drive first. The shell does not claim provider deletion, model forgetting, or provider-native memory control.</p>
+        <p>Create the local Memory Drive first. The shell reports local setup only; provider logs and model behavior require provider evidence.</p>
       </div>
       <div class="panel status-panel">
         <span class="status-pill">${escapeHtml(screen.health_status)}</span>

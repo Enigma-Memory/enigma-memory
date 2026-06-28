@@ -17,6 +17,18 @@ import {
   assertImmuneIngressPublicSafe,
   createImmuneIngressReport,
 } from '../../importers/src/index.js';
+import {
+  CONSENT_GRANT_JSON_SCHEMA,
+  PRIVATE_MEMORY_BUBBLE_JSON_SCHEMA,
+  MEMORY_WEATHER_REPORT_JSON_SCHEMA,
+  RECALL_VETO_DECISION_JSON_SCHEMA,
+  assertMemoryControllerPublicSafe,
+  closePrivateMemoryBubble,
+  createConsentGrant,
+  createMemoryWeatherReport,
+  createPrivateMemoryBubble,
+  createRecallVetoDecision,
+} from '../../controller/src/index.js';
 
 const DEFAULT_BUNDLE = '.enigma/bundle.json';
 const JSONRPC_VERSION = '2.0';
@@ -112,6 +124,20 @@ function optionalNonNegativeNumber(object, key, context) {
   }
 }
 
+function optionalNonNegativeInteger(object, key, context) {
+  if (object[key] === undefined) return;
+  if (!Number.isInteger(object[key]) || object[key] < 0) {
+    throw invalidParams(`${context} ${key} must be a non-negative integer.`);
+  }
+}
+
+function optionalPositiveInteger(object, key, context) {
+  if (object[key] === undefined) return;
+  if (!Number.isInteger(object[key]) || object[key] <= 0) {
+    throw invalidParams(`${context} ${key} must be a positive integer.`);
+  }
+}
+
 function requireNumber(object, key, context) {
   if (typeof object[key] !== 'number' || !Number.isFinite(object[key])) {
     throw invalidParams(`${context} requires ${key} as a finite number.`);
@@ -122,6 +148,73 @@ function optionalObjectArray(object, key, context) {
   if (object[key] === undefined) return;
   if (!Array.isArray(object[key]) || object[key].some((item) => !isPlainObject(item))) {
     throw invalidParams(`${context} ${key} must be an array of objects.`);
+  }
+}
+
+const CONSENT_GRANT_ARTIFACT_KEYS = new Set(Object.keys(CONSENT_GRANT_JSON_SCHEMA.properties));
+const PRIVATE_MEMORY_BUBBLE_ARTIFACT_KEYS = new Set(Object.keys(PRIVATE_MEMORY_BUBBLE_JSON_SCHEMA.properties));
+const WEATHER_TILE_KEYS = new Set(['tile_ref', 'status', 'metric', 'count', 'evidence_refs']);
+const MEMORY_CONTROLLER_FORBIDDEN_INPUT_KEY_RE = /(?:^|_)(?:raw|text|content|plaintext|memory|raw_text|raw_memory|memory_payload|prompt|raw_prompt|transcript|transcript_payload|provider_payload|provider_response|provider_output|private_data|secret|secret_material|signing_secret|api_key|token|credential|embedding|embeddings|local_absolute_path|account|account_id|customer|customer_id|customer_identifier)$/u;
+
+function assertMcpMemoryControllerPublicSafeInput(value, context, seen = new Set()) {
+  if (value === null || typeof value !== 'object') return;
+  if (seen.has(value)) return;
+  seen.add(value);
+  try {
+    if (Array.isArray(value)) {
+      for (const item of value) assertMcpMemoryControllerPublicSafeInput(item, context, seen);
+      return;
+    }
+    for (const key of Object.keys(value)) {
+      const normalized = key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+      if (MEMORY_CONTROLLER_FORBIDDEN_INPUT_KEY_RE.test(normalized)) {
+        throw invalidParams(`${context} contains unsafe public fields.`);
+      }
+      assertMcpMemoryControllerPublicSafeInput(value[key], context, seen);
+    }
+  } finally {
+    seen.delete(value);
+  }
+  try {
+    assertMemoryControllerPublicSafe(value);
+  } catch {
+    throw invalidParams(`${context} contains unsafe public fields.`);
+  }
+}
+
+function optionalStrictObject(object, key, allowed, context) {
+  optionalPlainObject(object, key, context);
+  if (object[key] !== undefined) rejectAdditionalProperties(object[key], allowed, `${context} ${key}`);
+}
+
+function optionalStrictObjectArray(object, key, allowed, context) {
+  optionalObjectArray(object, key, context);
+  if (object[key] === undefined) return;
+  for (let index = 0; index < object[key].length; index += 1) {
+    rejectAdditionalProperties(object[key][index], allowed, `${context} ${key}[${index}]`);
+  }
+}
+
+function optionalWeatherTiles(object, key, context) {
+  if (object[key] === undefined) return;
+  if (!Array.isArray(object[key]) || object[key].some((item) => !isPlainObject(item))) {
+    throw invalidParams(`${context} ${key} must be an array of objects.`);
+  }
+  for (let index = 0; index < object[key].length; index += 1) {
+    const tile = object[key][index];
+    rejectAdditionalProperties(tile, WEATHER_TILE_KEYS, `${context} ${key}[${index}]`);
+    optionalString(tile, 'tile_ref', `${context} ${key}[${index}]`);
+    optionalString(tile, 'status', `${context} ${key}[${index}]`);
+    optionalString(tile, 'metric', `${context} ${key}[${index}]`);
+    optionalNonNegativeInteger(tile, 'count', `${context} ${key}[${index}]`);
+    optionalStringArray(tile, 'evidence_refs', `${context} ${key}[${index}]`);
+  }
+}
+
+function requireMemoryBubbleAction(object, context) {
+  requireString(object, 'action', context);
+  if (!new Set(['open', 'keep', 'discard']).has(object.action)) {
+    throw invalidParams(`${context} action must be open, keep, or discard.`);
   }
 }
 
@@ -192,6 +285,66 @@ function validateToolArguments(name, args) {
       optionalString(args, 'generated_at', name);
       optionalString(args, 'now', name);
       if (args.candidate === undefined && args.candidates === undefined) throw invalidParams(`${name} requires candidate or candidates.`);
+      return args;
+    case 'enigma_memory_weather':
+      assertMcpMemoryControllerPublicSafeInput(args, name);
+      rejectAdditionalProperties(args, new Set(['tiles', 'issue_codes', 'evidence_refs', 'generated_at']), name);
+      optionalWeatherTiles(args, 'tiles', name);
+      optionalStringArray(args, 'issue_codes', name);
+      optionalStringArray(args, 'evidence_refs', name);
+      optionalString(args, 'generated_at', name);
+      return args;
+    case 'enigma_recall_veto':
+      assertMcpMemoryControllerPublicSafeInput(args, name);
+      rejectAdditionalProperties(args, new Set(['grant', 'grants', 'app_ref', 'purpose_ref', 'operation', 'memory_zone_ref', 'candidate_count', 'sensitive_count', 'tombstone_count', 'policy_ref', 'proof_refs', 'receipt_refs']), name);
+      optionalStrictObject(args, 'grant', CONSENT_GRANT_ARTIFACT_KEYS, name);
+      optionalStrictObjectArray(args, 'grants', CONSENT_GRANT_ARTIFACT_KEYS, name);
+      optionalString(args, 'app_ref', name);
+      optionalString(args, 'purpose_ref', name);
+      optionalString(args, 'operation', name);
+      optionalString(args, 'memory_zone_ref', name);
+      optionalNonNegativeInteger(args, 'candidate_count', name);
+      optionalNonNegativeInteger(args, 'sensitive_count', name);
+      optionalNonNegativeInteger(args, 'tombstone_count', name);
+      optionalString(args, 'policy_ref', name);
+      optionalStringArray(args, 'proof_refs', name);
+      optionalStringArray(args, 'receipt_refs', name);
+      return args;
+    case 'enigma_consent_grant':
+      assertMcpMemoryControllerPublicSafeInput(args, name);
+      rejectAdditionalProperties(args, new Set(['app_ref', 'purpose_ref', 'operation', 'operations', 'memory_zone_ref', 'memory_zone_refs', 'issued_at', 'expires_at', 'ttl_seconds', 'status', 'grant_ref', 'policy_ref', 'proof_refs', 'receipt_refs']), name);
+      optionalString(args, 'app_ref', name);
+      optionalString(args, 'purpose_ref', name);
+      optionalString(args, 'operation', name);
+      optionalStringArray(args, 'operations', name);
+      optionalString(args, 'memory_zone_ref', name);
+      optionalStringArray(args, 'memory_zone_refs', name);
+      optionalString(args, 'issued_at', name);
+      optionalString(args, 'expires_at', name);
+      optionalPositiveInteger(args, 'ttl_seconds', name);
+      optionalString(args, 'status', name);
+      optionalString(args, 'grant_ref', name);
+      optionalString(args, 'policy_ref', name);
+      optionalStringArray(args, 'proof_refs', name);
+      optionalStringArray(args, 'receipt_refs', name);
+      return args;
+    case 'enigma_private_bubble':
+      assertMcpMemoryControllerPublicSafeInput(args, name);
+      rejectAdditionalProperties(args, new Set(['action', 'bubble', 'app_ref', 'app_refs', 'purpose_ref', 'candidate_count', 'receipt_refs', 'bubble_ref', 'started_at', 'closed_at', 'kept_count', 'discarded_count']), name);
+      requireMemoryBubbleAction(args, name);
+      optionalStrictObject(args, 'bubble', PRIVATE_MEMORY_BUBBLE_ARTIFACT_KEYS, name);
+      optionalString(args, 'app_ref', name);
+      optionalStringArray(args, 'app_refs', name);
+      optionalString(args, 'purpose_ref', name);
+      optionalNonNegativeInteger(args, 'candidate_count', name);
+      optionalStringArray(args, 'receipt_refs', name);
+      optionalString(args, 'bubble_ref', name);
+      optionalString(args, 'started_at', name);
+      optionalString(args, 'closed_at', name);
+      optionalNonNegativeInteger(args, 'kept_count', name);
+      optionalNonNegativeInteger(args, 'discarded_count', name);
+      if (args.action === 'open' && args.bubble !== undefined) throw invalidParams(`${name} does not accept bubble when action is open.`);
+      if (args.action !== 'open' && args.bubble === undefined) throw invalidParams(`${name} requires bubble when action is keep or discard.`);
       return args;
     case 'enigma_meter_usage':
       rejectAdditionalProperties(args, new Set([
@@ -456,6 +609,106 @@ export const toolDescriptors = [
       },
       additionalProperties: false,
     },
+  },
+  {
+    name: 'enigma_memory_weather',
+    description: 'Return a public-safe Memory Weather report with opaque evidence refs and one next action before context is shared.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        tiles: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              tile_ref: { type: 'string' },
+              status: { type: 'string' },
+              metric: { type: 'string' },
+              count: { type: 'integer', minimum: 0 },
+              evidence_refs: { type: 'array', items: { type: 'string' } },
+            },
+            additionalProperties: false,
+          },
+        },
+        issue_codes: { type: 'array', items: { type: 'string' } },
+        evidence_refs: { type: 'array', items: { type: 'string' } },
+        generated_at: { type: 'string' },
+      },
+      additionalProperties: false,
+    },
+    outputSchema: MEMORY_WEATHER_REPORT_JSON_SCHEMA,
+  },
+  {
+    name: 'enigma_recall_veto',
+    description: 'Decide whether a local recall candidate set is safe to share for an app and purpose without returning raw memory.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        grant: CONSENT_GRANT_JSON_SCHEMA,
+        grants: { type: 'array', items: CONSENT_GRANT_JSON_SCHEMA },
+        app_ref: { type: 'string' },
+        purpose_ref: { type: 'string' },
+        operation: { type: 'string' },
+        memory_zone_ref: { type: 'string' },
+        candidate_count: { type: 'integer', minimum: 0 },
+        sensitive_count: { type: 'integer', minimum: 0 },
+        tombstone_count: { type: 'integer', minimum: 0 },
+        policy_ref: { type: 'string' },
+        proof_refs: { type: 'array', items: { type: 'string' } },
+        receipt_refs: { type: 'array', items: { type: 'string' } },
+      },
+      additionalProperties: false,
+    },
+    outputSchema: RECALL_VETO_DECISION_JSON_SCHEMA,
+  },
+  {
+    name: 'enigma_consent_grant',
+    description: 'Create a public-safe app permission grant for local Memory Controller decisions.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        app_ref: { type: 'string' },
+        purpose_ref: { type: 'string' },
+        operation: { type: 'string' },
+        operations: { type: 'array', items: { type: 'string' } },
+        memory_zone_ref: { type: 'string' },
+        memory_zone_refs: { type: 'array', items: { type: 'string' } },
+        issued_at: { type: 'string' },
+        expires_at: { type: 'string' },
+        ttl_seconds: { type: 'integer', minimum: 1 },
+        status: { type: 'string' },
+        grant_ref: { type: 'string' },
+        policy_ref: { type: 'string' },
+        proof_refs: { type: 'array', items: { type: 'string' } },
+        receipt_refs: { type: 'array', items: { type: 'string' } },
+      },
+      additionalProperties: false,
+    },
+    outputSchema: CONSENT_GRANT_JSON_SCHEMA,
+  },
+  {
+    name: 'enigma_private_bubble',
+    description: 'Open, keep, or discard a private memory bubble while returning only public-safe refs, counts, and boundary flags.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['open', 'keep', 'discard'] },
+        bubble: PRIVATE_MEMORY_BUBBLE_JSON_SCHEMA,
+        app_ref: { type: 'string' },
+        app_refs: { type: 'array', items: { type: 'string' } },
+        purpose_ref: { type: 'string' },
+        candidate_count: { type: 'integer', minimum: 0 },
+        receipt_refs: { type: 'array', items: { type: 'string' } },
+        bubble_ref: { type: 'string' },
+        started_at: { type: 'string' },
+        closed_at: { type: 'string' },
+        kept_count: { type: 'integer', minimum: 0 },
+        discarded_count: { type: 'integer', minimum: 0 },
+      },
+      required: ['action'],
+      additionalProperties: false,
+    },
+    outputSchema: PRIVATE_MEMORY_BUBBLE_JSON_SCHEMA,
   },
   {
     name: 'enigma_meter_usage',
@@ -939,6 +1192,33 @@ export async function enigma_immune_ingress(input = {}) {
   return createMcpImmuneIngressReport(input);
 }
 
+export async function enigma_memory_weather(input = {}) {
+  input = validateToolArguments('enigma_memory_weather', input);
+  return assertMemoryControllerPublicSafe(createMemoryWeatherReport(input));
+}
+
+export async function enigma_recall_veto(input = {}) {
+  input = validateToolArguments('enigma_recall_veto', input);
+  return assertMemoryControllerPublicSafe(createRecallVetoDecision(input));
+}
+
+export async function enigma_consent_grant(input = {}) {
+  input = validateToolArguments('enigma_consent_grant', input);
+  return assertMemoryControllerPublicSafe(createConsentGrant(input));
+}
+
+export async function enigma_private_bubble(input = {}) {
+  input = validateToolArguments('enigma_private_bubble', input);
+  if (input.action === 'open') return assertMemoryControllerPublicSafe(createPrivateMemoryBubble(input));
+  return assertMemoryControllerPublicSafe(closePrivateMemoryBubble(input.bubble, {
+    outcome: input.action,
+    closed_at: input.closed_at,
+    kept_count: input.kept_count,
+    discarded_count: input.discarded_count,
+    receipt_refs: input.receipt_refs,
+  }));
+}
+
 export async function enigma_meter_usage(input = {}) {
   input = validateToolArguments('enigma_meter_usage', input);
   if (Array.isArray(input.events)) {
@@ -1007,6 +1287,10 @@ export const handlers = Object.freeze({
   enigma_delete,
   enigma_verify_receipts,
   enigma_immune_ingress,
+  enigma_memory_weather,
+  enigma_recall_veto,
+  enigma_consent_grant,
+  enigma_private_bubble,
   enigma_meter_usage,
   enigma_settlement_job,
   enigma_settlement_capacity,
@@ -1229,6 +1513,10 @@ export default {
   enigma_delete,
   enigma_verify_receipts,
   enigma_immune_ingress,
+  enigma_memory_weather,
+  enigma_recall_veto,
+  enigma_consent_grant,
+  enigma_private_bubble,
   enigma_meter_usage,
   enigma_settlement_job,
   enigma_settlement_capacity,

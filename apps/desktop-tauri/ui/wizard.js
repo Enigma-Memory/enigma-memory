@@ -32,6 +32,8 @@ const CLIENT_COPY = {
 const tauri = window.__TAURI__;
 const invoke = tauri?.core?.invoke;
 const isMock = typeof invoke !== 'function';
+const PUBLIC_UNSAFE_TEXT_RE = /(?:prompt:|transcript:|provider[_\s-]*response|secret|token|password|private[_\s-]*key|[A-Za-z]:[\\/]|\/(?:Users|home|var|tmp|private|Volumes)\/|memory\.db|customer[_\s-]*(?:id|identifier)|account[_\s-]*id)/i;
+
 
 let currentStep = 0;
 let clients = [];
@@ -41,6 +43,13 @@ let update = {};
 let crashReporting = {};
 let serviceStatus = {};
 let serviceLogs = [];
+let controllerUi = {
+  grantsReviewed: false,
+  recallReviewed: false,
+  privateBubbleOpen: false,
+  privateBubbleTouched: false,
+};
+
 let busy = false;
 
 function $(selector) {
@@ -65,6 +74,31 @@ async function mockInvoke(cmd, args = {}) {
         diagnostics_status: diagnostics.status || 'passed',
         offline_ready: true,
         issue_codes: [],
+        memory_controller: {
+          memory_weather_report: {
+            status: controllerUi.grantsReviewed ? 'sunny' : 'needs_attention',
+            summary: controllerUi.grantsReviewed
+              ? 'Apps still ask before Enigma shares local memory.'
+              : 'Review app permissions before a connected app receives memory.',
+            next_action: controllerUi.grantsReviewed ? 'open_private_bubble' : 'review_grants',
+          },
+          consent_grant: {
+            status: clients.some((c) => c.status === 'connected') ? 'active' : 'missing',
+            label: controllerUi.grantsReviewed ? 'App permissions reviewed locally' : 'Connected apps must ask first',
+          },
+          recall_veto_decision: {
+            decision: controllerUi.recallReviewed ? 'allow' : 'ask',
+            label: controllerUi.recallReviewed ? 'Approved for this local request' : 'Waiting for your approval',
+            share_status: controllerUi.recallReviewed ? 'Safe to share after your approval' : 'Not shared until you approve',
+          },
+          private_memory_bubble: {
+            status: controllerUi.privateBubbleOpen ? 'open' : 'closed',
+            label: controllerUi.privateBubbleOpen ? 'Private bubble open' : 'Private bubble closed',
+            summary: controllerUi.privateBubbleOpen
+              ? 'Draft memory stays inside this local bubble.'
+              : 'Open a local bubble when you want to review memory before sharing.',
+          },
+        },
       };
     case 'detect_clients': {
       if (clients.length === 0) {
@@ -163,6 +197,124 @@ function primaryButton(label, action, opts = {}) {
 
 function secondaryButton(label, action) {
   return `<button type="button" class="secondary" data-action="${escapeHtml(action)}">${escapeHtml(label)}</button>`;
+}
+
+function safePublicLabel(value, fallback, max = 120) {
+  const text = String(value ?? '').trim();
+  if (!text || PUBLIC_UNSAFE_TEXT_RE.test(text)) return fallback;
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
+function controllerRecord(...records) {
+  return records.find((record) => record && typeof record === 'object') || {};
+}
+
+function controllerStatus(value, allowed, fallback) {
+  const status = String(value || '').replace(/_/g, '-').toLowerCase();
+  return allowed.includes(status) ? status : fallback;
+}
+
+function controllerActionFrom(nextAction, weatherStatus) {
+  const action = String(nextAction || '').replace(/-/g, '_').toLowerCase();
+  if (action === 'close_private_bubbles') return { label: 'Close private bubble', action: 'close-private-bubble' };
+  if (action === 'review_grants' || action === 'ask_for_consent') return { label: 'Review app permissions', action: 'review-grants' };
+  if (action === 'review_policy' || action === 'inspect_receipts') return { label: 'Review recall', action: 'review-recall' };
+  if (weatherStatus === 'storm-warning') return { label: 'Review recall', action: 'review-recall' };
+  if (weatherStatus === 'needs-attention') return { label: 'Review app permissions', action: 'review-grants' };
+  return controllerUi.privateBubbleOpen
+    ? { label: 'Close private bubble', action: 'close-private-bubble' }
+    : { label: 'Open private bubble', action: 'open-private-bubble' };
+}
+
+function getMemoryControllerView() {
+  const source = controllerRecord(health.memory_controller, health.memoryController, health.controller);
+  const weather = controllerRecord(source.memory_weather_report, source.weather_report, source.weather, health.memory_weather_report);
+  const grant = controllerRecord(source.consent_grant, source.grant, source.app_permissions, health.consent_grant);
+  const recall = controllerRecord(source.recall_veto_decision, source.recall, health.recall_veto_decision);
+  const bubble = controllerRecord(source.private_memory_bubble, source.privateBubble, health.private_memory_bubble);
+  const connectedCount = Number(health.connected_app_count ?? clients.filter((client) => normalizeClientStatus(client) === 'connected').length);
+  const issueCodes = Array.isArray(health.issue_codes) ? health.issue_codes : [];
+  const proofStatus = String(health.proof_status || '').toLowerCase();
+  const derivedWeatherStatus = issueCodes.length
+    ? 'needs_attention'
+    : proofStatus === 'failed' || proofStatus === 'error'
+      ? 'storm_warning'
+      : connectedCount > 0 || proofStatus === 'active' || proofStatus === 'checked'
+        ? 'sunny'
+        : 'needs_attention';
+  const rawWeather = controllerUi.grantsReviewed ? 'sunny' : weather.status || source.status || health.memory_weather_status || derivedWeatherStatus;
+  const weatherStatus = controllerStatus(rawWeather, ['sunny', 'needs-attention', 'storm-warning'], 'needs-attention');
+  const weatherLabels = {
+    sunny: 'Clear',
+    'needs-attention': 'Needs review',
+    'storm-warning': 'Sharing paused',
+  };
+  const weatherAction = controllerActionFrom(controllerUi.grantsReviewed ? 'open_private_bubble' : weather.next_action || source.next_action, weatherStatus);
+  const grantStatus = controllerUi.grantsReviewed ? (connectedCount > 0 ? 'active' : 'missing') : controllerStatus(grant.status || health.consent_grant_status || (connectedCount > 0 ? 'active' : 'missing'), ['active', 'expired', 'revoked', 'missing'], connectedCount > 0 ? 'active' : 'missing');
+  const recallDecision = controllerUi.recallReviewed ? 'allow' : controllerStatus(recall.decision || health.recall_decision || 'ask', ['allow', 'ask', 'deny'], 'ask');
+  const rawBubbleStatus = controllerUi.privateBubbleTouched ? (controllerUi.privateBubbleOpen ? 'open' : 'closed') : bubble.status || (controllerUi.privateBubbleOpen ? 'open' : 'closed');
+  const bubbleStatus = controllerStatus(rawBubbleStatus, ['open', 'closed', 'kept', 'discarded', 'expired'], controllerUi.privateBubbleOpen ? 'open' : 'closed');
+
+  return {
+    weather: {
+      status: weatherStatus,
+      label: safePublicLabel(controllerUi.grantsReviewed ? 'Clear' : weather.label, weatherLabels[weatherStatus]),
+      summary: safePublicLabel(controllerUi.grantsReviewed ? 'App permissions were reviewed locally. Enigma still asks before sharing memory.' : weather.summary, weatherStatus === 'sunny' ? 'Local checks are clear. Enigma still asks before sharing memory.' : 'Review local permissions before a connected app receives memory.'),
+      action: weatherAction,
+    },
+    grant: {
+      status: grantStatus,
+      label: safePublicLabel(controllerUi.grantsReviewed ? 'App permissions reviewed locally' : grant.label, grantStatus === 'active' ? 'Connected apps must ask first' : 'No app has permission yet'),
+      summary: safePublicLabel(grant.summary, 'App permissions decide which local apps may ask Enigma for context.'),
+      action: { label: 'Review app permissions', action: 'review-grants' },
+    },
+    recall: {
+      status: recallDecision,
+      label: safePublicLabel(controllerUi.recallReviewed ? 'Approved for this local request' : recall.label, recallDecision === 'allow' ? 'Approved for this local request' : recallDecision === 'deny' ? 'Recall blocked locally' : 'Waiting for your approval'),
+      summary: safePublicLabel(controllerUi.recallReviewed ? 'Safe to share after your approval.' : recall.share_status || recall.summary, recallDecision === 'allow' ? 'Safe to share after your approval.' : 'Not shared until you approve.'),
+      action: { label: 'Review recall', action: 'review-recall' },
+    },
+    bubble: {
+      status: bubbleStatus,
+      label: safePublicLabel(controllerUi.privateBubbleTouched ? (bubbleStatus === 'open' ? 'Private bubble open' : 'Private bubble closed') : bubble.label, bubbleStatus === 'open' ? 'Private bubble open' : 'Private bubble closed'),
+      summary: safePublicLabel(controllerUi.privateBubbleTouched ? (bubbleStatus === 'open' ? 'Draft memory stays local while you decide.' : 'Private bubble closed locally. Nothing has been shared.') : bubble.summary, bubbleStatus === 'open' ? 'Draft memory stays local while you decide.' : 'Open a local bubble to review memory before sharing.'),
+      action: bubbleStatus === 'open'
+        ? { label: 'Close private bubble', action: 'close-private-bubble' }
+        : { label: 'Open private bubble', action: 'open-private-bubble' },
+    },
+  };
+}
+
+function renderControllerTile(title, item) {
+  return `
+    <div class="controller-tile">
+      <div class="controller-tile__heading">
+        <dt>${escapeHtml(title)}</dt>
+        <span class="status-pill ${escapeHtml(item.status)}">${escapeHtml(item.label)}</span>
+      </div>
+      <dd>${escapeHtml(item.summary)}</dd>
+      ${primaryButton(item.action.label, item.action.action)}
+    </div>
+  `;
+}
+
+function renderMemoryControllerSection() {
+  const controller = getMemoryControllerView();
+  return `
+    <section class="dashboard-section memory-controller" aria-labelledby="memory-controller-title">
+      <div class="memory-controller__intro">
+        <p class="eyebrow">Memory Controller</p>
+        <h2 id="memory-controller-title">What can be shared right now?</h2>
+        <p>Enigma shows the local decision before any connected app receives context. The controller can approve recall, keep memory not shared, or hold it in a private bubble while you decide.</p>
+      </div>
+      <dl class="memory-controller-grid">
+        ${renderControllerTile('Memory Weather', controller.weather)}
+        ${renderControllerTile('App permissions', controller.grant)}
+        ${renderControllerTile('Recall approval', controller.recall)}
+        ${renderControllerTile('Private memory bubble', controller.bubble)}
+      </dl>
+    </section>
+  `;
 }
 
 function normalizeClientStatus(client) {
@@ -371,6 +523,8 @@ function renderDashboard() {
       <ul class="issue-list">${issueTags}</ul>
     </div>
 
+    ${renderMemoryControllerSection()}
+
     <div class="dashboard-section">
       <h2>App connection recovery</h2>
       <p class="note">Safe reset, restore, and rollback actions recover malformed connector settings without showing config JSON, local paths, or provider responses.</p>
@@ -423,7 +577,7 @@ function renderDashboard() {
       ${primaryButton('Run health check', 'run-health')}
       ${secondaryButton('Shutdown service', 'shutdown')}
     </div>
-  `, 'health');
+  `, 'memoryController');
 }
 
 function render() {
@@ -690,6 +844,28 @@ async function handleAction(event) {
       setStatus(`Sent ${result.submitted} report(s). ${result.remaining} remaining.`);
       return;
     }
+    case 'review-grants':
+      controllerUi.grantsReviewed = true;
+      render();
+      setStatus('App permissions reviewed locally. Connected apps still ask before Enigma shares context.');
+      return;
+    case 'open-private-bubble':
+      controllerUi.privateBubbleOpen = true;
+      controllerUi.privateBubbleTouched = true;
+      render();
+      setStatus('Private memory bubble opened locally. Nothing has been shared.');
+      return;
+    case 'close-private-bubble':
+      controllerUi.privateBubbleOpen = false;
+      controllerUi.privateBubbleTouched = true;
+      render();
+      setStatus('Private memory bubble closed locally. Nothing has been shared.');
+      return;
+    case 'review-recall':
+      controllerUi.recallReviewed = true;
+      render();
+      setStatus('Recall reviewed. Memory remains not shared unless you approve the local decision.');
+      return;
     default:
       return;
   }

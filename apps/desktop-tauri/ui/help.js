@@ -40,12 +40,39 @@ const HELP_ARTICLES = {
       <p>Repair and rollback do not alter provider memory, model behavior, or provider-side logs. Local health checks work without network access.</p>
     `,
   },
+  memoryController: {
+    title: 'Memory Controller',
+    body: `
+      <p>Memory Weather is the plain-language status for what Enigma can share right now: clear, needs review, or sharing paused.</p>
+      <p>App permissions use just-in-time consent. A connected app or MCP client may ask for local memory, but Enigma shows the decision before sharing context.</p>
+      <p>Recall approval lets you veto a specific memory recall. Until you approve, the recall stays not shared.</p>
+      <p>A private memory bubble is a local review space for draft memory. Opening or closing it controls the local bubble only; provider records and model behavior require provider-side evidence.</p>
+    `,
+  },
   privacy: {
     title: 'Privacy boundaries',
     body: `
       <p>Enigma keeps its canonical memory vault on this device. Connected AI apps receive context only when you connect and use them.</p>
-      <p>Enigma does not claim that AI providers delete their own logs, backups, or model memories. Provider deletion requires provider evidence.</p>
+      <p>Enigma does not claim control over provider logs, backups, or model behavior. Provider-side changes require provider evidence.</p>
       <p>Proof artifacts can show hashes, roots, counts, timestamps, and validation results without exposing raw memory text.</p>
+    `,
+  },
+  updateCheck: {
+    title: 'Update checks',
+    body: `
+      <p>Enigma checks the official release feed over HTTPS and verifies the signature on every update before offering it.</p>
+      <p>No update is downloaded or installed automatically. You approve each update from Settings &gt; General &gt; Check for updates.</p>
+      <p>Update checks do not send memory contents, prompts, wallet information, or local paths to the update server.</p>
+      <p>For more detail, see the full <a href="https://enigmamemory.com/help/update-check.html" target="_blank" rel="noopener">update checks guide</a>.</p>
+    `,
+  },
+  crashReporting: {
+    title: 'Crash reporting opt-in',
+    body: `
+      <p>Crash reporting is off by default. You can turn it on in Settings &gt; Support.</p>
+      <p>If enabled, reports include only the app version, OS family, a coarse timestamp, and the first panic line. They never include memory, prompts, wallet data, or local paths.</p>
+      <p>Pending reports are kept locally until you choose to send them. Turning crash reporting off stops all transmission.</p>
+      <p>For more detail, see the full <a href="https://enigmamemory.com/help/crash-reporting-opt-in.html" target="_blank" rel="noopener">crash reporting guide</a>.</p>
     `,
   },
 };

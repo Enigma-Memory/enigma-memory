@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="How Enigma Memory checks for updates, verifies signatures, and asks before downloading.">
+  <title>Update checks in Enigma Memory</title>
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="site-logo" href="../index.html">Enigma Memory</a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="../download.html">Download</a>
+        <a href="../setup.html">How it works</a>
+        <a href="../privacy.html">Privacy</a>
+        <a href="./index.html">Help</a>
+        <a href="../faq.html">FAQ</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <span class="eyebrow">Updates</span>
+      <h1>How Enigma Memory checks for updates.</h1>
+      <p>Update checks use a signed release feed. Enigma never downloads or installs an update without your approval.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="how-heading">
+      <h2 id="how-heading">How update checks work</h2>
+      <p>Enigma Memory checks the official release feed over HTTPS. The feed lists the latest version, release notes, and cryptographic signatures for each supported platform.</p>
+      <p>Before any update is offered, Enigma verifies the signature on the release metadata and the installer package. If verification fails, the update is not offered and the app reports a verification issue in the health dashboard.</p>
+
+      <div class="boundary-callout">
+        <strong>Boundary note:</strong> Update checks do not send your memory contents, prompts, wallet information, or local file paths to the update server.
+      </div>
+    </section>
+
+    <section class="content-section" aria-labelledby="manual-heading">
+      <h2 id="manual-heading">Check for updates manually</h2>
+      <ol>
+        <li>Open Enigma Memory.</li>
+        <li>Go to <strong>Settings</strong> &gt; <strong>General</strong>.</li>
+        <li>Click <strong>Check for updates</strong>.</li>
+      </ol>
+      <p>If an update is available, Enigma shows the version number, release notes, and an option to start the download. If no update is available, the app confirms you are on the latest version.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="available-heading">
+      <h2 id="available-heading">What "update available" means</h2>
+      <p>When Enigma says an update is available, a newer signed release exists for your platform. The message includes the new version number and a short summary of what changed.</p>
+      <p>Seeing "update available" does not change the app or your vault. The update is downloaded and installed only after you approve it.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="approval-heading">
+      <h2 id="approval-heading">No automatic downloads</h2>
+      <p>Enigma does not download or install updates in the background. You choose whether to update and when.</p>
+      <p>You can also disable automatic update checks in <strong>Settings</strong> &gt; <strong>General</strong>. When disabled, Enigma only checks for updates when you click <strong>Check for updates</strong> manually.</p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer__inner">
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="../download.html">Download</a></li>
+          <li><a href="../setup.html">How it works</a></li>
+          <li><a href="../privacy.html">Privacy</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Support</h4>
+        <ul>
+          <li><a href="./index.html">Help hub</a></li>
+          <li><a href="./install.html">Install guide</a></li>
+          <li><a href="./troubleshooting.html">Troubleshooting</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Developers</h4>
+        <ul>
+          <li><a href="../developers/cli.html">CLI appendix</a></li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

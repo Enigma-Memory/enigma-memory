@@ -41,6 +41,17 @@ Default and support copy must stay inside these boundaries:
 | Quarantine | Needs review | "Enigma held something back because it may be unsafe or incomplete." | Quarantine / review queue |
 | Connector sync | App status | "Whether a connected app can reach Enigma right now." | Connector health |
 | Revocation/deletion marker | Removed from Enigma sharing | "Enigma will no longer offer this item to connected apps." | Revocation record |
+| Memory Weather | Memory Weather | "A simple status for your Memory Drive, connected apps, and anything that needs review." | Memory Weather report |
+| Consent grant | App permission | "A connected app asks for memory for one purpose and for a limited time." | Consent grant |
+| Recall veto decision | Recall approval | "Enigma checks whether memory is safe to share before giving it to an app." | Recall veto decision |
+| Private memory bubble | Private memory bubble | "A temporary place for sensitive context that should not become durable memory unless you choose." | Private memory bubble |
+| `safe_to_share` | Safe to share | "Enigma can offer this memory to the app for this request." | Safe-to-share flag |
+| Withheld recall | Not shared | "Enigma kept this memory from the app for this request." | Withhold decision |
+| Public-safe guard | Safe to show | "Enigma checks that activity details do not include private memory, prompts, app responses, local paths, or secrets." | Public-safe guard |
+
+## Memory Controller permissions during onboarding
+
+Users do not see a broad permission wall during install or first launch. The wizard connects apps and explains that connected apps can ask Enigma for memory, but recall permission appears only when an app actually asks to recall memory for a specific purpose. At that moment the user sees the app name, purpose, Memory Weather state, and one primary action: approve the recall if it is safe to share. The secondary path keeps it not shared. Advanced activity details can show public-safe refs and reason codes after the decision, but the consumer path never exposes raw memory, prompts, transcripts, provider responses, local paths, or secrets.
 
 ## Public download and first-open surfaces
 
@@ -258,7 +269,7 @@ The default download page must detect the operating system where possible and re
 
 **Disclosure copy for secondary link:**
 
-`Connected apps can ask Enigma for relevant memory. Enigma still keeps your private vault local. You control which apps are connected.`
+`Connected apps can ask Enigma for relevant memory. Enigma still keeps your private vault local. You control which apps are connected, and you only see an app permission when that app asks Enigma to recall memory for a specific purpose.`
 
 **Claude Desktop extension note, shown only when applicable:**
 

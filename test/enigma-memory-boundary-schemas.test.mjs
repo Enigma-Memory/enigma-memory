@@ -14,6 +14,10 @@ const SCHEMA_FILES = Object.freeze([
   'antibody-pack-v1.schema.json',
   'trust-card-v1.schema.json',
   'evidence-packet-v1.schema.json',
+  'memory-controller-grant-v1.schema.json',
+  'recall-veto-decision-v1.schema.json',
+  'scoped-memory-bubble-v1.schema.json',
+  'memory-weather-report-v1.schema.json',
 ]);
 
 const SHA256_REF = `sha256:${'a'.repeat(64)}`;
@@ -61,6 +65,10 @@ function validateValue(schema, root, value, path = '$') {
     return;
   }
   if (schema.enum) assert.ok(schema.enum.includes(value), `${path} enum mismatch`);
+  if (Array.isArray(schema.type)) {
+    if (value === null && schema.type.includes('null')) return;
+    return validateValue({ ...schema, type: schema.type.find((type) => type !== 'null') }, root, value, path);
+  }
 
   if (schema.type === 'object') {
     assert.equal(value !== null && typeof value === 'object' && !Array.isArray(value), true, `${path} object expected`);
@@ -122,12 +130,13 @@ function sampleFor(schema, root, key = 'value') {
     for (const field of schema.required ?? Object.keys(schema.properties ?? {})) {
       out[field] = sampleFor(schema.properties[field], root, field);
     }
-    return out;
+    return normalizeFixtureForConditionals(out);
   }
   if (schema.type === 'array') {
-    const count = Math.max(schema.minItems ?? 0, 1);
+    const count = Math.max(schema.minItems ?? 0, schema.maxItems === 0 ? 0 : 1);
     return Array.from({ length: count }, (_unused, index) => sampleFor(schema.items, root, `${key}_${index}`));
   }
+  if (Array.isArray(schema.type)) return schema.type.includes('null') ? null : sampleFor({ ...schema, type: schema.type[0] }, root, key);
   if (schema.type === 'integer') return schema.minimum ?? 0;
   if (schema.type === 'number') return schema.minimum ?? 0;
   if (schema.type === 'boolean') return true;
@@ -137,6 +146,15 @@ function sampleFor(schema, root, key = 'value') {
     return `${publicToken(key)}_fixture`;
   }
   throw new Error(`unsupported schema node for ${key}`);
+}
+
+function normalizeFixtureForConditionals(out) {
+  if (out.schema === 'enigma.private_memory_bubble.v1' && out.status === 'open') out.closed_at = null;
+  if (out.schema === 'enigma.memory_weather_report.v1' && out.status === 'sunny') {
+    out.issue_codes = [];
+    out.next_action = 'none';
+  }
+  return out;
 }
 
 function sampleStringForPattern(pattern, key) {

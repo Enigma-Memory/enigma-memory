@@ -1,5 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import {
+  CONSENT_GRANT_SCHEMA,
+  MEMORY_WEATHER_REPORT_SCHEMA,
+  PRIVATE_MEMORY_BUBBLE_SCHEMA,
+  RECALL_VETO_DECISION_SCHEMA,
+  assertMemoryControllerPublicSafe,
+} from '../packages/controller/src/index.js';
 
 const RAW_MEMORY = 'private launch-code phrase must not leave local memory';
 const RAW_PROMPT = 'prompt: summarize the customer transcript';
@@ -11,6 +19,18 @@ async function importDesktop() {
   return import('../apps/desktop/src/app.js');
 }
 
+async function readDesktopUiFile(name) {
+  return readFile(new URL(`../apps/desktop-tauri/ui/${name}`, import.meta.url), 'utf8');
+}
+
+function assertControllerPrimitiveContracts(controller) {
+  assert.equal(CONSENT_GRANT_SCHEMA, 'enigma.memory_controller_grant.v1');
+  assert.equal(MEMORY_WEATHER_REPORT_SCHEMA, 'enigma.memory_weather_report.v1');
+  assert.equal(PRIVATE_MEMORY_BUBBLE_SCHEMA, 'enigma.private_memory_bubble.v1');
+  assert.equal(RECALL_VETO_DECISION_SCHEMA, 'enigma.recall_veto_decision.v1');
+  assert.equal(assertMemoryControllerPublicSafe(controller), controller);
+}
+
 function assertPublicSafe(value) {
   const text = JSON.stringify(value);
   assert.doesNotMatch(text, /private launch-code phrase/i);
@@ -20,6 +40,12 @@ function assertPublicSafe(value) {
   assert.doesNotMatch(text, /secret token/i);
   assert.doesNotMatch(text, /secret-token-value/i);
   assert.doesNotMatch(text, /C:\\\\Users\\\\Alice/i);
+  assert.doesNotMatch(text, /provider deletion/i);
+  assert.doesNotMatch(text, /model forgetting|make a model forget/i);
+  assert.doesNotMatch(text, /provider-native memory control/i);
+  assert.doesNotMatch(text, /compliance certification/i);
+  assert.doesNotMatch(text, /hosted readiness/i);
+  assert.doesNotMatch(text, /chain submission/i);
 }
 
 test('desktop first-run defaults to Memory Drive home dashboard', async () => {
@@ -38,6 +64,12 @@ test('desktop first-run defaults to Memory Drive home dashboard', async () => {
   assert.equal(model.dashboard.next_action.label, 'Create Memory Drive');
   assert.equal(dashboard.memory_drive_status, 'missing');
   assert.ok(model.dashboard.issue_codes.includes('MEMORY_DRIVE_MISSING'));
+  assert.equal(model.dashboard.memory_controller.schema, 'enigma.desktop.memory_controller_summary.v1');
+  assert.equal(model.dashboard.memory_controller.memory_weather.label, 'Needs review');
+  assert.equal(model.dashboard.memory_controller.app_permissions.label, 'No app has permission yet');
+  assert.equal(model.dashboard.memory_controller.recall_approval.summary, 'Not shared until you approve.');
+  assert.equal(model.dashboard.memory_controller.private_memory_bubble.primary_action.id, 'open_private_bubble');
+  assertControllerPrimitiveContracts(model.dashboard.memory_controller);
 });
 
 test('desktop create Memory Drive action prepares consumer dashboard without raw paths', async () => {
@@ -56,6 +88,9 @@ test('desktop create Memory Drive action prepares consumer dashboard without raw
   assert.equal(state.vault.status, 'ready');
   assert.equal(model.dashboard.memory_drive_status, 'ready');
   assert.equal(model.dashboard.next_action.id, 'start_service');
+  assert.equal(model.dashboard.memory_controller.memory_weather.primary_action.id, 'review_grants');
+  assert.equal(model.dashboard.memory_controller.recall_approval.primary_action.id, 'review_recall');
+  assertControllerPrimitiveContracts(model.dashboard.memory_controller);
   assertPublicSafe(model.dashboard);
 });
 
@@ -82,6 +117,11 @@ test('desktop dashboard exposes one primary fix-it action', async () => {
   assert.equal(dashboard.next_action.id, 'fix_health');
   assert.equal(dashboard.next_action.label, 'Fix Memory Drive health');
   assert.ok(dashboard.issue_codes.includes('APP_PERMISSION_MISSING'));
+  assert.equal(Array.isArray(dashboard.memory_controller.memory_weather.primary_action), false);
+  assert.equal(dashboard.memory_controller.app_permissions.primary_action.id, 'review_grants');
+  assert.equal(dashboard.memory_controller.recall_approval.primary_action.id, 'review_recall');
+  assertControllerPrimitiveContracts(dashboard.memory_controller);
+  assert.equal(dashboard.memory_controller.private_memory_bubble.primary_action.id, 'open_private_bubble');
   assert.ok(dashboard.issue_codes.includes('DIAGNOSTICS_STALE'));
   assertPublicSafe(dashboard);
 });
@@ -124,6 +164,10 @@ test('desktop public dashboard omits raw memory, prompts, transcripts, tokens, p
   const dashboard = renderMemoryDriveDashboard(state);
   assert.equal(model.dashboard.schema, 'enigma.desktop.memory_drive_dashboard.v1');
   assert.equal(dashboard.offline_ready, true);
+  assert.equal(dashboard.memory_controller.memory_weather.status, 'sunny');
+  assert.equal(dashboard.memory_controller.app_permissions.status, 'missing');
+  assert.equal(dashboard.memory_controller.recall_approval.summary, 'Not shared until you approve.');
+  assertControllerPrimitiveContracts(dashboard.memory_controller);
   assert.equal(model.screens.diagnostics.safe_summary.length, 1);
   assert.deepEqual(model.screens.diagnostics.safe_summary, ['Local service reachable']);
   assertPublicSafe(model);
@@ -151,4 +195,42 @@ test('desktop unknown public-launch action fails closed', async () => {
   assert.deepEqual(next.memoryDrive, initial.memoryDrive);
   assert.deepEqual(after, before);
   assertPublicSafe(after);
+});
+
+test('desktop Tauri dashboard exposes Memory Controller consumer controls', async () => {
+  const [wizard, help, styles] = await Promise.all([
+    readDesktopUiFile('wizard.js'),
+    readDesktopUiFile('help.js'),
+    readDesktopUiFile('styles.css'),
+  ]);
+  const ui = `${wizard}\n${help}\n${styles}`;
+
+  assert.match(wizard, /Memory Controller/);
+  assert.match(wizard, /Memory Weather/);
+  assert.match(wizard, /App permissions/);
+  assert.match(wizard, /Recall approval/);
+  assert.match(wizard, /Private memory bubble/);
+  assert.match(wizard, /Not shared until you approve/);
+  assert.match(wizard, /primaryButton\(item\.action\.label, item\.action\.action\)/);
+  assert.match(wizard, /review-grants/);
+  assert.match(wizard, /open-private-bubble/);
+  assert.match(wizard, /close-private-bubble/);
+  assert.match(wizard, /review-recall/);
+  assert.match(help, /just-in-time consent/i);
+  assert.match(help, /recall stays not shared/i);
+  assert.match(help, /local review space/i);
+  assert.match(styles, /memory-controller-grid/);
+  assert.doesNotMatch(ui, /provider-side control/i);
+  assert.doesNotMatch(ui, /provider deletion/i);
+  assert.doesNotMatch(ui, /model forgetting|make a model forget/i);
+  assert.doesNotMatch(ui, /provider-native memory control/i);
+  assert.doesNotMatch(ui, /compliance certification/i);
+  assert.doesNotMatch(ui, /hosted readiness/i);
+  assert.doesNotMatch(ui, /chain submission/i);
+  assert.doesNotMatch(ui, /private launch-code phrase/i);
+  assert.doesNotMatch(ui, /C:\\\\Users\\\\Alice/i);
+  assert.doesNotMatch(ui, /abc123/i);
+  assert.doesNotMatch(ui, /summarize the customer transcript/i);
+  assert.doesNotMatch(ui, /secret token/i);
+  assert.doesNotMatch(ui, /model returned private content/i);
 });

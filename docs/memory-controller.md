@@ -4,6 +4,14 @@ Enigma's Memory Controller is the local boundary that decides when AI apps may u
 
 This direction comes from the Workflowz research pass: current assistant memory products mostly focus on what was stored and what can be recalled. Enigma should differentiate at the control point: just-in-time consent, recall-time checks, temporary private scopes, and a dashboard that explains memory readiness without exposing memory.
 
+## What users see
+
+Consumers see the Memory Controller as a small set of plain states, not as a protocol. Memory Weather says whether the local Memory Drive, connected apps, privacy guardrails, and review queue are ready, then gives one primary action such as `Review held-back memory` or `Fix app connection`.
+
+App permissions appear only when a connected app asks Enigma to recall memory for a specific purpose. The prompt explains the app, the purpose, and whether Enigma believes the result is safe to share. The user can approve the recall, keep the memory not shared, or open a private memory bubble for temporary context that should not become durable memory by default.
+
+Recall approval happens before Enigma shares context with the app. A `not shared` result means Enigma withheld local memory from that Enigma-mediated recall; it does not mean the provider deleted logs, removed provider-native memory, or forgot anything.
+
 ## What it controls
 
 | Primitive | Product meaning | Technical boundary | Public-safe artifact |
@@ -12,6 +20,7 @@ This direction comes from the Workflowz research pass: current assistant memory 
 | Recall veto | Enigma can withhold memory before context is shared with an app. | Deterministic allow/withhold decision at recall time, using current grant state, bubble state, risk flags, and owner policy. | Decision ref, reason code, policy ref, time bucket, withheld count, receipt ref. |
 | Private memory bubble | A temporary memory space for sensitive, experimental, or short-lived context. | Local scope with clear entry, exit, expiry, and no default promotion into durable memory. | Bubble ref, status label, expiry bucket, item count, promotion count, receipt ref. |
 | Memory Weather | A plain-language control panel for memory readiness. | Public-safe projection of vault state, connector readiness, held-back recalls, review needs, and proof/export status. | Status label, one next action, counts, support code, proof refs, redaction status. |
+| Public-safe guard | A final check that Memory Controller details are safe to show, export, or return to an app. | Rejects artifacts that include raw memory, prompts, transcripts, provider output, local paths, secrets, identifiers, or unsupported claims. | Pass/fail label, support code, forbidden-field count, public hash, receipt ref. |
 
 ## Technical contract
 
@@ -25,6 +34,19 @@ Public schemas use draft 2020-12 and stable `enigma.<snake_case>.v1` identifiers
 - `enigma.memory_weather_report.v1`
 
 Those schemas describe receipts and summaries only. They do not serialize raw memory, prompts, transcripts, provider payloads, private paths, secrets, or account material.
+
+The implementation exports `createConsentGrant`, `verifyConsentGrant`, `createRecallVetoDecision`, `createPrivateMemoryBubble`, `closePrivateMemoryBubble`, `createMemoryWeatherReport`, and `assertMemoryControllerPublicSafe`. Consumer and MCP surfaces should treat `assertMemoryControllerPublicSafe` as the last guard before any artifact is displayed, exported, or returned to a client.
+
+## MCP tools
+
+MCP clients use the same primitives through public-safe tools. Each tool returns refs, labels, counts, booleans, and reason codes only; it must fail closed rather than return raw memory, prompts, transcripts, provider payloads, local paths, or secrets.
+
+| Tool | Consumer meaning | Public-safe result |
+| --- | --- | --- |
+| `enigma_memory_weather` | Show Memory Weather for the local setup. | Readiness label, one next action, review counts, connector labels, support code, and receipt/proof refs. |
+| `enigma_consent_grant` | Record a narrow app permission when an app asks to use memory. | Grant ref, app ref, scope label, purpose ref, expiry bucket, revocation state, policy ref, and receipt refs. |
+| `enigma_recall_veto` | Decide whether a recall is approved, needs approval, or is not shared before context leaves Enigma. | Decision `allow`, `ask`, or `deny`; reason codes; candidate counts; `safe_to_share`; policy/proof/receipt refs. |
+| `enigma_private_bubble` | Open or close a temporary private memory bubble. | Bubble ref, status label, expiry bucket, item/promotion counts, close outcome, and receipt refs. |
 
 ## Frictionless launch behavior
 
