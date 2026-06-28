@@ -11,6 +11,7 @@ import {
   planConnectWizard,
 } from '../packages/connectors/src/index.js';
 import { buildClaudeMcpbPackage, createClaudeMcpbRuntimePackageJson } from '../scripts/build-claude-mcpb-package.mjs';
+import { main } from '../apps/cli/bin/enigma.mjs';
 
 const PRIVATE_STRINGS = [
   'C:\\Users\\Casey',
@@ -28,6 +29,20 @@ function assertPublicSafe(value) {
   for (const privateString of PRIVATE_STRINGS) {
     assert.equal(serialized.includes(privateString), false, `leaked ${privateString}`);
   }
+}
+
+function makeIo() {
+  let stdout = '';
+  let stderr = '';
+  return {
+    io: {
+      stdout: { write: (chunk) => { stdout += chunk; } },
+      stderr: { write: (chunk) => { stderr += chunk; } },
+    },
+    stdout: () => stdout,
+    stderr: () => stderr,
+    json: () => JSON.parse(stdout),
+  };
 }
 
 test('Claude Desktop mcpb manifest is public-safe command metadata only', () => {
@@ -194,5 +209,27 @@ test('Claude Desktop mcpb package builder writes deterministic public-safe artif
   assert.equal(Object.hasOwn(runtimePackage, 'scripts'), false);
   assert.equal(Object.hasOwn(runtimePackage, 'dependencies'), false);
   assert.doesNotMatch(JSON.stringify(report), new RegExp(dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assertPublicSafe(report);
+});
+
+test('Claude MCPB package is available through the Enigma CLI', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-claude-mcpb-cli-'));
+  const mcpbPath = join(dir, 'cli.mcpb');
+  const outPath = join(dir, 'cli-report.json');
+  const io = makeIo();
+
+  assert.equal(await main(['claude-mcpb', 'package', '--mcpb', mcpbPath, '--out', outPath, '--version', '2.0.0'], io.io), 0, io.stderr());
+  const report = io.json();
+  const written = JSON.parse(await readFile(outPath, 'utf8'));
+  const mcpbStat = await stat(mcpbPath);
+
+  assert.equal(report.schema, 'enigma.claude_desktop_mcpb_package.v1');
+  assert.equal(report.manifest.version, '2.0.0');
+  assert.equal(report.package.mcpb_path, '<mcpb-output>');
+  assert.equal(written.package.mcpb_sha256, report.package.mcpb_sha256);
+  assert.ok(mcpbStat.size > 0);
+  assert.equal(report.package.provider_launched, false);
+  assert.equal(report.package.network_performed, false);
+  assert.doesNotMatch(io.stdout(), new RegExp(dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assertPublicSafe(report);
 });

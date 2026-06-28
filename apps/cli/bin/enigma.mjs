@@ -18,6 +18,7 @@ import * as relayServer from '../../relay/src/server.mjs';
 import * as gatewayServer from '../../gateway/src/server.mjs';
 import { verifyBundle } from '../../verifier/bin/enigma-verify.mjs';
 import { createNativeHostInstallPlan, createNativeHostManifest } from '../../native-host/bin/enigma-native-host.mjs';
+import { buildClaudeMcpbPackage } from '../../../scripts/build-claude-mcpb-package.mjs';
 import { aggregateUsageEvents, createUsageEvent } from '../../../packages/metering/src/index.js';
 import {
   createMemoryAccessReceipt,
@@ -2961,6 +2962,16 @@ export async function gatewayServeCommand(flags, io) {
   });
 }
 
+export async function claudeMcpbPackageCommand(flags, io) {
+  const report = await buildClaudeMcpbPackage({
+    mcpb: getFlag(flags, ['mcpb']) ?? undefined,
+    out: getFlag(flags, ['out']) ?? undefined,
+    version: getFlag(flags, ['version']) ?? undefined,
+  });
+  print(report, io);
+  return 0;
+}
+
 export async function nativeHostManifestCommand(flags, io) {
   const manifest = createNativeHostManifest({
     browser: requireFlag(flags, ['browser']),
@@ -3730,6 +3741,7 @@ function usage() {
       'quickstart',
       'start',
       'test-drive',
+      'claude-mcpb package',
       'demo cross-model',
       'doctor',
       'install',
@@ -3974,6 +3986,10 @@ function usage() {
     },
     connector_write_behavior: 'Config writes preserve unrelated settings and sibling MCP servers. Existing configs are backed up only when the semantic JSON config changes; reconnecting an identical config is idempotent.',
     claim_boundaries: 'Connectors configure local MCP access to an Enigma bundle. They do not make provider-native memory canonical and do not prove provider deletion or model forgetting.',
+    claude_mcpb_options: {
+      command: 'enigma claude-mcpb package [--mcpb <path>] [--out <report.json>] [--version <semver>]',
+      boundary: 'Builds a deterministic Claude Desktop MCPB review package locally. It does not install, launch Claude, write client config, or perform network calls.',
+    },
     import_sources: Object.keys(IMPORTERS),
     clients: supportedClients,
     bundle: DEFAULT_BUNDLE,
@@ -3992,14 +4008,14 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     }
     return 0;
   }
-  const twoPartCommands = ['boundary', 'mcp', 'mesh', 'enterprise', 'capsule', 'relay', 'gateway', 'connect', 'disconnect', 'import', 'native-host', 'meter', 'settlement', 'chain', 'demo', 'passport', 'drive', 'controller', 'support'];
+  const twoPartCommands = ['boundary', 'mcp', 'mesh', 'enterprise', 'capsule', 'relay', 'gateway', 'connect', 'disconnect', 'import', 'native-host', 'meter', 'settlement', 'chain', 'demo', 'passport', 'drive', 'controller', 'support', 'claude-mcpb'];
   const flags = parseArgs(twoPartCommands.includes(command) ? argv.slice(2) : argv.slice(1));
   const positionalFile = optionalPositional(argv[2]);
   if (command === 'help') {
     io.stdout.write(`${humanUsage()}\n`);
     return 0;
   }
-  if ((command === 'chain' && (!subcommand || subcommand === '--help' || subcommand === '-h' || flags.has('help'))) || ((flags.has('help') || argv.includes('-h')) && (command === 'init' || command === 'setup' || command === 'start' || command === 'next' || command === 'quickstart' || command === 'test-drive' || command === 'search' || command === 'context' || command === 'status' || (command === 'passport' && subcommand === 'status') || ((command === 'relay' || command === 'gateway') && (subcommand === 'serve' || subcommand === 'demo')) || (command === 'native-host' && (subcommand === 'manifest' || subcommand === 'install-plan')) || (command === 'demo' && subcommand === 'cross-model') || (command === 'drive' && subcommand === 'health') || (command === 'controller' && (subcommand === 'grant' || subcommand === 'revoke'))))) {
+  if ((command === 'chain' && (!subcommand || subcommand === '--help' || subcommand === '-h' || flags.has('help'))) || ((flags.has('help') || argv.includes('-h')) && (command === 'init' || command === 'setup' || command === 'start' || command === 'next' || command === 'quickstart' || command === 'test-drive' || command === 'search' || command === 'context' || command === 'status' || (command === 'passport' && subcommand === 'status') || ((command === 'relay' || command === 'gateway') && (subcommand === 'serve' || subcommand === 'demo')) || (command === 'native-host' && (subcommand === 'manifest' || subcommand === 'install-plan')) || (command === 'claude-mcpb' && subcommand === 'package') || (command === 'demo' && subcommand === 'cross-model') || (command === 'drive' && subcommand === 'health') || (command === 'controller' && (subcommand === 'grant' || subcommand === 'revoke'))))) {
     print(usage(), io);
     return 0;
   }
@@ -4039,6 +4055,7 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     if (command === 'relay' && subcommand === 'serve') return await relayServeCommand(flags, io);
     if (command === 'gateway' && subcommand === 'demo') return await gatewayDemoCommand(flags, io);
     if (command === 'gateway' && subcommand === 'serve') return await gatewayServeCommand(flags, io);
+    if (command === 'claude-mcpb' && subcommand === 'package') return await claudeMcpbPackageCommand(flags, io);
     if (command === 'native-host' && subcommand === 'manifest') return await nativeHostManifestCommand(flags, io);
     if (command === 'meter' && subcommand === 'event') return await meterEventCommand(flags, io);
     if (command === 'meter' && subcommand === 'aggregate') return await meterAggregateCommand(flags, io, positionalFile);
