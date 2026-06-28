@@ -372,6 +372,57 @@ fn public_test_summary(test: &crate::connector::engine::TestResult) -> Value {
     })
 }
 
+async fn run_text_import(
+    config: &DesktopConfig,
+    text: String,
+    write_vault: bool,
+) -> Result<Value, String> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return Err("import text is empty".to_string());
+    }
+    if trimmed.len() > 200_000 {
+        return Err("import text is too large".to_string());
+    }
+
+    let dir = config
+        .bundle_path
+        .parent()
+        .map(std::path::Path::to_path_buf)
+        .unwrap_or_else(std::env::temp_dir);
+    std::fs::create_dir_all(&dir).map_err(redact_command_error)?;
+    let file = dir.join(format!("import-sandbox-{}.md", current_epoch_millis()));
+    std::fs::write(&file, text).map_err(redact_command_error)?;
+
+    let file_arg = file.to_string_lossy().into_owned();
+    let bundle_arg = config.bundle_path.to_string_lossy().into_owned();
+    let result = if write_vault {
+        run_cli(
+            config,
+            &[
+                "import",
+                "text",
+                "--file",
+                &file_arg,
+                "--complete",
+                "--write-vault",
+                "--bundle",
+                &bundle_arg,
+            ],
+        )
+        .await
+    } else {
+        run_cli(
+            config,
+            &["import", "text", "--file", &file_arg, "--complete"],
+        )
+        .await
+    };
+
+    let _ = std::fs::remove_file(&file);
+    result.map_err(redact_command_error)
+}
+
 pub fn default_sidecar_config(config: &DesktopConfig) -> ServiceConfig {
     let args = vec![
         config.cli_path.to_string_lossy().into_owned(),
@@ -560,6 +611,22 @@ pub async fn test_client_config(
             "model_forgetting_proof": false,
         },
     }))
+}
+
+#[tauri::command]
+pub async fn preview_import_text(
+    state: tauri::State<'_, AppState>,
+    text: String,
+) -> Result<Value, String> {
+    run_text_import(&state.config, text, false).await
+}
+
+#[tauri::command]
+pub async fn approve_import_text(
+    state: tauri::State<'_, AppState>,
+    text: String,
+) -> Result<Value, String> {
+    run_text_import(&state.config, text, true).await
 }
 
 #[tauri::command]

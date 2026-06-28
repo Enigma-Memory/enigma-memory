@@ -51,6 +51,12 @@ let controllerUi = {
   privateBubbleOpen: false,
   privateBubbleTouched: false,
 };
+let importSandbox = {
+  preview: null,
+  result: null,
+  error: null,
+  pendingText: '',
+};
 
 let busy = false;
 
@@ -151,6 +157,39 @@ async function mockInvoke(cmd, args = {}) {
       const c = clients.find((c) => c.id === args.id);
       if (c) c.status = 'ready';
       return { id: args.id, status: 'ready', action: 'rollback', restored: true, public_safe: true };
+    }
+    case 'preview_import_text': {
+      const text = String(args.text || '');
+      const candidateCount = text.split(/\r?\n+/).map((line) => line.trim()).filter(Boolean).length;
+      return {
+        schema: 'enigma.import_preview.v1',
+        candidate_count: candidateCount,
+        import_decision: candidateCount > 0 ? 'ready_for_import' : 'empty',
+        counts: { dedupe: { duplicate_group_count: 0 } },
+        preview_receipt: {
+          schema: 'enigma.import_preview_receipt.v1',
+          candidate_count: candidateCount,
+          duplicate_group_count: 0,
+          raw_plaintext_returned: false,
+          vault_write_performed: false,
+        },
+        private_plaintext_boundary: { raw_plaintext_returned: false, write_requires_explicit_approval: true },
+      };
+    }
+    case 'approve_import_text': {
+      const text = String(args.text || '');
+      const candidateCount = text.split(/\r?\n+/).map((line) => line.trim()).filter(Boolean).length;
+      return {
+        schema: 'enigma.import_preview.v1',
+        candidate_count: candidateCount,
+        vault_write_performed: true,
+        import_batch_receipt: {
+          schema: 'enigma.import_batch_receipt.v1',
+          candidate_count: candidateCount,
+          raw_plaintext_returned: false,
+        },
+        claim_boundaries: { raw_memory_printed: false, provider_deletion_proof: false, model_forgetting_proof: false },
+      };
     }
     case 'get_diagnostics':
       return { status: 'passed', summary: 'Local checks completed.', issue_codes: [] };
@@ -454,16 +493,25 @@ function renderWelcome() {
 }
 
 function renderImportSandboxSection() {
+  const preview = importSandbox.preview;
+  const result = importSandbox.result;
+  const previewCount = preview?.candidate_count ?? preview?.preview_receipt?.candidate_count ?? 0;
+  const duplicateCount = preview?.counts?.dedupe?.duplicate_group_count ?? preview?.preview_receipt?.duplicate_group_count ?? 0;
+  const resultCount = result?.import_batch_receipt?.candidate_count ?? result?.candidate_count ?? 0;
   return `
     <section class="dashboard-section import-sandbox" aria-labelledby="import-sandbox-title">
       <p class="eyebrow">Import Sandbox</p>
       <h2 id="import-sandbox-title">Bring memories in safely</h2>
-      <p>Preview plain text, Markdown, or provider exports before anything is written. The preview shows counts, duplicate groups, commitments, and the one next action without raw memory text.</p>
-      <ol class="import-sandbox__steps">
-        <li><strong>Preview:</strong> public-safe receipt only.</li>
-        <li><strong>Approve:</strong> writes selected memories and returns a batch receipt.</li>
-        <li><strong>Rollback:</strong> uses the private raw report to tombstone local imports and returns a rollback receipt.</li>
-      </ol>
+      <p>Paste plain text or Markdown, preview counts and duplicate groups, then approve one local write. Raw text stays inside this local screen and is cleared after approval.</p>
+      <textarea id="import-sandbox-text" rows="5" placeholder="One memory per line. Example: I prefer concise setup steps."></textarea>
+      <div class="button-row">
+        ${primaryButton('Preview import', 'preview-import-text')}
+        <button type="button" class="secondary" data-action="approve-import-text" ${preview ? '' : 'disabled'}>Approve preview</button>
+        ${secondaryButton('Clear import', 'clear-import-text')}
+      </div>
+      ${preview ? `<p class="note">Preview ready: ${escapeHtml(String(previewCount))} candidates, ${escapeHtml(String(duplicateCount))} duplicate groups, decision ${escapeHtml(preview.import_decision || 'unknown')}.</p>` : ''}
+      ${result ? `<p class="note">Import written locally: ${escapeHtml(String(resultCount))} candidates. Batch receipt returned without raw memory text.</p>` : ''}
+      ${importSandbox.error ? `<p class="note">Import needs attention: ${escapeHtml(importSandbox.error)}</p>` : ''}
       <p class="note">Import receipts prove Enigma-local vault activity only. They do not prove changes outside Enigma or model behavior changes.</p>
     </section>
   `;
@@ -841,6 +889,49 @@ async function handleAction(event) {
       });
       return;
     }
+    case 'preview-import-text': {
+      const text = $('#import-sandbox-text')?.value || '';
+      busy = true;
+      importSandbox.error = null;
+      setStatus('Previewing import...');
+      try {
+        const preview = await call('preview_import_text', { text });
+        importSandbox = { preview, result: null, error: null, pendingText: text };
+        setStatus('Preview ready. Review counts before approval.');
+      } catch (_) {
+        importSandbox = { preview: null, result: null, error: 'Preview failed without exposing text.', pendingText: '' };
+        setStatus('Preview failed. Raw text was not shown.');
+      }
+      busy = false;
+      render();
+      return;
+    }
+    case 'approve-import-text': {
+      if (!importSandbox.preview || !importSandbox.pendingText) {
+        setStatus('Preview an import before approving it.');
+        return;
+      }
+      busy = true;
+      importSandbox.error = null;
+      setStatus('Writing import locally...');
+      try {
+        const result = await call('approve_import_text', { text: importSandbox.pendingText });
+        importSandbox = { preview: null, result, error: null, pendingText: '' };
+        health = await call('get_health');
+        setStatus('Import written locally. Batch receipt is available.');
+      } catch (_) {
+        importSandbox = { ...importSandbox, error: 'Approval failed without exposing text.' };
+        setStatus('Approval failed. Raw text was not shown.');
+      }
+      busy = false;
+      render();
+      return;
+    }
+    case 'clear-import-text':
+      importSandbox = { preview: null, result: null, error: null, pendingText: '' };
+      render();
+      setStatus('Import text cleared from this screen.');
+      return;
     case 'go-health':
       currentStep = 4;
       render();

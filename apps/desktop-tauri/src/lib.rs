@@ -92,6 +92,8 @@ pub fn run() {
             commands::service::repair_client_config,
             commands::service::test_client_config,
             commands::service::rollback_client_config,
+            commands::service::preview_import_text,
+            commands::service::approve_import_text,
             commands::service::get_health,
             commands::service::shutdown_service,
             commands::diagnostics::get_diagnostics,
