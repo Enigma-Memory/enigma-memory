@@ -565,3 +565,27 @@ test('doctor plain output gives one readable next action without JSON or paths',
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('setup plain output summarizes first run without JSON or local paths', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-setup-plain-'));
+  const bundlePath = join(dir, 'bundle.json');
+  const outDir = join(dir, 'out');
+  try {
+    const io = makeIo();
+    assert.equal(await main(['setup', '--bundle', bundlePath, '--out-dir', outDir, '--overwrite', '--plain'], io.io), 0, io.stderr());
+    const stdout = io.stdout();
+
+    assert.match(stdout, /^Enigma setup\n/);
+    assert.match(stdout, /Status: Ready/);
+    assert.match(stdout, /Memory Drive: <bundle-path>/);
+    assert.match(stdout, /Connectors: planned only/);
+    assert.match(stdout, /Next: enigma remember --bundle "<bundle-path>" --text-file \.\/memory\.txt/);
+    assert.match(stdout, /Boundary: local Enigma setup only/);
+    assert.doesNotMatch(stdout, /^\s*\{/);
+    assert.equal(stdout.includes(dir), false);
+    assert.equal(stdout.includes(bundlePath), false);
+    assert.equal(stdout.includes(outDir), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

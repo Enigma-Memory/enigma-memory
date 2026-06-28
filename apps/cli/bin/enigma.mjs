@@ -1454,7 +1454,7 @@ export async function setupCommand(flags, io) {
   const ok = artifacts.verifyReport.ok === true;
   const anyConnectorWritePerformed = connectors.some((connector) => connector.connect_plan.writes_performed === true);
 
-  print({
+  const summary = {
     ok,
     schema: 'enigma.setup.v1',
     command: 'enigma setup',
@@ -1491,7 +1491,8 @@ export async function setupCommand(flags, io) {
     next_commands: setupNextCommands(displays.bundle, displays.export, clients, connectorWritesRequested && (!connectInstalled || anyConnectorWritePerformed)),
     checks: doctor.checks,
     claim_boundaries: { ...SETUP_CLAIM_BOUNDARIES, hosted_saas_live: false, raw_memory_printed: false, solana_required: false, browser_extension_required: false },
-  }, io);
+  };
+  printSetupSummary(summary, flags, io);
   return ok ? 0 : 1;
 }
 
@@ -2025,6 +2026,29 @@ function renderNextActionPlain(action) {
   lines.push('Boundary: local Enigma status only; no raw memory or outside-Enigma control claims.');
   return `${lines.join('\n')}\n`;
 }
+function renderSetupPlain(summary) {
+  const lines = [
+    'Enigma setup',
+    `Status: ${summary.ok ? 'Ready' : 'Needs attention'}`,
+    `Memory Drive: ${summary.bundle}`,
+    `Memories: ${summary.memory_count}`,
+    `Connectors: ${summary.client_configs_written ? 'configured' : 'planned only'}`,
+  ];
+  if (summary.dry_run) lines.push('Mode: dry run; no files were written.');
+  if (Array.isArray(summary.connector_write_skips) && summary.connector_write_skips.length > 0) {
+    lines.push(`Skipped: ${summary.connector_write_skips.length} client config(s) were not present.`);
+  }
+  const next = Array.isArray(summary.next_commands) ? summary.next_commands.slice(0, 3) : [];
+  for (const command of next) lines.push(`Next: ${command}`);
+  lines.push('Boundary: local Enigma setup only; no raw memory, local paths, provider deletion, model behavior, hosted service, or signing claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printSetupSummary(summary, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderSetupPlain(summary));
+  else print(summary, io);
+}
+
 
 function renderDoctorPlain(summary) {
   const lines = [
@@ -3870,6 +3894,7 @@ function usage() {
       '--overwrite': 'Replace existing local setup artifacts.',
       '--dry-run': 'Plan setup without writing local artifacts or client configs.',
       '--write-connectors': 'Also write selected client MCP config files. Defaults to false.',
+      '--plain': 'Print a human-readable setup summary with next commands instead of JSON. Alias: --text or --format text.',
     },
     install_options: {
       'one-command installed clients': 'npm install -g enigma-memory && enigma setup --client auto --connect-installed --overwrite',
