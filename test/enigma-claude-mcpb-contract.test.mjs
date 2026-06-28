@@ -10,7 +10,7 @@ import {
   createClaudeDesktopMcpbManifest,
   planConnectWizard,
 } from '../packages/connectors/src/index.js';
-import { buildClaudeMcpbPackage } from '../scripts/build-claude-mcpb-package.mjs';
+import { buildClaudeMcpbPackage, createClaudeMcpbRuntimePackageJson } from '../scripts/build-claude-mcpb-package.mjs';
 
 const PRIVATE_STRINGS = [
   'C:\\Users\\Casey',
@@ -56,6 +56,9 @@ test('Claude Desktop mcpb manifest is public-safe command metadata only', () => 
   assert.equal(manifest.user_config.enigma_bundle.required, true);
   assert.deepEqual(manifest.environment_names, ['ENIGMA_BUNDLE']);
   assert.equal(manifest.spec_reference.package_shape, 'zip_with_manifest_json');
+  assert.equal(manifest.runtime_package_scope.package_json_included, true);
+  assert.equal(manifest.runtime_package_scope.module_type, 'module');
+  assert.equal(manifest.runtime_package_scope.scripts_included, false);
   assert.deepEqual(manifest.supported_platforms, ['win32', 'darwin', 'linux']);
   assert.equal(manifest.public_safety.raw_config_body_included, false);
   assert.equal(manifest.public_safety.local_absolute_path_included, false);
@@ -172,15 +175,24 @@ test('Claude Desktop mcpb package builder writes deterministic public-safe artif
   assert.match(report.package.mcpb_sha256, /^sha256:[a-f0-9]{64}$/);
   assert.ok(mcpbStat.size > 0);
   assert.deepEqual(written.package.deterministic_order, report.package.deterministic_order);
-  assert.deepEqual(report.package.deterministic_order.slice(0, 3), [
+  assert.deepEqual(report.package.deterministic_order.slice(0, 4), [
     'apps/verifier/bin/enigma-verify.mjs',
     'manifest.json',
+    'package.json',
     'packages/controller/src/index.js',
   ]);
   assert.ok(report.package.deterministic_order.includes('packages/mcp-server/bin/enigma-mcp.mjs'));
   assert.equal(report.package.install_performed, false);
   assert.equal(report.package.provider_launched, false);
   assert.equal(report.package.network_performed, false);
+  assert.equal(report.runtime_package.path, 'package.json');
+  assert.equal(report.runtime_package.type, 'module');
+  assert.equal(report.runtime_package.scripts_included, false);
+  assert.equal(report.runtime_package.dependencies_included, false);
+  const runtimePackage = createClaudeMcpbRuntimePackageJson('1.2.3');
+  assert.equal(runtimePackage.type, 'module');
+  assert.equal(Object.hasOwn(runtimePackage, 'scripts'), false);
+  assert.equal(Object.hasOwn(runtimePackage, 'dependencies'), false);
   assert.doesNotMatch(JSON.stringify(report), new RegExp(dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assertPublicSafe(report);
 });

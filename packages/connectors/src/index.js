@@ -731,6 +731,13 @@ export function createClaudeDesktopMcpbManifest(options = {}) {
       note: 'Requires Enigma Desktop bundled runtime or an Enigma-managed MCP bridge; the public manifest does not carry local paths or config bodies.',
     },
     required_runtime_note: 'Requires Enigma Desktop bundled runtime or an Enigma-managed MCP bridge; the public manifest does not carry local paths or config bodies.',
+    runtime_package_scope: {
+      package_json_included: true,
+      package_json_path: 'package.json',
+      module_type: 'module',
+      scripts_included: false,
+      dependencies_included: false,
+    },
     spec_reference: {
       manifest_spec: 'modelcontextprotocol/mcpb MANIFEST.md',
       package_shape: 'zip_with_manifest_json',

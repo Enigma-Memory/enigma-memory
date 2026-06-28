@@ -53,6 +53,23 @@ function sha256(buffer) {
   return `sha256:${createHash('sha256').update(buffer).digest('hex')}`;
 }
 
+export function createClaudeMcpbRuntimePackageJson(version) {
+  return {
+    name: 'enigma-memory-claude-mcpb-runtime',
+    version,
+    private: true,
+    type: 'module',
+    description: 'Minimal package scope for the Enigma Memory Claude MCPB runtime.',
+    license: 'MIT',
+    enigma: {
+      package_scope_only: true,
+      scripts_included: false,
+      dependencies_included: false,
+      local_paths_included: false,
+    },
+  };
+}
+
 
 async function readPackageVersion() {
   const pkg = JSON.parse(await readFile(resolve(PROJECT_ROOT, 'package.json'), 'utf8'));
@@ -78,8 +95,11 @@ export async function buildClaudeMcpbPackage(options = {}) {
   const version = options.version ?? await readPackageVersion();
   const manifest = createClaudeDesktopMcpbManifest({ version });
   const manifestBuffer = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+  const runtimePackage = createClaudeMcpbRuntimePackageJson(version);
+  const runtimePackageBuffer = Buffer.from(`${JSON.stringify(runtimePackage, null, 2)}\n`, 'utf8');
   const files = [
     { path: 'manifest.json', buffer: manifestBuffer, size: manifestBuffer.byteLength, sha256: sha256(manifestBuffer) },
+    { path: 'package.json', buffer: runtimePackageBuffer, size: runtimePackageBuffer.byteLength, sha256: sha256(runtimePackageBuffer) },
     ...await runtimeEntries(),
   ].sort((a, b) => a.path.localeCompare(b.path));
   const zip = createDeterministicZip(files);
@@ -107,6 +127,15 @@ export async function buildClaudeMcpbPackage(options = {}) {
       install_performed: false,
       provider_launched: false,
       network_performed: false,
+    },
+    runtime_package: {
+      path: 'package.json',
+      name: runtimePackage.name,
+      type: runtimePackage.type,
+      private: runtimePackage.private,
+      scripts_included: false,
+      dependencies_included: false,
+      local_paths_included: false,
     },
     files: files.map((file) => ({ path: file.path, size: file.size, sha256: file.sha256 })),
     claim_boundaries: {

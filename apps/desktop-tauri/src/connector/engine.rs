@@ -1709,7 +1709,10 @@ mod tests {
             manifest["server"]["entry_point"].as_str(),
             Some("packages/mcp-server/bin/enigma-mcp.mjs")
         );
-        assert_eq!(manifest["server"]["mcp_config"]["command"].as_str(), Some("node"));
+        assert_eq!(
+            manifest["server"]["mcp_config"]["command"].as_str(),
+            Some("node")
+        );
         assert_eq!(
             manifest["server"]["mcp_config"]["args"][0].as_str(),
             Some("packages/mcp-server/bin/enigma-mcp.mjs")
@@ -1721,6 +1724,14 @@ mod tests {
         assert_eq!(
             manifest["user_config"]["enigma_bundle"]["type"].as_str(),
             Some("file")
+        );
+        assert_eq!(
+            manifest["runtime_package_scope"]["package_json_included"].as_bool(),
+            Some(true)
+        );
+        assert_eq!(
+            manifest["runtime_package_scope"]["module_type"].as_str(),
+            Some("module")
         );
         assert!(!s.contains("C:\\"));
         assert!(!s.contains("/home/"));
