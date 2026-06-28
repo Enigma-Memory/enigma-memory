@@ -31,6 +31,10 @@ const PRODUCTION_WORKPLAN_SCRIPT = 'scripts/build-production-workplan.mjs';
 const PRODUCTION_STATUS_BOARD_SCRIPT = 'scripts/build-production-status-board.mjs';
 const AI_ORCHESTRATION_PLAN_SCRIPT = 'scripts/build-ai-orchestration-plan.mjs';
 const CLOUDFLARE_CREDENTIALS_SCRIPT = 'scripts/validate-cloudflare-credentials.mjs';
+const PUBLIC_BETA_QA_MATRIX_SCRIPT = 'scripts/run-public-beta-qa-matrix.mjs';
+const CLEAN_MACHINE_SMOKE_SCRIPT = 'scripts/run-clean-machine-smoke.mjs';
+const SUPPORT_DRY_RUN_SCRIPT = 'scripts/build-support-dry-run-summary.mjs';
+const CLAUDE_MCPB_PACKAGE_SCRIPT = 'scripts/build-claude-mcpb-package.mjs';
 const INFRASTRUCTURE_READINESS_SCHEMA = 'enigma.infrastructure_readiness.v1';
 const INFRASTRUCTURE_READINESS_MANIFEST_SCHEMA = 'enigma.infrastructure_readiness_manifest.v1';
 const INFRASTRUCTURE_READINESS_SCRIPT = 'scripts/infrastructure-readiness.mjs';
@@ -1552,6 +1556,14 @@ test('preflight release audit wiring is local-only and documented', async () => 
   assert.equal(packageFilesCover(pkg, AI_ORCHESTRATION_PLAN_SCRIPT), true, 'AI orchestration plan script must be included in the package file list');
   assert.equal(pkg.scripts?.['production:cloudflare-credentials'], `node ${CLOUDFLARE_CREDENTIALS_SCRIPT}`);
   assert.equal(packageFilesCover(pkg, CLOUDFLARE_CREDENTIALS_SCRIPT), true, 'Cloudflare credentials validator must be included in the package file list');
+  assert.equal(pkg.scripts?.['public-beta-qa'], `node ${PUBLIC_BETA_QA_MATRIX_SCRIPT} --json`);
+  assert.equal(packageFilesCover(pkg, PUBLIC_BETA_QA_MATRIX_SCRIPT), true, 'public beta QA matrix script must be included in the package file list');
+  assert.equal(pkg.scripts?.['clean-machine-smoke'], `node ${CLEAN_MACHINE_SMOKE_SCRIPT} --json`);
+  assert.equal(packageFilesCover(pkg, CLEAN_MACHINE_SMOKE_SCRIPT), true, 'clean-machine smoke script must be included in the package file list');
+  assert.equal(pkg.scripts?.['production:support-dry-run'], `node ${SUPPORT_DRY_RUN_SCRIPT}`);
+  assert.equal(packageFilesCover(pkg, SUPPORT_DRY_RUN_SCRIPT), true, 'support dry-run script must be included in the package file list');
+  assert.equal(pkg.scripts?.['claude:mcpb:package'], `node ${CLAUDE_MCPB_PACKAGE_SCRIPT}`);
+  assert.equal(packageFilesCover(pkg, CLAUDE_MCPB_PACKAGE_SCRIPT), true, 'Claude MCPB package script must be included in the package file list');
 
   const auditSource = await readFile(new URL(`../${RELEASE_AUDIT_SCRIPT}`, import.meta.url), 'utf8');
   assert.match(auditSource, /nodeTestInvocation/, 'release audit must run the Node test runner directly instead of nesting npm test inside npm run release:audit');
