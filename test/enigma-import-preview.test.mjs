@@ -220,6 +220,7 @@ test('CLI text import previews curated notes without raw note output', async () 
 test('CLI text import with write-vault returns sanitized batch receipt', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'enigma-import-text-write-cli-'));
   const bundle = join(dir, 'bundle.json');
+  const reportOut = join(dir, 'raw-report.json');
   const source = join(dir, 'memories.md');
   const note = 'Vault write receipt should hide this note';
   await writeFile(source, `- ${note}\n`, 'utf8');
@@ -228,7 +229,7 @@ test('CLI text import with write-vault returns sanitized batch receipt', async (
   assert.equal(await main(['quickstart', '--bundle', bundle, '--overwrite'], quickstart.io), 0, quickstart.stderr());
 
   const io = makeIo();
-  assert.equal(await main(['import', 'text', '--file', source, '--complete', '--write-vault', '--bundle', bundle], io.io), 0, io.stderr());
+  assert.equal(await main(['import', 'text', '--file', source, '--complete', '--write-vault', '--bundle', bundle, '--out', reportOut], io.io), 0, io.stderr());
   const stdout = io.stdout();
   const preview = io.json();
 
@@ -242,6 +243,27 @@ test('CLI text import with write-vault returns sanitized batch receipt', async (
   assert.equal(preview.import_batch_receipt.rollback_boundary.tombstone_or_undo_requires_local_vault_access, true);
   assert.equal(stdout.includes(note), false);
   assert.equal(stdout.includes(dir), false);
+
+  const rollback = makeIo();
+  assert.equal(await main(['import', 'rollback', '--file', reportOut, '--bundle', bundle, '--now', NOW], rollback.io), 0, rollback.stderr());
+  const rollbackStdout = rollback.stdout();
+  const rollbackReceipt = rollback.json();
+  assert.equal(rollbackReceipt.schema, 'enigma.import_rollback_receipt.v1');
+  assert.equal(rollbackReceipt.requested_write_count, 1);
+  assert.equal(rollbackReceipt.tombstoned_count, 1);
+  assert.equal(rollbackReceipt.skipped_count, 0);
+  assert.equal(rollbackReceipt.tombstones[0].memory_addr_commitment, preview.import_batch_receipt.writes[0].memory_addr_commitment);
+  assert.equal(rollbackReceipt.tombstones[0].receipt_hash.startsWith('sha256:'), true);
+  assert.equal(rollbackReceipt.claim_boundaries.raw_memory_returned, false);
+  assert.equal(rollbackStdout.includes(note), false);
+  assert.equal(rollbackStdout.includes(dir), false);
+
+  const rollbackAgain = makeIo();
+  assert.equal(await main(['import', 'rollback', '--file', reportOut, '--bundle', bundle, '--now', NOW], rollbackAgain.io), 0, rollbackAgain.stderr());
+  const secondReceipt = rollbackAgain.json();
+  assert.equal(secondReceipt.tombstoned_count, 0);
+  assert.equal(secondReceipt.skipped_count, 1);
+  assert.equal(secondReceipt.skipped[0].reason_code, 'already_tombstoned');
 });
 
 test('import batch receipt handles preview-only reports without raw content', () => {

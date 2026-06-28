@@ -398,6 +398,10 @@ function sha256Json(value) {
   return `sha256:${createHash('sha256').update(JSON.stringify(value)).digest('hex')}`;
 }
 
+function sha256PublicValue(value) {
+  return `sha256:${createHash('sha256').update(typeof value === 'string' ? value : JSON.stringify(value)).digest('hex')}`;
+}
+
 function contextPackPublicDigest(pack) {
   return sha256Json({
     schema: pack.schema,
@@ -2487,6 +2491,97 @@ export async function importCommand(source, flags, io, positionalFile = undefine
   return report.memory_candidates?.length > 0 || report.ok === true ? 0 : 1;
 }
 
+function importWriteMemoryAddr(write) {
+  if (!write || typeof write !== 'object') return undefined;
+  return typeof write.memory_addr === 'string' && write.memory_addr.length > 0 ? write.memory_addr : undefined;
+}
+
+function importRollbackCandidateRef(write, index) {
+  const candidateId = write?.candidate_id ?? `candidate_${index}`;
+  return `ref:import-candidate:${String(candidateId).replace(/[^A-Za-z0-9._~:@#?=&%+-]/gu, '_')}`;
+}
+
+function publicDeleteReceiptHash(result) {
+  if (typeof result?.receipt?.receipt_hash === 'string') return result.receipt.receipt_hash;
+  if (typeof result?.receipt?.receipt_id === 'string') return sha256Json(result.receipt.receipt_id);
+  return sha256Json(result ?? {});
+}
+
+export async function importRollbackCommand(flags, io, positionalFile = undefined) {
+  const reportPath = resolve(String(requireFileArg(flags, ['file', 'report', 'import-report', 'importReport'], positionalFile, 'file')));
+  const report = await readJson(reportPath);
+  const writes = Array.isArray(report.vault_writes) ? report.vault_writes : [];
+  const bundlePath = resolve(String(getFlag(flags, ['bundle'], DEFAULT_BUNDLE)));
+  const { vault, passport } = await loadState(bundlePath, { passphrase: getFlag(flags, ['passphrase']) });
+  const now = getFlag(flags, ['now']);
+  const generatedAt = now && now !== true ? String(now) : new Date().toISOString();
+  const tombstones = [];
+  const skipped = [];
+  for (let index = 0; index < writes.length; index += 1) {
+    const write = writes[index];
+    const memoryAddr = importWriteMemoryAddr(write);
+    const candidateRef = importRollbackCandidateRef(write, index);
+    const memoryAddrCommitment = sha256PublicValue(memoryAddr ?? candidateRef);
+    if (!memoryAddr) {
+      skipped.push({ candidate_ref: candidateRef, memory_addr_commitment: memoryAddrCommitment, reason_code: 'memory_addr_missing' });
+      continue;
+    }
+    if (vault.tombstones.has(memoryAddr)) {
+      skipped.push({ candidate_ref: candidateRef, memory_addr_commitment: memoryAddrCommitment, reason_code: 'already_tombstoned' });
+      continue;
+    }
+    if (!vault.activeAddresses.has(memoryAddr)) {
+      skipped.push({ candidate_ref: candidateRef, memory_addr_commitment: memoryAddrCommitment, reason_code: 'not_active' });
+      continue;
+    }
+    const result = deleteMemory({
+      vault,
+      passport,
+      memory_addr: memoryAddr,
+      reason: getFlag(flags, ['reason'], 'import_rollback'),
+      now: generatedAt,
+    });
+    tombstones.push({
+      candidate_ref: candidateRef,
+      memory_addr_commitment: memoryAddrCommitment,
+      tombstone_ref: `ref:import-rollback-tombstone:${sha256Json(result.tombstone).slice('sha256:'.length, 'sha256:'.length + 32)}`,
+      receipt_hash: publicDeleteReceiptHash(result),
+      event_commitment: sha256Json(result.event ?? {}),
+    });
+  }
+  if (tombstones.length > 0) await persistState(bundlePath, vault, { passphrase: getFlag(flags, ['passphrase']) });
+  const receipt = {
+    schema: 'enigma.import_rollback_receipt.v1',
+    ok: true,
+    generated_at: generatedAt,
+    report_ref: `ref:import-report:${report.report_id ?? sha256Json(report)}`,
+    source_file: '<import-report-file>',
+    source_file_redacted: true,
+    bundle: publicPathDisplay(bundlePath, 'bundle-path'),
+    requested_write_count: writes.length,
+    tombstoned_count: tombstones.length,
+    skipped_count: skipped.length,
+    tombstones,
+    skipped,
+    roots: {
+      tombstone_root: sha256Json(tombstones.map((item) => item.tombstone_ref)),
+      receipt_root: sha256Json(tombstones.map((item) => item.receipt_hash)),
+      skipped_root: sha256Json(skipped),
+    },
+    claim_boundaries: {
+      local_enigma_vault_only: true,
+      provider_deletion_proof: false,
+      model_forgetting_proof: false,
+      raw_memory_returned: false,
+      local_paths_redacted: true,
+    },
+  };
+  const out = getFlag(flags, ['out']);
+  if (out && out !== true) await writeJson(resolve(String(out)), receipt);
+  print(receipt, io);
+  return 0;
+}
+
 export async function capsuleExportCommand(flags, io, positionalFile = undefined) {
   const file = resolve(requireFileArg(flags, ['file', 'report'], positionalFile, 'file'));
   const input = await readJson(file);
@@ -3567,6 +3662,7 @@ function usage() {
     },
     import_options: {
       'enigma import <source> --file <export.json>': 'Preview import candidates locally without printing memory plaintext.',
+      'enigma import rollback --file <raw-import-report.json> --bundle <bundle.json>': 'Tombstone memories written by a prior import report and emit a public-safe rollback receipt.',
       '--out <path>': 'Write the raw local import report for capsule export or review. CLI stdout remains a public-safe preview.',
       '--write-vault': 'Explicitly write accepted importer candidates into the selected local bundle.',
       '--bundle <path>': 'Bundle JSON to write when --write-vault is present. Defaults to .enigma/bundle.json.',
@@ -3636,6 +3732,7 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     if (command === 'passport' && subcommand === 'status') return await statusCommand(flags, io);
     if (command === 'drive' && subcommand === 'health') return await driveHealthCommand(flags, io);
     if (command === 'export') return await exportCommand(flags, io);
+    if (command === 'import' && subcommand === 'rollback') return await importRollbackCommand(flags, io, positionalFile);
     if (command === 'import') return await importCommand(subcommand, flags, io, positionalFile);
     if (command === 'capsule' && subcommand === 'export') return await capsuleExportCommand(flags, io, positionalFile);
     if (command === 'capsule' && subcommand === 'import') return await capsuleImportCommand(flags, io, positionalFile);

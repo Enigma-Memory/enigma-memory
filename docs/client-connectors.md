@@ -483,6 +483,12 @@ enigma capsule export --file ./enigma-import-report.json --out ./enigma-capsule.
 enigma capsule import --file ./enigma-capsule.json --bundle "$HOME/.enigma/bundle.json"
 ```
 
+Rollback a local import with the private raw report that was written by `--out`:
+
+```sh
+enigma import rollback --file ./enigma-import-report.json --bundle "$HOME/.enigma/bundle.json"
+```
+
 Imported source memories carry limitations and completeness status. They become Enigma-canonical only after writing through the local vault and receiving Enigma receipts.
 
 ## Honesty boundaries for client setup

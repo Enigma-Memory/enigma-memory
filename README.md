@@ -61,7 +61,7 @@ Optional instant-value import preview:
 enigma import text --file ./memories.md --complete
 ```
 
-This prints a public-safe preview/receipt only, including duplicate groups/counts. Raw notes stay local and nothing is written to the vault unless an explicit import path is approved; approved `--write-vault` imports return a sanitized batch receipt with write refs and receipt hashes.
+This prints a public-safe preview/receipt only, including duplicate groups/counts. Raw notes stay local and nothing is written to the vault unless an explicit import path is approved; approved `--write-vault` imports return a sanitized batch receipt with write refs and receipt hashes. To undo a local import, keep the private raw report written with `--out` and run `enigma import rollback --file <raw-report.json> --bundle <bundle.json>`.
 
 Preview a single client before writing:
 
