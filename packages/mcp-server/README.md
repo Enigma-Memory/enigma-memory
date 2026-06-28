@@ -25,6 +25,10 @@ The generated server entry uses command `enigma-mcp`, no args, and `ENIGMA_BUNDL
 
 `enigma_next_action` is safe before setup. If the bundle is missing it returns `enigma.next_action.v1` with `state:"setup_needed"` and the `enigma_init` tool as the next action instead of throwing. After setup it points the client at `enigma_remember`/import or app-connection work, while keeping paths and raw memory out of the response.
 
+## Import preview
+
+`enigma_import_preview` lets a client preview user-provided text or Markdown memory candidates without writing the vault. The response contains counts, duplicate groups, commitments, receipt/action metadata, and no raw memory text.
+
 ## Grant-gated context
 
 `enigma_context_pack` can require a Memory Controller grant before returning local context. Pass `require_grant:true` with `grant` or `grants`; pass `revoked_grant_refs` to make stale active grants fail closed. Missing, expired, revoked, or mismatched grants return `enigma.context_pack_recall_blocked.v1` with `context_pack_returned:false` and no memory payload.

@@ -16,6 +16,8 @@ import {
 import {
   assertImmuneIngressPublicSafe,
   createImmuneIngressReport,
+  createImportPreview,
+  importTextMemoryList,
 } from '../../importers/src/index.js';
 import {
   CONSENT_GRANT_JSON_SCHEMA,
@@ -289,6 +291,13 @@ function validateToolArguments(name, args) {
       optionalString(args, 'memory_addr', name);
       optionalString(args, 'purpose', name);
       optionalLimit(args, 'limit', name);
+      return args;
+    case 'enigma_import_preview':
+      rejectAdditionalProperties(args, new Set(['text', 'complete', 'now', 'confidence']), name);
+      optionalString(args, 'text', name);
+      optionalBoolean(args, 'complete', name);
+      optionalString(args, 'now', name);
+      optionalString(args, 'confidence', name);
       return args;
     case 'enigma_context_pack':
       rejectAdditionalProperties(args, new Set([
@@ -606,6 +615,20 @@ export const toolDescriptors = [
         metadata: { type: 'object' },
       },
       required: ['text'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'enigma_import_preview',
+    description: 'Preview user-provided text or Markdown memories without writing the vault or returning raw memory text.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string' },
+        complete: { type: 'boolean' },
+        now: { type: 'string' },
+        confidence: { type: 'string' },
+      },
       additionalProperties: false,
     },
   },
@@ -1256,6 +1279,29 @@ export async function enigma_next_action(input = {}) {
   };
 }
 
+export async function enigma_import_preview(input = {}) {
+  input = validateToolArguments('enigma_import_preview', input);
+  const report = importTextMemoryList(input.text ?? '', {
+    now: input.now,
+    complete: input.complete === true,
+    confidence: input.confidence,
+  });
+  const preview = createImportPreview(report, { now: input.now });
+  return {
+    ...preview,
+    mcp_tool: 'enigma_import_preview',
+    vault_write_performed: false,
+    claim_boundaries: {
+      ...preview.claim_boundaries,
+      local_preview_only: true,
+      mcp_request_may_contain_private_text: true,
+      raw_memory_returned: false,
+      provider_deletion_proof: false,
+      model_forgetting_proof: false,
+    },
+  };
+}
+
 export async function enigma_remember(input = {}) {
   input = validateToolArguments('enigma_remember', input);
   const path = bundlePath(input);
@@ -1478,6 +1524,7 @@ export const handlers = Object.freeze({
   enigma_next_action,
   enigma_init,
   enigma_remember,
+  enigma_import_preview,
   enigma_search,
   enigma_context_pack,
   enigma_delete,
@@ -1705,6 +1752,7 @@ export default {
   enigma_init,
   enigma_next_action,
   enigma_remember,
+  enigma_import_preview,
   enigma_search,
   enigma_context_pack,
   enigma_delete,

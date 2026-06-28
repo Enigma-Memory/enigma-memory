@@ -456,7 +456,7 @@ enigma connect generic-mcp
 printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"manual","version":"0"}}}\n{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}\n' | ENIGMA_BUNDLE="$HOME/.enigma/bundle.json" enigma-mcp
 ```
 
-Expected behavior: the response lists Enigma tools (`enigma_init`, `enigma_next_action`, `enigma_remember`, `enigma_search`, `enigma_context_pack`, `enigma_delete`, `enigma_verify_receipts`, `enigma_memory_weather`, `enigma_consent_grant`, `enigma_recall_veto`, `enigma_private_bubble`), the `enigma://passport/summary` resource, and the `enigma_standard_memory_prompt` prompt. This only verifies the local MCP process and bundle path. It does not prove that a hosted provider deleted memory or forgot anything.
+Expected behavior: the response lists Enigma tools (`enigma_init`, `enigma_next_action`, `enigma_remember`, `enigma_import_preview`, `enigma_search`, `enigma_context_pack`, `enigma_delete`, `enigma_verify_receipts`, `enigma_memory_weather`, `enigma_consent_grant`, `enigma_recall_veto`, `enigma_private_bubble`), the `enigma://passport/summary` resource, and the `enigma_standard_memory_prompt` prompt. This only verifies the local MCP process and bundle path. It does not prove that a hosted provider deleted memory or forgot anything.
 
 ## Import/export commands for migrations
 

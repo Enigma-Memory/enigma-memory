@@ -481,6 +481,7 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
   assert.ok(names.includes('enigma_next_action'));
   assert.ok(names.includes('enigma_remember'));
   assert.ok(names.includes('enigma_search'));
+  assert.ok(names.includes('enigma_import_preview'));
   assert.ok(names.includes('enigma_context_pack'));
   const contextPackTool = list.result.tools.find((tool) => tool.name === 'enigma_context_pack');
   assert.equal(contextPackTool.inputSchema.properties.revoked_grant_refs.items.pattern.startsWith('^ref:'), true);
@@ -493,6 +494,19 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
   assert.ok(names.includes('enigma_settlement_receipt'));
   assert.ok(names.includes('enigma_settlement_verify'));
   assert.ok(names.includes('enigma_settlement_batch'));
+  const previewText = 'mcp import preview private sentinel';
+  const importPreview = await callTool('import-preview', 'enigma_import_preview', {
+    text: `- ${previewText}\n- ${previewText}`,
+    complete: true,
+    now: '2026-06-28T13:30:00.000Z',
+  });
+  assert.equal(importPreview.result.schema, 'enigma.import_preview.v1');
+  assert.equal(importPreview.result.mcp_tool, 'enigma_import_preview');
+  assert.equal(importPreview.result.vault_write_performed, false);
+  assert.equal(importPreview.result.import_decision, 'needs_review');
+  assert.equal(importPreview.result.duplicate_groups.length, 1);
+  assert.equal(importPreview.result.claim_boundaries.raw_memory_returned, false);
+  assert.doesNotMatch(JSON.stringify(importPreview.response), /mcp import preview private sentinel/);
 
   const tempRoot = process.env.TEMP ?? process.env.TMP ?? '.';
   const dir = `${tempRoot}/enigma-network-${process.pid}-${Date.now()}`;
