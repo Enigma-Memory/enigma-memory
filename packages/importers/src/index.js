@@ -648,6 +648,38 @@ function importPreviewCounts(candidates) {
   return { confidence, recommended_actions };
 }
 
+function importPreviewDecision(candidates, counts) {
+  if (candidates.length === 0) return 'empty';
+  if (counts.recommended_actions.review_before_import > 0) return 'needs_review';
+  return 'ready_for_import';
+}
+
+function importPreviewPrimaryAction(decision) {
+  const actions = {
+    empty: {
+      id: 'choose_import_file',
+      label: 'Choose memory file',
+      description: 'Pick a local memory export or curated memory list to preview.',
+    },
+    needs_review: {
+      id: 'review_import_candidates',
+      label: 'Review before importing',
+      description: 'Review low-confidence, incomplete, or caveated candidates before anything is written.',
+    },
+    ready_for_import: {
+      id: 'approve_import',
+      label: 'Import selected memories',
+      description: 'Approve this local import batch before Enigma writes candidates into the vault.',
+    },
+  };
+  return {
+    ...actions[decision],
+    writes_vault: decision === 'ready_for_import',
+    requires_explicit_approval: true,
+    public_safe: true,
+  };
+}
+
 export function createImportPreview(input, options = {}) {
   const reports = normalizeReportsForPreview(input);
   const candidates = importPreviewCandidates(reports);
@@ -656,16 +688,20 @@ export function createImportPreview(input, options = {}) {
   const importers = uniqueStrings(reports.map((report) => report.importer).filter(Boolean));
   const limitations = uniqueStrings(reports.flatMap((report) => asArray(report.limitations).filter((item) => typeof item === 'string')));
   const candidateRefs = candidates.map((candidate) => candidate.candidate_ref);
+  const counts = importPreviewCounts(candidates);
+  const decision = importPreviewDecision(candidates, counts);
+  const generatedAt = nowFrom(options);
+  const previewId = `preview_${shortHash({ reportRefs, candidateRefs, generated_at: generatedAt })}`;
   const preview = {
     schema: PREVIEW_SCHEMA,
-    preview_id: `preview_${shortHash({ reportRefs, candidateRefs, generated_at: nowFrom(options) })}`,
-    generated_at: nowFrom(options),
+    preview_id: previewId,
+    generated_at: generatedAt,
     report_count: reports.length,
     importers,
     source_types: sourceTypes,
     candidate_count: candidates.length,
     candidates,
-    counts: importPreviewCounts(candidates),
+    counts,
     limitations,
     roots: {
       report_root: new MerkleSet(reportRefs).root(),
@@ -676,6 +712,19 @@ export function createImportPreview(input, options = {}) {
       raw_plaintext_returned: false,
       default_action: 'preview_only',
       write_requires_explicit_approval: true,
+      public_artifact_policy: 'hashes_counts_refs_and_commitments_only',
+    },
+    import_decision: decision,
+    primary_action: importPreviewPrimaryAction(decision),
+    preview_receipt: {
+      schema: 'enigma.import_preview_receipt.v1',
+      preview_ref: `ref:import-preview:${previewId}`,
+      candidate_count: candidates.length,
+      ready_for_import_count: counts.recommended_actions.ready_for_import,
+      review_before_import_count: counts.recommended_actions.review_before_import,
+      explicit_import_required: true,
+      raw_plaintext_returned: false,
+      vault_write_performed: false,
       public_artifact_policy: 'hashes_counts_refs_and_commitments_only',
     },
   };

@@ -31,6 +31,13 @@ test('import preview summarizes candidates without returning plaintext', () => {
   assert.equal(preview.private_plaintext_boundary.raw_plaintext_returned, false);
   assert.equal(preview.private_plaintext_boundary.default_action, 'preview_only');
   assert.equal(preview.private_plaintext_boundary.write_requires_explicit_approval, true);
+  assert.equal(preview.import_decision, 'needs_review');
+  assert.equal(preview.primary_action.id, 'review_import_candidates');
+  assert.equal(preview.primary_action.requires_explicit_approval, true);
+  assert.equal(preview.preview_receipt.schema, 'enigma.import_preview_receipt.v1');
+  assert.equal(preview.preview_receipt.preview_ref, `ref:import-preview:${preview.preview_id}`);
+  assert.equal(preview.preview_receipt.raw_plaintext_returned, false);
+  assert.equal(preview.preview_receipt.vault_write_performed, false);
   assert.equal(preview.candidates[0].candidate_ref.startsWith('ref:import-candidate:cand_'), true);
   assert.equal(preview.candidates[0].content_commitment.startsWith('sha256:'), true);
   assert.equal(preview.candidates[0].metadata_commitment.startsWith('sha256:'), true);
@@ -64,9 +71,31 @@ test('import preview combines reports and keeps action counts public-safe', () =
   assert.equal(preview.counts.confidence.low, 1);
   assert.equal(preview.counts.recommended_actions.ready_for_import, 1);
   assert.equal(preview.counts.recommended_actions.review_before_import, 1);
+  assert.equal(preview.import_decision, 'needs_review');
+  assert.equal(preview.primary_action.id, 'review_import_candidates');
+  assert.equal(preview.preview_receipt.ready_for_import_count, 1);
+  assert.equal(preview.preview_receipt.review_before_import_count, 1);
   assert.equal(preview.roots.report_root.startsWith('sha256:'), true);
   assert.equal(preview.roots.candidate_preview_root.startsWith('sha256:'), true);
   assert.equal(preview.roots.content_commitment_root.startsWith('sha256:'), true);
+});
+
+test('import preview exposes approve action only when every candidate is ready', () => {
+  const report = importChatGptExport({
+    complete: true,
+    memories: [{ id: 'ready', memory: 'stable preference candidate', confidence: 'high', kind: 'preference', limitations: [] }],
+    limitations: [],
+  }, { now: NOW });
+  report.limitations = [];
+  report.memory_candidates[0].limitations = [];
+
+  const preview = createImportPreview(report, { now: NOW });
+
+  assert.equal(preview.import_decision, 'ready_for_import');
+  assert.equal(preview.primary_action.id, 'approve_import');
+  assert.equal(preview.primary_action.writes_vault, true);
+  assert.equal(preview.preview_receipt.ready_for_import_count, 1);
+  assert.equal(preview.preview_receipt.review_before_import_count, 0);
 });
 
 test('import preview handles empty input as a safe preview-only artifact', () => {
@@ -78,6 +107,9 @@ test('import preview handles empty input as a safe preview-only artifact', () =>
   assert.deepEqual(preview.candidates, []);
   assert.deepEqual(preview.counts.recommended_actions, { ready_for_import: 0, review_before_import: 0 });
   assert.equal(preview.private_plaintext_boundary.raw_plaintext_returned, false);
+  assert.equal(preview.import_decision, 'empty');
+  assert.equal(preview.primary_action.id, 'choose_import_file');
+  assert.equal(preview.preview_receipt.candidate_count, 0);
 });
 
 function makeIo() {
@@ -112,6 +144,8 @@ test('CLI import prints a public-safe preview and redacts local paths', async ()
   assert.equal(preview.raw_report_written, true);
   assert.equal(preview.report_out, '<out>');
   assert.equal(preview.claim_boundaries.raw_memory_printed, false);
+  assert.equal(preview.preview_receipt.schema, 'enigma.import_preview_receipt.v1');
+  assert.equal(preview.primary_action.requires_explicit_approval, true);
   assert.equal(stdout.includes(PRIVATE_MEMORY), false);
   assert.equal(stdout.includes(dir), false);
   assert.equal(rawReport.memory_candidates[0].content, PRIVATE_MEMORY);
