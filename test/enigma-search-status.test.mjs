@@ -150,6 +150,35 @@ test('memory lifecycle plain output is readable, persistent, and redacted', asyn
     assert.match(deleted.stdout, /Boundary: local Enigma memory lifecycle only/);
     assert.doesNotMatch(deleted.stdout, /remember lifecycle private canary|updated lifecycle private canary/);
     assert.equal(deleted.stdout.includes(dir), false);
+
+    const exportPath = join(dir, 'export.json');
+    const exported = await runCliText([
+      'export',
+      '--bundle', bundlePath,
+      '--out', exportPath,
+      '--plain',
+    ]);
+    assert.equal(exported.code, 0);
+    assert.match(exported.stdout, /^Enigma export\n/);
+    assert.match(exported.stdout, /Status: Ready/);
+    assert.match(exported.stdout, /Receipts: /);
+    assert.match(exported.stdout, /Export: <export-file>/);
+    assert.match(exported.stdout, /Boundary: local Enigma export only/);
+    assert.doesNotMatch(exported.stdout, /remember lifecycle private canary|updated lifecycle private canary/);
+    assert.equal(exported.stdout.includes(dir), false);
+
+    const verified = await runCliText([
+      'verify',
+      '--export', exportPath,
+      '--plain',
+    ]);
+    assert.equal(verified.code, 0);
+    assert.match(verified.stdout, /^Enigma verify\n/);
+    assert.match(verified.stdout, /Status: Ready/);
+    assert.match(verified.stdout, /Errors: 0/);
+    assert.match(verified.stdout, /Boundary: local offline receipt verification only/);
+    assert.doesNotMatch(verified.stdout, /remember lifecycle private canary|updated lifecycle private canary/);
+    assert.equal(verified.stdout.includes(dir), false);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

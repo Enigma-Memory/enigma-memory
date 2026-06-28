@@ -46,7 +46,7 @@
 - Desktop-first `README.md`.
 - Updated `docs/install-anywhere.md`.
 - Static `website/` pages: home, download, setup, help hub, install/connect/troubleshooting guides, privacy, proofs, FAQ, and developer CLI appendix. Home/download pages now present a consumer setup path, local trust boundary, Import Sandbox, Proof Activity, and unsigned-build caveat without claiming signed public release.
-- CLI-first fallback is still supported for power users: `enigma quickstart --plain`, `enigma setup --plain`, `enigma remember --plain`, `enigma update --plain`, `enigma delete --plain`, `enigma search --plain`, `enigma context --plain`, `enigma connect --plain`, `enigma disconnect --plain`, `enigma import --plain`, `enigma import rollback --plain`, `enigma status --plain`, `enigma drive health --plain`, `enigma support summary --plain`, `enigma doctor --plain`, and `enigma next --plain` give one-screen, path-redacted summaries instead of JSON or raw-memory output.
+- CLI-first fallback is still supported for power users: `enigma quickstart --plain`, `enigma setup --plain`, `enigma remember --plain`, `enigma update --plain`, `enigma delete --plain`, `enigma search --plain`, `enigma context --plain`, `enigma export --plain`, `enigma verify --plain`, `enigma connect --plain`, `enigma disconnect --plain`, `enigma import --plain`, `enigma import rollback --plain`, `enigma status --plain`, `enigma drive health --plain`, `enigma support summary --plain`, `enigma doctor --plain`, and `enigma next --plain` give one-screen, path-redacted summaries instead of JSON or raw-memory output.
 
 ---
 

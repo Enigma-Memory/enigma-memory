@@ -2081,6 +2081,41 @@ function printMemoryLifecycleResult(result, operation, flags, io) {
   else print(result, io);
 }
 
+function renderExportPlain(result) {
+  const lines = [
+    'Enigma export',
+    `Status: ${result.ok ? 'Ready' : 'Needs attention'}`,
+    `Receipts: ${result.receipt_count ?? 0}`,
+    'Export: <export-file>',
+  ];
+  lines.push('Boundary: local Enigma export only; plaintext is excluded, local paths are redacted, and this is not provider deletion, model behavior, hosted service, or compliance proof.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printExportResult(result, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderExportPlain(result));
+  else print(result, io);
+}
+
+function renderVerifyPlain(report) {
+  const errors = Array.isArray(report.errors) ? report.errors : [];
+  const lines = [
+    'Enigma verify',
+    `Status: ${report.ok ? 'Ready' : 'Needs attention'}`,
+    `Receipts: ${report.receipt_count ?? 0}`,
+    `Checkpoints: ${report.checkpoint_count ?? 0}`,
+    `Errors: ${errors.length}`,
+  ];
+  for (const error of errors.slice(0, 3)) lines.push(`Issue: ${error.code ?? 'VERIFY_ERROR'}`);
+  lines.push('Boundary: local offline receipt verification only; no raw memory, local paths, provider deletion, model behavior, hosted service, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printVerifyReport(report, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderVerifyPlain(report));
+  else print(report, io);
+}
+
 function nextPlainRequested(flags) {
   const format = getFlag(flags, ['format']);
   return booleanFlag(flags, ['plain', 'text'], false) || format === 'plain' || format === 'text';
@@ -2712,14 +2747,15 @@ async function exportCommand(flags, io) {
   await writeJson(bundlePath, bundle);
   const out = resolve(String(getFlag(flags, ['out'], 'enigma-export.json')));
   await writeJson(out, bundle);
-  print({ ok: true, export: out, receipt_count: Array.isArray(bundle.receipts) ? bundle.receipts.length : 0 }, io);
+  const output = { ok: true, export: out, receipt_count: Array.isArray(bundle.receipts) ? bundle.receipts.length : 0 };
+  printExportResult(output, flags, io);
   return 0;
 }
 
 async function verifyCommand(flags, io) {
   const path = resolve(String(getFlag(flags, ['bundle', 'file', 'export'], DEFAULT_BUNDLE)));
   const report = verifyBundle(await readJson(path));
-  print(report, io);
+  printVerifyReport(report, flags, io);
   return report.ok ? 0 : 1;
 }
 
@@ -4074,6 +4110,10 @@ function usage() {
       '--app-ref/--purpose-ref/--memory-zone-ref <ref>': 'Opaque scope refs checked against supplied grants.',
       '--policy-ref <ref>': 'Opaque policy ref checked against supplied grants. Defaults to ref:policy:cli-context.',
       '--now <iso>': 'Trusted timestamp for deterministic tests; defaults to current local time.',
+    },
+    proof_options: {
+      'enigma export --bundle <path> --out <path> --plain': 'Write a public-safe local proof bundle and print a path-redacted receipt summary.',
+      'enigma verify --export <path> --plain': 'Verify a local proof bundle and print a path-redacted offline verification summary.',
     },
     controller_options: {
       'controller grant': 'Create a public-safe Memory Controller consent grant for local context recall.',
