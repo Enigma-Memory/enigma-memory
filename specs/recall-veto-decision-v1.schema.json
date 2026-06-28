@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.enigma.ai/recall-veto-decision-v1.schema.json",
+  "title": "Enigma Recall Veto Decision v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "request_ref",
+    "app_ref",
+    "policy_ref",
+    "decision",
+    "reason_codes",
+    "candidate_count",
+    "sensitive_count",
+    "tombstone_count",
+    "grant_refs",
+    "proof_refs",
+    "receipt_refs",
+    "safe_to_share",
+    "public_payload_only",
+    "raw_memory_included",
+    "raw_prompt_included",
+    "raw_transcript_included",
+    "raw_embedding_included",
+    "provider_response_included",
+    "credential_included",
+    "token_included",
+    "private_key_included",
+    "signing_secret_included",
+    "local_path_included",
+    "account_identifier_included",
+    "customer_identifier_included",
+    "provider_deletion_claim",
+    "model_forgetting_claim",
+    "provider_native_memory_control_claim",
+    "compliance_certification_claim"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": { "decision": { "const": "allow" } },
+        "required": ["decision"]
+      },
+      "then": {
+        "properties": {
+          "safe_to_share": { "const": true }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "decision": { "enum": ["ask", "deny"] } },
+        "required": ["decision"]
+      },
+      "then": {
+        "properties": {
+          "reason_codes": { "minItems": 1 },
+          "safe_to_share": { "const": false }
+        }
+      }
+    }
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "enigma.recall_veto_decision.v1" },
+    "request_ref": { "$ref": "#/$defs/publicRef" },
+    "app_ref": { "$ref": "#/$defs/publicRef" },
+    "policy_ref": { "$ref": "#/$defs/publicRef" },
+    "decision": { "type": "string", "enum": ["allow", "ask", "deny"] },
+    "reason_codes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/reasonCode" },
+      "uniqueItems": true
+    },
+    "candidate_count": { "type": "integer", "minimum": 0 },
+    "sensitive_count": { "type": "integer", "minimum": 0 },
+    "tombstone_count": { "type": "integer", "minimum": 0 },
+    "grant_refs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/publicRef" },
+      "uniqueItems": true
+    },
+    "proof_refs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/publicRef" },
+      "uniqueItems": true
+    },
+    "receipt_refs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/publicRef" },
+      "uniqueItems": true
+    },
+    "safe_to_share": { "type": "boolean" },
+    "public_payload_only": { "const": true },
+    "raw_memory_included": { "const": false },
+    "raw_prompt_included": { "const": false },
+    "raw_transcript_included": { "const": false },
+    "raw_embedding_included": { "const": false },
+    "provider_response_included": { "const": false },
+    "credential_included": { "const": false },
+    "token_included": { "const": false },
+    "private_key_included": { "const": false },
+    "signing_secret_included": { "const": false },
+    "local_path_included": { "const": false },
+    "account_identifier_included": { "const": false },
+    "customer_identifier_included": { "const": false },
+    "provider_deletion_claim": { "const": false },
+    "model_forgetting_claim": { "const": false },
+    "provider_native_memory_control_claim": { "const": false },
+    "compliance_certification_claim": { "const": false }
+  },
+  "$defs": {
+    "publicRef": {
+      "type": "string",
+      "pattern": "^ref:[A-Za-z0-9][A-Za-z0-9._~:@#?=&%+-]{0,255}$"
+    },
+    "reasonCode": {
+      "type": "string",
+      "enum": [
+        "grant_missing",
+        "grant_expired",
+        "purpose_mismatch",
+        "zone_not_allowed",
+        "sensitivity_blocked",
+        "tombstone_present",
+        "private_bubble_open",
+        "policy_requires_ask",
+        "policy_denies_recall",
+        "candidate_limit_exceeded"
+      ]
+    }
+  }
+}

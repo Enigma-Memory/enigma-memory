@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.enigma.ai/memory-controller-grant-v1.schema.json",
+  "title": "Enigma Memory Controller Grant v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "app_ref",
+    "purpose_ref",
+    "operations",
+    "memory_zone_refs",
+    "issued_at",
+    "expires_at",
+    "status",
+    "grant_ref",
+    "policy_ref",
+    "proof_refs",
+    "receipt_refs",
+    "public_payload_only",
+    "raw_memory_included",
+    "raw_prompt_included",
+    "raw_transcript_included",
+    "raw_embedding_included",
+    "provider_response_included",
+    "credential_included",
+    "token_included",
+    "private_key_included",
+    "signing_secret_included",
+    "local_path_included",
+    "account_identifier_included",
+    "customer_identifier_included",
+    "provider_deletion_claim",
+    "model_forgetting_claim",
+    "provider_native_memory_control_claim",
+    "compliance_certification_claim"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "enigma.memory_controller_grant.v1" },
+    "app_ref": { "$ref": "#/$defs/publicRef" },
+    "purpose_ref": { "$ref": "#/$defs/publicRef" },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/grantOperation" },
+      "uniqueItems": true
+    },
+    "memory_zone_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/publicRef" },
+      "uniqueItems": true
+    },
+    "issued_at": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "status": { "type": "string", "enum": ["active", "expired", "revoked"] },
+    "grant_ref": { "$ref": "#/$defs/publicRef" },
+    "policy_ref": { "$ref": "#/$defs/publicRef" },
+    "proof_refs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/publicRef" },
+      "uniqueItems": true
+    },
+    "receipt_refs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/publicRef" },
+      "uniqueItems": true
+    },
+    "public_payload_only": { "const": true },
+    "raw_memory_included": { "const": false },
+    "raw_prompt_included": { "const": false },
+    "raw_transcript_included": { "const": false },
+    "raw_embedding_included": { "const": false },
+    "provider_response_included": { "const": false },
+    "credential_included": { "const": false },
+    "token_included": { "const": false },
+    "private_key_included": { "const": false },
+    "signing_secret_included": { "const": false },
+    "local_path_included": { "const": false },
+    "account_identifier_included": { "const": false },
+    "customer_identifier_included": { "const": false },
+    "provider_deletion_claim": { "const": false },
+    "model_forgetting_claim": { "const": false },
+    "provider_native_memory_control_claim": { "const": false },
+    "compliance_certification_claim": { "const": false }
+  },
+  "$defs": {
+    "publicRef": {
+      "type": "string",
+      "pattern": "^ref:[A-Za-z0-9][A-Za-z0-9._~:@#?=&%+-]{0,255}$"
+    },
+    "grantOperation": {
+      "type": "string",
+      "enum": [
+        "read_local",
+        "write_local",
+        "recall_context",
+        "withhold_context",
+        "share_context",
+        "open_private_bubble",
+        "close_private_bubble",
+        "connector_access"
+      ]
+    }
+  }
+}

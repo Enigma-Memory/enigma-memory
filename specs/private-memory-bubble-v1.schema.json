@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.enigma.ai/private-memory-bubble-v1.schema.json",
+  "title": "Enigma Private Memory Bubble v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "bubble_ref",
+    "app_refs",
+    "purpose_ref",
+    "status",
+    "started_at",
+    "closed_at",
+    "candidate_count",
+    "kept_count",
+    "discarded_count",
+    "receipt_refs",
+    "bubble_root",
+    "public_payload_only",
+    "raw_memory_included",
+    "raw_prompt_included",
+    "raw_transcript_included",
+    "raw_embedding_included",
+    "provider_response_included",
+    "credential_included",
+    "token_included",
+    "private_key_included",
+    "signing_secret_included",
+    "local_path_included",
+    "account_identifier_included",
+    "customer_identifier_included",
+    "provider_deletion_claim",
+    "model_forgetting_claim",
+    "provider_native_memory_control_claim",
+    "compliance_certification_claim"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "enigma.private_memory_bubble.v1" },
+    "bubble_ref": { "$ref": "#/$defs/publicRef" },
+    "app_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/publicRef" },
+      "uniqueItems": true
+    },
+    "purpose_ref": { "$ref": "#/$defs/publicRef" },
+    "status": { "type": "string", "enum": ["open", "kept", "discarded", "expired"] },
+    "started_at": { "type": "string", "format": "date-time" },
+    "closed_at": { "type": ["string", "null"], "format": "date-time" },
+    "candidate_count": { "type": "integer", "minimum": 0 },
+    "kept_count": { "type": "integer", "minimum": 0 },
+    "discarded_count": { "type": "integer", "minimum": 0 },
+    "receipt_refs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/publicRef" },
+      "uniqueItems": true
+    },
+    "bubble_root": { "$ref": "#/$defs/sha256Digest" },
+    "public_payload_only": { "const": true },
+    "raw_memory_included": { "const": false },
+    "raw_prompt_included": { "const": false },
+    "raw_transcript_included": { "const": false },
+    "raw_embedding_included": { "const": false },
+    "provider_response_included": { "const": false },
+    "credential_included": { "const": false },
+    "token_included": { "const": false },
+    "private_key_included": { "const": false },
+    "signing_secret_included": { "const": false },
+    "local_path_included": { "const": false },
+    "account_identifier_included": { "const": false },
+    "customer_identifier_included": { "const": false },
+    "provider_deletion_claim": { "const": false },
+    "model_forgetting_claim": { "const": false },
+    "provider_native_memory_control_claim": { "const": false },
+    "compliance_certification_claim": { "const": false }
+  },
+  "$defs": {
+    "sha256Digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "publicRef": {
+      "type": "string",
+      "pattern": "^ref:[A-Za-z0-9][A-Za-z0-9._~:@#?=&%+-]{0,255}$"
+    }
+  }
+}

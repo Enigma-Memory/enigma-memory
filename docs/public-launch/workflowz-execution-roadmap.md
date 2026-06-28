@@ -2,7 +2,7 @@
 
 This roadmap converts the launch research into deterministic workflowz phases for a frictionless general-public launch. The wedge is deliberately narrow: signed desktop app first, Claude Desktop first, local Memory Drive first. Everything else either reduces that path's friction now or waits.
 
-Source basis: `docs/GENERAL_PUBLIC_LAUNCH_GOAL.md`, `docs/GENERAL_PUBLIC_LAUNCH_WORKPLAN.md`, existing `docs/public-launch/*.md`, and the internal research/advisor artifacts for desktop, Claude `.mcpb`, website funnel, dashboard, import, release infrastructure, proof viewer, Memory Controller category, and Advisor governance.
+Source basis: `docs/GENERAL_PUBLIC_LAUNCH_GOAL.md`, `docs/GENERAL_PUBLIC_LAUNCH_WORKPLAN.md`, [`docs/memory-controller.md`](../memory-controller.md), existing `docs/public-launch/*.md`, and the internal research/advisor artifacts for desktop, Claude `.mcpb`, website funnel, dashboard, import, release infrastructure, proof viewer, Memory Controller category, and Advisor governance.
 
 ## Launch invariant
 
@@ -82,7 +82,7 @@ The first sprint must produce a narrow, demonstrable spine rather than broad fea
 
 1. Lock `EV-P0-LAUNCH-LEDGER` with phase owners, claim boundary, privacy/export allowlist, and Advisor ship/hold fields.
 2. Define the desktop command contract: setup, vault, service, clients, health, diagnostics, proof, updates, shutdown.
-3. Define the public-safe view models shared by dashboard, proof, diagnostics, import receipts, release evidence, and screenshots.
+3. Define the [Memory Controller](../memory-controller.md) public-safe view models shared by consent grants, recall veto, private bubbles, dashboard weather, proof, diagnostics, import receipts, release evidence, and screenshots.
 4. Build the desktop shell skeleton around the bundled runtime/service boundary and Memory Drive create/detect action.
 5. Build the Claude connector contract: `.mcpb` manifest fields, bridge pairing, supported states, install handoff, test, repair, disconnect, and fallback boundaries.
 6. Build the dashboard health contract and one-action rollup before detailed UI polish.
@@ -129,11 +129,12 @@ Advisor output for each phase is exactly one of: ship, hold, or rollback. A hold
 
 ## Memory Controller category scope
 
-The category story is useful now only when it makes the desktop path easier to understand:
+The [Memory Controller primitive layer](../memory-controller.md) is useful now only when it makes the desktop path easier to understand:
 
 - Use public language: private Memory Controller, local Memory Drive, connected apps, app permissions, Memory Drive health, Activity details, Needs review.
-- Ship category primitives as boring product controls first: app-level grants, one-click revoke, safe recall/readiness states, proof summaries, and dashboard weather/fix-it tiles.
-- Keep cryptographic consent-token internals, full Memory Passport standardization, incognito/private bubbles, visual proof cinema, marketplace, operator network, and chain rails out of the beta default path.
+- Ship category primitives as boring product controls first: consent grants, recall veto, private bubbles, one-click revoke, safe recall/readiness states, proof summaries, and dashboard weather/fix-it tiles.
+- Keep consent progressive: no upfront permission wall, just-in-time prompts at memory use, one primary action per state, and proof/schema internals behind an advanced drawer.
+- Keep cryptographic consent-token internals, full Memory Passport standardization, visual proof cinema, marketplace, operator network, and chain rails out of the beta default path.
 - Every category claim repeats the boundary: Enigma controls Enigma-mediated local memory and proof summaries, not provider-native memory, logs, retention, model weights, or deletion.
 
 ## Deferred work

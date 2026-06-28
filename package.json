@@ -254,7 +254,8 @@
     "production:threat-model": "node scripts/validate-security-threat-model.mjs",
     "simulate:production": "node scripts/simulate-production-env.mjs",
     "wait:backend": "node scripts/wait-for-backend-ready.mjs",
-    "public-beta-qa": "node scripts/run-public-beta-qa-matrix.mjs --json"
+    "public-beta-qa": "node scripts/run-public-beta-qa-matrix.mjs --json",
+    "clean-machine-smoke": "node scripts/run-clean-machine-smoke.mjs --json"
   },
   "optionalDependencies": {
     "@solana/web3.js": "^1.98.2"

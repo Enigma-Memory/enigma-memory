@@ -19,6 +19,8 @@ The CLI, npm package, manual MCP JSON, source checkout, proof schemas, verifier 
 9. Use optional post-setup actions from the dashboard: import memory, review held-back items, refresh activity/proof details, preview a safe support report, or manage app permissions.
 10. Export only public-safe proof/support summaries after an allowlist/privacy scan passes.
 
+The [Memory Controller primitive layer](memory-controller.md) is the product boundary behind this path: no upfront permission wall, just-in-time app grants, recall veto before Enigma shares context, private bubbles for temporary memory, Memory Weather with one next action, and advanced proof details behind disclosure.
+
 ## Advisor gate
 
 The Advisor is the required phase gatekeeper for this launch. A phase may not advance from concept, design, implementation, evidence, public copy, beta, or GA unless the Advisor records a ship/hold/rollback decision against observed evidence.
@@ -58,7 +60,7 @@ Everything else is private by default. Raw memory, prompts, transcripts, complet
 | Import wizard | Optional post-setup Import Sandbox, not mandatory first-run setup. | Paste/drop curated memory text or supported memory files, preview locally, dedupe, quarantine risky/transcript-derived candidates, commit selected items, and produce sanitized receipt. ChatGPT full export stays advanced/preview/quarantine by default. | Hardened source adapters, parser limits, undo/tombstone by batch, receipt/export redaction, import caveats, and performance limits are proven. |
 | Public beta release infrastructure | Trust, signing, updates, diagnostics, evidence, and support process. | Signed beta artifacts, update verification path, public-safe evidence packet, diagnostics preview/export rejection, support owner, release owner, signing owner, and BETA scenario results exist. | Store/MSIX or direct-download trust path, Developer ID notarization/stapling, updater rollback, key/cert custody, emergency release process, and support dry runs are complete. |
 | Proof viewer/verifier | Consumer **Proof Activity**: local activity, context summary, not-shared evidence, offline verifier state, and safe export preview. | `BETA-PROOF-001` works offline from Enigma-controlled local events, says what it proves/does not prove, and contains no forbidden fields. Shape checks cannot produce a green verified state. | Verifier trust bundle, export scanner, support refs, advanced details, and all proof states are stable and claim-boundary approved. |
-| Memory Controller category | The category narrative: Enigma is the private Memory Controller for AI, backed first by local permissions, Memory Drive health, recall controls, and portable proof summaries. | The category appears as plain product copy only: one Memory Drive, apps ask permission, user controls Enigma-mediated recall. No full memory OS, provider deletion, provider forgetting, hosted network, or chain claims. | Consent grants, recall veto, private bubbles, and Passport/backup flows may expand only after desktop/connector/privacy evidence remains green. |
+| Memory Controller category | The category narrative: Enigma is the private Memory Controller for AI, backed first by local permissions, Memory Drive health, recall controls, and portable proof summaries. See the [Memory Controller primitive layer](memory-controller.md) for the product/technical boundary. | The category appears as plain product copy only: one Memory Drive, apps ask permission, user controls Enigma-mediated recall. No full memory OS, provider deletion, provider forgetting, hosted network, or chain claims. | Consent grants, recall veto, private bubbles, and Passport/backup flows may expand only after desktop/connector/privacy evidence remains green. |
 
 ## Friction budget
 
@@ -176,6 +178,7 @@ This goal is based on the 2026-06-27 Workflowz research pass across these lanes:
 
 Repository plans aligned by this goal:
 
+- [`docs/memory-controller.md`](memory-controller.md)
 - [`docs/GENERAL_PUBLIC_LAUNCH_GOAL.md`](GENERAL_PUBLIC_LAUNCH_GOAL.md)
 - [`docs/GENERAL_PUBLIC_LAUNCH_WORKPLAN.md`](GENERAL_PUBLIC_LAUNCH_WORKPLAN.md)
 - [`docs/public-launch/desktop-app-plan.md`](public-launch/desktop-app-plan.md)
