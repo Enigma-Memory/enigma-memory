@@ -58,6 +58,7 @@ let importSandbox = {
   preview: null,
   result: null,
   error: null,
+  rollback: null,
   pendingText: '',
 };
 let proofActivity = {};
@@ -255,12 +256,32 @@ async function mockInvoke(cmd, args = {}) {
         schema: 'enigma.import_preview.v1',
         candidate_count: candidateCount,
         vault_write_performed: true,
+        rollback_available: true,
+        rollback_ref: 'latest-import-sandbox-batch',
+        raw_report_path_redacted: true,
         import_batch_receipt: {
           schema: 'enigma.import_batch_receipt.v1',
           candidate_count: candidateCount,
           raw_plaintext_returned: false,
         },
         claim_boundaries: { raw_memory_printed: false, provider_deletion_proof: false, model_forgetting_proof: false },
+      };
+    }
+    case 'rollback_import_text': {
+      return {
+        schema: 'enigma.import_rollback_receipt.v1',
+        ok: true,
+        rollback_ref: 'latest-import-sandbox-batch',
+        requested_write_count: 1,
+        tombstoned_count: 1,
+        skipped_count: 0,
+        raw_report_path_redacted: true,
+        claim_boundaries: { local_enigma_vault_only: true, raw_memory_returned: false },
+        desktop_surface: {
+          schema: 'enigma.desktop_import_rollback_surface.v1',
+          local_paths_hidden: true,
+          raw_memory_hidden: true,
+        },
       };
     }
     case 'get_support_summary':
@@ -600,9 +621,12 @@ function renderWelcome() {
 function renderImportSandboxSection() {
   const preview = importSandbox.preview;
   const result = importSandbox.result;
+  const rollback = importSandbox.rollback;
   const previewCount = preview?.candidate_count ?? preview?.preview_receipt?.candidate_count ?? 0;
   const duplicateCount = preview?.counts?.dedupe?.duplicate_group_count ?? preview?.preview_receipt?.duplicate_group_count ?? 0;
   const resultCount = result?.import_batch_receipt?.candidate_count ?? result?.candidate_count ?? 0;
+  const rollbackCount = rollback?.tombstoned_count ?? 0;
+  const rollbackAvailable = result?.rollback_available === true;
   return `
     <section class="dashboard-section import-sandbox" aria-labelledby="import-sandbox-title">
       <p class="eyebrow">Import Sandbox</p>
@@ -612,12 +636,14 @@ function renderImportSandboxSection() {
       <div class="button-row">
         ${primaryButton('Preview import', 'preview-import-text')}
         <button type="button" class="secondary" data-action="approve-import-text" ${preview ? '' : 'disabled'}>Approve preview</button>
+        <button type="button" class="secondary" data-action="rollback-import-text" ${rollbackAvailable ? '' : 'disabled'}>Rollback last import</button>
         ${secondaryButton('Clear import', 'clear-import-text')}
       </div>
       ${preview ? `<p class="note">Preview ready: ${escapeHtml(String(previewCount))} candidates, ${escapeHtml(String(duplicateCount))} duplicate groups, decision ${escapeHtml(preview.import_decision || 'unknown')}.</p>` : ''}
-      ${result ? `<p class="note">Import written locally: ${escapeHtml(String(resultCount))} candidates. Batch receipt returned without raw memory text.</p>` : ''}
+      ${result ? `<p class="note">Import written locally: ${escapeHtml(String(resultCount))} candidates. Batch receipt returned without raw memory text. Rollback is available from the latest local import report.</p>` : ''}
+      ${rollback ? `<p class="note">Rollback complete: ${escapeHtml(String(rollbackCount))} local memories tombstoned. Rollback receipt returned without raw memory text.</p>` : ''}
       ${importSandbox.error ? `<p class="note">Import needs attention: ${escapeHtml(importSandbox.error)}</p>` : ''}
-      <p class="note">Import receipts prove Enigma-local vault activity only. They do not prove changes outside Enigma or model behavior changes.</p>
+      <p class="note">Import and rollback receipts prove Enigma-local vault activity only. They do not prove changes outside Enigma or model behavior changes.</p>
     </section>
   `;
 }
@@ -1056,10 +1082,10 @@ async function handleAction(event) {
       setStatus('Previewing import...');
       try {
         const preview = await call('preview_import_text', { text });
-        importSandbox = { preview, result: null, error: null, pendingText: text };
+        importSandbox = { preview, result: null, rollback: null, error: null, pendingText: text };
         setStatus('Preview ready. Review counts before approval.');
       } catch (_) {
-        importSandbox = { preview: null, result: null, error: 'Preview failed without exposing text.', pendingText: '' };
+        importSandbox = { preview: null, result: null, rollback: null, error: 'Preview failed without exposing text.', pendingText: '' };
         setStatus('Preview failed. Raw text was not shown.');
       }
       busy = false;
@@ -1076,10 +1102,10 @@ async function handleAction(event) {
       setStatus('Writing import locally...');
       try {
         const result = await call('approve_import_text', { text: importSandbox.pendingText });
-        importSandbox = { preview: null, result, error: null, pendingText: '' };
+        importSandbox = { preview: null, result, rollback: null, error: null, pendingText: '' };
         health = await call('get_health');
         proofActivity = health.proof_activity?.schema ? health.proof_activity : await call('get_proof_activity');
-        setStatus('Import written locally. Batch receipt is available.');
+        setStatus('Import written locally. Batch receipt and rollback are available.');
       } catch (_) {
         importSandbox = { ...importSandbox, error: 'Approval failed without exposing text.' };
         setStatus('Approval failed. Raw text was not shown.');
@@ -1088,8 +1114,33 @@ async function handleAction(event) {
       render();
       return;
     }
+    case 'rollback-import-text': {
+      if (!importSandbox.result?.rollback_available) {
+        setStatus('Approve an import before rolling it back.');
+        return;
+      }
+      if (!confirm('Rollback the latest Import Sandbox write? This tombstones Enigma-local memories only.')) {
+        return;
+      }
+      busy = true;
+      importSandbox.error = null;
+      setStatus('Rolling back latest import locally...');
+      try {
+        const rollback = await call('rollback_import_text');
+        importSandbox = { preview: null, result: null, rollback, error: null, pendingText: '' };
+        health = await call('get_health');
+        proofActivity = health.proof_activity?.schema ? health.proof_activity : await call('get_proof_activity');
+        setStatus('Import rollback complete. Receipt returned without raw memory.');
+      } catch (_) {
+        importSandbox = { ...importSandbox, error: 'Rollback failed without exposing text.' };
+        setStatus('Rollback failed. Raw text was not shown.');
+      }
+      busy = false;
+      render();
+      return;
+    }
     case 'clear-import-text':
-      importSandbox = { preview: null, result: null, error: null, pendingText: '' };
+      importSandbox = { preview: null, result: null, rollback: null, error: null, pendingText: '' };
       render();
       setStatus('Import text cleared from this screen.');
       return;

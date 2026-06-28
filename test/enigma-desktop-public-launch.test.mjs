@@ -273,6 +273,9 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(wizard, /preview-import-text/);
   assert.match(wizard, /approve-import-text/);
   assert.match(wizard, /clear-import-text/);
+  assert.match(wizard, /rollback-import-text/);
+  assert.match(wizard, /Rollback last import/);
+  assert.match(wizard, /Import rollback complete/);
   assert.match(wizard, /test-connection/);
   assert.match(wizard, /test_client_config/);
   assert.match(wizard, /Local connector test complete/);
@@ -282,8 +285,11 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(tauriService, /pub async fn preview_import_text/);
   assert.match(tauriService, /pub async fn approve_import_text/);
   assert.match(tauriService, /import-sandbox-/);
+  assert.match(tauriService, /pub async fn rollback_import_text/);
+  assert.match(tauriService, /enigma\.desktop_import_rollback_surface\.v1/);
   assert.match(tauriLib, /commands::service::preview_import_text/);
   assert.match(tauriLib, /commands::service::approve_import_text/);
+  assert.match(tauriLib, /commands::service::rollback_import_text/);
   assert.match(wizard, /Proof Activity/);
   assert.match(wizard, /What Enigma can prove locally/);
   assert.match(wizard, /refresh-proof-activity/);

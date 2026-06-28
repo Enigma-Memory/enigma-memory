@@ -489,6 +489,15 @@ fn public_test_summary(test: &crate::connector::engine::TestResult) -> Value {
     })
 }
 
+fn import_sandbox_report_path(config: &DesktopConfig) -> std::path::PathBuf {
+    config
+        .bundle_path
+        .parent()
+        .map(std::path::Path::to_path_buf)
+        .unwrap_or_else(std::env::temp_dir)
+        .join("import-sandbox-last-report.json")
+}
+
 async fn run_text_import(
     config: &DesktopConfig,
     text: String,
@@ -513,6 +522,14 @@ async fn run_text_import(
 
     let file_arg = file.to_string_lossy().into_owned();
     let bundle_arg = config.bundle_path.to_string_lossy().into_owned();
+    let report_file = if write_vault {
+        Some(import_sandbox_report_path(config))
+    } else {
+        None
+    };
+    let report_arg = report_file
+        .as_ref()
+        .map(|path| path.to_string_lossy().into_owned());
     let result = if write_vault {
         run_cli(
             config,
@@ -525,6 +542,10 @@ async fn run_text_import(
                 "--write-vault",
                 "--bundle",
                 &bundle_arg,
+                "--out",
+                report_arg
+                    .as_deref()
+                    .unwrap_or("import-sandbox-last-report.json"),
             ],
         )
         .await
@@ -537,7 +558,14 @@ async fn run_text_import(
     };
 
     let _ = std::fs::remove_file(&file);
-    result.map_err(redact_command_error)
+    let mut output = result.map_err(redact_command_error)?;
+    if write_vault {
+        output["rollback_available"] = json!(true);
+        output["rollback_ref"] = json!("latest-import-sandbox-batch");
+        output["raw_report_stored_locally"] = json!(true);
+        output["raw_report_path_redacted"] = json!(true);
+    }
+    Ok(output)
 }
 
 pub fn default_sidecar_config(config: &DesktopConfig) -> ServiceConfig {
@@ -744,6 +772,38 @@ pub async fn approve_import_text(
     text: String,
 ) -> Result<Value, String> {
     run_text_import(&state.config, text, true).await
+}
+
+#[tauri::command]
+pub async fn rollback_import_text(state: tauri::State<'_, AppState>) -> Result<Value, String> {
+    let report_file = import_sandbox_report_path(&state.config);
+    if !report_file.exists() {
+        return Err("no import rollback report is available".to_string());
+    }
+    let report_arg = report_file.to_string_lossy().into_owned();
+    let bundle_arg = state.config.bundle_path.to_string_lossy().into_owned();
+    let mut receipt = run_cli(
+        &state.config,
+        &[
+            "import",
+            "rollback",
+            "--file",
+            &report_arg,
+            "--bundle",
+            &bundle_arg,
+        ],
+    )
+    .await
+    .map_err(redact_command_error)?;
+    let _ = std::fs::remove_file(&report_file);
+    receipt["rollback_ref"] = json!("latest-import-sandbox-batch");
+    receipt["raw_report_path_redacted"] = json!(true);
+    receipt["desktop_surface"] = json!({
+        "schema": "enigma.desktop_import_rollback_surface.v1",
+        "local_paths_hidden": true,
+        "raw_memory_hidden": true,
+    });
+    Ok(receipt)
 }
 
 #[tauri::command]
