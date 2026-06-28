@@ -1,3 +1,5 @@
+> **Status:** A Microsoft account session was found in Microsoft Edge on the user's workstation. Azure Artifact Signing setup is being attempted through that signed-in session. If the session expires, sign in to https://portal.azure.com/ before continuing.
+
 # Code Signing Setup for Public Launch
 
 This guide lists the two external signing paths required for a frictionless public desktop launch. Repository scaffolding is in place; only account/certificate setup remains.

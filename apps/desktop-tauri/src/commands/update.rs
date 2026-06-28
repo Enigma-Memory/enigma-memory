@@ -59,7 +59,6 @@ pub async fn check_update(state: tauri::State<'_, AppState>) -> Result<Value, St
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn current_version_comparison() {

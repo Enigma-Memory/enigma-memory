@@ -5,7 +5,8 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
 /// Keys that must never appear in a public diagnostics bundle.
 const FORBIDDEN_KEYS: &[&str] = &[
@@ -81,7 +82,13 @@ pub async fn export_diagnostics(
                 "enigma-diagnostics-{}.json",
                 Utc::now().format("%Y%m%dT%H%M%SZ")
             );
-            state.config.bundle_path.parent().map(|p| p.to_path_buf()).unwrap_or_else(std::env::temp_dir).join(file_name)
+            state
+                .config
+                .bundle_path
+                .parent()
+                .map(Path::to_path_buf)
+                .unwrap_or_else(std::env::temp_dir)
+                .join(file_name)
         }
     };
 
@@ -177,11 +184,15 @@ fn redact_paths(value: &Value) -> Value {
 }
 
 fn redact_path(s: &str) -> String {
-    static PATH_RE: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
+    path_regex().replace_all(s, "<redacted-path>").to_string()
+}
+
+fn path_regex() -> &'static Regex {
+    static PATH_RE: OnceLock<Regex> = OnceLock::new();
+    PATH_RE.get_or_init(|| {
         Regex::new(r"(?i)([A-Z]:[/\\\\][^\\s<>|?*]+|/(?:Users|home|tmp|var|opt|usr|etc|private|Volumes)[/\\\\]?[^\\s<>|?*]*)")
-            .unwrap()
-    });
-    PATH_RE.replace_all(s, "<redacted-path>").to_string()
+            .expect("diagnostics path redaction regex must compile")
+    })
 }
 
 #[cfg(test)]

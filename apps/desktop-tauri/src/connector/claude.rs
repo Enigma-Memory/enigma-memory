@@ -221,21 +221,17 @@ pub struct McpbHealthOptions {
 }
 
 fn has_passing_evidence(evidence: &Value) -> bool {
-    if evidence == &Value::Bool(true) {
-        return true;
-    }
-    evidence.get("passed").and_then(|v| v.as_bool()) == Some(true)
-        || evidence.get("ok").and_then(|v| v.as_bool()) == Some(true)
-        || evidence.get("status").and_then(|v| v.as_str()) == Some("passed")
+    evidence.as_bool() == Some(true)
+        || evidence.get("passed").and_then(Value::as_bool) == Some(true)
+        || evidence.get("ok").and_then(Value::as_bool) == Some(true)
+        || evidence.get("status").and_then(Value::as_str) == Some("passed")
 }
 
 fn has_failing_evidence(evidence: &Value) -> bool {
-    if evidence == &Value::Bool(false) {
-        return true;
-    }
-    evidence.get("passed").and_then(|v| v.as_bool()) == Some(false)
-        || evidence.get("ok").and_then(|v| v.as_bool()) == Some(false)
-        || evidence.get("status").and_then(|v| v.as_str()) == Some("failed")
+    evidence.as_bool() == Some(false)
+        || evidence.get("passed").and_then(Value::as_bool) == Some(false)
+        || evidence.get("ok").and_then(Value::as_bool) == Some(false)
+        || evidence.get("status").and_then(Value::as_str) == Some("failed")
 }
 
 pub fn create_claude_desktop_mcpb_health(options: McpbHealthOptions) -> Value {
@@ -247,13 +243,11 @@ pub fn create_claude_desktop_mcpb_health(options: McpbHealthOptions) -> Value {
         || options
             .test_evidence
             .as_ref()
-            .map(|e| has_failing_evidence(e))
-            .unwrap_or(false);
+            .is_some_and(has_failing_evidence);
     let test_passed = options
         .test_evidence
         .as_ref()
-        .map(|e| has_passing_evidence(e))
-        .unwrap_or(false);
+        .is_some_and(has_passing_evidence);
     let test_evidence_present = options.test_evidence.is_some();
 
     let status = if advanced_fallback {
@@ -323,7 +317,7 @@ mod tests {
             ..Default::default()
         });
         assert_eq!(health.get("status").unwrap().as_str().unwrap(), "mcpb_ready");
-        assert_eq!(health.get("ready").unwrap().as_bool().unwrap(), false);
+        assert!(!health.get("ready").unwrap().as_bool().unwrap());
     }
 
     #[test]
@@ -334,6 +328,6 @@ mod tests {
             ..Default::default()
         });
         assert_eq!(health.get("status").unwrap().as_str().unwrap(), "ready");
-        assert_eq!(health.get("ready").unwrap().as_bool().unwrap(), true);
+        assert!(health.get("ready").unwrap().as_bool().unwrap());
     }
 }

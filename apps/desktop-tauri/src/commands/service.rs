@@ -6,7 +6,7 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::process::{Child, Command};
 use tokio::sync::oneshot;
@@ -208,7 +208,6 @@ impl ServiceHandle {
     fn spawn_watcher(self: Arc<Self>, mut child: Child, stop_rx: oneshot::Receiver<()>) {
         tokio::spawn(async move {
             let mut stop_rx = stop_rx;
-            let _id = child.id();
             let result = tokio::select! {
                 biased;
                 _ = &mut stop_rx => {
@@ -316,23 +315,32 @@ fn current_epoch_millis() -> u64 {
 
 /// Redact absolute paths and credential-like tokens from a log line.
 pub fn redact_log(line: &str) -> String {
-    static PATH_RE: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
-        Regex::new(r"(?i)([A-Z]:[/\\\\][^\\s<>|?*]+|/(?:Users|home|tmp|var|opt|usr|etc|private|Volumes)[/\\\\]?[^\\s<>|?*]*)")
-            .unwrap()
-    });
-    static TOKEN_RE: std::sync::LazyLock<Regex> =
-        std::sync::LazyLock::new(|| Regex::new(r"\b(?:sk-[a-zA-Z0-9_\-]{20,}|key-[a-zA-Z0-9_\-]{16,})\b").unwrap());
+    let out = log_path_regex().replace_all(line, "<path>");
+    log_token_regex().replace_all(&out, "<token>").into_owned()
+}
 
-    let mut out = PATH_RE.replace_all(line, "<path>").to_string();
-    out = TOKEN_RE.replace_all(&out, "<token>").to_string();
-    out
+fn log_path_regex() -> &'static Regex {
+    static PATH_RE: OnceLock<Regex> = OnceLock::new();
+    PATH_RE.get_or_init(|| {
+        Regex::new(r"(?i)([A-Z]:[/\\\\][^\\s<>|?*]+|/(?:Users|home|tmp|var|opt|usr|etc|private|Volumes)[/\\\\]?[^\\s<>|?*]*)")
+            .expect("service path redaction regex must compile")
+    })
+}
+
+fn log_token_regex() -> &'static Regex {
+    static TOKEN_RE: OnceLock<Regex> = OnceLock::new();
+    TOKEN_RE.get_or_init(|| {
+        Regex::new(r"\b(?:sk-[a-zA-Z0-9_\-]{20,}|key-[a-zA-Z0-9_\-]{16,})\b")
+            .expect("service token redaction regex must compile")
+    })
 }
 
 pub fn default_sidecar_config(config: &DesktopConfig) -> ServiceConfig {
-    let mut args = Vec::new();
-    args.push(config.cli_path.to_string_lossy().into_owned());
-    args.push("mcp".to_string());
-    args.push("serve".to_string());
+    let args = vec![
+        config.cli_path.to_string_lossy().into_owned(),
+        "mcp".to_string(),
+        "serve".to_string(),
+    ];
     ServiceConfig {
         program: config.node_path.clone(),
         args,
@@ -428,7 +436,7 @@ pub async fn connect_client(
     let client = id.parse::<ClientId>().map_err(|_| format!("unknown client: {id}"))?;
     let ctx = EngineContext::from_env().map_err(|e| e.to_string())?;
     let engine = ConnectorEngine::new();
-    let _ = engine
+    engine
         .connect(client, &ctx, &ConnectOptions::confirmed())
         .map_err(|e| e.to_string())?;
     Ok(json!({ "id": id, "status": "connected" }))
@@ -444,7 +452,7 @@ pub async fn disconnect_client(
     let client = id.parse::<ClientId>().map_err(|_| format!("unknown client: {id}"))?;
     let ctx = EngineContext::from_env().map_err(|e| e.to_string())?;
     let engine = ConnectorEngine::new();
-    let _ = engine
+    engine
         .disconnect(client, &ctx, &ConnectOptions::confirmed())
         .map_err(|e| e.to_string())?;
     Ok(json!({ "id": id, "status": "ready" }))
@@ -467,9 +475,13 @@ pub async fn get_health(state: tauri::State<'_, AppState>) -> Result<Value, Stri
                 .count()
         })
         .unwrap_or(0);
+    let memory_drive_status = drive
+        .get("memory_drive_status")
+        .cloned()
+        .unwrap_or_else(|| json!("unknown"));
 
     Ok(json!({
-        "memory_drive_status": drive.get("memory_drive_status").unwrap_or(&json!("unknown")),
+        "memory_drive_status": memory_drive_status,
         "connected_app_count": connected_count,
         "proof_status": if service.running { "active" } else { "idle" },
         "update_status": "current",

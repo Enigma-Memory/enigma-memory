@@ -23,21 +23,14 @@ pub struct CrashReport {
 }
 
 impl CrashReport {
-    pub fn new(info: &std::panic::PanicInfo<'_>) -> Self {
-        let summary = info
-            .payload()
-            .downcast_ref::<&str>()
-            .copied()
-            .or_else(|| info.payload().downcast_ref::<String>().map(|s| s.as_str()))
-            .unwrap_or("unknown panic")
+    pub fn from_panic_parts(summary: &str, location: Option<String>) -> Self {
+        let summary = summary
             .lines()
             .next()
             .unwrap_or("unknown panic")
             .chars()
             .take(240)
             .collect();
-
-        let location = info.location().map(|loc| format!("{}:{}", loc.file(), loc.line()));
 
         Self {
             app_version: env!("CARGO_PKG_VERSION").to_string(),
@@ -107,7 +100,7 @@ fn crash_reports_dir() -> PathBuf {
 
 fn crate_dir() -> PathBuf {
     dirs::data_dir()
-        .unwrap_or_else(|| std::env::temp_dir())
+        .unwrap_or_else(std::env::temp_dir)
         .join("enigma-desktop")
 }
 
@@ -155,7 +148,16 @@ pub fn init_panic_hook() {
     HOOK.call_once(|| {
         let default_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
-            let report = CrashReport::new(info);
+            let summary = info
+                .payload()
+                .downcast_ref::<&str>()
+                .copied()
+                .or_else(|| info.payload().downcast_ref::<String>().map(String::as_str))
+                .unwrap_or("unknown panic");
+            let location = info
+                .location()
+                .map(|loc| format!("{}:{}", loc.file(), loc.line()));
+            let report = CrashReport::from_panic_parts(summary, location);
             let _ = write_pending_report(&report);
             default_hook(info);
         }));
