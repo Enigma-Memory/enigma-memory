@@ -198,6 +198,7 @@ test('support dry-run blocker names the concrete public-safe evidence summary st
   assert.equal(supportDryRun.status, 'blocked');
   assert.ok(supportDryRun.scenario_ids.includes('BETA-DIAG-001'));
   assert.ok(supportDryRun.scenario_ids.includes('BETA-CRASH-001'));
+  assert.ok(supportDryRun.evidence_refs.includes('ref:repo:scripts.build-support-dry-run-summary.mjs'));
 
   assert.deepEqual(supportDryRun.missing_evidence_items, [
     {

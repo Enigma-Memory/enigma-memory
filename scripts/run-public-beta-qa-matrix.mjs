@@ -47,6 +47,7 @@ const REFS = Object.freeze({
   productionStatus: 'ref:repo:docs.public-launch.production-readiness-status.md#blockers',
   releaseEvidenceScript: 'ref:repo:scripts.release-evidence-desktop.mjs',
   updateSignerScript: 'ref:repo:scripts.sign-update-manifest.mjs',
+  supportDryRunScript: 'ref:repo:scripts.build-support-dry-run-summary.mjs',
 });
 
 const BLOCKERS = Object.freeze({
@@ -58,7 +59,7 @@ const BLOCKERS = Object.freeze({
   supportDryRun: {
     blocker_id: 'BLOCKER-SUPPORT-DRY-RUN',
     status: 'blocked',
-    evidence_refs: [REFS.qaSupport, REFS.releaseChecklist],
+    evidence_refs: [REFS.qaSupport, REFS.releaseChecklist, REFS.supportDryRunScript],
     missing_evidence_items: [
       {
         evidence_item_id: 'EV-P10-SUPPORT-DRY-RUN-SUMMARY',

@@ -245,6 +245,7 @@
     "production:incident-drill": "node scripts/validate-incident-drill.mjs",
     "production:whitepaper": "node scripts/validate-whitepaper-claims.mjs",
     "production:sla": "node scripts/validate-support-sla.mjs",
+    "production:support-dry-run": "node scripts/build-support-dry-run-summary.mjs",
     "production:legal": "node scripts/validate-legal-compliance-approval.mjs",
     "production:monitoring": "node scripts/validate-monitoring-alerting.mjs",
     "production:network": "node scripts/validate-network-access-policy.mjs",
