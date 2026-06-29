@@ -837,6 +837,7 @@ function renderImportSandboxSection() {
       <div class="button-row">
         ${primaryButton('Preview import', 'preview-import-text')}
         <button type="button" class="secondary" data-action="approve-import-text" ${importReady ? '' : 'disabled'}>Approve preview</button>
+        <button type="button" class="secondary" data-action="copy-import-receipt" ${result || rollback ? '' : 'disabled'}>Copy import receipt</button>
         <button type="button" class="secondary" data-action="rollback-import-text" ${rollbackAvailable ? '' : 'disabled'}>Rollback last import</button>
         ${secondaryButton('Clear import', 'clear-import-text')}
       </div>
@@ -888,6 +889,27 @@ function publicSupportClipboardText(summary = {}) {
     `Next command: ${next.command || '<none>'}`,
     'Redaction: public-safe summary only; no raw memory, prompts, transcripts, credentials, provider responses, complete app settings, or local paths.',
     'Boundary: local Enigma status only; no outside-provider changes, model behavior changes, hosted service readiness, benchmark, token ROI, or compliance claims.',
+  ].join('\n');
+}
+
+function publicImportReceiptClipboardText(result = null, rollback = null) {
+  if (rollback?.schema === 'enigma.import_rollback_receipt.v1') {
+    return [
+      'Enigma import rollback receipt',
+      `Status: ${rollback.ok ? 'complete' : 'unknown'}`,
+      `Local memories tombstoned: ${rollback.tombstoned_count ?? 0}`,
+      `Raw memory text returned: ${rollback.raw_plaintext_returned === true ? 'yes' : 'no'}`,
+      'Boundary: Enigma-local rollback receipt only; no outside-provider changes, model behavior changes, hosted service readiness, benchmark, token ROI, or compliance claims.',
+    ].join('\n');
+  }
+  const receipt = result?.import_batch_receipt && typeof result.import_batch_receipt === 'object' ? result.import_batch_receipt : {};
+  return [
+    'Enigma import batch receipt',
+    `Candidates written locally: ${receipt.candidate_count ?? result?.candidate_count ?? 0}`,
+    `Rollback available: ${result?.rollback_available === true ? 'yes' : 'no'}`,
+    `Rollback reference: ${result?.rollback_ref || '<not-available>'}`,
+    `Raw memory text returned: ${receipt.raw_plaintext_returned === true ? 'yes' : 'no'}`,
+    'Boundary: Enigma-local import receipt only; no raw memory text, outside-provider changes, model behavior changes, hosted service readiness, benchmark, token ROI, or compliance claims.',
   ].join('\n');
 }
 
@@ -1483,6 +1505,19 @@ async function handleAction(event) {
       }
       busy = false;
       render();
+      return;
+    }
+    case 'copy-import-receipt': {
+      if (!importSandbox.result && !importSandbox.rollback) {
+        setStatus('Approve an import or rollback before copying its receipt.');
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(publicImportReceiptClipboardText(importSandbox.result, importSandbox.rollback));
+        setStatus('Import receipt copied without raw memory or local paths.');
+      } catch (_) {
+        setStatus('Clipboard copy is unavailable. Import receipt counts remain visible in the dashboard.');
+      }
       return;
     }
     case 'clear-import-text':

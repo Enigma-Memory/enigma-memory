@@ -305,6 +305,12 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(wizard, /clear-import-text/);
   assert.match(wizard, /rollback-import-text/);
   assert.match(wizard, /Rollback last import/);
+  assert.match(wizard, /copy-import-receipt/);
+  assert.match(wizard, /Copy import receipt/);
+  assert.match(wizard, /publicImportReceiptClipboardText/);
+  assert.match(wizard, /Import receipt copied without raw memory or local paths/);
+  assert.match(wizard.match(/function publicImportReceiptClipboardText\(result = null, rollback = null\) \{[\s\S]*?\n\}/)?.[0] || '', /Enigma import batch receipt/);
+  assert.match(wizard.match(/function publicImportReceiptClipboardText\(result = null, rollback = null\) \{[\s\S]*?\n\}/)?.[0] || '', /Enigma import rollback receipt/);
   assert.match(wizard, /importReady = preview\?\.import_decision === 'ready_for_import'/);
   assert.match(wizard, /\$\{escapeHtml\(importSandbox\.pendingText \|\| ''\)\}<\/textarea>/);
   assert.match(wizard, /Review required before writing/);
