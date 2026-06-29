@@ -64,6 +64,7 @@ let importSandbox = {
 let proofActivity = {};
 let supportSummary = {};
 let connectionPreview = null;
+let dashboardHydration = { status: 'idle', error: null, last_updated: null };
 
 let busy = false;
 
@@ -995,6 +996,45 @@ async function refreshClientState() {
   health = await call('get_health');
 }
 
+
+function settledValue(result, fallback) {
+  return result.status === 'fulfilled' ? result.value : fallback;
+}
+
+async function hydrateDashboardState() {
+  dashboardHydration = { status: 'refreshing', error: null, last_updated: dashboardHydration.last_updated };
+  const [
+    clientsResult,
+    healthResult,
+    serviceResult,
+    logsResult,
+    diagnosticsResult,
+    updateResult,
+    proofResult,
+    crashResult,
+  ] = await Promise.allSettled([
+    call('detect_clients'),
+    call('get_health'),
+    call('get_service_status'),
+    call('get_service_logs', { limit: 100 }),
+    call('get_diagnostics'),
+    call('check_update'),
+    call('get_proof_activity'),
+    call('get_crash_reporting_status'),
+  ]);
+
+  clients = settledValue(clientsResult, clients);
+  health = settledValue(healthResult, health);
+  serviceStatus = settledValue(serviceResult, serviceStatus);
+  serviceLogs = settledValue(logsResult, serviceLogs);
+  diagnostics = settledValue(diagnosticsResult, diagnostics);
+  update = settledValue(updateResult, update);
+  proofActivity = settledValue(proofResult, health.proof_activity?.schema ? health.proof_activity : proofActivity);
+  crashReporting.status = settledValue(crashResult, crashReporting.status);
+  health.proof_status = proofActivity?.proof_status || health.proof_status;
+  health.proof_activity = proofActivity;
+  dashboardHydration = { status: 'ready', error: null, last_updated: new Date().toISOString() };
+}
 async function runClientCommand({ command, args, pending, success, failure }) {
   busy = true;
   setStatus(pending);
@@ -1263,10 +1303,13 @@ async function handleAction(event) {
     }
     case 'go-dashboard': {
       currentStep = 6;
-      clients = await call('detect_clients');
-      proofActivity = await call('get_proof_activity');
-      crashReporting.status = await call('get_crash_reporting_status');
+      busy = true;
+      setStatus('Refreshing dashboard...');
       render();
+      await hydrateDashboardState();
+      busy = false;
+      render();
+      setStatus('Dashboard refreshed with current local status.');
       return;
     }
     case 'shutdown': {
@@ -1425,9 +1468,15 @@ async function handleAction(event) {
   }
 }
 
-function init() {
+async function init() {
   restoreWizardResumeState();
   render();
+  if (currentStep === 6) {
+    setStatus('Refreshing dashboard...');
+    await hydrateDashboardState();
+    render();
+    setStatus('Dashboard refreshed with current local status.');
+  }
 }
 
 if (document.readyState === 'loading') {

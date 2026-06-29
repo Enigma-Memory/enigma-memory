@@ -295,6 +295,16 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(tauriService, /"writes_performed": false/);
   assert.match(tauriLib, /commands::service::preview_client_config/);
   assert.match(styles, /connection-preview/);
+  assert.match(wizard, /hydrateDashboardState/);
+  assert.match(wizard, /Promise\.allSettled/);
+  assert.match(wizard, /call\('get_health'\)/);
+  assert.match(wizard, /call\('get_service_status'\)/);
+  assert.match(wizard, /call\('get_service_logs'/);
+  assert.match(wizard, /call\('get_diagnostics'\)/);
+  assert.match(wizard, /call\('check_update'\)/);
+  assert.match(wizard, /currentStep === 6/);
+  assert.match(wizard.match(/case 'go-dashboard': \{[\s\S]*?return;\n    \}/)?.[0] || '', /hydrateDashboardState/);
+  assert.match(wizard.match(/async function init\(\) \{[\s\S]*?\n\}/)?.[0] || '', /hydrateDashboardState/);
   assert.match(tauriService, /pub async fn preview_import_text/);
   assert.match(tauriService, /pub async fn approve_import_text/);
   assert.match(tauriService, /import-sandbox-/);

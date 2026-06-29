@@ -43,6 +43,8 @@
 - Desktop connector cards expose a local "Test connection" action that checks config parse, Enigma entry correctness, bundle reachability, and restart guidance without launching provider apps.
 - Desktop connector cards now require a path-redacted preview and explicit "Approve connection" click before writing MCP client config changes.
 
+- Desktop dashboard entry now hydrates current health, service, logs, diagnostics, update, proof, client, and crash state before presenting the Memory Drive dashboard.
+
 ### Docs and website
 - Desktop-first `README.md`.
 - Updated `docs/install-anywhere.md`.
