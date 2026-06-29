@@ -51,12 +51,13 @@ Prerequisites:
 npm install -g enigma-memory
 ENIGMA_BUNDLE_FILE="<private-bundle-file>"
 enigma next --plain --bundle "$ENIGMA_BUNDLE_FILE"
-enigma setup --bundle "$ENIGMA_BUNDLE_FILE" --client auto --connect-installed --overwrite
+enigma quickstart --bundle "$ENIGMA_BUNDLE_FILE"
 enigma doctor --bundle "$ENIGMA_BUNDLE_FILE"
 enigma drive health --bundle "$ENIGMA_BUNDLE_FILE"
+enigma connect claude-desktop --bundle "$ENIGMA_BUNDLE_FILE" --dry-run
 enigma status --bundle "$ENIGMA_BUNDLE_FILE"
 ```
-`enigma next --plain` is the simplest first command: it prints one human-readable next step without requiring an existing bundle. `enigma status` includes `first_run_status`: one public-safe setup state, one primary action, and lanes for Memory Drive, Import Sandbox, memory inventory, proof activity, and diagnostics.
+`enigma next --plain` is the simplest first command: it prints one human-readable next step without requiring an existing bundle. `enigma quickstart` creates the local bundle; connector writes stay behind explicit `enigma connect <client> --dry-run` preview and a separate intentional connect command. `enigma status` includes `first_run_status`: one public-safe setup state, one primary action, and lanes for Memory Drive, Import Sandbox, memory inventory, proof activity, and diagnostics.
 If `doctor` is red on a fresh install, read `setup_status.state`: `setup_needed` means run the included `setup_status.next_command`; `attention_needed` means a real local install/config issue remains.
 For support, use `enigma support summary --bundle "$ENIGMA_BUNDLE_FILE"` and share only that redacted JSON unless support explicitly asks for a private local artifact.
 
