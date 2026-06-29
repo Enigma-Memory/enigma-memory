@@ -8,6 +8,7 @@ import { promisify } from 'node:util';
 import {
   AI_ORCHESTRATION_PLAN_SCHEMA,
   buildAiOrchestrationPlan,
+  renderAiOrchestrationPlanPlain,
 } from '../scripts/build-ai-orchestration-plan.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -68,6 +69,21 @@ test('AI orchestration plan maps current blockers to role lanes and waves', () =
   assert.doesNotMatch(JSON.stringify(plan), /Bearer\s+[A-Za-z0-9._~+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|sk-[A-Za-z0-9_-]{16,}/i);
 });
 
+test('AI orchestration plan plain output is Workflowz-readable and claim-bounded', () => {
+  const plan = buildAiOrchestrationPlan({ statusBoard: statusBoard() }, { generated_at: '2026-06-24T00:01:00.000Z' });
+  const plain = renderAiOrchestrationPlanPlain(plan);
+
+  assert.match(plain, /^Enigma AI orchestration plan\n/);
+  assert.match(plain, /Status: blocked/);
+  assert.match(plain, /Launch ready: no/);
+  assert.match(plain, /Role lanes: 5/);
+  assert.match(plain, /Wave: wave_1_external_access/);
+  assert.match(plain, /Lane: human_operator_credentials/);
+  assert.match(plain, /Boundary: public-safe orchestration summary only/);
+  assert.doesNotMatch(plain, /^\s*\{/);
+  assert.doesNotMatch(plain, /Bearer\s+[A-Za-z0-9._~+/=-]{12,}|C:\\Users\\|\/home\/|raw_memory|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/i);
+});
+
 test('AI orchestration plan rejects unsafe source status evidence', () => {
   assert.throws(() => buildAiOrchestrationPlan({
     statusBoard: statusBoard({ blocked_groups: [{ name: 'cloudflare_credentials', blockers: ['Bearer abcdefghijklmnopqrstuvwxyz'] }] }),
@@ -103,5 +119,35 @@ test('AI orchestration plan CLI writes blocked public-safe JSON with exit 1', as
     },
   );
   const written = JSON.parse(await readFile(paths.out, 'utf8'));
+  assert.equal(written.role_lane_count, 5);
+});
+
+test('AI orchestration plan CLI writes JSON evidence while printing plain output', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-ai-orchestration-plain-'));
+  const paths = {
+    status: join(dir, 'status.json'),
+    out: join(dir, 'orchestration.json'),
+  };
+  await writeFile(paths.status, `${JSON.stringify(statusBoard(), null, 2)}\n`, 'utf8');
+  await assert.rejects(
+    () => execFileAsync(process.execPath, [
+      'scripts/build-ai-orchestration-plan.mjs',
+      '--status-board', paths.status,
+      '--out', paths.out,
+      '--plain',
+    ], { cwd: process.cwd(), timeout: 10000, windowsHide: true }),
+    (error) => {
+      assert.equal(error.code, 1);
+      assert.match(error.stdout, /^Enigma AI orchestration plan\n/);
+      assert.match(error.stdout, /Wave: wave_1_external_access/);
+      assert.match(error.stdout, /Boundary: public-safe orchestration summary only/);
+      assert.doesNotMatch(error.stdout, /^\s*\{/);
+      assert.equal(error.stdout.includes(dir), false);
+      assert.equal(error.stdout.includes(paths.out), false);
+      return true;
+    },
+  );
+  const written = JSON.parse(await readFile(paths.out, 'utf8'));
+  assert.equal(written.schema, AI_ORCHESTRATION_PLAN_SCHEMA);
   assert.equal(written.role_lane_count, 5);
 });

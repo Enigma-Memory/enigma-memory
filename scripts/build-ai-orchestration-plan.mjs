@@ -9,7 +9,7 @@ const SECRET_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{1
 const LOCAL_PATH_RE = /(?<![A-Za-z])(?:[A-Za-z]:[\\/]|\\\\[^\\/]+[\\/][^\\/]+|\/(?:Users|home)\/[^\s"']+)/u;
 
 function parseArgs(argv = process.argv.slice(2)) {
-  const out = { statusBoard: null, out: null, help: false };
+  const out = { statusBoard: null, out: null, plain: false, help: false };
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     const readValue = () => {
@@ -21,13 +21,17 @@ function parseArgs(argv = process.argv.slice(2)) {
     if (token === '--status-board' || token === '--statusBoard') out.statusBoard = readValue();
     else if (token === '--out') out.out = readValue();
     else if (token === '--help' || token === '-h') out.help = true;
+    else if (token === '--plain' || token === '--text' || token === '--format=text' || (token === '--format' && argv[index + 1] === 'text')) {
+      out.plain = true;
+      if (token === '--format') index += 1;
+    }
     else throw new Error(`Unknown AI orchestration option: ${token}`);
   }
   return out;
 }
 
 function usage() {
-  return 'Usage: node scripts/build-ai-orchestration-plan.mjs --status-board <production-status-board.json> [--out <file>]\n\nBuilds a public-safe AI/operator orchestration plan from the current production status board.\n';
+  return 'Usage: node scripts/build-ai-orchestration-plan.mjs --status-board <production-status-board.json> [--out <file>] [--plain]\n\nBuilds a public-safe AI/operator orchestration plan from the current production status board. --plain prints a human-readable Workflowz-style orchestration summary while --out preserves JSON evidence.\n';
 }
 
 async function readJson(path, label) {
@@ -224,6 +228,23 @@ export function buildAiOrchestrationPlan(inputs = {}, options = {}) {
   return plan;
 }
 
+export function renderAiOrchestrationPlanPlain(plan) {
+  const lines = [
+    'Enigma AI orchestration plan',
+    `Status: ${plan.status ?? 'blocked'}`,
+    `Launch ready: ${plan.launch_ready ? 'yes' : 'no'}`,
+    `Mode: ${plan.orchestration_mode ?? '<mode>'}`,
+    `Role lanes: ${plan.role_lane_count ?? 0}`,
+    `Waves: ${plan.wave_count ?? 0}`,
+    `Source next phase: ${plan.source_status_next_phase_id ?? 'none'}`,
+    `Fresh source evidence: ${plan.source_status_fresh_input_evidence ? 'yes' : 'no'}`,
+  ];
+  for (const wave of Array.isArray(plan.waves) ? plan.waves : []) lines.push(`Wave: ${wave.id} — ${wave.objective}`);
+  for (const lane of Array.isArray(plan.lanes) ? plan.lanes.slice(0, 5) : []) lines.push(`Lane: ${lane.id} — ${lane.role}; blockers ${lane.blocker_count ?? 0}`);
+  lines.push('Boundary: public-safe orchestration summary only; no external AI invocation, account creation, deploy, infrastructure approval, launch certification, credentials, account ids, raw memory, local paths, provider responses, provider deletion, model behavior, hosted service, compliance, benchmark superiority, token ROI, or provider invoice savings claims.');
+  return `${lines.join('\n')}\n`;
+}
+
 export async function main(argv = process.argv.slice(2)) {
   const args = parseArgs(argv);
   if (args.help) return { text: usage(), status: 0 };
@@ -234,7 +255,7 @@ export async function main(argv = process.argv.slice(2)) {
     await mkdir(dirname(args.out), { recursive: true });
     await writeFile(args.out, json, 'utf8');
   }
-  return { text: json, status: plan.launch_ready ? 0 : 1 };
+  return { text: args.plain ? renderAiOrchestrationPlanPlain(plan) : json, status: plan.launch_ready ? 0 : 1 };
 }
 
 if (fileURLToPath(import.meta.url) === process.argv[1]) {
