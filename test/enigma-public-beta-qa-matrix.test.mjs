@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { buildPublicBetaQaMatrix, buildRankedNextActions, buildScenarioRows } from '../scripts/run-public-beta-qa-matrix.mjs';
+import { buildPublicBetaQaMatrix, buildRankedNextActions, buildScenarioRows, parseArgs, renderPublicBetaQaPlain } from '../scripts/run-public-beta-qa-matrix.mjs';
 
 const GENERATED_AT = '2026-06-28T00:00:00.000Z';
 
@@ -142,6 +142,27 @@ function expectedStatusCounts(scenarios) {
 test('public beta QA npm script invokes the JSON matrix runner', async () => {
   const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
   assert.equal(packageJson.scripts['public-beta-qa'], 'node scripts/run-public-beta-qa-matrix.mjs --json');
+});
+
+test('public beta QA runner accepts explicit plain output mode', () => {
+  assert.deepEqual(parseArgs(['--plain']), { json: false, plain: true, out: null });
+  assert.deepEqual(parseArgs(['--format', 'text']), { json: false, plain: true, out: null });
+  assert.throws(() => parseArgs(['--json', '--plain']), /Choose only one output format/);
+});
+
+test('public beta QA plain output is readable, bounded, and non-JSON', async () => {
+  const matrix = await loadMatrix();
+  const plain = renderPublicBetaQaPlain(matrix);
+
+  assert.match(plain, /^Enigma public beta QA advisor\n/);
+  assert.match(plain, /Decision: HOLD/);
+  assert.match(plain, /Ready for public beta: no/);
+  assert.match(plain, /Blocked: /);
+  assert.match(plain, /Pending: /);
+  assert.match(plain, /Next: approve_merge_release_pr/);
+  assert.match(plain, /Boundary: local repository evidence matrix only/);
+  assert.doesNotMatch(plain, /^\s*\{/);
+  assertPublicSafe(plain);
 });
 
 test('public beta QA matrix emits the expected public schema and scenario coverage', async () => {

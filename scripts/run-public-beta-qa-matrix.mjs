@@ -196,7 +196,7 @@ export function buildRankedNextActions(blockers) {
 }
 
 function usage() {
-  return `Usage: node scripts/run-public-beta-qa-matrix.mjs [--json] [--out <path>]\n\nGenerates a public-safe ${PUBLIC_BETA_QA_MATRIX_SCHEMA} report from repository files only, including ranked next_actions for release owners.\n`;
+  return `Usage: node scripts/run-public-beta-qa-matrix.mjs [--json|--plain] [--out <path>]\n\nGenerates a public-safe ${PUBLIC_BETA_QA_MATRIX_SCHEMA} report from repository files only, including ranked next_actions for release owners.\n`;
 }
 
 function readArg(argv, index, flag) {
@@ -205,11 +205,14 @@ function readArg(argv, index, flag) {
 }
 
 export function parseArgs(argv = process.argv.slice(2)) {
-  const options = { json: false, out: null };
+  const options = { json: false, plain: false, out: null };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--json') {
       options.json = true;
+    } else if (arg === '--plain' || arg === '--text' || arg === '--format=text' || (arg === '--format' && argv[i + 1] === 'text')) {
+      options.plain = true;
+      if (arg === '--format') i += 1;
     } else if (arg === '--out') {
       options.out = readArg(argv, i + 1, '--out');
       i += 1;
@@ -219,6 +222,7 @@ export function parseArgs(argv = process.argv.slice(2)) {
       throw new Error(`Unknown argument: ${arg}`);
     }
   }
+  if (options.json && options.plain) throw new Error('Choose only one output format: --json or --plain.');
   return options;
 }
 
@@ -683,6 +687,26 @@ export async function buildPublicBetaQaMatrix(options = {}) {
   return report;
 }
 
+export function renderPublicBetaQaPlain(report) {
+  const counts = report.summary?.status_counts ?? {};
+  const lines = [
+    'Enigma public beta QA advisor',
+    `Decision: ${String(report.advisor_decision ?? 'hold').toUpperCase()}`,
+    `Version: ${report.version ?? 'unknown'} / required ${report.required_public_beta_version ?? 'unknown'}`,
+    `Ready for public beta: ${report.summary?.ready_for_public_beta ? 'yes' : 'no'}`,
+    `Scenarios: ${report.summary?.total_scenarios ?? 0}`,
+    `Pass: ${counts.pass ?? 0}`,
+    `Blocked: ${counts.blocked ?? 0}`,
+    `Pending: ${counts.pending ?? 0}`,
+    `Missing: ${counts.missing ?? 0}`,
+    `Fail: ${counts.fail ?? 0}`,
+  ];
+  const actions = Array.isArray(report.next_actions) ? report.next_actions.slice(0, 5) : [];
+  for (const action of actions) lines.push(`Next: ${action.action_id} — ${action.summary}`);
+  lines.push('Boundary: local repository evidence matrix only; no PR approval, merge, npm publication, signed installer, clean-machine install, hosted service, provider deletion, model behavior, benchmark superiority, token ROI, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
 async function main() {
   const options = parseArgs();
   if (options.help) {
@@ -697,7 +721,7 @@ async function main() {
     await writeFile(outPath, json, 'utf8');
     return;
   }
-  process.stdout.write(json);
+  process.stdout.write(options.plain ? renderPublicBetaQaPlain(report) : json);
 }
 
 if (process.argv[1] === SCRIPT_PATH) {
