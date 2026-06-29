@@ -127,6 +127,7 @@ test('installer scripts are source installers with safe dry-run defaults', () =>
   assert.match(formula, /enigma quickstart --bundle \.\/\.enigma\/bundle\.json/);
   assert.match(formula, /enigma doctor --bundle \.\/\.enigma\/bundle\.json/);
   assert.match(formula, /enigma connect <client> --bundle \.\/\.enigma\/bundle\.json --dry-run/);
+  assert.doesNotMatch(formula, /enigma setup\b/);
   assert.equal(macosManifest.generated_native_pkg, false);
   assert.equal(macosManifest.source_only, true);
   assert.equal(macosManifest.package_id, '<reverse-dns-package-id>');

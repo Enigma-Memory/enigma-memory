@@ -62,7 +62,7 @@ Until those blockers are cleared, use npm or generated source scripts only.
 
 ## Homebrew path
 
-The formula generated under `homebrew/enigma-memory.rb` is a draft for a future tap workflow. It records the intended package name, license, Node dependency, command shims, and installer smoke test shape: `enigma test-drive --dry-run`, `enigma setup --dry-run`, `enigma doctor`, and the printed next command `enigma connect <client> --dry-run`. Before publication, release engineering must replace the placeholder tarball URL and SHA with a real release archive and confirm the formula installs only the intended package files.
+The formula generated under `homebrew/enigma-memory.rb` is a draft for a future tap workflow. It records the intended package name, license, Node dependency, command shims, and installer smoke test shape: `enigma test-drive --dry-run`, `enigma quickstart --bundle ./.enigma/bundle.json`, `enigma doctor --bundle ./.enigma/bundle.json`, and the printed next command `enigma connect <client> --bundle ./.enigma/bundle.json --dry-run`. Before publication, release engineering must replace the placeholder tarball URL and SHA with a real release archive and confirm the formula installs only the intended package files.
 
 ## Desktop tray model boundary
 

@@ -191,9 +191,9 @@ function homebrewFormulaDraft() {
 # Release engineering must replace the tarball URL and sha256 after a real source archive exists.
 # Post-install smoke path:
 #   enigma test-drive --dry-run
-#   enigma setup --overwrite
-#   enigma doctor
-#   enigma connect <client> --dry-run
+#   enigma quickstart --bundle ./.enigma/bundle.json
+#   enigma doctor --bundle ./.enigma/bundle.json
+#   enigma connect <client> --bundle ./.enigma/bundle.json --dry-run
 class EnigmaMemory < Formula
   desc "Provider-agnostic AI memory passport and offline-verifiable proof layer"
   homepage "https://github.com/Enigma-Memory/enigma-memory"

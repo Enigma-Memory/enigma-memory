@@ -3696,6 +3696,9 @@ test('public collateral keeps proof, token, hosted, and raw-memory claim boundar
       /native messaging host name `com\.enigma\.native_host`/i,
       /requires explicit user action before requesting or inserting context/i,
       /must not store raw memory in browser sync storage/i,
+      /POSIX-style `test\/\*\.test\.mjs` paths/i,
+      /--test-concurrency=1/i,
+      /without nested npm lifecycle scripts/i,
     ],
     'launch/02_WHITEPAPER.md': [
       /Enigma does not claim to make providers forget/i,

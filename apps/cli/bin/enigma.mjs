@@ -296,7 +296,7 @@ async function assertCanWriteQuickstartOutputs(outputs, overwrite) {
     if (await fileExists(output.path)) existing.push(output.display);
   }
   if (existing.length > 0) {
-    throw new Error(`Quickstart output already exists: ${existing.join(', ')}. Pass --overwrite to replace it.`);
+    throw new Error(`Quickstart output already exists: ${existing.join(', ')}. Choose a different empty --out-dir, or pass --overwrite only if you intend to replace it.`);
   }
 }
 
@@ -1185,7 +1185,7 @@ function initExecuteCommand(bundleDisplay, outDirDisplay, requestedSelection, co
 }
 
 function initNextCommands({ dryRun, bundleDisplay, outDirDisplay, exportDisplay, clients, requestedSelection, connectRequested, overwrite, connectorWritesPerformed }) {
-  const commands = dryRun ? [initExecuteCommand(bundleDisplay, outDirDisplay, requestedSelection, connectRequested, overwrite || dryRun)] : [];
+  const commands = dryRun ? [initExecuteCommand(bundleDisplay, outDirDisplay, requestedSelection, connectRequested, overwrite)] : [];
   commands.push(...setupNextCommands(bundleDisplay, exportDisplay, clients, connectRequested && connectorWritesPerformed));
   return commands;
 }
@@ -2096,7 +2096,7 @@ function passportStatusReport({ bundlePath, stored = {}, vault, passport }) {
       `enigma search --bundle "${bundlePath}" --query <text>`,
       `enigma context --bundle "${bundlePath}" --query <text>`,
       `enigma verify --bundle "${bundlePath}"`,
-      `enigma connect <client> --bundle "${bundlePath}"`,
+      `enigma connect <client> --bundle "${bundlePath}" --dry-run`,
     ],
     claim_boundary: 'Status reports local bundle counters, owner display fields, connector readiness hints, and commitment roots only; it does not expose raw memory, certify compliance, prove provider deletion, or prove model forgetting.',
   };
@@ -2758,10 +2758,11 @@ function redactCliErrorMessage(error) {
     .replace(/\/(?:Users|home|var|tmp|private|Volumes)\/[^\s,)"']+/g, '<local-path>');
 }
 
-function recoveryCommandFor(command) {
-  if (command === 'init' || command === 'setup') return 'enigma setup --bundle <bundle-path> --out-dir <out-dir> --overwrite';
-  if (command === 'start' || command === 'quickstart') return 'enigma quickstart --bundle <bundle-path> --out-dir <out-dir> --overwrite';
-  if (command === 'test-drive') return 'enigma test-drive --out-dir <out-dir> --overwrite';
+function recoveryCommandFor(command, error) {
+  const existingArtifact = /already exists/i.test(String(error?.message ?? error ?? ''));
+  if (command === 'init' || command === 'setup') return existingArtifact ? 'enigma setup --bundle <new-bundle-path> --out-dir <new-empty-out-dir>' : 'enigma setup --bundle <bundle-path> --out-dir <out-dir> --overwrite';
+  if (command === 'start' || command === 'quickstart') return existingArtifact ? 'enigma quickstart --bundle <new-bundle-path> --out-dir <new-empty-out-dir>' : 'enigma quickstart --bundle <bundle-path> --out-dir <out-dir> --overwrite';
+  if (command === 'test-drive') return existingArtifact ? 'enigma test-drive --out-dir <new-empty-out-dir>' : 'enigma test-drive --out-dir <out-dir> --overwrite';
   return 'enigma next --bundle <bundle-path>';
 }
 
@@ -2771,7 +2772,7 @@ function renderCliErrorPlain(command, error) {
     `Enigma ${safeCommand}`,
     'Status: Needs attention',
     `Issue: ${redactCliErrorMessage(error)}`,
-    `Next: ${recoveryCommandFor(command)}`,
+    `Next: ${recoveryCommandFor(command, error)}`,
     'Boundary: local Enigma error summary only; no raw memory, local paths, provider deletion, model behavior, hosted service, or signing claims.',
   ];
   return `${lines.join('\n')}\n`;
@@ -3008,7 +3009,7 @@ function publicTestDriveStatusSummary(summary, bundleDisplay) {
       `enigma search --bundle ${commandPath(bundleDisplay)} --query <text>`,
       `enigma context --bundle ${commandPath(bundleDisplay)} --query <text>`,
       `enigma verify --bundle ${commandPath(bundleDisplay)}`,
-      `enigma connect <client> --bundle ${commandPath(bundleDisplay)}`,
+      `enigma connect <client> --bundle ${commandPath(bundleDisplay)} --dry-run`,
     ],
   };
 }

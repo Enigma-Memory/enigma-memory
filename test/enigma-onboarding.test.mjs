@@ -139,7 +139,8 @@ test('setup fails closed when an artifact already exists', async () => {
   assert.match(plainIo.stdout(), /^Enigma setup\n/);
   assert.match(plainIo.stdout(), /Status: Needs attention/);
   assert.match(plainIo.stdout(), /Issue: Quickstart output already exists/);
-  assert.match(plainIo.stdout(), /Next: enigma setup --bundle <bundle-path> --out-dir <out-dir> --overwrite/);
+  assert.match(plainIo.stdout(), /Next: enigma setup --bundle <new-bundle-path> --out-dir <new-empty-out-dir>/);
+  assert.doesNotMatch(plainIo.stdout().split('\n').find((line) => line.startsWith('Next:')) ?? '', /--overwrite/);
   assert.match(plainIo.stdout(), /Boundary: local Enigma error summary only/);
   assert.doesNotMatch(plainIo.stdout(), /^\s*\{/);
   assert.equal(plainIo.stdout().includes(dir), false);
@@ -328,7 +329,7 @@ test('init dry-run prints a public-safe first-run plan without writing artifacts
   assert.equal(summary.out_dir, '<out-dir>');
   assert.equal(serialized.includes(dir), false);
   assert.ok(summary.next_commands[0].startsWith('enigma init --bundle "<bundle-path>" --out-dir "<out-dir>"'));
-  assert.ok(summary.next_commands[0].includes('--overwrite'));
+  assert.doesNotMatch(summary.next_commands[0], /--overwrite/);
   assert.ok(summary.next_commands.some((command) => command.startsWith('enigma remember ')));
   assert.ok(summary.next_commands.some((command) => command.startsWith('enigma verify ')));
   assert.equal(summary.connectors.every((connector) => connector.connect_plan.dry_run === true), true);
@@ -710,6 +711,11 @@ test('status plain output reports counters without JSON or local paths', async (
     assert.match(stdout, /Boundary: local Enigma counters and roots only/);
     assert.doesNotMatch(stdout, /^\s*\{/);
     assert.equal(stdout.includes(dir), false);
+
+    const jsonIo = makeIo();
+    assert.equal(await main(['status', '--bundle', bundlePath], jsonIo.io), 0, jsonIo.stderr());
+    const status = jsonIo.json();
+    assert.ok(status.next_recommended_commands.some((command) => command.startsWith('enigma connect <client> ') && command.endsWith(' --dry-run')));
     assert.equal(stdout.includes(bundlePath), false);
   } finally {
     await rm(dir, { recursive: true, force: true });
