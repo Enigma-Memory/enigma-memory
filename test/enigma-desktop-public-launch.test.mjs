@@ -504,6 +504,9 @@ test('public website explains consumer install path without unsupported claims',
   assert.doesNotMatch(publicApiReference, /quickstart --bundle \.\/\.enigma\/bundle\.json --overwrite/);
   assert.match(publicApiReference, /enigma quickstart --bundle \.\/\.enigma\/bundle\.json/);
   assert.match(publicApiReference, /enigma connect claude-desktop --bundle \.\/\.enigma\/bundle\.json --dry-run/);
+  assert.match(faq, /help\/troubleshooting\/vault-not-ready\.html/);
+  assert.match(faq, /Restore from backup, Safe reset/);
+  assert.doesNotMatch(faq, /<p>Run Repair vault[^<]*<a href="\.\/developers\/cli\.html"/);
   assert.match(websiteStyles, /first-run-map/);
   assert.match(help, /Start here/);
   assert.match(help, /You should not need Node, npm, terminal commands, or JSON edits/);
