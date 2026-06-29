@@ -1568,6 +1568,7 @@ test('preflight release audit wiring is local-only and documented', async () => 
   const auditSource = await readFile(new URL(`../${RELEASE_AUDIT_SCRIPT}`, import.meta.url), 'utf8');
   assert.match(auditSource, /nodeTestInvocation/, 'release audit must run the Node test runner directly instead of nesting npm test inside npm run release:audit');
   assert.doesNotMatch(auditSource, /const test = npmInvocation\(\['test'\]\)/, 'release audit must avoid nested npm test lifecycle flake');
+  assert.match(auditSource, /\.map\(\(entry\) => `test\/\$\{entry\.name\}`\)/, 'release audit must pass POSIX-style test paths to match npm test across Windows runners');
   assert.match(auditSource, /runNativeHostInstallPlanGate/, 'release audit must include native install-plan coverage');
   assert.match(auditSource, /native-host['"],\s*['"]install-plan/, 'release audit must execute the native install-plan command shape');
   assert.match(auditSource, /writes_performed/, 'release audit must validate that install-plan does not write browser or OS registration state');

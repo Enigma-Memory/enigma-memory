@@ -157,7 +157,7 @@ async function nodeTestInvocation() {
   const entries = await readdir(join(PROJECT_ROOT, 'test'), { withFileTypes: true });
   const testFiles = entries
     .filter((entry) => entry.isFile() && entry.name.endsWith('.test.mjs'))
-    .map((entry) => join('test', entry.name))
+    .map((entry) => `test/${entry.name}`)
     .sort();
   if (testFiles.length === 0) throw new Error('No test/*.test.mjs files found.');
   return { command: process.execPath, args: ['--test', ...testFiles], label: 'npm test' };
