@@ -326,6 +326,13 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(tauriService, /enigma\.desktop_proof_activity_export\.v1/);
   assert.match(tauriLib, /commands::service::get_proof_activity/);
   assert.match(tauriLib, /commands::service::export_proof_activity/);
+  assert.match(wizard, /publicExportScanStatus/);
+  assert.match(wizard, /Privacy scan:/);
+  assert.match(wizard, /privacy_scan_blocked/);
+  assert.match(tauriService, /desktop_public_export_privacy_scan/);
+  assert.match(tauriService, /ensure_desktop_public_export_allowed/);
+  assert.match(tauriService, /enigma\.desktop_public_export_privacy_scan\.v1/);
+  assert.match(tauriService, /Desktop export privacy scan blocked/);
   assert.match(wizard, /Support summary/);
   assert.match(wizard, /Shareable status without private memory/);
   assert.match(wizard, /collect-support-summary/);
@@ -339,6 +346,8 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(tauriService, /enigma\.desktop_support_summary_export\.v1/);
   assert.match(tauriLib, /commands::service::get_support_summary/);
   assert.match(tauriLib, /commands::service::export_support_summary/);
+  assert.match(tauriService, /privacy_scan_status/);
+  assert.match(tauriService, /export_allowed/);
   assert.match(tauriService, /connector_card_status/);
   assert.match(tauriService, /recommended_action/);
   assert.match(tauriService, /repair_reasons/);

@@ -141,7 +141,7 @@ async fn build_bundle(state: &AppState) -> Result<DiagnosticsBundle, String> {
     })
 }
 
-fn find_forbidden_keys(value: &Value) -> Vec<String> {
+pub(crate) fn find_forbidden_keys(value: &Value) -> Vec<String> {
     let forbidden: HashSet<&str> = FORBIDDEN_KEYS.iter().copied().collect();
     let mut found = Vec::new();
     collect_forbidden_keys(value, &forbidden, &mut found);
@@ -169,7 +169,7 @@ fn collect_forbidden_keys(value: &Value, forbidden: &HashSet<&str>, out: &mut Ve
     }
 }
 
-fn redact_paths(value: &Value) -> Value {
+pub(crate) fn redact_paths(value: &Value) -> Value {
     match value {
         Value::String(s) => Value::String(redact_path(s)),
         Value::Object(map) => {

@@ -44,6 +44,7 @@
 - Desktop connector cards now require a path-redacted preview and explicit "Approve connection" click before writing MCP client config changes.
 
 - Desktop dashboard entry now hydrates current health, service, logs, diagnostics, update, proof, client, and crash state before presenting the Memory Drive dashboard.
+- Desktop support-summary and proof-activity exports now fail closed behind a shared public-export privacy scan; the UI shows scan status and disables export until the scan passes.
 
 ### Docs and website
 - Desktop-first `README.md`.

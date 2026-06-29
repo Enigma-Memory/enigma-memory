@@ -1,4 +1,4 @@
-use crate::commands::run_cli;
+use crate::commands::{diagnostics, run_cli};
 use crate::{AppState, DesktopConfig};
 use chrono::Utc;
 use regex::Regex;
@@ -301,7 +301,7 @@ async fn proof_activity_summary(config: &crate::DesktopConfig) -> Value {
     let status = match run_cli(config, &["status", "--bundle", &bundle]).await {
         Ok(status) => status,
         Err(_) => {
-            return json!({
+            return attach_desktop_public_export_scan(json!({
                 "ok": false,
                 "schema": "enigma.desktop_proof_activity.v1",
                 "proof_status": "setup_needed",
@@ -328,7 +328,7 @@ async fn proof_activity_summary(config: &crate::DesktopConfig) -> Value {
                     "model_forgetting_proof": false,
                     "hosted_saas_live": false,
                 },
-            });
+            }));
         }
     };
     let receipt_count = status
@@ -362,7 +362,7 @@ async fn proof_activity_summary(config: &crate::DesktopConfig) -> Value {
         })
     };
 
-    json!({
+    attach_desktop_public_export_scan(json!({
         "ok": true,
         "schema": "enigma.desktop_proof_activity.v1",
         "proof_status": proof_status,
@@ -390,7 +390,7 @@ async fn proof_activity_summary(config: &crate::DesktopConfig) -> Value {
             "model_forgetting_proof": false,
             "hosted_saas_live": false,
         },
-    })
+    }))
 }
 
 fn connector_card_status(result: &crate::connector::engine::DetectResult) -> &'static str {
@@ -867,6 +867,52 @@ pub async fn rollback_client_config(
     }))
 }
 
+fn desktop_public_export_privacy_scan(value: &Value) -> Value {
+    let forbidden_keys = diagnostics::find_forbidden_keys(value);
+    let serialized = serde_json::to_string(value).unwrap_or_default();
+    let redacted_serialized =
+        serde_json::to_string(&diagnostics::redact_paths(value)).unwrap_or_default();
+    let local_paths_found =
+        serialized != redacted_serialized || log_path_regex().is_match(&serialized);
+    let credential_text_found = log_token_regex().is_match(&serialized);
+    let export_allowed = forbidden_keys.is_empty() && !local_paths_found && !credential_text_found;
+    json!({
+        "schema": "enigma.desktop_public_export_privacy_scan.v1",
+        "status": if export_allowed { "pass" } else { "blocked" },
+        "export_allowed": export_allowed,
+        "forbidden_keys": forbidden_keys,
+        "raw_memory_denied": true,
+        "prompts_denied": true,
+        "transcripts_denied": true,
+        "credentials_denied": !credential_text_found,
+        "provider_responses_denied": true,
+        "local_paths_denied": !local_paths_found,
+        "claim_boundary": "Local desktop export privacy scan only; it does not prove provider deletion, model forgetting, hosted services, release signing, or compliance.",
+    })
+}
+
+fn scan_allows_export(scan: &Value) -> bool {
+    scan.get("export_allowed")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+}
+
+fn attach_desktop_public_export_scan(mut value: Value) -> Value {
+    let scan = desktop_public_export_privacy_scan(&value);
+    value["privacy_scan"] = scan.clone();
+    value["export_allowed"] = json!(scan_allows_export(&scan));
+    value
+}
+
+fn ensure_desktop_public_export_allowed(value: &Value) -> Result<Value, String> {
+    let scan = desktop_public_export_privacy_scan(value);
+    if scan_allows_export(&scan) {
+        Ok(scan)
+    } else {
+        Err("Desktop export privacy scan blocked this public export.".to_string())
+    }
+}
+
 async fn build_support_summary(config: &DesktopConfig) -> Result<Value, String> {
     let bundle = config.bundle_path.to_string_lossy();
     let mut summary = run_cli(
@@ -882,12 +928,19 @@ async fn build_support_summary(config: &DesktopConfig) -> Result<Value, String> 
     )
     .await
     .map_err(redact_command_error)?;
+    let scan = desktop_public_export_privacy_scan(&summary);
     summary["desktop_surface"] = json!({
         "schema": "enigma.desktop_support_summary_surface.v1",
         "local_paths_hidden": true,
         "raw_memory_hidden": true,
         "shareable_by_default": false,
+        "privacy_scan_status": scan.get("status").and_then(Value::as_str).unwrap_or("blocked"),
+        "export_allowed": scan_allows_export(&scan),
     });
+    summary["privacy_scan"] = scan;
+    summary["export_allowed"] = json!(summary["desktop_surface"]["export_allowed"]
+        .as_bool()
+        .unwrap_or(false));
     Ok(summary)
 }
 
@@ -931,6 +984,7 @@ pub async fn export_support_summary(
         return Err("User approval is required before exporting support summary.".to_string());
     }
     let summary = build_support_summary(&state.config).await?;
+    let scan = ensure_desktop_public_export_allowed(&summary)?;
     let out_path = support_summary_export_path(&state.config);
     if let Some(parent) = out_path.parent() {
         tokio::fs::create_dir_all(parent)
@@ -948,6 +1002,8 @@ pub async fn export_support_summary(
         "local_paths_hidden": true,
         "raw_memory_hidden": true,
         "shareable_by_default": false,
+        "privacy_scan": scan,
+        "export_allowed": true,
     }))
 }
 
@@ -965,6 +1021,7 @@ pub async fn export_proof_activity(
         return Err("User approval is required before exporting proof activity.".to_string());
     }
     let activity = proof_activity_summary(&state.config).await;
+    let scan = ensure_desktop_public_export_allowed(&activity)?;
     let out_path = proof_activity_export_path(&state.config);
     if let Some(parent) = out_path.parent() {
         tokio::fs::create_dir_all(parent)
@@ -982,6 +1039,8 @@ pub async fn export_proof_activity(
         "local_paths_hidden": true,
         "raw_memory_hidden": true,
         "shareable_by_default": false,
+        "privacy_scan": scan,
+        "export_allowed": true,
     }))
 }
 
@@ -1165,6 +1224,42 @@ mod tests {
         assert!(!dashboard_offline_ready(&stopped, "ready", "healthy"));
         assert!(!dashboard_offline_ready(&running, "missing", "healthy"));
         assert!(!dashboard_offline_ready(&running, "ready", "fix-needed"));
+    }
+
+    #[test]
+    fn desktop_public_export_privacy_scan_fails_closed() {
+        let safe = json!({
+            "schema": "enigma.desktop_proof_activity.v1",
+            "receipt_count": 1,
+            "redaction": {
+                "raw_memory_included": false,
+                "local_paths_redacted": true
+            }
+        });
+        let safe_scan = desktop_public_export_privacy_scan(&safe);
+        assert_eq!(safe_scan["status"].as_str(), Some("pass"));
+        assert_eq!(safe_scan["export_allowed"].as_bool(), Some(true));
+
+        let raw_memory = json!({
+            "schema": "enigma.desktop_proof_activity.v1",
+            "raw_memory": "private text"
+        });
+        let raw_scan = desktop_public_export_privacy_scan(&raw_memory);
+        assert_eq!(raw_scan["status"].as_str(), Some("blocked"));
+        assert_eq!(raw_scan["export_allowed"].as_bool(), Some(false));
+        assert!(raw_scan["forbidden_keys"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|key| key.as_str() == Some("raw_memory")));
+
+        let path = json!({
+            "schema": "enigma.desktop_proof_activity.v1",
+            "note": "C:\\Users\\person\\.enigma\\bundle.json"
+        });
+        let path_scan = desktop_public_export_privacy_scan(&path);
+        assert_eq!(path_scan["status"].as_str(), Some("blocked"));
+        assert_eq!(path_scan["local_paths_denied"].as_bool(), Some(false));
     }
 
     #[tokio::test]

@@ -221,6 +221,14 @@ async function mockInvoke(cmd, args = {}) {
           provider_responses_included: false,
           local_paths_redacted: true,
         },
+        privacy_scan: {
+          schema: 'enigma.desktop_public_export_privacy_scan.v1',
+          status: 'pass',
+          export_allowed: true,
+          local_paths_denied: true,
+          credentials_denied: true,
+        },
+        export_allowed: true,
         claim_boundaries: {
           local_enigma_events_only: true,
           provider_deletion_proof: false,
@@ -236,6 +244,12 @@ async function mockInvoke(cmd, args = {}) {
         local_paths_hidden: true,
         raw_memory_hidden: true,
         shareable_by_default: false,
+        privacy_scan: {
+          schema: 'enigma.desktop_public_export_privacy_scan.v1',
+          status: 'pass',
+          export_allowed: true,
+        },
+        export_allowed: true,
       };
     case 'rollback_client_config': {
       const c = clients.find((c) => c.id === args.id);
@@ -326,7 +340,17 @@ async function mockInvoke(cmd, args = {}) {
           local_paths_hidden: true,
           raw_memory_hidden: true,
           shareable_by_default: false,
+          privacy_scan_status: 'pass',
+          export_allowed: true,
         },
+        privacy_scan: {
+          schema: 'enigma.desktop_public_export_privacy_scan.v1',
+          status: 'pass',
+          export_allowed: true,
+          local_paths_denied: true,
+          credentials_denied: true,
+        },
+        export_allowed: true,
       };
     case 'export_support_summary':
       return {
@@ -336,6 +360,12 @@ async function mockInvoke(cmd, args = {}) {
         local_paths_hidden: true,
         raw_memory_hidden: true,
         shareable_by_default: false,
+        privacy_scan: {
+          schema: 'enigma.desktop_public_export_privacy_scan.v1',
+          status: 'pass',
+          export_allowed: true,
+        },
+        export_allowed: true,
       };
     case 'get_diagnostics':
       return { status: 'passed', summary: 'Local checks completed.', issue_codes: [] };
@@ -686,6 +716,15 @@ function renderImportSandboxSection() {
   `;
 }
 
+function publicExportScanStatus(surface = {}) {
+  const scan = surface.privacy_scan && typeof surface.privacy_scan === 'object' ? surface.privacy_scan : {};
+  const status = scan.status || (surface.export_allowed ? 'pass' : 'not_checked');
+  return {
+    status,
+    exportAllowed: scan.export_allowed === true || surface.export_allowed === true,
+  };
+}
+
 function renderProofActivitySection() {
   const activity = proofActivity?.schema ? proofActivity : health.proof_activity || {};
   const receiptCount = activity.receipt_count ?? 0;
@@ -693,6 +732,7 @@ function renderProofActivitySection() {
   const tombstoneCount = activity.tombstoned_memory_count ?? 0;
   const verifierStatus = activity.verifier_status || 'not_run';
   const evidenceStatus = activity.evidence_status || 'local_counts_and_roots_only';
+  const scan = publicExportScanStatus(activity);
   const exported = activity.exported?.schema === 'enigma.desktop_proof_activity_export.v1';
   return `
     <section class="dashboard-section proof-activity" aria-labelledby="proof-activity-title">
@@ -705,11 +745,11 @@ function renderProofActivitySection() {
         <div class="metric"><dt>Tombstones</dt><dd>${escapeHtml(String(tombstoneCount))}</dd></div>
         <div class="metric"><dt>Verifier</dt><dd>${escapeHtml(verifierStatus)}</dd></div>
       </div>
-      <p class="note">Evidence status: ${escapeHtml(evidenceStatus)}. This is Enigma-controlled local evidence only; it does not prove outside-provider changes or model behavior changes.</p>
+      <p class="note">Evidence status: ${escapeHtml(evidenceStatus)}. Privacy scan: ${escapeHtml(scan.status)}. This is Enigma-controlled local evidence only; it does not prove outside-provider changes or model behavior changes.</p>
       ${exported ? `<p class="note">Proof activity export ready. File location is hidden in this view.</p>` : ''}
       <div class="button-row">
         ${primaryButton('Refresh proof activity', 'refresh-proof-activity')}
-        <button type="button" class="secondary" data-action="export-proof-activity" ${activity.schema ? '' : 'disabled'}>Export proof activity</button>
+        <button type="button" class="secondary" data-action="export-proof-activity" ${activity.schema && scan.exportAllowed ? '' : 'disabled'}>Export proof activity</button>
       </div>
     </section>
   `;
@@ -721,6 +761,7 @@ function renderSupportSummarySection() {
   const issueCount = Array.isArray(summary.issue_codes) ? summary.issue_codes.length : 0;
   const nextLabel = summary.next_action?.label || 'Collect support summary';
   const supportCode = summary.support_code || 'not collected';
+  const scan = publicExportScanStatus(summary);
   const exported = summary.exported?.schema === 'enigma.desktop_support_summary_export.v1';
   return `
     <section class="dashboard-section support-summary" aria-labelledby="support-summary-title">
@@ -733,11 +774,11 @@ function renderSupportSummarySection() {
         <div class="metric"><dt>Next action</dt><dd>${escapeHtml(nextLabel)}</dd></div>
         <div class="metric"><dt>Support code</dt><dd>${escapeHtml(supportCode)}</dd></div>
       </div>
-      <p class="note">Local Enigma status only. Summary sharing is explicit; Enigma does not claim outside-provider changes, model behavior changes, or hosted service readiness.</p>
+      <p class="note">Local Enigma status only. Privacy scan: ${escapeHtml(scan.status)}. Summary sharing is explicit; Enigma does not claim outside-provider changes, model behavior changes, or hosted service readiness.</p>
       ${exported ? `<p class="note">Support summary export ready. File location is hidden in this view.</p>` : ''}
       <div class="button-row">
         ${primaryButton('Collect support summary', 'collect-support-summary')}
-        <button type="button" class="secondary" data-action="export-support-summary" ${summary.schema ? '' : 'disabled'}>Export support summary</button>
+        <button type="button" class="secondary" data-action="export-support-summary" ${summary.schema && scan.exportAllowed ? '' : 'disabled'}>Export support summary</button>
       </div>
     </section>
   `;
@@ -1271,12 +1312,17 @@ async function handleAction(event) {
       }
       busy = true;
       setStatus('Exporting public-safe proof activity...');
-      const exported = await call('export_proof_activity', { approve: true });
-      proofActivity = { ...proofActivity, exported };
-      health.proof_activity = proofActivity;
+      try {
+        const exported = await call('export_proof_activity', { approve: true });
+        proofActivity = { ...proofActivity, exported };
+        health.proof_activity = proofActivity;
+        setStatus('Proof activity exported. The file location is hidden in this view.');
+      } catch (_) {
+        proofActivity = { ...proofActivity, export_error: 'privacy_scan_blocked' };
+        setStatus('Proof activity export blocked by the desktop privacy scan.');
+      }
       busy = false;
       render();
-      setStatus('Proof activity exported. The file location is hidden in this view.');
       return;
     }
     case 'go-health':
@@ -1378,11 +1424,16 @@ async function handleAction(event) {
       }
       busy = true;
       setStatus('Exporting public-safe support summary...');
-      const exported = await call('export_support_summary', { approve: true });
-      supportSummary = { ...supportSummary, exported };
+      try {
+        const exported = await call('export_support_summary', { approve: true });
+        supportSummary = { ...supportSummary, exported };
+        setStatus('Support summary exported. The file location is hidden in this view.');
+      } catch (_) {
+        supportSummary = { ...supportSummary, export_error: 'privacy_scan_blocked' };
+        setStatus('Support summary export blocked by the desktop privacy scan.');
+      }
       busy = false;
       render();
-      setStatus('Support summary exported. The file location is hidden in this view.');
       return;
     }
     case 'export-diagnostics': {
