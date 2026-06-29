@@ -2251,6 +2251,29 @@ function printNativeHostInstallPlan(plan, flags, io) {
   else print(plan, io);
 }
 
+function renderClaudeMcpbPackagePlain(report, outWritten = false) {
+  const lines = [
+    'Enigma Claude MCPB package',
+    `Status: ${report.ok ? 'Ready' : 'Needs attention'}`,
+    `Version: ${report.manifest?.version ?? '<version>'}`,
+    `Files: ${report.package?.file_count ?? 0}`,
+    `Bytes: ${report.package?.total_bytes ?? 0}`,
+    `Network: ${report.package?.network_performed ? 'performed' : 'not performed'}`,
+    `Install: ${report.package?.install_performed ? 'performed' : 'not performed'}`,
+    'Package: written to <mcpb-output>',
+  ];
+  if (outWritten) lines.push('Report: written to <out>');
+  lines.push('Next: import <mcpb-output> in Claude Desktop after PR approval and release-owner review.');
+  lines.push('Boundary: local Claude MCPB package artifact only; no Claude install, client config writes, provider launch, network calls, raw memory, local paths, provider deletion, model behavior, hosted service, or signing claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printClaudeMcpbPackageReport(report, flags, io, outWritten = false) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderClaudeMcpbPackagePlain(report, outWritten));
+  else print(report, io);
+}
+
+
 
 
 function renderInstallPlain(summary) {
@@ -3444,7 +3467,7 @@ export async function claudeMcpbPackageCommand(flags, io) {
     out: getFlag(flags, ['out']) ?? undefined,
     version: getFlag(flags, ['version']) ?? undefined,
   });
-  print(report, io);
+  printClaudeMcpbPackageReport(report, flags, io, Boolean(getFlag(flags, ['out'])));
   return 0;
 }
 
@@ -4568,7 +4591,8 @@ function usage() {
     connector_write_behavior: 'Config writes preserve unrelated settings and sibling MCP servers. Existing configs are backed up only when the semantic JSON config changes; reconnecting an identical config is idempotent.',
     claim_boundaries: 'Connectors configure local MCP access to an Enigma bundle. They do not make provider-native memory canonical and do not prove provider deletion or model forgetting.',
     claude_mcpb_package: {
-      command: 'enigma claude-mcpb package [--mcpb <path>] [--out <report.json>] [--version <semver>]',
+      command: 'enigma claude-mcpb package [--mcpb <path>] [--out <report.json>] [--version <semver>] [--plain]',
+      '--plain': 'Print a path-redacted Claude MCPB package summary instead of JSON. Alias: --text or --format text.',
       boundary: 'Builds a deterministic Claude Desktop MCPB review package locally. It does not install, launch Claude, write client config, or perform network calls.',
     },
     import_sources: Object.keys(IMPORTERS),

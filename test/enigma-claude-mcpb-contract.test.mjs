@@ -232,4 +232,19 @@ test('Claude MCPB package is available through the Enigma CLI', async () => {
   assert.equal(report.package.network_performed, false);
   assert.doesNotMatch(io.stdout(), new RegExp(dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assertPublicSafe(report);
+
+  const plainIo = makeIo();
+  const plainMcpbPath = join(dir, 'cli-plain.mcpb');
+  const plainOutPath = join(dir, 'cli-plain-report.json');
+  assert.equal(await main(['claude-mcpb', 'package', '--mcpb', plainMcpbPath, '--out', plainOutPath, '--version', '2.0.1', '--plain'], plainIo.io), 0, plainIo.stderr());
+  const plain = plainIo.stdout();
+  assert.match(plain, /^Enigma Claude MCPB package\n/);
+  assert.match(plain, /Status: Ready/);
+  assert.match(plain, /Version: 2\.0\.1/);
+  assert.match(plain, /Package: written to <mcpb-output>/);
+  assert.match(plain, /Report: written to <out>/);
+  assert.match(plain, /Boundary: local Claude MCPB package artifact only/);
+  assert.doesNotMatch(plain, /^\s*\{/);
+  assert.doesNotMatch(plain, new RegExp(dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assertPublicSafe(plain);
 });

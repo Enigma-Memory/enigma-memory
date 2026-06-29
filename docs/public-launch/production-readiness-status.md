@@ -46,7 +46,7 @@
 - Desktop-first `README.md`.
 - Updated `docs/install-anywhere.md`.
 - Static `website/` pages: home, download, setup, help hub, install/connect/troubleshooting guides, privacy, proofs, FAQ, and developer CLI appendix. Home/download pages now present a consumer setup path, local trust boundary, Import Sandbox, Proof Activity, and unsigned-build caveat without claiming signed public release.
-- CLI-first fallback is still supported for power users: `enigma init --plain`, `enigma test-drive --plain`, `enigma demo cross-model --plain`, `enigma install --plain`, `enigma quickstart --plain`, `enigma setup --plain`, `enigma native-host manifest --plain`, `enigma native-host install-plan --plain`, `enigma controller grant --plain`, `enigma controller revoke --plain`, `enigma controller weather --plain`, `enigma controller bubble --plain`, `enigma remember --plain`, `enigma update --plain`, `enigma delete --plain`, `enigma search --plain`, `enigma context --plain`, `enigma export --plain`, `enigma verify --plain`, `enigma connect --plain`, `enigma disconnect --plain`, `enigma import --plain`, `enigma import rollback --plain`, `enigma status --plain`, `enigma drive health --plain`, `enigma support summary --plain`, `enigma doctor --plain`, and `enigma next --plain` give one-screen, path-redacted summaries instead of JSON or raw-memory output.
+- CLI-first fallback is still supported for power users: `enigma init --plain`, `enigma test-drive --plain`, `enigma demo cross-model --plain`, `enigma install --plain`, `enigma quickstart --plain`, `enigma setup --plain`, `enigma claude-mcpb package --plain`, `enigma native-host manifest --plain`, `enigma native-host install-plan --plain`, `enigma controller grant --plain`, `enigma controller revoke --plain`, `enigma controller weather --plain`, `enigma controller bubble --plain`, `enigma remember --plain`, `enigma update --plain`, `enigma delete --plain`, `enigma search --plain`, `enigma context --plain`, `enigma export --plain`, `enigma verify --plain`, `enigma connect --plain`, `enigma disconnect --plain`, `enigma import --plain`, `enigma import rollback --plain`, `enigma status --plain`, `enigma drive health --plain`, `enigma support summary --plain`, `enigma doctor --plain`, and `enigma next --plain` give one-screen, path-redacted summaries instead of JSON or raw-memory output.
 
 ---
 
@@ -67,6 +67,7 @@
 
 - `node --check apps/cli/bin/enigma.mjs` at repo root: **pass**.
 - `node --test test/enigma-context-proof-cli.test.mjs` at repo root: **6/6 pass**.
+- `node --test test/enigma-claude-mcpb-contract.test.mjs` at repo root: **6/6 pass**.
 - `node --test test/enigma-release-smoke.test.mjs` at repo root: **11/11 pass**.
 - `node --test test/enigma-cross-model-demo.test.mjs` at repo root: **5/5 pass**.
 - `node --test test/enigma-onboarding.test.mjs` at repo root: **23/23 pass**.
