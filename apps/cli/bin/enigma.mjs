@@ -2338,6 +2338,54 @@ function printCapsuleImportResult(result, flags, io) {
   else print(result, io);
 }
 
+function renderMeterEventPlain(event, outWritten = false) {
+  const usage = event.usage ?? {};
+  const cost = event.estimated_cost ?? {};
+  const lines = [
+    'Enigma meter event',
+    'Status: Ready',
+    `Event: ${event.event_id ?? '<event-id>'}`,
+    `Provider/model: ${event.provider ?? '<provider>'}/${event.model ?? '<model>'}`,
+    `Prompt tokens: ${usage.prompt_tokens ?? 0}`,
+    `Completion tokens: ${usage.completion_tokens ?? 0}`,
+    `Memory baseline tokens: ${usage.memory_baseline_tokens ?? 0}`,
+    `Memory optimized tokens: ${usage.memory_optimized_tokens ?? 0}`,
+    `Deterministic memory token delta: ${usage.memory_savings_tokens ?? 0}`,
+    `Estimated deterministic credit: ${cost.currency ?? 'USD'} ${Number(cost.estimated_memory_credit ?? 0).toFixed(6)}`,
+  ];
+  if (outWritten) lines.push('Usage event: written to <out>');
+  lines.push('Boundary: local deterministic usage metering only; no prompts, completions, provider responses, credentials, token ROI, provider invoice savings, provider deletion, model behavior, hosted service, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printMeterEventResult(event, flags, io, outWritten = false, jsonResult = event) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderMeterEventPlain(event, outWritten));
+  else print(jsonResult, io);
+}
+
+function renderMeterAggregatePlain(aggregate, outWritten = false) {
+  const totals = aggregate.totals ?? {};
+  const lines = [
+    'Enigma meter aggregate',
+    'Status: Ready',
+    `Aggregate: ${aggregate.aggregate_id ?? '<aggregate-id>'}`,
+    `Events: ${aggregate.event_count ?? 0}`,
+    `Provider/model groups: ${Array.isArray(aggregate.by_provider_model) ? aggregate.by_provider_model.length : 0}`,
+    `Memory baseline tokens: ${totals.memory_baseline_tokens ?? 0}`,
+    `Memory optimized tokens: ${totals.memory_optimized_tokens ?? 0}`,
+    `Deterministic memory token delta: ${totals.memory_savings_tokens ?? 0}`,
+    `Estimated deterministic credit: ${totals.currency ?? 'USD'} ${Number(totals.estimated_memory_credit ?? 0).toFixed(6)}`,
+  ];
+  if (outWritten) lines.push('Usage aggregate: written to <out>');
+  lines.push('Boundary: local deterministic aggregate metering only; no prompts, completions, provider responses, credentials, token ROI, provider invoice savings, provider deletion, model behavior, hosted service, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printMeterAggregateResult(aggregate, flags, io, outWritten = false, jsonResult = aggregate) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderMeterAggregatePlain(aggregate, outWritten));
+  else print(jsonResult, io);
+}
+
 function nextPlainRequested(flags) {
   const format = getFlag(flags, ['format']);
   return booleanFlag(flags, ['plain', 'text'], false) || format === 'plain' || format === 'text';
@@ -4033,9 +4081,9 @@ export async function meterEventCommand(flags, io) {
   if (flags.has('out')) {
     const outPath = resolve(String(requireFlag(flags, ['out'])));
     await writeJson(outPath, event);
-    print({ ok: true, path: outPath, event_id: event.event_id, event_hash: event.event_hash }, io);
+    printMeterEventResult(event, flags, io, true, { ok: true, path: outPath, event_id: event.event_id, event_hash: event.event_hash });
   } else {
-    print(event, io);
+    printMeterEventResult(event, flags, io);
   }
   return 0;
 }
@@ -4052,9 +4100,9 @@ export async function meterAggregateCommand(flags, io, positionalFile) {
   if (flags.has('out')) {
     const outPath = resolve(String(requireFlag(flags, ['out'])));
     await writeJson(outPath, aggregate);
-    print({ ok: true, path: outPath, aggregate_id: aggregate.aggregate_id, aggregate_hash: aggregate.aggregate_hash }, io);
+    printMeterAggregateResult(aggregate, flags, io, true, { ok: true, path: outPath, aggregate_id: aggregate.aggregate_id, aggregate_hash: aggregate.aggregate_hash });
   } else {
-    print(aggregate, io);
+    printMeterAggregateResult(aggregate, flags, io);
   }
   return 0;
 }
@@ -4562,8 +4610,9 @@ function usage() {
       boundary: 'Browser native messaging returns local context plus receipt summaries only; provider-native memory remains cache only.',
     },
     metering: {
-      event: 'enigma meter event --tenant <id> --provider <id> --model <id> --prompt-tokens <n> --completion-tokens <n> --memory-baseline-tokens <n> --memory-optimized-tokens <n> --price-per-million-tokens <n> [--out <file>]',
-      aggregate: 'enigma meter aggregate --events <events.json> [--tenant <id>] [--out <file>]',
+      event: 'enigma meter event --tenant <id> --provider <id> --model <id> --prompt-tokens <n> --completion-tokens <n> --memory-baseline-tokens <n> --memory-optimized-tokens <n> --price-per-million-tokens <n> [--out <file>] [--plain]',
+      aggregate: 'enigma meter aggregate --events <events.json> [--tenant <id>] [--out <file>] [--plain]',
+      '--plain': 'Print a path-redacted deterministic metering summary instead of JSON. Alias: --text or --format text.',
       boundary: 'Metering artifacts contain counts, hashes, identifiers, pricing inputs, and claim boundaries only; no prompts, completions, provider responses, credentials, token ROI, or provider-invoice savings claim.',
     },
     settlement: {

@@ -1,5 +1,5 @@
 import test from 'node:test';
-import { mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import assert from 'node:assert/strict';
@@ -183,4 +183,71 @@ test('CLI emits metering event and aggregate artifacts', async () => {
   assert.equal(aggregate.schema, USAGE_AGGREGATE_SCHEMA);
   assert.equal(aggregate.event_count, 1);
   assert.equal(aggregate.totals.memory_savings_tokens, 780);
+});
+
+test('CLI plain metering output is readable and path-redacted', async () => {
+  const { main } = await import('../apps/cli/bin/enigma.mjs');
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-metering-plain-'));
+  const eventPath = join(dir, 'event.json');
+  const eventsPath = join(dir, 'events.json');
+  const aggregatePath = join(dir, 'aggregate.json');
+  const eventIo = makeIo();
+
+  assert.equal(await main([
+    'meter',
+    'event',
+    '--tenant',
+    'tenant-a',
+    '--provider',
+    'openai',
+    '--model',
+    'gpt-5.5',
+    '--prompt-tokens',
+    '1200',
+    '--completion-tokens',
+    '300',
+    '--memory-baseline-tokens',
+    '1200',
+    '--memory-optimized-tokens',
+    '420',
+    '--price-per-million-tokens',
+    '2',
+    '--out',
+    eventPath,
+    '--plain',
+  ], eventIo.io), 0, eventIo.stderr());
+  assert.match(eventIo.stdout(), /^Enigma meter event\n/);
+  assert.match(eventIo.stdout(), /Status: Ready/);
+  assert.match(eventIo.stdout(), /Event: uevt_/);
+  assert.match(eventIo.stdout(), /Deterministic memory token delta: 780/);
+  assert.match(eventIo.stdout(), /Usage event: written to <out>/);
+  assert.match(eventIo.stdout(), /Boundary: local deterministic usage metering only/);
+  assert.doesNotMatch(eventIo.stdout(), /^\s*\{/);
+  assert.equal(eventIo.stdout().includes(dir), false);
+  assert.equal(eventIo.stdout().includes(eventPath), false);
+
+  const event = JSON.parse(await readFile(eventPath, 'utf8'));
+  await writeFile(eventsPath, `${JSON.stringify([event], null, 2)}\n`, 'utf8');
+  const aggregateIo = makeIo();
+  assert.equal(await main([
+    'meter',
+    'aggregate',
+    '--events',
+    eventsPath,
+    '--tenant',
+    'tenant-a',
+    '--out',
+    aggregatePath,
+    '--plain',
+  ], aggregateIo.io), 0, aggregateIo.stderr());
+  assert.match(aggregateIo.stdout(), /^Enigma meter aggregate\n/);
+  assert.match(aggregateIo.stdout(), /Status: Ready/);
+  assert.match(aggregateIo.stdout(), /Events: 1/);
+  assert.match(aggregateIo.stdout(), /Deterministic memory token delta: 780/);
+  assert.match(aggregateIo.stdout(), /Usage aggregate: written to <out>/);
+  assert.match(aggregateIo.stdout(), /Boundary: local deterministic aggregate metering only/);
+  assert.doesNotMatch(aggregateIo.stdout(), /^\s*\{/);
+  assert.equal(aggregateIo.stdout().includes(dir), false);
+  assert.equal(aggregateIo.stdout().includes(eventsPath), false);
+  assert.equal(aggregateIo.stdout().includes(aggregatePath), false);
 });
