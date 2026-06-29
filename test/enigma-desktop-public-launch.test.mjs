@@ -257,6 +257,7 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   const ui = `${wizard}\n${help}\n${styles}`;
   const runHealthBlock = wizard.match(/case 'run-health': \{[\s\S]*?return;\n    \}/)?.[0] || '';
   const approveImportBlock = wizard.match(/case 'approve-import-text': \{[\s\S]*?return;\n    \}/)?.[0] || '';
+  const renderClientActionsBlock = wizard.match(/function renderClientActions\(client, status\) \{[\s\S]*?\n\}/)?.[0] || '';
 
   assert.match(wizard, /Memory Controller/);
   assert.match(wizard, /Memory Weather/);
@@ -333,6 +334,13 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(wizard, /get_claude_mcpb_handoff/);
   assert.match(wizard, /Enigma did not write Claude config/);
   assert.match(wizard, /enigma\.desktop_claude_mcpb_handoff\.v1/);
+  assert.match(wizard, /Connect with Claude extension/);
+  assert.match(wizard, /Advanced config preview/);
+  assert.ok(renderClientActionsBlock.indexOf('claude-mcpb-handoff') < renderClientActionsBlock.indexOf('Advanced config preview'));
+  assert.match(wizard, /Remove or disable later/);
+  assert.match(wizard, /Config fallback test/);
+  assert.match(wizard, /Open the Enigma Claude extension package in Claude Desktop, then test the connection/);
+  assert.match(wizard, /Enigma did not write Claude config for the extension handoff/);
   assert.match(tauriService, /pub async fn get_claude_mcpb_handoff/);
   assert.match(tauriService, /create_claude_desktop_mcpb_connection_plan/);
   assert.match(tauriService, /create_claude_desktop_mcpb_manifest/);

@@ -226,6 +226,11 @@ async function mockInvoke(cmd, args = {}) {
             user_confirms_in_claude: true,
             enigma_writes_claude_config: false,
           },
+          disconnect_boundaries: {
+            mcpb_path: 'Guide the user to remove or disable the Enigma Memory extension in Claude Desktop.',
+            fallback_path: 'Remove only the Enigma MCP server entry after advanced-user consent.',
+            automatic_config_write: false,
+          },
         },
         health: {
           schema: 'enigma.claude_desktop_mcpb_health.v1',
@@ -234,6 +239,7 @@ async function mockInvoke(cmd, args = {}) {
         next_action: {
           id: 'install_mcpb',
           label: 'Install Claude extension',
+          description: 'Open the Enigma Claude extension package in Claude Desktop, then test the connection.',
         },
         claim_boundaries: {
           local_handoff_only: true,
@@ -686,11 +692,14 @@ function renderClientActions(client, status) {
       <button type="button" class="link" data-action="rollback" data-id="${id}">Rollback</button>
     `;
   }
+  if (client.id === 'claude-desktop') {
+    return `
+      <button type="button" class="client-primary" data-action="claude-mcpb-handoff" data-id="${id}">Connect with Claude extension</button>
+      <button type="button" class="link" data-action="connect" data-id="${id}">Advanced config preview</button>
+    `;
+  }
   const actionLabel = status === 'skipped' ? 'Connect later' : 'Preview connection';
-  const claudeHandoff = client.id === 'claude-desktop'
-    ? `<button type="button" class="link" data-action="claude-mcpb-handoff" data-id="${id}">Claude extension handoff</button>`
-    : '';
-  return `<button type="button" class="link" data-action="connect" data-id="${id}">${escapeHtml(actionLabel)}</button>${claudeHandoff}`;
+  return `<button type="button" class="link" data-action="connect" data-id="${id}">${escapeHtml(actionLabel)}</button>`;
 }
 
 function renderConnectionPreview(client) {
@@ -732,11 +741,15 @@ function renderClaudeMcpbHandoff(client) {
   if (!claudeMcpbHandoff || client.id !== 'claude-desktop') return '';
   const plan = claudeMcpbHandoff.connection_plan && typeof claudeMcpbHandoff.connection_plan === 'object' ? claudeMcpbHandoff.connection_plan : {};
   const health = claudeMcpbHandoff.health && typeof claudeMcpbHandoff.health === 'object' ? claudeMcpbHandoff.health : {};
+  const nextAction = claudeMcpbHandoff.next_action && typeof claudeMcpbHandoff.next_action === 'object' ? claudeMcpbHandoff.next_action : {};
+  const disconnect = plan.disconnect_boundaries && typeof plan.disconnect_boundaries === 'object' ? plan.disconnect_boundaries : {};
   return `
     <div class="connection-preview claude-mcpb-handoff">
       <p class="note"><strong>Claude-first path.</strong> Preferred install: ${escapeHtml(claudeMcpbHandoff.preferred_path || 'mcpb_extension')}. Writes performed: ${claudeMcpbHandoff.writes_performed === true ? 'yes' : 'no'}.</p>
       <p class="note">Claude confirms install: ${plan.install_handoff?.user_confirms_in_claude === true ? 'yes' : 'review required'} · Enigma writes Claude config: ${plan.install_handoff?.enigma_writes_claude_config === true ? 'yes' : 'no'} · Status: ${escapeHtml(health.status || 'not_installed')}</p>
-      <p class="note">Next: ${escapeHtml(claudeMcpbHandoff.next_action?.label || 'Install Claude extension')}</p>
+      <p class="note">Next: ${escapeHtml(nextAction.label || 'Install Claude extension')}. ${escapeHtml(nextAction.description || 'Open the Enigma Claude extension package in Claude Desktop, then test the connection.')}</p>
+      <p class="note">Remove or disable later: ${escapeHtml(disconnect.mcpb_path || 'Remove or disable the Enigma Memory extension in Claude Desktop.')}</p>
+      <p class="note">Config fallback test: use "Test connection" only after the advanced config preview path. Enigma did not write Claude config for the extension handoff.</p>
     </div>
   `;
 }
