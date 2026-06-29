@@ -98,14 +98,14 @@ function assertPublicSafe(content, label = 'asset') {
 
 function windowsInstallerScript() {
   return `# Enigma Memory source installer for Windows PowerShell.
-# Dry-run is the default; pass -Execute to mutate global npm state and create local setup files.
+# Dry-run is the default; pass -Execute to mutate global npm state and create local quickstart files.
 param(
   [switch]$Execute,
   [string]$Bundle = '.\\.enigma\\bundle.json'
 )
 $ErrorActionPreference = 'Stop'
 $PackageName = '${INSTALLER_ASSET_PACKAGE}'
-$NextClientConnect = 'enigma connect <client> --dry-run'
+$NextClientConnect = 'enigma connect <client> --bundle <bundle> --dry-run'
 
 Write-Output 'Enigma Memory Windows installer source asset'
 Write-Output 'Default mode: dry-run. No native .exe, code-signing, tokens, or hosted credentials are included.'
@@ -115,8 +115,8 @@ Write-Output "Bundle: $Bundle"
 $steps = @(
   'npm install -g enigma-memory',
   'enigma test-drive --dry-run',
-  'enigma setup --bundle <bundle> --overwrite',
-  'enigma doctor',
+  'enigma quickstart --bundle <bundle>',
+  'enigma doctor --bundle <bundle>',
   "Next client-connect preview: $NextClientConnect"
 )
 
@@ -128,8 +128,8 @@ if (-not $Execute) {
 
 npm install -g $PackageName
 enigma test-drive --dry-run
-enigma setup --bundle $Bundle --overwrite
-enigma doctor
+enigma quickstart --bundle $Bundle
+enigma doctor --bundle $Bundle
 Write-Output "Next client-connect preview: $NextClientConnect"
 `;
 }
@@ -138,7 +138,7 @@ function linuxInstallerScript() {
   return [
     '#!/usr/bin/env sh',
     '# Enigma Memory source installer for Linux.',
-    '# Dry-run is the default; pass --execute to mutate global npm state and create local setup files.',
+    '# Dry-run is the default; pass --execute to mutate global npm state and create local quickstart files.',
     'set -eu',
     '',
     'execute=0',
@@ -161,7 +161,7 @@ function linuxInstallerScript() {
     'done',
     '',
     `package='${INSTALLER_ASSET_PACKAGE}'`,
-    "next_client_connect='enigma connect <client> --dry-run'",
+    "next_client_connect='enigma connect <client> --bundle <bundle> --dry-run'",
     "printf '%s\\n' 'Enigma Memory Linux installer source asset'",
     "printf '%s\\n' 'Default mode: dry-run. No native package, signing key, tokens, or hosted credentials are included.'",
     'printf \'%s\\n\' "Package: $package"',
@@ -171,16 +171,16 @@ function linuxInstallerScript() {
     "  printf '%s\\n' 'Preview only. Re-run with --execute after reviewing these steps.'",
     "  printf '%s\\n' 'DRY-RUN: npm install -g enigma-memory'",
     "  printf '%s\\n' 'DRY-RUN: enigma test-drive --dry-run'",
-    "  printf '%s\\n' 'DRY-RUN: enigma setup --bundle <bundle> --overwrite'",
-    "  printf '%s\\n' 'DRY-RUN: enigma doctor'",
+    "  printf '%s\\n' 'DRY-RUN: enigma quickstart --bundle <bundle>'",
+    "  printf '%s\\n' 'DRY-RUN: enigma doctor --bundle <bundle>'",
     '  printf \'%s\\n\' "DRY-RUN: Next client-connect preview: $next_client_connect"',
     '  exit 0',
     'fi',
     '',
     'npm install -g "$package"',
     'enigma test-drive --dry-run',
-    'enigma setup --bundle "$bundle" --overwrite',
-    'enigma doctor',
+    'enigma quickstart --bundle "$bundle"',
+    'enigma doctor --bundle "$bundle"',
     'printf \'%s\\n\' "Next client-connect preview: $next_client_connect"',
     '',
   ].join('\n');
@@ -216,9 +216,9 @@ class EnigmaMemory < Formula
   test do
     assert_match "enigma", shell_output("#{bin}/enigma --help")
     assert_match "enigma.test_drive.v1", shell_output("#{bin}/enigma test-drive --dry-run")
-    assert_match "enigma.setup.v1", shell_output("#{bin}/enigma setup --dry-run")
-    shell_output("#{bin}/enigma doctor")
-    puts "Next client-connect preview: enigma connect <client> --dry-run"
+    assert_match "enigma.quickstart.v1", shell_output("#{bin}/enigma quickstart --bundle ./.enigma/bundle.json")
+    shell_output("#{bin}/enigma doctor --bundle ./.enigma/bundle.json")
+    puts "Next client-connect preview: enigma connect <client> --bundle ./.enigma/bundle.json --dry-run"
   end
 end
 `;
@@ -234,12 +234,12 @@ Current supported path:
 \`\`\`sh
 npm install -g ${INSTALLER_ASSET_PACKAGE}
 enigma test-drive --dry-run
-enigma setup --overwrite
-enigma doctor
-enigma connect <client> --dry-run
+enigma quickstart --bundle ./.enigma/bundle.json
+enigma doctor --bundle ./.enigma/bundle.json
+enigma connect <client> --bundle ./.enigma/bundle.json --dry-run
 \`\`\`
 
-\`enigma connect <client> --dry-run\` is the next client-connect preview command. Remove \`--dry-run\` only after reviewing the planned client config change.
+\`enigma connect <client> --bundle ./.enigma/bundle.json --dry-run\` is the next client-connect preview command. Remove \`--dry-run\` only after reviewing the planned client config change.
 
 Blockers before shipping a native .pkg:
 
@@ -264,10 +264,10 @@ function macosPkgManifest() {
     commands: [
       ['npm', 'install', '-g', INSTALLER_ASSET_PACKAGE],
       ['enigma', 'test-drive', '--dry-run'],
-      ['enigma', 'setup', '--overwrite'],
-      ['enigma', 'doctor'],
+      ['enigma', 'quickstart', '--bundle', './.enigma/bundle.json'],
+      ['enigma', 'doctor', '--bundle', './.enigma/bundle.json'],
     ],
-    next_client_connect: ['enigma', 'connect', '<client>', '--dry-run'],
+    next_client_connect: ['enigma', 'connect', '<client>', '--bundle', './.enigma/bundle.json', '--dry-run'],
     execution_gate: {
       default_mode: 'dry-run',
       mutation_requires: ['--execute', '-Execute'],
@@ -325,10 +325,10 @@ export function buildInstallerAssets(options = {}, runtime = {}) {
       default_preview_commands: [
         'npm install -g enigma-memory',
         'enigma test-drive --dry-run',
-        'enigma setup --overwrite',
-        'enigma doctor',
+        'enigma quickstart --bundle ./.enigma/bundle.json',
+        'enigma doctor --bundle ./.enigma/bundle.json',
       ],
-      next_client_connect: 'enigma connect <client> --dry-run',
+      next_client_connect: 'enigma connect <client> --bundle ./.enigma/bundle.json --dry-run',
       mutation_requires: ['--execute', '-Execute'],
     },
     safety: {

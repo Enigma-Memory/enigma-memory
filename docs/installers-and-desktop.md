@@ -9,12 +9,12 @@ Use the published package path when you want the current supported local install
 ```sh
 npm install -g enigma-memory
 enigma test-drive --dry-run
-enigma setup --overwrite
-enigma doctor
-enigma connect <client> --dry-run
+enigma quickstart --bundle ./.enigma/bundle.json
+enigma doctor --bundle ./.enigma/bundle.json
+enigma connect <client> --bundle ./.enigma/bundle.json --dry-run
 ```
 
-The package exposes the CLI bins `enigma`, `enigma-verify`, `enigma-mcp`, `enigma-relay`, `enigma-gateway`, and `enigma-native-host`. Node.js `>=24` is required. The installer smoke path keeps `enigma test-drive --dry-run` and `enigma connect <client> --dry-run` non-mutating; `enigma setup --overwrite` writes Enigma-controlled local artifacts only and does not write third-party app configs. It does not prove provider deletion, model forgetting, hosted availability, compliance certification, savings, or provider-native memory removal.
+The package exposes the CLI bins `enigma`, `enigma-verify`, `enigma-mcp`, `enigma-relay`, `enigma-gateway`, and `enigma-native-host`. Node.js `>=24` is required. The installer smoke path keeps `enigma test-drive --dry-run` and `enigma connect <client> --bundle ./.enigma/bundle.json --dry-run` non-mutating; `enigma quickstart --bundle ./.enigma/bundle.json` writes Enigma-controlled local artifacts only and does not write third-party app configs. It does not prove provider deletion, model forgetting, hosted availability, compliance certification, savings, or provider-native memory removal.
 
 ## Tier 2: generated source installer assets
 
@@ -32,9 +32,9 @@ node scripts/build-installer-assets.mjs --out-dir dist/installer-assets --write
 
 Generated asset paths are listed in deterministic code-point lexical order:
 
-- `homebrew/enigma-memory.rb` — Homebrew formula draft. It is not submitted to a tap by the generator; release engineering must replace the source archive URL and SHA before any tap workflow. Its test metadata exercises `enigma test-drive --dry-run`, `enigma setup --dry-run`, and `enigma doctor`, then prints the next client-connect preview command.
-- `install-linux.sh` — POSIX shell source installer. It previews by default and only mutates global npm/local setup files when called with `--execute`. Its preview includes package install, `enigma test-drive --dry-run`, `enigma setup --bundle <bundle> --overwrite`, `enigma doctor`, and `enigma connect <client> --dry-run` as the next client-connect command.
-- `install-windows.ps1` — PowerShell source installer. It previews by default and only runs `npm install -g enigma-memory`, `enigma test-drive --dry-run`, `enigma setup --bundle <bundle> --overwrite`, and `enigma doctor` when called with `-Execute`; it then prints `enigma connect <client> --dry-run` as the next client-connect command.
+- `homebrew/enigma-memory.rb` — Homebrew formula draft. It is not submitted to a tap by the generator; release engineering must replace the source archive URL and SHA before any tap workflow. Its test metadata exercises `enigma test-drive --dry-run`, `enigma quickstart --bundle ./.enigma/bundle.json`, and `enigma doctor --bundle ./.enigma/bundle.json`, then prints the next bundled client-connect preview command.
+- `install-linux.sh` — POSIX shell source installer. It previews by default and only mutates global npm/local setup files when called with `--execute`. Its preview includes package install, `enigma test-drive --dry-run`, `enigma quickstart --bundle <bundle>`, `enigma doctor --bundle <bundle>`, and `enigma connect <client> --bundle <bundle> --dry-run` as the next client-connect command.
+- `install-windows.ps1` — PowerShell source installer. It previews by default and only runs `npm install -g enigma-memory`, `enigma test-drive --dry-run`, `enigma quickstart --bundle <bundle>`, and `enigma doctor --bundle <bundle>` when called with `-Execute`; it then prints `enigma connect <client> --bundle <bundle> --dry-run` as the next client-connect command.
 - `installer-assets-manifest.json` — deterministic public manifest with checksums for the generated source assets.
 - `macos-pkgbuild/README.md` — macOS package source plan and blockers, not a signed package.
 - `macos-pkgbuild/manifest.json` — macOS package source metadata and blockers, not a signed package.
