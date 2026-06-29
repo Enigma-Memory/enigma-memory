@@ -194,6 +194,10 @@ test('public beta QA plain output is readable, bounded, and non-JSON', async () 
   assert.match(plain, /Pending: /);
   assert.match(plain, /Collect: npm run public-beta:evidence-manifest -- --out \.enigma\/public-beta\/evidence-manifest\.json --plain/);
   assert.match(plain, /Review: npm run public-beta:advisor -- --evidence-manifest \.enigma\/public-beta\/evidence-manifest\.json/);
+  assert.match(plain, /Patchable evidence:/);
+  assert.match(plain, /Evidence: record_support_dry_run — EV-P10-SUPPORT-DRY-RUN-SUMMARY/);
+  assert.match(plain, /public-safe support dry-run summary/);
+  assert.match(plain, /Fields: scenario_id, issue_code, triage_result, bundle_privacy_check_status, support_owner_ref/);
   assert.match(plain, /Boundary: local repository and supplied public-safe evidence matrix only/);
   assert.doesNotMatch(plain, /^\s*\{/);
   assertPublicSafe(plain);

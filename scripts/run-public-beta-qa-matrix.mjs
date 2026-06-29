@@ -857,6 +857,18 @@ export function renderPublicBetaQaPlain(report) {
   ];
   const actions = Array.isArray(report.next_actions) ? report.next_actions.slice(0, 5) : [];
   for (const action of actions) lines.push(`Next: ${action.action_id} — ${action.summary}`);
+  const patchableEvidence = (Array.isArray(report.next_actions) ? report.next_actions : [])
+    .flatMap((action) => (Array.isArray(action.missing_evidence_items) ? action.missing_evidence_items : [])
+      .map((item) => ({ action, item })));
+  if (patchableEvidence.length > 0) {
+    lines.push('Patchable evidence:');
+    for (const { action, item } of patchableEvidence) {
+      lines.push(`Evidence: ${action.action_id} — ${item.evidence_item_id} (${item.evidence_kind})`);
+      if (Array.isArray(item.required_fields) && item.required_fields.length > 0) {
+        lines.push(`Fields: ${item.required_fields.join(', ')}`);
+      }
+    }
+  }
   if (!report.summary?.ready_for_public_beta) {
     lines.push('Collect: npm run public-beta:evidence-manifest -- --out .enigma/public-beta/evidence-manifest.json --plain');
     lines.push('Review: npm run public-beta:advisor -- --evidence-manifest .enigma/public-beta/evidence-manifest.json');
