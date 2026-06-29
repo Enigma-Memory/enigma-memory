@@ -974,7 +974,7 @@ async function initCommand(flags, io) {
   const ok = artifacts.verifyReport.ok === true;
   const anyConnectorWritePerformed = connectors.some((connector) => connector.connect_plan.writes_performed === true);
 
-  print({
+  const summary = {
     ok,
     schema: artifacts.bundle.schema,
     command: 'enigma init',
@@ -1013,7 +1013,8 @@ async function initCommand(flags, io) {
     next_commands: initNextCommands({ dryRun, bundleDisplay: displays.bundle, outDirDisplay: publicPathDisplay(outDirInput, 'out-dir'), exportDisplay: displays.export, clients, requestedSelection, connectRequested, overwrite, connectorWritesPerformed: anyConnectorWritePerformed }),
     checks: doctor.checks,
     claim_boundaries: { ...SETUP_CLAIM_BOUNDARIES, hosted_saas_live: false, raw_memory_printed: false, solana_required: false, browser_extension_required: false },
-  }, io);
+  };
+  printSetupSummary(summary, flags, io);
   return ok ? 0 : 1;
 }
 
@@ -2323,7 +2324,7 @@ function renderNextActionPlain(action) {
 }
 function renderSetupPlain(summary) {
   const lines = [
-    'Enigma setup',
+    summary.command === 'enigma init' ? 'Enigma init' : 'Enigma setup',
     `Status: ${summary.ok ? 'Ready' : 'Needs attention'}`,
     `Memory Drive: ${summary.bundle}`,
     `Memories: ${summary.memory_count}`,
@@ -4263,6 +4264,7 @@ function usage() {
       '--memory-file <path>': 'Read local memory text from a file without echoing plaintext. Alias: --text-file.',
       '--memory-text <text>': 'Inline demo-only memory text. Avoid for private content because argv can be logged.',
       '--overwrite': 'Replace existing local first-run artifacts.',
+      '--plain': 'Print a human-readable first-run summary with next commands instead of JSON. Alias: --text or --format text.',
     },
     setup_options: {
       '--bundle <path>': 'Bundle JSON to create. Defaults to .enigma/bundle.json.',

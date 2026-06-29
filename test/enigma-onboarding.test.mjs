@@ -315,6 +315,25 @@ test('init dry-run prints a public-safe first-run plan without writing artifacts
   await assert.rejects(() => readFile(join(dir, 'verify-report.json'), 'utf8'), /ENOENT/);
 });
 
+test('init plain dry-run summarizes first run without JSON or local paths', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-init-plain-'));
+  const bundlePath = join(dir, 'bundle.json');
+  const io = makeIo();
+
+  assert.equal(await main(['init', '--bundle', bundlePath, '--out-dir', dir, '--dry-run', '--plain'], io.io), 0, io.stderr());
+  const stdout = io.stdout();
+
+  assert.match(stdout, /^Enigma init\n/);
+  assert.match(stdout, /Status: Ready/);
+  assert.match(stdout, /Memory Drive: <bundle-path>/);
+  assert.match(stdout, /Mode: dry run; no files were written\./);
+  assert.match(stdout, /Next: enigma init --bundle "<bundle-path>" --out-dir "<out-dir>"/);
+  assert.match(stdout, /Boundary: local Enigma setup only/);
+  assert.doesNotMatch(stdout, /^\s*\{/);
+  assert.equal(stdout.includes(dir), false);
+  assert.equal(stdout.includes(bundlePath), false);
+});
+
 test('init execute creates local artifacts without client config writes by default', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'enigma-init-execute-'));
 
