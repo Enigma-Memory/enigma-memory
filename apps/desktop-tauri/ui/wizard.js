@@ -372,7 +372,7 @@ async function mockInvoke(cmd, args = {}) {
     case 'export_diagnostics':
       return { exported: true, path: '<redacted-path>' };
     case 'check_update':
-      return { status: 'current', current_version: '0.1.18', available_version: '0.1.18' };
+      return { status: 'current', current_version: '0.1.19', available_version: '0.1.19' };
     case 'start_service':
     case 'get_service_status':
       return { running: true, pid: 12345, restarts: 0, uptime_secs: 0 };
@@ -985,7 +985,7 @@ function renderDashboard() {
 
     <div class="dashboard-section">
       <h2>Update check</h2>
-      <p>Current version: ${escapeHtml(update?.current_version || '0.1.18')}</p>
+      <p>Current version: ${escapeHtml(update?.current_version || '0.1.19')}</p>
       <p>Available version: ${escapeHtml(update?.available_version || 'unknown')}
         ${updateAvailable ? ` <span class="status-pill warning">Update available</span>` : ''}</p>
       <div class="button-row">

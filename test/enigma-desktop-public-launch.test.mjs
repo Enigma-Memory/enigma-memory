@@ -228,6 +228,24 @@ test('desktop unknown public-launch action fails closed', async () => {
   assertPublicSafe(after);
 });
 
+test('desktop release metadata matches prepared public beta package version', async () => {
+  const [packageJsonText, tauriConfigText, cargoToml, cargoLock, wizard] = await Promise.all([
+    readFile(new URL('../package.json', import.meta.url), 'utf8'),
+    readFile(new URL('../apps/desktop-tauri/tauri.conf.json', import.meta.url), 'utf8'),
+    readFile(new URL('../apps/desktop-tauri/Cargo.toml', import.meta.url), 'utf8'),
+    readFile(new URL('../apps/desktop-tauri/Cargo.lock', import.meta.url), 'utf8'),
+    readDesktopUiFile('wizard.js'),
+  ]);
+  const packageJson = JSON.parse(packageJsonText);
+  const tauriConfig = JSON.parse(tauriConfigText);
+  assert.equal(packageJson.version, '0.1.19');
+  assert.equal(tauriConfig.version, packageJson.version);
+  assert.match(cargoToml, new RegExp(`^version = "${packageJson.version}"$`, 'm'));
+  assert.match(cargoLock, new RegExp(`name = "enigma-desktop-tauri"\\nversion = "${packageJson.version}"`));
+  assert.match(wizard, /current_version: '0\.1\.19'/);
+  assert.match(wizard, /\|\| '0\.1\.19'/);
+});
+
 test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consumer controls', async () => {
   const [wizard, help, styles, tauriService, tauriLib] = await Promise.all([
     readDesktopUiFile('wizard.js'),

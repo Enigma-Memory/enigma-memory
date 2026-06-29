@@ -27,6 +27,7 @@
 - Update-check card fetches signed manifest metadata and shows current/available versions without auto-download.
 - Opt-in crash reporting: panic hook writes redacted report to disk; user controls whether pending reports are uploaded. No memory, wallet, or path data is included.
 - Release evidence generator (`scripts/release-evidence-desktop.mjs`) dry-run tested.
+- Desktop Tauri metadata and mock update UI are aligned to public beta package version `0.1.19`.
 - Signed release workflow: `.github/workflows/desktop-release.yml` with conditional Azure (Windows) and Apple (macOS) signing placeholders.
 - Unsigned dry-run workflow: `.github/workflows/desktop-build.yml` mirrors release matrix and passes without signing secrets.
 - Tauri updater signing key: generated and stored as `TAURI_SIGNING_PRIVATE_KEY` GitHub secret; public key committed in `tauri.conf.json`.

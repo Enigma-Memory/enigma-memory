@@ -1,6 +1,6 @@
 [package]
 name = "enigma-desktop-tauri"
-version = "0.1.18"
+version = "0.1.19"
 description = "Enigma Memory consumer desktop app"
 authors = ["Enigma Protocol"]
 license = "Apache-2.0"
