@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 import { createVault, remember, recall, updateMemory, deleteMemory, exportBundle, decryptKeyring, KEYRING_ENCRYPTED_TYPE } from '../../../packages/vault/src/index.js';
 import { createPassport, compileContextPack, createContextPassport, createProofOfNonUse, createMemoryDriveHealthReport } from '../../../packages/passport/src/index.js';
 import { runBoundarySimulation } from '../../../packages/boundary/src/index.js';
-import { assertMemoryControllerPublicSafe, createConsentGrant, createRecallVetoDecision } from '../../../packages/controller/src/index.js';
+import { assertMemoryControllerPublicSafe, createConsentGrant, createMemoryWeatherReport, createRecallVetoDecision } from '../../../packages/controller/src/index.js';
 import { startStdioServer } from '../../../packages/mcp-server/src/index.js';
 import { runMeshDemo } from '../../../packages/mesh/src/index.js';
 import { runEnterpriseDemo } from '../../../packages/enterprise/src/index.js';
@@ -2167,6 +2167,28 @@ function printControllerGrantResult(grant, action, flags, io, outWritten = false
   else print(grant, io);
 }
 
+function renderControllerWeatherPlain(report, outWritten = false) {
+  const tiles = Array.isArray(report.tiles) ? report.tiles : [];
+  const issues = Array.isArray(report.issue_codes) ? report.issue_codes : [];
+  const lines = [
+    'Enigma memory weather',
+    `Status: ${report.status ?? 'unknown'}`,
+    `Generated: ${report.generated_at ?? '<generated-at>'}`,
+    `Tiles: ${tiles.length}`,
+    `Issues: ${issues.length === 0 ? 'none' : issues.join(', ')}`,
+    `Next: ${report.next_action ?? 'none'}`,
+  ];
+  if (outWritten) lines.push('Weather report: written to <out>');
+  lines.push('Boundary: public-safe local memory weather only; no raw memory, local paths, provider calls, provider deletion, model behavior, hosted service, benchmark, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printControllerWeatherResult(report, flags, io, outWritten = false) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderControllerWeatherPlain(report, outWritten));
+  else print(report, io);
+}
+
+
 
 function renderInstallPlain(summary) {
   const clients = Array.isArray(summary.clients) ? summary.clients : [];
@@ -4086,6 +4108,33 @@ export async function controllerRevokeCommand(flags, io, positionalFile) {
   return 0;
 }
 
+export async function controllerWeatherCommand(flags, io) {
+  const evidenceRefs = parseList(getFlag(flags, ['evidence-ref', 'evidence-refs', 'evidenceRefs']));
+  const issueCodes = parseList(getFlag(flags, ['issue-code', 'issue-codes', 'issueCodes']));
+  const metric = getFlag(flags, ['metric'], 'active_grants');
+  const count = parseOptionalNumber(getFlag(flags, ['count']));
+  const tileStatus = getFlag(flags, ['tile-status', 'tileStatus']);
+  const tileRequested = getFlag(flags, ['tile-ref', 'tileRef']) !== undefined || tileStatus !== undefined || count !== undefined || getFlag(flags, ['metric']) !== undefined;
+  const tiles = tileRequested ? [{
+    tile_ref: getFlag(flags, ['tile-ref', 'tileRef'], `ref:tile:${String(metric).replace(/[^a-z0-9_:-]/giu, '_')}`),
+    status: tileStatus ?? 'sunny',
+    metric,
+    count: count ?? 0,
+    evidence_refs: evidenceRefs.length === 0 ? ['ref:evidence:weather'] : evidenceRefs,
+  }] : undefined;
+  const report = createMemoryWeatherReport({
+    status: getFlag(flags, ['status']),
+    generated_at: getFlag(flags, ['generated-at', 'generatedAt', 'now']),
+    issue_codes: issueCodes.length === 0 ? undefined : issueCodes,
+    evidence_refs: evidenceRefs.length === 0 ? undefined : evidenceRefs,
+    tiles,
+  });
+  const out = getFlag(flags, ['out']);
+  if (out && out !== true) await writeJson(resolve(String(out)), report);
+  printControllerWeatherResult(report, flags, io, out && out !== true);
+  return 0;
+}
+
 function humanUsage() {
   return `Enigma Memory CLI — local-first AI Memory Passport
 
@@ -4221,6 +4270,7 @@ function usage() {
     controller_options: {
       'controller grant': 'Create a public-safe Memory Controller consent grant for local context recall.',
       'controller revoke': 'Mark an existing public-safe Memory Controller grant revoked without exposing memory.',
+      'controller weather': 'Create a public-safe Memory Weather report for dashboard/review status.',
       '--grant-file <path>': 'Grant JSON to revoke for controller revoke. Positional file is also accepted.',
       '--app-ref <ref>': 'Opaque connected-app ref. Defaults to ref:app:cli.',
       '--purpose-ref <ref>': 'Opaque purpose ref. Defaults to ref:purpose:cli_context.',
@@ -4229,8 +4279,11 @@ function usage() {
       '--ttl-seconds <n>': 'Grant lifetime in seconds when --expires-at is omitted.',
       '--issued-at/--now <iso>': 'Grant issue timestamp. Defaults to current local time.',
       '--expires-at <iso>': 'Explicit grant expiration timestamp. If omitted, ttl-seconds is applied.',
-      '--out <path>': 'Write grant JSON for later enigma context --require-grant --grant-file use.',
-      '--plain': 'Print a path-redacted consent grant/revocation summary instead of JSON. Alias: --text or --format text.',
+      '--out <path>': 'Write grant or weather JSON for later review without printing local paths.',
+      '--status <sunny|needs_attention|storm_warning>': 'Optional Memory Weather status override for controller weather.',
+      '--issue-code <code>': 'Optional public-safe weather issue code; repeat or comma-separate.',
+      '--tile-status/--metric/--count': 'Optional single weather tile fields for controller weather.',
+      '--plain': 'Print a path-redacted consent/weather summary instead of JSON. Alias: --text or --format text.',
     },
     search_options: {
       '--query <text>': 'Required local query. Output redacts the query and memory plaintext by default. Alias: --q.',
@@ -4435,7 +4488,7 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     io.stdout.write(`${humanUsage()}\n`);
     return 0;
   }
-  if ((command === 'chain' && (!subcommand || subcommand === '--help' || subcommand === '-h' || flags.has('help'))) || ((flags.has('help') || argv.includes('-h')) && (command === 'init' || command === 'setup' || command === 'start' || command === 'next' || command === 'quickstart' || command === 'test-drive' || command === 'search' || command === 'context' || command === 'status' || (command === 'passport' && subcommand === 'status') || ((command === 'relay' || command === 'gateway') && (subcommand === 'serve' || subcommand === 'demo')) || (command === 'native-host' && (subcommand === 'manifest' || subcommand === 'install-plan')) || (command === 'claude-mcpb' && subcommand === 'package') || (command === 'demo' && subcommand === 'cross-model') || (command === 'drive' && subcommand === 'health') || (command === 'controller' && (subcommand === 'grant' || subcommand === 'revoke'))))) {
+  if ((command === 'chain' && (!subcommand || subcommand === '--help' || subcommand === '-h' || flags.has('help'))) || ((flags.has('help') || argv.includes('-h')) && (command === 'init' || command === 'setup' || command === 'start' || command === 'next' || command === 'quickstart' || command === 'test-drive' || command === 'search' || command === 'context' || command === 'status' || (command === 'passport' && subcommand === 'status') || ((command === 'relay' || command === 'gateway') && (subcommand === 'serve' || subcommand === 'demo')) || (command === 'native-host' && (subcommand === 'manifest' || subcommand === 'install-plan')) || (command === 'claude-mcpb' && subcommand === 'package') || (command === 'demo' && subcommand === 'cross-model') || (command === 'drive' && subcommand === 'health') || (command === 'controller' && (subcommand === 'grant' || subcommand === 'revoke' || subcommand === 'weather'))))) {
     print(usage(), io);
     return 0;
   }
@@ -4459,6 +4512,7 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     if (command === 'search') return await searchCommand(flags, io);
     if (command === 'controller' && subcommand === 'grant') return await controllerGrantCommand(flags, io);
     if (command === 'controller' && subcommand === 'revoke') return await controllerRevokeCommand(flags, io, positionalFile);
+    if (command === 'controller' && subcommand === 'weather') return await controllerWeatherCommand(flags, io);
     if (command === 'next') return await nextCommand(flags, io);
     if (command === 'status') return await statusCommand(flags, io);
     if (command === 'passport' && subcommand === 'status') return await statusCommand(flags, io);

@@ -226,3 +226,44 @@ test('controller grant and revoke plain output is readable and path-redacted', a
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('controller weather plain output is readable and path-redacted', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-controller-weather-'));
+  const outFile = join(dir, 'weather.json');
+  try {
+    const io = makeIo();
+    assert.equal(await main([
+      'controller',
+      'weather',
+      '--status',
+      'needs_attention',
+      '--issue-code',
+      'grant_expiring',
+      '--tile-status',
+      'needs_attention',
+      '--metric',
+      'expiring_grants',
+      '--count',
+      '2',
+      '--evidence-ref',
+      'ref:evidence:weather-test',
+      '--out',
+      outFile,
+      '--plain',
+    ], io.io), 0, io.stderr());
+    const stdout = io.stdout();
+
+    assert.match(stdout, /^Enigma memory weather\n/);
+    assert.match(stdout, /Status: needs_attention/);
+    assert.match(stdout, /Tiles: 1/);
+    assert.match(stdout, /Issues: grant_expiring/);
+    assert.match(stdout, /Next: review_grants/);
+    assert.match(stdout, /Weather report: written to <out>/);
+    assert.match(stdout, /Boundary: public-safe local memory weather only/);
+    assert.doesNotMatch(stdout, /^\s*\{/);
+    assert.equal(stdout.includes(dir), false);
+    assert.equal(stdout.includes(outFile), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
