@@ -120,6 +120,16 @@ test('setup fails closed when an artifact already exists', async () => {
   assert.equal(summary.error.code, 'CLI_ERROR');
   assert.match(summary.error.message, /already exists/);
   assert.equal(JSON.stringify(summary).includes(dir), false);
+
+  const plainIo = makeIo();
+  assert.equal(await main(['setup', '--bundle', bundlePath, '--out-dir', dir, '--plain'], plainIo.io), 2);
+  assert.match(plainIo.stdout(), /^Enigma setup\n/);
+  assert.match(plainIo.stdout(), /Status: Needs attention/);
+  assert.match(plainIo.stdout(), /Issue: Quickstart output already exists/);
+  assert.match(plainIo.stdout(), /Next: enigma setup --bundle <bundle-path> --out-dir <out-dir> --overwrite/);
+  assert.match(plainIo.stdout(), /Boundary: local Enigma error summary only/);
+  assert.doesNotMatch(plainIo.stdout(), /^\s*\{/);
+  assert.equal(plainIo.stdout().includes(dir), false);
   assert.equal(await readFile(bundlePath, 'utf8'), '{}\n');
 });
 

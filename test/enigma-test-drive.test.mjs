@@ -176,6 +176,16 @@ test('test-drive rerun without overwrite fails safely and preserves existing art
   assert.equal(result.json.ok, false);
   assert.equal(result.json.error.code, 'CLI_ERROR');
   assert.match(result.json.error.message, /already exists|overwrite/i);
+
+  const plain = await runTestDriveText(['--out-dir', outDir, '--plain']);
+  assert.equal(plain.code, 2);
+  assert.match(plain.stdout, /^Enigma test-drive\n/);
+  assert.match(plain.stdout, /Status: Needs attention/);
+  assert.match(plain.stdout, /Issue: Quickstart output already exists/);
+  assert.match(plain.stdout, /Next: enigma test-drive --out-dir <out-dir> --overwrite/);
+  assert.match(plain.stdout, /Boundary: local Enigma error summary only/);
+  assert.doesNotMatch(plain.stdout, /^\s*\{/);
+  assert.equal(plain.stdout.includes(root), false);
   const after = await Promise.all(artifactPaths.map((path) => readFile(path, 'utf8')));
   assert.deepEqual(after, before);
 });

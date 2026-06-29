@@ -2731,6 +2731,32 @@ function printNextAction(action, flags, io) {
   else print(action, io);
 }
 
+function redactCliErrorMessage(error) {
+  return String(error?.message ?? error ?? 'Command failed.')
+    .replace(/[A-Za-z]:[\\/][^\s,)"']+/g, '<local-path>')
+    .replace(/\/(?:Users|home|var|tmp|private|Volumes)\/[^\s,)"']+/g, '<local-path>');
+}
+
+function recoveryCommandFor(command) {
+  if (command === 'init' || command === 'setup') return 'enigma setup --bundle <bundle-path> --out-dir <out-dir> --overwrite';
+  if (command === 'start' || command === 'quickstart') return 'enigma quickstart --bundle <bundle-path> --out-dir <out-dir> --overwrite';
+  if (command === 'test-drive') return 'enigma test-drive --out-dir <out-dir> --overwrite';
+  return 'enigma next --bundle <bundle-path>';
+}
+
+function renderCliErrorPlain(command, error) {
+  const safeCommand = command ? String(command).replace(/[^a-z0-9:-]/gi, '') : 'command';
+  const lines = [
+    `Enigma ${safeCommand}`,
+    'Status: Needs attention',
+    `Issue: ${redactCliErrorMessage(error)}`,
+    `Next: ${recoveryCommandFor(command)}`,
+    'Boundary: local Enigma error summary only; no raw memory, local paths, provider deletion, model behavior, hosted service, or signing claims.',
+  ];
+  return `${lines.join('\n')}\n`;
+}
+
+
 async function nextCommand(flags, io) {
   const bundleInput = String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE));
   const bundlePath = resolve(bundleInput);
@@ -4972,7 +4998,8 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     if (command === 'enterprise' && subcommand === 'demo') return await enterpriseDemoCommand(flags, io);
     throw new Error(`Unknown command: ${[command, subcommand].filter(Boolean).join(' ')}`);
   } catch (error) {
-    print({ ok: false, error: { code: 'CLI_ERROR', message: error.message } }, io);
+    if (nextPlainRequested(flags)) io.stdout.write(renderCliErrorPlain(command, error));
+    else print({ ok: false, error: { code: 'CLI_ERROR', message: error.message } }, io);
     return 2;
   }
 }
