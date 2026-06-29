@@ -196,7 +196,7 @@ export function buildRankedNextActions(blockers) {
 }
 
 function usage() {
-  return `Usage: node scripts/run-public-beta-qa-matrix.mjs [--json|--plain] [--out <path>] [--clean-machine-smoke <path>] [--support-dry-run <path>] [--registry-install <path>] [--desktop-release-evidence <path>]\n\nGenerates a public-safe ${PUBLIC_BETA_QA_MATRIX_SCHEMA} report from repository files plus optional public-safe QA evidence artifacts, including ranked next_actions for release owners.\n`;
+  return `Usage: node scripts/run-public-beta-qa-matrix.mjs [--json|--plain] [--out <path>] [--clean-machine-smoke <path>] [--support-dry-run <path>] [--registry-install <path>] [--desktop-release-evidence <path>] [--production-handoff-packet <path>]\n\nGenerates a public-safe ${PUBLIC_BETA_QA_MATRIX_SCHEMA} report from repository files plus optional public-safe QA evidence artifacts, including ranked next_actions for release owners.\n`;
 }
 
 function readArg(argv, index, flag) {
@@ -205,7 +205,7 @@ function readArg(argv, index, flag) {
 }
 
 export function parseArgs(argv = process.argv.slice(2)) {
-  const options = { json: false, plain: false, out: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: null, desktopReleaseEvidence: null };
+  const options = { json: false, plain: false, out: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: null, desktopReleaseEvidence: null, productionHandoffPacket: null };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--json') {
@@ -227,6 +227,9 @@ export function parseArgs(argv = process.argv.slice(2)) {
       i += 1;
     } else if (arg === '--desktop-release-evidence') {
       options.desktopReleaseEvidence = readArg(argv, i + 1, '--desktop-release-evidence');
+      i += 1;
+    } else if (arg === '--production-handoff-packet') {
+      options.productionHandoffPacket = readArg(argv, i + 1, '--production-handoff-packet');
       i += 1;
     } else if (arg === '--help' || arg === '-h') {
       options.help = true;
@@ -372,6 +375,7 @@ export async function inspectPublicBetaQaInputs(options = {}) {
   const supportDryRunSummaries = await readPublicEvidenceJsonList(options.supportDryRun, 'enigma.support_dry_run_summary.v1');
   const registryInstall = await readPublicEvidenceJson(options.registryInstall, 'enigma.registry_install_verifier.v1');
   const desktopReleaseEvidence = await readPublicEvidenceJson(options.desktopReleaseEvidence, 'enigma.desktop_release_evidence.v1');
+  const productionHandoffPacket = await readPublicEvidenceJson(options.productionHandoffPacket, 'enigma.production_handoff_packet.v1');
   const [
     packageJson,
     tauriConfig,
@@ -454,6 +458,7 @@ export async function inspectPublicBetaQaInputs(options = {}) {
     cleanMachineSmoke,
     registryInstall,
     desktopReleaseEvidence,
+    productionHandoffPacket,
     mcpbConnectionPlan,
     mcpbHealth,
   };
@@ -560,6 +565,17 @@ export function buildScenarioRows(inputs) {
     && inputs.desktopReleaseEvidence?.manifest?.signature?.status === 'verified';
   const desktopReleaseEvidenceRefs = desktopReleaseEvidenceReady ? ['ref:evidence:desktop-release'] : [];
   const desktopReleaseBlockers = (...rest) => (desktopReleaseEvidenceReady ? rest : [windowsSignedArtifact, macosNotarizedArtifact, ...rest]);
+  const productionHandoffPacketReady = inputs.productionHandoffPacket?.schema === 'enigma.production_handoff_packet.v1'
+    && inputs.productionHandoffPacket?.go_live_ready === true
+    && Array.isArray(inputs.productionHandoffPacket?.blockers)
+    && inputs.productionHandoffPacket.blockers.length === 0
+    && inputs.productionHandoffPacket?.release_audit?.ok === true
+    && inputs.productionHandoffPacket?.operator_acceptance?.ok === true
+    && inputs.productionHandoffPacket?.local_static_artifact_ready === true;
+  const productionHandoffRefs = productionHandoffPacketReady ? ['ref:evidence:production-handoff-packet'] : [];
+  const releasePacketBlockers = productionHandoffPacketReady ? [releaseApproval] : [releaseApproval, publicSafePacket];
+  const releasePacketIssues = productionHandoffPacketReady ? ['release-approval-evidence-missing', 'reviewer-approval-evidence-missing'] : ['release-approval-evidence-missing', 'reviewer-approval-evidence-missing', 'public-safe-release-packet-approval-missing'];
+
   const desktopReleaseIssues = (...rest) => (desktopReleaseEvidenceReady ? rest : ['signed-artifact-evidence-missing', ...rest]);
 
   const registryEvidenceRefs = registryInstallEvidenceReady ? ['ref:evidence:registry-install'] : [];
@@ -714,9 +730,9 @@ export function buildScenarioRows(inputs) {
       scenario_id: 'BETA-MERGE-001',
       title: 'Release PR approval, merge, and reviewer approval evidence',
       status: 'blocked',
-      evidence_refs: [REFS.roadmap, REFS.releaseChecklist, REFS.qaSupport],
-      blocker_refs: [releaseApproval, publicSafePacket],
-      issue_codes: ['release-approval-evidence-missing', 'reviewer-approval-evidence-missing'],
+      evidence_refs: [REFS.roadmap, REFS.releaseChecklist, REFS.qaSupport, ...productionHandoffRefs],
+      blocker_refs: releasePacketBlockers,
+      issue_codes: releasePacketIssues,
     }),
     scenario({
       scenario_id: 'EV-P9-WINDOWS-SIGNING-OBSERVED',

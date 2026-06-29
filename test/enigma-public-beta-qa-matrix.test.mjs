@@ -145,12 +145,13 @@ test('public beta QA npm script invokes the JSON matrix runner', async () => {
 });
 
 test('public beta QA runner accepts explicit plain output mode', () => {
-  assert.deepEqual(parseArgs(['--plain']), { json: false, plain: true, out: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: null, desktopReleaseEvidence: null });
-  assert.deepEqual(parseArgs(['--format', 'text']), { json: false, plain: true, out: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: null, desktopReleaseEvidence: null });
-  assert.deepEqual(parseArgs(['--clean-machine-smoke', 'smoke.json']), { json: false, plain: false, out: null, cleanMachineSmoke: 'smoke.json', supportDryRun: [], registryInstall: null, desktopReleaseEvidence: null });
-  assert.deepEqual(parseArgs(['--support-dry-run', 'diag.json', '--support-dry-run', 'crash.json']), { json: false, plain: false, out: null, cleanMachineSmoke: null, supportDryRun: ['diag.json', 'crash.json'], registryInstall: null, desktopReleaseEvidence: null });
-  assert.deepEqual(parseArgs(['--registry-install', 'registry.json']), { json: false, plain: false, out: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: 'registry.json', desktopReleaseEvidence: null });
-  assert.deepEqual(parseArgs(['--desktop-release-evidence', 'desktop.json']), { json: false, plain: false, out: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: null, desktopReleaseEvidence: 'desktop.json' });
+  assert.deepEqual(parseArgs(['--plain']), { json: false, plain: true, out: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: null, desktopReleaseEvidence: null, productionHandoffPacket: null });
+  assert.deepEqual(parseArgs(['--format', 'text']), { json: false, plain: true, out: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: null, desktopReleaseEvidence: null, productionHandoffPacket: null });
+  assert.deepEqual(parseArgs(['--clean-machine-smoke', 'smoke.json']), { json: false, plain: false, out: null, cleanMachineSmoke: 'smoke.json', supportDryRun: [], registryInstall: null, desktopReleaseEvidence: null, productionHandoffPacket: null });
+  assert.deepEqual(parseArgs(['--support-dry-run', 'diag.json', '--support-dry-run', 'crash.json']), { json: false, plain: false, out: null, cleanMachineSmoke: null, supportDryRun: ['diag.json', 'crash.json'], registryInstall: null, desktopReleaseEvidence: null, productionHandoffPacket: null });
+  assert.deepEqual(parseArgs(['--registry-install', 'registry.json']), { json: false, plain: false, out: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: 'registry.json', desktopReleaseEvidence: null, productionHandoffPacket: null });
+  assert.deepEqual(parseArgs(['--desktop-release-evidence', 'desktop.json']), { json: false, plain: false, out: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: null, desktopReleaseEvidence: 'desktop.json', productionHandoffPacket: null });
+  assert.deepEqual(parseArgs(['--production-handoff-packet', 'handoff.json']), { json: false, plain: false, out: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: null, desktopReleaseEvidence: null, productionHandoffPacket: 'handoff.json' });
   assert.throws(() => parseArgs(['--json', '--plain']), /Choose only one output format/);
 });
 
@@ -418,6 +419,25 @@ test('public beta next actions are ranked and public-safe', async () => {
   assert.equal(matrix.next_actions.some((action) => action.action_id === 'record_support_dry_run'), true);
   const supportAction = matrix.next_actions.find((action) => action.action_id === 'record_support_dry_run');
   assert.equal(supportAction.missing_evidence_items[0].evidence_item_id, 'EV-P10-SUPPORT-DRY-RUN-SUMMARY');
+});
+
+test('public beta QA matrix can consume production handoff packet without clearing PR approval', () => {
+  const scenarios = buildScenarioRows({
+    productionHandoffPacket: {
+      schema: 'enigma.production_handoff_packet.v1',
+      go_live_ready: true,
+      local_static_artifact_ready: true,
+      blockers: [],
+      operator_acceptance: { ok: true },
+      release_audit: { ok: true },
+    },
+  });
+
+  const merge = scenarioById(scenarios, 'BETA-MERGE-001');
+  assert.equal(merge.status, 'blocked');
+  assert.deepEqual(merge.blocker_refs, ['BLOCKER-PR-APPROVAL-MERGE-REVIEWER-APPROVAL']);
+  assert.equal(merge.issue_codes.includes('public-safe-release-packet-approval-missing'), false);
+  assert.match(JSON.stringify(merge.evidence_refs), /ref:evidence:production-handoff-packet/);
 });
 
 test('config recovery scenarios are blocked once command and UI recovery surfaces exist', () => {
