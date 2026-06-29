@@ -41,21 +41,22 @@ Use npm only when you want the command-line engine instead of the desktop app.
 
 ```sh
 npm install -g enigma-memory
-enigma init
-enigma setup --client auto --connect-installed --overwrite
-enigma drive health
-enigma status
+enigma quickstart --bundle ./.enigma/bundle.json
+enigma doctor --bundle ./.enigma/bundle.json
+enigma drive health --bundle ./.enigma/bundle.json
+enigma connect claude-desktop --bundle ./.enigma/bundle.json --dry-run
+enigma status --bundle ./.enigma/bundle.json
 ```
 
-`enigma init` is the credential-free first run that creates the local `.enigma` workspace, bundle, and proof artifacts. `enigma setup --client auto --connect-installed --overwrite` then configures the drive and writes the `mcpServers.enigma` entry into every installed/config-present client it detects; it skips clients that are not installed and never creates configs from scratch. Preview with `--dry-run` first to see which clients will be written. Both commands emit deterministic, public-safe JSON without printing raw memory plaintext, and both run on Windows PowerShell via the `enigma.cmd` shim the npm global install adds.
+`enigma quickstart` is the credential-free first run that creates the local `.enigma` workspace, bundle, and proof artifacts. Connector writes stay behind explicit `enigma connect <client> --dry-run` preview and a separate intentional connect command. These commands emit deterministic, public-safe JSON or plain text without printing raw memory plaintext, and they run on Windows PowerShell via the `enigma.cmd` shim the npm global install adds.
 
-Run setup or quickstart before treating `enigma doctor` as a fully green install check. Doctor checks Node/package state, local paths, schemas, MCP command naming, and connector configs. On a fresh install it can return `ok:false` when an existing MCP client config points at a bundle that has not been initialized yet, or at a different bundle than the one you are checking. That is expected first-run state, not a package install failure. In JSON output, `setup_status.state:"setup_needed"` means run the included `setup_status.next_command`; `setup_status.state:"attention_needed"` means a real install/config issue still needs repair. The shortest repair path is `enigma quickstart --bundle ./.enigma/bundle.json --overwrite` or `enigma setup --bundle ./.enigma/bundle.json --overwrite`, then `enigma doctor --bundle ./.enigma/bundle.json`.
+Run quickstart before treating `enigma doctor` as a fully green install check. Doctor checks Node/package state, local paths, schemas, MCP command naming, and connector configs. On a fresh install it can return `ok:false` when an existing MCP client config points at a bundle that has not been initialized yet, or at a different bundle than the one you are checking. That is expected first-run state, not a package install failure. In JSON output, `setup_status.state:"setup_needed"` means run the included `setup_status.next_command`; `setup_status.state:"attention_needed"` means a real install/config issue still needs repair. The shortest safe path is `enigma quickstart --bundle ./.enigma/bundle.json`, then `enigma connect <client> --bundle ./.enigma/bundle.json --dry-run` before approving a connector write.
 
 `enigma status` is the one-screen local setup view after a bundle exists. Read `first_run_status.primary_action` for the next consumer-safe step, and use the lanes to check Memory Drive, Import Sandbox, memory inventory, proof activity, and diagnostics without raw memory text.
 `enigma next --plain` is safe to run before or after setup. If no bundle exists, it prints a human-readable `run_quickstart` action instead of a stack trace; after setup, it mirrors `first_run_status`. Omit `--plain` when automation needs JSON.
 `enigma support summary --bundle ./.enigma/bundle.json` creates the redacted support artifact to share first when asking for help. It contains setup/diagnostic status and issue codes, not memory text, prompts, transcripts, credentials, provider responses, or local absolute paths.
 
-For the one-off npm path, run `npx --yes --package enigma-memory enigma quickstart --bundle ./.enigma/bundle.json --overwrite` before `npx --yes --package enigma-memory enigma doctor --bundle ./.enigma/bundle.json`. Running the npx doctor first can report a red generic-MCP connector if an existing client config names a not-yet-created bundle.
+For the one-off npm path, run `npx --yes --package enigma-memory enigma quickstart --bundle ./.enigma/bundle.json` before `npx --yes --package enigma-memory enigma doctor --bundle ./.enigma/bundle.json`. Running the npx doctor first can report a red generic-MCP connector if an existing client config names a not-yet-created bundle.
 
 `enigma drive health` reports a SMART-style memory-drive health packet — freshness, duplicate rate, tombstone backlog, stale derived artifacts, receipt coverage, and connector health — from local metadata only, with no network calls or private payloads.
 
@@ -216,14 +217,15 @@ MCP resource and prompt:
 
 Use `docs/client-connectors.md` from a source checkout for Claude Desktop, Cursor, Kimi Code, VS Code/Cline, Roo Code, OpenCode, and generic MCP JSON. Connector entries default to command `enigma-mcp` and env key `ENIGMA_BUNDLE`.
 
-Npm-first connector flow — one command connects every installed/config-present client:
+Npm-first connector flow — preview one intended client before writing:
 
 ```sh
 npm install -g enigma-memory
-enigma setup --client auto --connect-installed --overwrite
+enigma quickstart --bundle ./.enigma/bundle.json
+enigma connect claude-desktop --bundle ./.enigma/bundle.json --dry-run
 ```
 
-`--connect-installed` detects installed/config-present clients (Claude Desktop, Cursor, Kimi Code, VS Code/Cline, Roo, OpenCode, generic MCP) and writes only those existing client configs; missing client configs are reported and skipped. To preview a single client without writing, or to connect just one client later, use `enigma connect <client> --dry-run` and then drop `--dry-run`.
+To connect a client, review the dry-run output first and then repeat the same `enigma connect <client> --bundle ./.enigma/bundle.json` command without `--dry-run`. To inspect every installed/config-present client without writing, use `enigma status --bundle ./.enigma/bundle.json` or the desktop app's connection preview cards instead of an auto-connect overwrite command.
 
 Copy-paste MCP snippets:
 
