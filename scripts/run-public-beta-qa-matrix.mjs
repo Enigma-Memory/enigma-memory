@@ -261,7 +261,13 @@ async function readRepoJson(rel) {
 
 async function readPublicEvidenceJson(path, expectedSchema) {
   if (!path) return null;
-  const artifact = JSON.parse(await readFile(resolve(String(path)), 'utf8'));
+  let artifact;
+  try {
+    artifact = JSON.parse(await readFile(resolve(String(path)), 'utf8'));
+  } catch (error) {
+    if (error && error.code === 'ENOENT') return null;
+    throw error;
+  }
   if (artifact?.schema !== expectedSchema) {
     throw new Error(`Evidence artifact schema mismatch: expected ${expectedSchema}.`);
   }

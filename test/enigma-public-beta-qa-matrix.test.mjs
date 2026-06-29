@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { buildPublicBetaQaMatrix, buildRankedNextActions, buildScenarioRows, mergeEvidenceOptions, normalizeEvidenceManifest, parseArgs, renderPublicBetaQaPlain } from '../scripts/run-public-beta-qa-matrix.mjs';
 
 const GENERATED_AT = '2026-06-28T00:00:00.000Z';
@@ -181,6 +183,28 @@ test('public beta evidence manifest normalizes one-file release-owner inputs', (
     productionHandoffPacket: 'handoff.json',
   });
   assert.throws(() => normalizeEvidenceManifest({ schema: 'wrong' }), /Evidence manifest schema mismatch/);
+});
+
+test('public beta QA manifest treats missing optional evidence paths as blockers', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-public-beta-missing-evidence-'));
+  try {
+    const manifestPath = join(dir, 'evidence-manifest.json');
+    await writeFile(manifestPath, `${JSON.stringify({
+      schema: 'enigma.public_beta_evidence_manifest.v1',
+      clean_machine_smoke: join(dir, 'missing-clean-machine.json'),
+      support_dry_run: [join(dir, 'missing-support.json')],
+      registry_install: join(dir, 'missing-registry.json'),
+      desktop_release_evidence: join(dir, 'missing-desktop.json'),
+      production_handoff_packet: join(dir, 'missing-handoff.json'),
+    }, null, 2)}\n`, 'utf8');
+
+    const matrix = await buildPublicBetaQaMatrix({ evidenceManifest: manifestPath });
+    assert.equal(matrix.advisor_decision, 'hold');
+    assert.equal(matrix.summary.ready_for_public_beta, false);
+    assert.equal(matrix.next_actions.some((action) => action.action_id === 'record_support_dry_run'), true);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test('public beta QA plain output is readable, bounded, and non-JSON', async () => {
