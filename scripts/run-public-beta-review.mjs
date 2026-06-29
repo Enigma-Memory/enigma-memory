@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { buildPublicBetaEvidenceManifest } from './build-public-beta-evidence-manifest.mjs';
 import { buildSupportDryRunSummary } from './build-support-dry-run-summary.mjs';
 import { buildPublicBetaQaMatrix, renderPublicBetaQaPlain } from './run-public-beta-qa-matrix.mjs';
+import { buildCleanMachineSmokePlan } from './run-clean-machine-smoke.mjs';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const GENERATED_SUPPORT_DRY_RUNS = Object.freeze([
@@ -29,7 +30,7 @@ const GENERATED_SUPPORT_DRY_RUNS = Object.freeze([
 const DEFAULT_OUT_DIR = '.enigma/public-beta';
 
 function usage() {
-  return `Usage: node scripts/run-public-beta-review.mjs [--out-dir <path>] [--plain|--json]\n\nRuns the local public beta Advisor with one command. It writes a path-only evidence manifest, generated public-safe support dry-run summaries, and a public-safe QA matrix, then prints a bounded human Advisor summary. Missing external evidence files are treated as blockers, not fatal script errors.\n\nOutputs:\n  <out-dir>/evidence-manifest.json\n  <out-dir>/support-dry-run-diagnostics.json\n  <out-dir>/support-dry-run-crash.json\n  <out-dir>/qa-matrix.json\n\nNo PR approval, merge, npm publish, signing, upload, provider launch, or network action is performed.\n`;
+  return `Usage: node scripts/run-public-beta-review.mjs [--out-dir <path>] [--plain|--json]\n\nRuns the local public beta Advisor with one command. It writes a path-only evidence manifest, generated public-safe support dry-run summaries, a public-safe clean-machine smoke collection plan, and a public-safe QA matrix, then prints a bounded human Advisor summary. Missing external evidence files are treated as blockers, not fatal script errors.\n\nOutputs:\n  <out-dir>/evidence-manifest.json\n  <out-dir>/support-dry-run-diagnostics.json\n  <out-dir>/support-dry-run-crash.json\n  <out-dir>/clean-machine-smoke-plan.json\n  <out-dir>/qa-matrix.json\n\nNo PR approval, merge, npm publish, signing, upload, provider launch, or network action is performed.\n`;
 }
 
 function readArg(argv, index, flag) {
@@ -131,6 +132,7 @@ export function renderPublicBetaReviewPlain(result) {
     `QA matrix: written to ${result.paths.matrix}`,
     `Evidence files used: ${result.evidence_files_used}`,
     `Generated support dry-runs: ${result.generated_evidence_files ?? 0}`,
+    `Generated clean-machine plan: ${result.generated_plan_files ?? 0}`,
     '',
     renderPublicBetaQaPlain(result.matrix).trim(),
     'Boundary: one-command local review only; no PR approval, merge, npm publication, signed installer, hosted service, provider deletion, model behavior, benchmark superiority, token ROI, compliance, upload, or network claims.',
@@ -144,6 +146,7 @@ export async function runPublicBetaReview(options = {}) {
   const manifestPath = `${normalizedOutDir}/evidence-manifest.json`;
   const matrixPath = `${normalizedOutDir}/qa-matrix.json`;
   const supportDryRunPaths = generatedSupportDryRunPaths(normalizedOutDir);
+  const cleanMachineSmokePlanPath = joinPathLabel(normalizedOutDir, 'clean-machine-smoke-plan.json');
   const manifest = buildPublicBetaEvidenceManifest({
     out: manifestPath,
     supportDryRun: isRepositoryRelativePath(normalizedOutDir) ? supportDryRunPaths : undefined,
@@ -152,6 +155,7 @@ export async function runPublicBetaReview(options = {}) {
   await mkdir(resolve(outDir), { recursive: true });
   await mkdir(dirname(resolve(manifestPath)), { recursive: true });
   await writeGeneratedSupportDryRunSummaries(supportDryRunPaths);
+  await writeFile(resolve(cleanMachineSmokePlanPath), `${JSON.stringify(buildCleanMachineSmokePlan(), null, 2)}\n`, 'utf8');
   await writeFile(resolve(manifestPath), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
 
   const manifestEvidenceOptions = isRepositoryRelativePath(normalizedOutDir) ? await existingEvidenceOptionsFromManifest(manifest) : { supportDryRun: [] };
@@ -177,6 +181,7 @@ export async function runPublicBetaReview(options = {}) {
     },
     evidence_files_used: evidenceFilesUsed,
     generated_evidence_files: supportDryRunPaths.length,
+    generated_plan_files: 1,
     generated_evidence_items: ['EV-P10-SUPPORT-DRY-RUN-SUMMARY'],
     matrix,
     safety: {
@@ -184,6 +189,7 @@ export async function runPublicBetaReview(options = {}) {
       network_performed: false,
       artifact_contents_embedded_in_manifest: false,
       generated_support_dry_run_public_safe: true,
+      generated_clean_machine_plan_public_safe: true,
       local_paths_hidden_in_stdout: true,
     },
     claim_boundary: 'Local public beta review only. It does not approve PRs, merge branches, publish npm, sign installers, upload artifacts, launch hosted services, prove provider deletion, or prove model behavior.',
