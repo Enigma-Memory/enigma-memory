@@ -564,3 +564,19 @@ test('public beta QA matrix output is public-safe and omits forbidden private fi
   const matrix = await loadMatrix();
   assertPublicSafe(matrix);
 });
+
+test('release owner docs explain evidence templates as blockers only', async () => {
+  const [checklist, supportObservability] = await Promise.all([
+    readFile(new URL('../docs/public-launch/release-owner-checklist.md', import.meta.url), 'utf8'),
+    readFile(new URL('../docs/public-launch/qa-support-observability.md', import.meta.url), 'utf8'),
+  ]);
+
+  for (const doc of [checklist, supportObservability]) {
+    assert.match(doc, /npm run public-beta:evidence-templates -- --out-dir \.enigma\/public-beta --plain/);
+    assert.match(doc, /blockers?|hold/i);
+    assert.match(doc, /real evidence|actual public-safe artifact/i);
+  }
+  assert.match(checklist, /Read each `Collect next:` line/);
+  assert.match(supportObservability, /`Collect next:` file targets/);
+  assert.doesNotMatch(`${checklist}\n${supportObservability}`, /templates?.{0,120}(?:ship|pass|ready)/i);
+});

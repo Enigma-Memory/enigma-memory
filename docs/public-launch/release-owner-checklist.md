@@ -89,9 +89,26 @@ Run `npm run public-beta-qa` or `node scripts/run-public-beta-qa-matrix.mjs --js
 
 Treat `pass` as evidence for the automated local/static slice only. Treat `fail`, `blocked`, `missing`, or `pending` as a hold for public beta until the named blocker has public-safe evidence. The matrix must not be used as a substitute for clean Windows/macOS manual install tests, signed Windows/macOS artifact evidence, Apple notarization/stapling evidence, Microsoft/Windows signing evidence, Apple/Microsoft signing identity and signing-secret custody evidence, `0.1.19` npm publish evidence, PR approval/merge, reviewer approval, or a support dry run; do not mark any of those complete unless the supporting public-safe repo artifact/evidence exists.
 
+Before collecting manual artifacts, create public-safe starter files with:
+
+```sh
+npm run public-beta:evidence-templates -- --out-dir .enigma/public-beta --plain
+```
+
+Those files are templates only. They deliberately keep Advisor in `hold` until a release owner replaces each placeholder with real public-safe evidence from the actual PR review/merge, npm publication, signed installer, clean-machine smoke, and support-dry-run actions.
+
+Then run:
+
+```sh
+npm run public-beta:advisor -- --evidence-manifest .enigma/public-beta/evidence-manifest.json
+```
+
+Read each `Collect next:` line before editing the template files. It names the evidence item, target `.enigma/public-beta/*.json` file, and safe fields to collect. Do not copy private runbook details, local paths, raw memory, credentials, provider responses, account identifiers, or complete app settings into those artifacts.
+
+
 Read `next_actions` before the full scenario list. The first entry is the highest-priority blocker queue item, and every entry includes the blocker ID, owner ref, affected scenarios, evidence refs, and any concrete `missing_evidence_items`. It is only a queue; it does not change a blocker status or clear a release gate.
 
-If the matrix reports `BLOCKER-SUPPORT-DRY-RUN`, the concrete public-safe evidence item to collect is `EV-P10-SUPPORT-DRY-RUN-SUMMARY`: a support dry-run summary with scenario ID, issue code, triage result, bundle privacy-check status, support owner ref, and optionally an allowlisted hash snapshot of a redacted `enigma.support_summary.v1` or `enigma.diagnostics.v1` artifact. Generate it with `npm run production:support-dry-run -- --scenario-id BETA-DIAG-001 --issue-code DIAG-BUNDLE-PREVIEWED --triage-result needs_user_action --bundle-privacy-check-status pass --support-owner-ref ref:role:beta-support --support-artifact .enigma/redacted-support-summary.json --out .enigma/support-dry-run-summary.json`. Recording that item makes the missing evidence reviewable; it does not clear clean-machine, signing, release, approval, or support blockers by itself.
+If the matrix reports `BLOCKER-SUPPORT-DRY-RUN`, the concrete public-safe evidence item to collect is `EV-P10-SUPPORT-DRY-RUN-SUMMARY`: a support dry-run summary with scenario ID, issue code, triage result, bundle privacy-check status, support owner ref, and optionally an allowlisted hash snapshot of a redacted `enigma.support_summary.v1` or `enigma.diagnostics.v1` artifact. Generate starter placeholders with `npm run public-beta:evidence-templates -- --out-dir .enigma/public-beta --plain`; replace the support summary placeholder with a real reviewable summary from `npm run production:support-dry-run -- --scenario-id BETA-DIAG-001 --issue-code DIAG-BUNDLE-PREVIEWED --triage-result needs_user_action --bundle-privacy-check-status pass --support-owner-ref ref:role:beta-support --support-artifact .enigma/redacted-support-summary.json --out .enigma/support-dry-run-summary.json` when a redacted `enigma.support_summary.v1` or `enigma.diagnostics.v1` artifact exists. Recording that item makes the missing evidence reviewable; it does not mark the scenario pass without the actual public-safe artifact.
 
 ## Public beta hold conditions
 
