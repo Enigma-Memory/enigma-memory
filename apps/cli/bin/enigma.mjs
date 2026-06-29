@@ -1734,6 +1734,26 @@ async function deleteCommand(flags, io) {
   return 0;
 }
 
+async function recallCommand(flags, io) {
+  const bundleInput = String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE));
+  const bundlePath = resolve(bundleInput);
+  const includeContent = booleanFlag(flags, ['include-content', 'content'], false);
+  const { vault, passport } = await loadState(bundlePath, { passphrase: getFlag(flags, ['passphrase']) });
+  const result = recall({
+    vault,
+    passport,
+    memory_addr: requireFlag(flags, ['id', 'memory-addr', 'memory_addr', 'memoryAddr'], 'id'),
+    purpose: getFlag(flags, ['purpose'], 'cli_recall'),
+    actor_id: getFlag(flags, ['actor-id', 'actorId']),
+    policy_id: getFlag(flags, ['policy-id', 'policyId']),
+  });
+  await persistState(bundlePath, vault, { passphrase: getFlag(flags, ['passphrase']) });
+  const output = memoryRecallReport({ bundleInput, result, includeContent });
+  printRecallReport(output, flags, io);
+  return 0;
+}
+
+
 function contextRecallScopeFromFlags(flags) {
   return {
     app_ref: getFlag(flags, ['app-ref', 'appRef'], 'ref:app:cli'),
@@ -2086,6 +2106,50 @@ async function statusCommand(flags, io) {
   const report = passportStatusReport({ bundlePath, stored, vault, passport });
   printStatusSummary(report, flags, io);
   return 0;
+}
+
+function memoryRecallReport({ bundleInput, result, includeContent = false }) {
+  const memory = result.memory && typeof result.memory === 'object' ? result.memory : {};
+  const receiptRef = result.receipt ? publicAccessReceiptRef(result.receipt) : null;
+  return {
+    ok: true,
+    schema: 'enigma.memory_recall.v1',
+    bundle: publicPathDisplay(bundleInput, 'bundle-path'),
+    memory_addr: result.memory_addr,
+    memory_ref: result.memory_addr ? `enigma://memory/${result.memory_addr}` : '<memory-ref>',
+    kind: memory.kind ?? 'memory',
+    sensitivity: memory.sensitivity ?? 'unknown',
+    content_hash: memory.content_hash,
+    content_commitment: memory.content_commitment,
+    content_redacted: !includeContent,
+    content: includeContent ? result.content : undefined,
+    receipt_id: result.receipt?.receipt_id,
+    access_receipt_ref: receiptRef,
+    claim_boundary: includeContent
+      ? 'Recall returned plaintext only because --include-content was explicit; this does not prove provider deletion, provider-native memory state, or model forgetting.'
+      : 'Recall redacts plaintext by default; refs, commitments, and receipt refs are not provider deletion proof or model forgetting proof.',
+  };
+}
+
+function renderRecallPlain(report) {
+  const lines = [
+    'Enigma recall',
+    `Status: ${report.ok ? 'Ready' : 'Needs attention'}`,
+    `Memory: ${report.memory_ref ?? '<memory-ref>'}`,
+    `Plaintext: ${report.content_redacted === false ? 'included by explicit opt-in' : 'redacted'}`,
+    `Kind: ${report.kind ?? 'memory'}`,
+    `Sensitivity: ${report.sensitivity ?? 'unknown'}`,
+  ];
+  if (report.receipt_id) lines.push(`Receipt: ${report.receipt_id}`);
+  if (report.access_receipt_ref?.access_receipt_ref) lines.push(`Access: ${report.access_receipt_ref.access_receipt_ref}`);
+  lines.push('Next: enigma context --bundle <bundle-path> --query <text>');
+  lines.push('Boundary: local Enigma recall only; no raw memory in plain output, local paths, provider deletion, model behavior, hosted service, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printRecallReport(report, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderRecallPlain(report));
+  else print(report, io);
 }
 
 function renderMemoryLifecyclePlain(result, operation) {
@@ -4579,6 +4643,11 @@ function usage() {
       '--text-file <path>': 'Read local memory text from a file so private smoke input is not exposed in shell argv. Aliases: --memory-file, --textFile, --memoryFile.',
       '--importance <0-1>': 'Optional numeric importance/priority in [0,1]; higher values rank the memory higher in optimized context. Alias: --priority.',
       '--plain': 'Print a human-readable memory lifecycle receipt instead of JSON for remember, update, or delete. Alias: --text or --format text.',
+    },
+    recall_options: {
+      '--id <memory_addr>': 'Memory address to read and receipt locally. Alias: --memory-addr.',
+      '--include-content': 'Explicit opt-in to include plaintext in JSON output. Plain output still summarizes without printing raw memory.',
+      '--plain': 'Print a human-readable recall receipt instead of JSON. Alias: --text or --format text.',
     },
     context_options: {
       '--query <text>': 'Local query. When non-empty, only query-relevant active memories are returned by default. Alias: --q.',

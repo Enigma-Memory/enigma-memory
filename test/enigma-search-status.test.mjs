@@ -120,6 +120,47 @@ test('memory lifecycle plain output is readable, persistent, and redacted', asyn
     const rememberedAddr = remembered.stdout.match(/Memory: enigma:\/\/memory\/(\S+)/)?.[1];
     assert.equal(typeof rememberedAddr, 'string');
 
+
+    const recalledJson = await runCli([
+      'recall',
+      '--bundle', bundlePath,
+      '--id', rememberedAddr,
+    ]);
+    assert.equal(recalledJson.code, 0);
+    assert.equal(recalledJson.json.ok, true);
+    assert.equal(recalledJson.json.schema, 'enigma.memory_recall.v1');
+    assert.equal(recalledJson.json.memory_addr, rememberedAddr);
+    assert.equal(recalledJson.json.content_redacted, true);
+    assert.equal(Object.hasOwn(recalledJson.json, 'content'), false);
+    assert.match(recalledJson.json.memory_ref, /^enigma:\/\/memory\//);
+    assert.match(recalledJson.json.access_receipt_ref.access_receipt_ref, /^enigma:\/\/memory-access\//);
+    assert.doesNotMatch(recalledJson.stdout, /remember lifecycle private canary/);
+
+    const recalledPlain = await runCliText([
+      'recall',
+      '--bundle', bundlePath,
+      '--id', rememberedAddr,
+      '--plain',
+    ]);
+    assert.equal(recalledPlain.code, 0);
+    assert.match(recalledPlain.stdout, /^Enigma recall\n/);
+    assert.match(recalledPlain.stdout, /Plaintext: redacted/);
+    assert.match(recalledPlain.stdout, /Next: enigma context --bundle <bundle-path> --query <text>/);
+    assert.match(recalledPlain.stdout, /Boundary: local Enigma recall only/);
+    assert.doesNotMatch(recalledPlain.stdout, /^\s*\{/);
+    assert.doesNotMatch(recalledPlain.stdout, /remember lifecycle private canary/);
+    assert.equal(recalledPlain.stdout.includes(dir), false);
+
+    const recalledContent = await runCli([
+      'recall',
+      '--bundle', bundlePath,
+      '--id', rememberedAddr,
+      '--include-content',
+    ]);
+    assert.equal(recalledContent.code, 0);
+    assert.equal(recalledContent.json.content_redacted, false);
+    assert.equal(recalledContent.json.content, 'remember lifecycle private canary');
+    assert.match(recalledContent.json.claim_boundary, /--include-content was explicit/);
     const updated = await runCliText([
       'update',
       '--bundle', bundlePath,
