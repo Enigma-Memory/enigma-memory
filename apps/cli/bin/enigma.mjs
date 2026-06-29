@@ -1823,10 +1823,10 @@ function renderContextPlain(output) {
     `Memories: ${memoryCount}`,
     `Receipts: ${receiptCount}`,
   ];
-  if (schema === 'enigma.context_proof_bundle.v1') lines.push('Proof: context passport and non-use proof included');
+  if (schema === 'enigma.context_proof_bundle.v1') lines.push('Proof summary: local context selection and not-shared/tombstoned Enigma memories are accounted for.');
   if (controller?.decision) lines.push(`Controller: ${controller.decision}`);
   if (Array.isArray(controller?.reason_codes) && controller.reason_codes.length > 0) lines.push(`Reason: ${controller.reason_codes.join(', ')}`);
-  lines.push('Boundary: local Enigma context only; no raw memory in plain output, local paths, provider deletion, model behavior, or hosted service claims.');
+  lines.push('Boundary: local Enigma context only; no raw memory in plain output, local paths, provider deletion, provider non-use, model behavior, or hosted service claims.');
   return `${lines.join('\n')}\n`;
 }
 
@@ -1890,6 +1890,7 @@ async function contextCommand(flags, io) {
       claim_boundaries: {
         local_enigma_vault_only: true,
         provider_deletion_claim: false,
+        provider_non_use_claim: false,
         model_forgetting_claim: false,
         raw_memory_printed: false,
       },

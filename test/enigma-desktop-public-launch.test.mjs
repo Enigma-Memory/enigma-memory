@@ -376,6 +376,11 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(wizard, /enigma\.desktop_proof_activity\.v1/);
   assert.match(tauriService, /pub async fn get_proof_activity/);
   assert.match(tauriService, /local_counts_and_roots_only/);
+  assert.match(wizard, /`Verifier: \$\{activity\.verifier_status \|\| 'not_run'\}`/);
+  assert.match(wizard, /`Evidence: \$\{activity\.evidence_status \|\| 'local_counts_and_roots_only'\}`/);
+  assert.match(wizard, /Not-shared\/tombstoned local memories/);
+  assert.match(wizard, /provider non-use/);
+  assert.match(tauriService, /provider_non_use_proof": false/);
   assert.match(tauriService, /pub async fn export_proof_activity/);
   assert.match(tauriService, /enigma\.desktop_proof_activity_export\.v1/);
   assert.match(tauriLib, /commands::service::get_proof_activity/);

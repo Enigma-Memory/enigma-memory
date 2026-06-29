@@ -35,6 +35,7 @@ test('context --proof emits passport and non-use proof without context plaintext
     assert.equal(output.context_passport.schema, 'enigma.context_passport.v1');
     assert.equal(output.proof_of_non_use.schema, 'enigma.proof_of_non_use.v1');
     assert.equal(output.claim_boundaries.provider_deletion_claim, false);
+    assert.equal(output.claim_boundaries.provider_non_use_claim, false);
     assert.equal(output.claim_boundaries.model_forgetting_claim, false);
     assert.equal(output.claim_boundaries.raw_memory_printed, false);
     assert.equal(output.context_pack_summary.memory_count > 0, true);
@@ -45,8 +46,10 @@ test('context --proof emits passport and non-use proof without context plaintext
     assert.equal(await main(['context', '--bundle', bundle, '--query', 'local proof bundle', '--proof', '--plain'], plain.io), 0, plain.stderr());
     assert.match(plain.stdout(), /^Enigma context\n/);
     assert.match(plain.stdout(), /Status: Ready/);
-    assert.match(plain.stdout(), /Proof: context passport and non-use proof included/);
+    assert.match(plain.stdout(), /Proof summary: local context selection and not-shared\/tombstoned Enigma memories are accounted for/);
     assert.match(plain.stdout(), /Boundary: local Enigma context only/);
+    assert.match(plain.stdout(), /provider non-use/);
+    assert.doesNotMatch(plain.stdout(), /non-use proof/);
     assert.doesNotMatch(plain.stdout(), /^\s*\{/);
     assert.equal(plain.stdout().includes('Enigma quickstart demo memory'), false);
     assert.equal(plain.stdout().includes(dir), false);

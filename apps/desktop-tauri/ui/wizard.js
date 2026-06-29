@@ -831,10 +831,12 @@ function publicProofClipboardText(activity = {}) {
     'Enigma proof activity',
     `Receipts: ${activity.receipt_count ?? 0}`,
     `Active memories: ${activity.active_memory_count ?? 0}`,
-    `Tombstones: ${activity.tombstoned_memory_count ?? 0}`,
+    `Not-shared/tombstoned local memories: ${activity.tombstoned_memory_count ?? 0}`,
+    `Verifier: ${activity.verifier_status || 'not_run'}`,
+    `Evidence: ${activity.evidence_status || 'local_counts_and_roots_only'}`,
     `Active set root: ${roots.active_set_root || '<not-available>'}`,
     `Receipt log root: ${roots.receipt_log_root || '<not-available>'}`,
-    'Boundary: local Enigma roots and counts only; no raw memory, local paths, outside-provider control, or model behavior claims.',
+    'Boundary: local Enigma roots and counts only; no raw memory, local paths, outside-provider removal, provider non-use, or model behavior claims.',
   ].join('\n');
 }
 
@@ -859,7 +861,7 @@ function renderProofActivitySection() {
         <div class="metric"><dt>Tombstones</dt><dd>${escapeHtml(String(tombstoneCount))}</dd></div>
         <div class="metric"><dt>Verifier</dt><dd>${escapeHtml(verifierStatus)}</dd></div>
       </div>
-      <p class="note">Evidence status: ${escapeHtml(evidenceStatus)}. Privacy scan: ${escapeHtml(scan.status)}. This is Enigma-controlled local evidence only; it does not prove outside-provider changes or model behavior changes.</p>
+      <p class="note">Evidence status: ${escapeHtml(evidenceStatus)}. Privacy scan: ${escapeHtml(scan.status)}. This is Enigma-controlled local evidence only; it does not prove outside-provider removal, provider non-use, outside-provider changes, or model behavior changes.</p>
       ${exported ? `<p class="note">Proof activity export ready. File location is hidden in this view.</p>` : ''}
       <div class="button-row">
         ${primaryButton('Refresh proof activity', 'refresh-proof-activity')}

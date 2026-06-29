@@ -22,7 +22,7 @@
 - First-run health check now starts the bundled local engine before showing the Ready screen, then refreshes health so Ready is not shown while the dashboard still needs "Start engine."
 - Memory Controller dashboard cards show consent/review/private-bubble states without approving recall on review alone.
 - Import Sandbox supports local text/Markdown paste, preview counts and duplicate groups, explicit approve only when the preview decision is `ready_for_import`, local vault write, batch receipt, and latest-import rollback; raw text and raw report paths are not printed in the UI result.
-- Proof Activity summary shows local receipt counts, Memory Drive roots, verifier status, claim boundaries, and explicit public-safe export without raw memory, prompts, transcripts, provider responses, or paths.
+- Proof Activity summary shows local receipt counts, Memory Drive roots, verifier/evidence status, claim boundaries including provider non-use non-claims, and explicit public-safe export without raw memory, prompts, transcripts, provider responses, or paths.
 - Diagnostics preview/export with forbidden-field rejection and user approval.
 - Support summary surfaces exist through CLI, MCP, and the desktop dashboard with explicit public-safe export; the support dry-run script can ingest only redacted `enigma.support_summary.v1` / `enigma.diagnostics.v1` artifacts as allowlisted hash snapshots.
 - Update-check card fetches signed manifest metadata and shows current/available versions without auto-download.

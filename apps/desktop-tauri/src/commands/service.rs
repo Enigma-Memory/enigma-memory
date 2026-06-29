@@ -387,6 +387,7 @@ async fn proof_activity_summary(config: &crate::DesktopConfig) -> Value {
         "claim_boundaries": {
             "local_enigma_events_only": true,
             "provider_deletion_proof": false,
+            "provider_non_use_proof": false,
             "model_forgetting_proof": false,
             "hosted_saas_live": false,
         },
