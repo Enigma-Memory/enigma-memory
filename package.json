@@ -251,6 +251,7 @@
     "production:whitepaper": "node scripts/validate-whitepaper-claims.mjs",
     "production:sla": "node scripts/validate-support-sla.mjs",
     "production:support-dry-run": "node scripts/build-support-dry-run-summary.mjs",
+    "public-beta:evidence-manifest": "node scripts/build-public-beta-evidence-manifest.mjs",
     "production:legal": "node scripts/validate-legal-compliance-approval.mjs",
     "production:monitoring": "node scripts/validate-monitoring-alerting.mjs",
     "production:network": "node scripts/validate-network-access-policy.mjs",
