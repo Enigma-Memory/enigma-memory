@@ -8,6 +8,7 @@ import { promisify } from 'node:util';
 import {
   GOAL_COMPLETION_AUDIT_SCHEMA,
   buildGoalCompletionAudit,
+  renderGoalCompletionAuditPlain,
 } from '../scripts/build-goal-completion-audit.mjs';
 import { buildOperatorAcceptancePacket } from '../scripts/build-operator-acceptance-packet.mjs';
 
@@ -132,6 +133,35 @@ test('goal completion audit preserves broad objective and remains blocked withou
   assert.match(audit.blockers.join('\n'), /missing refs\.relay_deployment/);
   assert.match(audit.blockers.join('\n'), /missing refs\.gateway_deployment/);
   assert.doesNotMatch(JSON.stringify(audit), /Bearer|PRIVATE KEY|sk-/i);
+});
+
+test('goal completion audit plain output is readable and claim-bounded', async () => {
+  const site = await writeSite();
+  const audit = await buildGoalCompletionAudit({
+    site,
+    projectName: 'enigma-memory',
+    domain: 'enigmamemory.com',
+    liveUrl: 'https://enigmamemory.com/',
+    expectTitle: 'Enigma',
+    accountId: 'account-fixture',
+    objective: 'plain goal audit objective stays intact',
+  }, {
+    env: {},
+    generated_at: '2026-06-24T00:00:00.000Z',
+    fetchImpl: fakeFetch(),
+  });
+  const plain = renderGoalCompletionAuditPlain(audit);
+
+  assert.match(plain, /^Enigma goal completion audit\n/);
+  assert.match(plain, /Status: Needs attention/);
+  assert.match(plain, /Go-live ready: no/);
+  assert.match(plain, /Release posture: local_package_artifact_ready_with_blocked_live_infrastructure/);
+  assert.match(plain, /Deliverables: /);
+  assert.match(plain, /Blocker: /);
+  assert.match(plain, /Next: /);
+  assert.match(plain, /Boundary: public-safe goal audit summary only/);
+  assert.doesNotMatch(plain, /^\s*\{/);
+  assert.doesNotMatch(plain, /Bearer|PRIVATE KEY|sk-|raw_memory|C:\\Users\\|\/home\/|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/i);
 });
 
 
@@ -345,6 +375,37 @@ test('goal completion audit CLI writes public-safe JSON', async () => {
   assert.match(stdoutAudit.next_actions.map((item) => item.id).join('\n'), /final-release-audit/);
   assert.doesNotMatch(result.stdout, /Bearer|PRIVATE KEY|sk-/i);
   assert.doesNotMatch(result.stdout, /enigma-goal-audit-site-/i);
+});
+
+test('goal completion audit CLI writes JSON while printing plain output', async () => {
+  const site = await writeSite();
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-goal-audit-plain-'));
+  const outPath = join(dir, 'audit.json');
+  const result = await execFileAsync(process.execPath, [
+    'scripts/build-goal-completion-audit.mjs',
+    '--site', site,
+    '--project-name', 'enigma-memory',
+    '--domain', 'enigmamemory.com',
+    '--live-url', 'data:text/html,%3Ctitle%3EEnigma%20%E2%80%94%20Verifiable%20AI%20memory%20plane%3C%2Ftitle%3E',
+    '--account-id', 'account-fixture',
+    '--out', outPath,
+    '--plain',
+  ], {
+    cwd: process.cwd(),
+    env: { ...process.env, CLOUDFLARE_API_TOKEN: '' },
+    timeout: 15000,
+    windowsHide: true,
+  });
+  assert.equal(result.stderr, '');
+  assert.match(result.stdout, /^Enigma goal completion audit\n/);
+  assert.match(result.stdout, /Status: Needs attention/);
+  assert.match(result.stdout, /Boundary: public-safe goal audit summary only/);
+  assert.doesNotMatch(result.stdout, /^\s*\{/);
+  assert.equal(result.stdout.includes(dir), false);
+  assert.equal(result.stdout.includes(outPath), false);
+  const fileAudit = JSON.parse(await readFile(outPath, 'utf8'));
+  assert.equal(fileAudit.schema, GOAL_COMPLETION_AUDIT_SCHEMA);
+  assert.equal(fileAudit.complete, false);
 });
 
 test('goal completion audit CLI redacts unreadable packet paths from errors', async () => {
