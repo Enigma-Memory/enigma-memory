@@ -282,10 +282,27 @@ function quickstartPathDisplay(outDirInput, name) {
   return `${base.replace(/[\\/]+$/, '')}/${name}`;
 }
 
-function ensureDistinctOutputPaths(paths) {
-  const normalized = paths.map((path) => (process.platform === 'win32' ? path.toLowerCase() : path));
-  if (new Set(normalized).size !== paths.length) {
-    throw new Error('Quickstart output paths must be distinct.');
+function outputPathRole(output, index) {
+  if (output && typeof output === 'object' && typeof output.role === 'string' && output.role.length > 0) return output.role;
+  return `output_${index + 1}`;
+}
+
+function outputPathValue(output) {
+  return output && typeof output === 'object' ? output.path : output;
+}
+
+function ensureDistinctOutputPaths(outputs) {
+  const seen = new Map();
+  for (let index = 0; index < outputs.length; index += 1) {
+    const output = outputs[index];
+    const path = outputPathValue(output);
+    const normalized = process.platform === 'win32' ? String(path).toLowerCase() : String(path);
+    const previous = seen.get(normalized);
+    if (previous) {
+      const currentRole = outputPathRole(output, index);
+      throw new Error(`Quickstart output paths overlap: ${previous.role} and ${currentRole} resolve to the same file. Choose a bundle filename that is not ${Object.values(QUICKSTART_ARTIFACT_NAMES).join(', ')}; for example --bundle <out-dir>/bundle.json --out-dir <out-dir>.`);
+    }
+    seen.set(normalized, { role: outputPathRole(output, index) });
   }
 }
 
@@ -331,17 +348,17 @@ function quickstartOutputs(bundleInput, outDirInput) {
     exportDisplay: quickstartPathDisplay(outDirInput, QUICKSTART_ARTIFACT_NAMES.export),
     verifyReportDisplay: quickstartPathDisplay(outDirInput, QUICKSTART_ARTIFACT_NAMES.verifyReport),
     outputs: [
-      { path: bundlePath, display: bundleInput },
-      { path: contextPackPath, display: quickstartPathDisplay(outDirInput, QUICKSTART_ARTIFACT_NAMES.contextPack) },
-      { path: exportPath, display: quickstartPathDisplay(outDirInput, QUICKSTART_ARTIFACT_NAMES.export) },
-      { path: verifyReportPath, display: quickstartPathDisplay(outDirInput, QUICKSTART_ARTIFACT_NAMES.verifyReport) },
+      { role: 'bundle', path: bundlePath, display: bundleInput },
+      { role: 'context_pack', path: contextPackPath, display: quickstartPathDisplay(outDirInput, QUICKSTART_ARTIFACT_NAMES.contextPack) },
+      { role: 'export', path: exportPath, display: quickstartPathDisplay(outDirInput, QUICKSTART_ARTIFACT_NAMES.export) },
+      { role: 'verify_report', path: verifyReportPath, display: quickstartPathDisplay(outDirInput, QUICKSTART_ARTIFACT_NAMES.verifyReport) },
     ],
   };
 }
 
 async function buildQuickstartArtifacts(flags, { bundleInput = DEFAULT_BUNDLE, outDirInput = dirname(bundleInput), overwrite = false, write = true, checkExisting = true } = {}) {
   const paths = quickstartOutputs(bundleInput, outDirInput);
-  ensureDistinctOutputPaths(paths.outputs.map((output) => output.path));
+  ensureDistinctOutputPaths(paths.outputs);
   if (checkExisting) await assertCanWriteQuickstartOutputs(paths.outputs, overwrite);
 
   const passphrase = getFlag(flags, ['passphrase']);
@@ -1504,6 +1521,7 @@ export async function quickstartCommand(flags, io) {
   const overwrite = booleanFlag(flags, ['overwrite'], false);
   const displays = setupPublicDisplays(bundleInput, outDirInput);
   const rawOutputs = quickstartOutputs(bundleInput, outDirInput);
+  ensureDistinctOutputPaths(rawOutputs.outputs);
   await assertCanWriteQuickstartOutputs([
     { path: rawOutputs.bundlePath, display: displays.bundle },
     { path: rawOutputs.contextPackPath, display: displays.context_pack },
@@ -2669,11 +2687,11 @@ function doctorSetupExplanation(summary) {
   const connectorReasons = (Array.isArray(summary.connectors?.clients) ? summary.connectors.clients : [])
     .flatMap((client) => Array.isArray(client.repair_reasons) ? client.repair_reasons : []);
   for (const reason of connectorReasons) reasons.add(`connector_${reason}`);
+  if (reasons.has('connector_bundle_env_missing') || reasons.has('connector_bundle_env_mismatch')) {
+    return 'Why: the Memory Drive is not ready and an AI app connection setting points at a missing or different bundle. Create this Memory Drive, then preview or repair the app connection.';
+  }
   if (reasons.has('bundle_missing')) {
     return 'Why: the target Enigma bundle does not exist yet. Run quickstart for this bundle, then rerun doctor.';
-  }
-  if (reasons.has('connector_bundle_env_missing') || reasons.has('connector_bundle_env_mismatch')) {
-    return 'Why: an existing MCP client config points at a missing or different bundle. Initialize this bundle, then preview or repair the connector.';
   }
   if (summary.setup_status?.state === 'setup_needed') {
     return 'Why: doctor is the final green check after local setup, not the first install step.';
@@ -3050,7 +3068,7 @@ export async function testDriveCommand(flags, io) {
   const overwrite = booleanFlag(flags, ['overwrite'], false);
   const dryRun = booleanFlag(flags, ['dry-run', 'dryRun'], false);
   const outputs = testDriveOutputs(outDirInput, bundleInput);
-  ensureDistinctOutputPaths(outputs.outputs.map((output) => output.path));
+  ensureDistinctOutputPaths(outputs.outputs);
   if (!dryRun) await assertCanWriteQuickstartOutputs(outputs.outputs, overwrite);
 
   const artifacts = await buildQuickstartArtifacts(flags, {

@@ -147,6 +147,23 @@ test('setup fails closed when an artifact already exists', async () => {
   assert.equal(await readFile(bundlePath, 'utf8'), '{}\n');
 });
 
+test('setup explains colliding bundle and generated artifact paths', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-setup-collision-'));
+  const bundlePath = join(dir, 'context-pack.json');
+  const io = makeIo();
+
+  assert.equal(await main(['setup', '--bundle', bundlePath, '--out-dir', dir, '--plain'], io.io), 2);
+  const stdout = io.stdout();
+
+  assert.match(stdout, /^Enigma setup\n/);
+  assert.match(stdout, /Issue: Quickstart output paths overlap: bundle and context_pack resolve to the same file/);
+  assert.match(stdout, /Choose a bundle filename that is not context-pack\.json, export\.json, verify-report\.json/);
+  assert.match(stdout, /--bundle <out-dir>\/bundle\.json --out-dir <out-dir>/);
+  assert.match(stdout, /Next: enigma setup --bundle <bundle-path> --out-dir <out-dir>/);
+  assert.doesNotMatch(stdout, /--overwrite/);
+  assert.equal(stdout.includes(dir), false);
+});
+
 test('setup dry-run plans without writing local artifacts', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'enigma-setup-dry-run-'));
   const bundlePath = join(dir, 'bundle.json');
@@ -622,6 +639,13 @@ test('doctor explains connector bundle mismatch as first-run state without local
     'enigma drive health --bundle "<bundle-path>"',
   ]);
   assert.equal(JSON.stringify(summary.first_run_hint).includes(dir), false);
+
+  const plainIo = makeIo();
+  assert.equal(await main(['doctor', '--bundle', bundlePath, '--client', 'generic-mcp', '--config', configPath, '--plain'], plainIo.io), 1);
+  assert.match(plainIo.stdout(), /AI app connection setting points at a missing or different bundle/);
+  assert.match(plainIo.stdout(), /preview or repair the app connection/);
+  assert.doesNotMatch(plainIo.stdout(), /MCP client config|local client config|JSON/i);
+  assert.equal(plainIo.stdout().includes(dir), false);
 });
 
 test('doctor plain output gives one readable next action without JSON or paths', async () => {
@@ -635,7 +659,8 @@ test('doctor plain output gives one readable next action without JSON or paths',
     assert.match(stdout, /^Enigma doctor\n/);
     assert.match(stdout, /Status: Needs attention/);
     assert.match(stdout, /Setup: setup_needed/);
-    assert.match(stdout, /Why: the target Enigma bundle does not exist yet/);
+    assert.match(stdout, /Why: (?:the target Enigma bundle does not exist yet|the Memory Drive is not ready)/);
+    assert.doesNotMatch(stdout, /MCP client config|local client config|JSON/i);
     assert.match(stdout, /Run: enigma quickstart --bundle "<bundle-path>"/);
     assert.match(stdout, /Boundary: local Enigma checks only/);
     assert.doesNotMatch(stdout, /^\s*\{/);
