@@ -857,6 +857,10 @@ export function renderPublicBetaQaPlain(report) {
   ];
   const actions = Array.isArray(report.next_actions) ? report.next_actions.slice(0, 5) : [];
   for (const action of actions) lines.push(`Next: ${action.action_id} — ${action.summary}`);
+  if (!report.summary?.ready_for_public_beta) {
+    lines.push('Collect: npm run public-beta:evidence-manifest -- --out .enigma/public-beta/evidence-manifest.json --plain');
+    lines.push('Review: npm run public-beta:advisor -- --evidence-manifest .enigma/public-beta/evidence-manifest.json');
+  }
   lines.push('Boundary: local repository and supplied public-safe evidence matrix only; no PR approval, merge, npm publication, signed installer, hosted service, provider deletion, model behavior, benchmark superiority, token ROI, or compliance claims.');
   return `${lines.join('\n')}\n`;
 }

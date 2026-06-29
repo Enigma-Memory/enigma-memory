@@ -252,6 +252,7 @@
     "production:sla": "node scripts/validate-support-sla.mjs",
     "production:support-dry-run": "node scripts/build-support-dry-run-summary.mjs",
     "public-beta:evidence-manifest": "node scripts/build-public-beta-evidence-manifest.mjs",
+    "public-beta:advisor": "node scripts/run-public-beta-qa-matrix.mjs --plain",
     "production:legal": "node scripts/validate-legal-compliance-approval.mjs",
     "production:monitoring": "node scripts/validate-monitoring-alerting.mjs",
     "production:network": "node scripts/validate-network-access-policy.mjs",

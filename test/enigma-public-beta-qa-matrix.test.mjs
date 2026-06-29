@@ -139,9 +139,10 @@ function expectedStatusCounts(scenarios) {
   return counts;
 }
 
-test('public beta QA npm script invokes the JSON matrix runner', async () => {
+test('public beta QA npm scripts expose JSON and Advisor runners', async () => {
   const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
   assert.equal(packageJson.scripts['public-beta-qa'], 'node scripts/run-public-beta-qa-matrix.mjs --json');
+  assert.equal(packageJson.scripts['public-beta:advisor'], 'node scripts/run-public-beta-qa-matrix.mjs --plain');
 });
 
 test('public beta QA runner accepts explicit plain output mode', () => {
@@ -191,6 +192,8 @@ test('public beta QA plain output is readable, bounded, and non-JSON', async () 
   assert.match(plain, /Ready for public beta: no/);
   assert.match(plain, /Blocked: /);
   assert.match(plain, /Pending: /);
+  assert.match(plain, /Collect: npm run public-beta:evidence-manifest -- --out \.enigma\/public-beta\/evidence-manifest\.json --plain/);
+  assert.match(plain, /Review: npm run public-beta:advisor -- --evidence-manifest \.enigma\/public-beta\/evidence-manifest\.json/);
   assert.match(plain, /Boundary: local repository and supplied public-safe evidence matrix only/);
   assert.doesNotMatch(plain, /^\s*\{/);
   assertPublicSafe(plain);
