@@ -2386,6 +2386,60 @@ function printMeterAggregateResult(aggregate, flags, io, outWritten = false, jso
   else print(jsonResult, io);
 }
 
+function renderSettlementArtifactPlain(kind, artifact, outWritten = false) {
+  const lines = [
+    `Enigma settlement ${kind}`,
+    'Status: Ready',
+  ];
+  if (kind === 'job') {
+    lines.push(`Job: ${artifact.job_id ?? '<job-id>'}`);
+    lines.push(`Type: ${artifact.job_type ?? '<job-type>'}`);
+    lines.push(`Max price: ${artifact.max_price?.amount ?? 0} ${artifact.max_price?.asset ?? '<asset>'}`);
+  } else if (kind === 'capacity') {
+    lines.push(`Operator: ${artifact.operator_id ?? '<operator>'}`);
+    lines.push(`Accelerator: ${artifact.accelerator_class ?? '<accelerator-class>'}`);
+    lines.push(`Models: ${Array.isArray(artifact.model_refs) ? artifact.model_refs.length : 0}`);
+    lines.push(`Price: ${artifact.price_per_million_context_tokens?.amount ?? 0} ${artifact.price_per_million_context_tokens?.asset ?? '<asset>'} per million context tokens`);
+  } else if (kind === 'quote') {
+    lines.push(`Quote: ${artifact.quote_id ?? '<quote-id>'}`);
+    lines.push(`Service: ${artifact.service_kind ?? '<service-kind>'}`);
+    lines.push(`Price: ${artifact.price?.amount ?? 0} ${artifact.price?.asset ?? '<asset>'}`);
+  } else if (kind === 'receipt') {
+    lines.push(`Receipt: ${artifact.settlement_receipt_id ?? '<receipt-id>'}`);
+    lines.push(`Service: ${artifact.service_kind ?? '<service-kind>'}`);
+    lines.push(`Settled: ${artifact.settled_price?.amount ?? 0} ${artifact.settled_price?.asset ?? '<asset>'}`);
+  } else if (kind === 'batch') {
+    lines.push(`Batch: ${artifact.batch_id ?? '<batch-id>'}`);
+    lines.push(`Receipts: ${artifact.receipt_count ?? 0}`);
+    lines.push(`Total settled: ${artifact.total_settled_amount ?? 0} ${artifact.asset ?? '<asset>'}`);
+  }
+  if (outWritten) lines.push(`${kind[0].toUpperCase()}${kind.slice(1)} file: written to <out>`);
+  lines.push('Boundary: local settlement artifact only; no raw memory, prompts, provider responses, credentials, token ROI, token profit, provider invoice savings, decentralized raw-memory inference, provider deletion, model behavior, hosted service, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printSettlementArtifact(kind, artifact, flags, io, outWritten = false, jsonResult = artifact) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderSettlementArtifactPlain(kind, artifact, outWritten));
+  else print(jsonResult, io);
+}
+
+function renderSettlementVerifyPlain(result) {
+  const errors = Array.isArray(result.errors) ? result.errors : [];
+  const lines = [
+    'Enigma settlement verify',
+    `Status: ${result.ok ? 'Ready' : 'Needs attention'}`,
+    `Errors: ${errors.length}`,
+  ];
+  for (const error of errors.slice(0, 3)) lines.push(`Issue: ${error}`);
+  lines.push('Boundary: local settlement receipt verification only; no raw memory, prompts, provider responses, credentials, token ROI, token profit, provider invoice savings, provider deletion, model behavior, hosted service, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printSettlementVerifyResult(result, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderSettlementVerifyPlain(result));
+  else print(result, io);
+}
+
 function nextPlainRequested(flags) {
   const format = getFlag(flags, ['format']);
   return booleanFlag(flags, ['plain', 'text'], false) || format === 'plain' || format === 'text';
@@ -4122,9 +4176,9 @@ export async function settlementJobCommand(flags, io) {
   if (flags.has('out')) {
     const outPath = resolve(String(requireFlag(flags, ['out'])));
     await writeJson(outPath, job);
-    print({ ok: true, path: outPath, job_id: job.job_id, job_hash: job.job_hash }, io);
+    printSettlementArtifact('job', job, flags, io, true, { ok: true, path: outPath, job_id: job.job_id, job_hash: job.job_hash });
   } else {
-    print(job, io);
+    printSettlementArtifact('job', job, flags, io);
   }
   return 0;
 }
@@ -4151,9 +4205,9 @@ export async function settlementCapacityCommand(flags, io) {
   if (flags.has('out')) {
     const outPath = resolve(String(requireFlag(flags, ['out'])));
     await writeJson(outPath, profile);
-    print({ ok: true, path: outPath, capacity_profile_hash: profile.capacity_profile_hash }, io);
+    printSettlementArtifact('capacity', profile, flags, io, true, { ok: true, path: outPath, capacity_profile_hash: profile.capacity_profile_hash });
   } else {
-    print(profile, io);
+    printSettlementArtifact('capacity', profile, flags, io);
   }
   return 0;
 }
@@ -4178,9 +4232,9 @@ export async function settlementQuoteCommand(flags, io) {
   if (flags.has('out')) {
     const outPath = resolve(String(requireFlag(flags, ['out'])));
     await writeJson(outPath, quote);
-    print({ ok: true, path: outPath, quote_id: quote.quote_id, quote_hash: quote.quote_hash }, io);
+    printSettlementArtifact('quote', quote, flags, io, true, { ok: true, path: outPath, quote_id: quote.quote_id, quote_hash: quote.quote_hash });
   } else {
-    print(quote, io);
+    printSettlementArtifact('quote', quote, flags, io);
   }
   return 0;
 }
@@ -4199,9 +4253,9 @@ export async function settlementReceiptCommand(flags, io) {
   if (flags.has('out')) {
     const outPath = resolve(String(requireFlag(flags, ['out'])));
     await writeJson(outPath, receipt);
-    print({ ok: true, path: outPath, receipt_ref: receipt.receipt_ref ?? receipt.receipt_id ?? receipt.settlement_ref ?? null }, io);
+    printSettlementArtifact('receipt', receipt, flags, io, true, { ok: true, path: outPath, receipt_ref: receipt.receipt_ref ?? receipt.receipt_id ?? receipt.settlement_ref ?? null });
   } else {
-    print(receipt, io);
+    printSettlementArtifact('receipt', receipt, flags, io);
   }
   return 0;
 }
@@ -4211,7 +4265,7 @@ export async function settlementVerifyCommand(flags, io) {
   const quote = await readJson(resolve(String(requireFileArg(flags, ['quote'], undefined, 'quote'))));
   const receipt = await readJson(resolve(String(requireFileArg(flags, ['receipt'], undefined, 'receipt'))));
   const result = verifyServiceSettlementReceipt({ job, quote, receipt });
-  print(result, io);
+  printSettlementVerifyResult(result, flags, io);
   return result.ok ? 0 : 1;
 }
 
@@ -4227,9 +4281,9 @@ export async function settlementBatchCommand(flags, io, positionalFile) {
   if (flags.has('out')) {
     const outPath = resolve(String(requireFlag(flags, ['out'])));
     await writeJson(outPath, batch);
-    print({ ok: true, path: outPath, batch_id: batch.batch_id, batch_hash: batch.batch_hash }, io);
+    printSettlementArtifact('batch', batch, flags, io, true, { ok: true, path: outPath, batch_id: batch.batch_id, batch_hash: batch.batch_hash });
   } else {
-    print(batch, io);
+    printSettlementArtifact('batch', batch, flags, io);
   }
   return 0;
 }
@@ -4616,12 +4670,13 @@ function usage() {
       boundary: 'Metering artifacts contain counts, hashes, identifiers, pricing inputs, and claim boundaries only; no prompts, completions, provider responses, credentials, token ROI, or provider-invoice savings claim.',
     },
     settlement: {
-      job: 'enigma settlement job --tenant <id> --job-type <type> --memory-root <sha256:...> --policy-hash <sha256:...> --usage-event-hash <sha256:...> --max-price-amount <n> --payment-asset <asset> --expires-at <iso> [--out <file>]',
-      capacity: 'enigma settlement capacity --operator <id> --accelerator-class <consumer_gpu|workstation_gpu|edge_gpu> --hardware-ref <ref> --region <region> --model-family <family> --model-ref <id[,id]> --vram-gb <n> --max-context-window-tokens <n> --available-context-tokens-per-minute <n> --p95-latency-ms <n> --price-per-million-context-tokens <n> --capacity-ref <ref> --terms-ref <ref> --expires-at <iso> [--asset <asset>] [--out <file>]',
-      quote: 'enigma settlement quote --job <job.json> --operator <id> --service-kind <kind> --price-amount <n> --asset <asset> --capacity-ref <ref> --terms-ref <ref> --expires-at <iso> [--capacity-profile <profile.json>] [--out <file>]',
-      receipt: 'enigma settlement receipt --job <job.json> --quote <quote.json> --settled-amount <n> --settlement-ref <ref> --service-receipt-ref <ref> [--out <file>]',
-      verify: 'enigma settlement verify --job <job.json> --quote <quote.json> --receipt <receipt.json>',
-      batch: 'enigma settlement batch --receipts <receipts.json> --batch-ref <ref> [--asset <asset>] [--out <file>]',
+      job: 'enigma settlement job --tenant <id> --job-type <type> --memory-root <sha256:...> --policy-hash <sha256:...> --usage-event-hash <sha256:...> --max-price-amount <n> --payment-asset <asset> --expires-at <iso> [--out <file>] [--plain]',
+      capacity: 'enigma settlement capacity --operator <id> --accelerator-class <consumer_gpu|workstation_gpu|edge_gpu> --hardware-ref <ref> --region <region> --model-family <family> --model-ref <id[,id]> --vram-gb <n> --max-context-window-tokens <n> --available-context-tokens-per-minute <n> --p95-latency-ms <n> --price-per-million-context-tokens <n> --capacity-ref <ref> --terms-ref <ref> --expires-at <iso> [--asset <asset>] [--out <file>] [--plain]',
+      quote: 'enigma settlement quote --job <job.json> --operator <id> --service-kind <kind> --price-amount <n> --asset <asset> --capacity-ref <ref> --terms-ref <ref> --expires-at <iso> [--capacity-profile <profile.json>] [--out <file>] [--plain]',
+      receipt: 'enigma settlement receipt --job <job.json> --quote <quote.json> --settled-amount <n> --settlement-ref <ref> --service-receipt-ref <ref> [--out <file>] [--plain]',
+      verify: 'enigma settlement verify --job <job.json> --quote <quote.json> --receipt <receipt.json> [--plain]',
+      batch: 'enigma settlement batch --receipts <receipts.json> --batch-ref <ref> [--asset <asset>] [--out <file>] [--plain]',
+      '--plain': 'Print a path-redacted settlement summary instead of JSON. Alias: --text or --format text.',
       boundary: 'Settlement artifacts contain commitment roots, capacity profiles, hashes, refs, prices, and claim boundaries only; no raw memory, prompts, provider responses, credentials, token ROI/profit, decentralization, or provider-invoice savings claim.',
     },
     chain: {
