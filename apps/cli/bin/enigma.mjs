@@ -2573,6 +2573,17 @@ function renderSupportPlain(summary) {
     `Issues: ${Array.isArray(summary.issue_codes) ? summary.issue_codes.length : 0}`,
   ];
   if (summary.next_action?.command) lines.push(`Next: ${summary.next_action.command}`);
+  const redaction = summary.redaction ?? {};
+  const redacted = [
+    redaction.raw_memory_included === false ? 'raw memory' : null,
+    redaction.prompts_included === false ? 'prompts' : null,
+    redaction.transcripts_included === false ? 'transcripts' : null,
+    redaction.credentials_included === false ? 'credentials' : null,
+    redaction.provider_responses_included === false ? 'provider responses' : null,
+    redaction.local_paths_redacted === true ? 'local paths' : null,
+  ].filter(Boolean);
+  if (redacted.length > 0) lines.push(`Redacted: ${redacted.join(', ')}`);
+  lines.push('Safe to share: support code, setup state, issue count, and next action only.');
   lines.push('Boundary: local Enigma support state only; no raw memory, local paths, credentials, provider responses, provider deletion, model behavior, or hosted service claims.');
   return `${lines.join('\n')}\n`;
 }

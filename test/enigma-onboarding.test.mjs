@@ -561,6 +561,8 @@ test('support summary is public-safe on fresh install and initialized bundles', 
     assert.match(plainIo.stdout(), /^Enigma support summary\n/);
     assert.match(plainIo.stdout(), /Status: Ready/);
     assert.match(plainIo.stdout(), /Support code: ref:support-summary:/);
+    assert.match(plainIo.stdout(), /Redacted: raw memory, prompts, transcripts, credentials, provider responses, local paths/);
+    assert.match(plainIo.stdout(), /Safe to share: support code, setup state, issue count, and next action only/);
     assert.match(plainIo.stdout(), /Boundary: local Enigma support state only/);
     assert.doesNotMatch(plainIo.stdout(), /^\s*\{/);
     assert.equal(plainIo.stdout().includes(dir), false);
