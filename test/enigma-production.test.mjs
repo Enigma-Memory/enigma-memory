@@ -20,6 +20,7 @@ const DESKTOP_INDEX_URL = new URL('../apps/desktop/src/index.html', import.meta.
 const NATIVE_HOST_BIN_URL = new URL('../apps/native-host/bin/enigma-native-host.mjs', import.meta.url);
 const NATIVE_HOST_BIN_PATH = fileURLToPath(NATIVE_HOST_BIN_URL);
 const CLI_BIN_URL = new URL('../apps/cli/bin/enigma.mjs', import.meta.url);
+const CI_WORKFLOW_URL = new URL('../.github/workflows/ci.yml', import.meta.url);
 const RAW_MEMORY = 'private launch-code phrase must not leave local memory';
 const REQUIRED_BIN_NAMES = Object.freeze(['enigma', 'enigma-verify', 'enigma-mcp', 'enigma-relay', 'enigma-gateway', 'enigma-native-host']);
 const NODE_SHEBANG = '#!/usr/bin/env node';
@@ -1758,6 +1759,13 @@ test('preflight release audit wiring is local-only and documented', async () => 
   assert.match(docs['docs/cloudflare-token-and-domain-runbook.md'], /Do not paste API tokens into chat/i, 'Cloudflare runbook must forbid pasting tokens into chat');
   assert.match(docs['docs/cloudflare-token-and-domain-runbook.md'], /dry-run registration plan unless `--execute` is present/i, 'Cloudflare runbook must document registration dry-run defaults');
   assert.match(docs['docs/cloudflare-token-and-domain-runbook.md'], /Exact domain name/i, 'Cloudflare runbook must document exact registration domain confirmation boundaries');
+});
+
+test('CI blocks moderate dependency advisories before package gates pass', async () => {
+  const ciWorkflow = await readFile(CI_WORKFLOW_URL, 'utf8');
+  assert.match(ciWorkflow, /name:\s*Run security audit/);
+  assert.match(ciWorkflow, /npm audit --audit-level=moderate/);
+  assert.doesNotMatch(ciWorkflow, /npm audit --audit-level=high/);
 });
 
 test('review packet builder and CLI copy safe public-site artifacts and release audit validates the manifest', async () => {
