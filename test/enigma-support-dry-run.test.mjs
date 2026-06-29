@@ -9,6 +9,7 @@ import {
   buildSupportDryRunSummary,
   buildSupportArtifactSnapshot,
   parseSupportDryRunArgs,
+  renderSupportDryRunPlain,
   readSupportArtifactSnapshot,
   SUPPORT_DRY_RUN_EVIDENCE_ITEM_ID,
   SUPPORT_DRY_RUN_SUMMARY_SCHEMA,
@@ -136,6 +137,54 @@ test('support dry-run CLI writes the same public-safe JSON artifact', async () =
   assert.equal(JSON.stringify(printed).includes(dir), false);
 });
 
+test('support dry-run plain output is readable and writes JSON evidence separately', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-support-dry-run-plain-'));
+  const out = join(dir, 'summary.json');
+
+  const { stdout, stderr } = await execFileAsync(process.execPath, [
+    SCRIPT,
+    '--scenario-id', BASE.scenario_id,
+    '--issue-code', BASE.issue_code,
+    '--triage-result', BASE.triage_result,
+    '--bundle-privacy-check-status', BASE.bundle_privacy_check_status,
+    '--support-owner-ref', BASE.support_owner_ref,
+    '--generated-at', BASE.generated_at,
+    '--out', out,
+    '--plain',
+  ], { windowsHide: true });
+
+  assert.equal(stderr.trim(), '');
+  assert.match(stdout, /^Enigma support dry-run\n/);
+  assert.match(stdout, /Status: Ready/);
+  assert.match(stdout, /Evidence item: EV-P10-SUPPORT-DRY-RUN-SUMMARY/);
+  assert.match(stdout, /Scenario: BETA-DIAG-001/);
+  assert.match(stdout, /Bundle privacy check: pass/);
+  assert.match(stdout, /Boundary: public-safe support dry-run evidence only/);
+  assert.doesNotMatch(stdout, /^\s*\{/);
+  assert.equal(stdout.includes(dir), false);
+  assert.equal(stdout.includes(out), false);
+  const written = JSON.parse(await readFile(out, 'utf8'));
+  assert.equal(written.schema, SUPPORT_DRY_RUN_SUMMARY_SCHEMA);
+});
+
+test('support dry-run plain renderer summarizes attached artifact by hash only', () => {
+  const summary = buildSupportDryRunSummary({
+    ...BASE,
+    support_artifact: {
+      schema: 'enigma.diagnostics.v1',
+      app_version: '0.1.19',
+      service_running: true,
+      memory_drive_status: 'healthy',
+      issue_codes: ['DIAG-BUNDLE-PREVIEWED'],
+    },
+  });
+  const plain = renderSupportDryRunPlain(summary);
+
+  assert.match(plain, /^Enigma support dry-run\n/);
+  assert.match(plain, /Support artifact: attached by hash/);
+  assert.doesNotMatch(plain, /memory_drive_status|service_running|C:\\Users|\/home\/|\/tmp\//i);
+});
+
 test('support dry-run CLI reads a redacted support artifact without leaking its path', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'enigma-support-artifact-'));
   const artifactPath = join(dir, 'support-summary.json');
@@ -178,7 +227,7 @@ test('support dry-run argument parser recognizes required fields', () => {
     '--triage-result', BASE.triage_result,
     '--bundle-privacy-check-status', BASE.bundle_privacy_check_status,
     '--support-owner-ref', BASE.support_owner_ref,
-    '--json',
+    '--plain',
     '--support-artifact', 'support-summary.json',
   ]);
 
@@ -187,6 +236,6 @@ test('support dry-run argument parser recognizes required fields', () => {
   assert.equal(parsed.triage_result, BASE.triage_result);
   assert.equal(parsed.bundle_privacy_check_status, BASE.bundle_privacy_check_status);
   assert.equal(parsed.support_owner_ref, BASE.support_owner_ref);
-  assert.equal(parsed.json, true);
+  assert.equal(parsed.plain, true);
   assert.equal(parsed.support_artifact, 'support-summary.json');
 });

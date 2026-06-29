@@ -17,7 +17,7 @@ const SUPPORT_ARTIFACT_SCHEMAS = new Set(['enigma.support_summary.v1', 'enigma.d
 const PUBLIC_VALUE_RE = /^[A-Za-z0-9][A-Za-z0-9._~:@#?=&%+/-]{0,159}$/u;
 
 function usage() {
-  return `Usage: node scripts/build-support-dry-run-summary.mjs --scenario-id <id> --issue-code <code> --triage-result <result> --bundle-privacy-check-status <status> --support-owner-ref <ref:role:...> [--support-artifact <redacted-json>] [--out <path>] [--json]\n\nBuilds a public-safe ${SUPPORT_DRY_RUN_SUMMARY_SCHEMA} artifact for the public beta support dry-run evidence item.\n`;
+  return `Usage: node scripts/build-support-dry-run-summary.mjs --scenario-id <id> --issue-code <code> --triage-result <result> --bundle-privacy-check-status <status> --support-owner-ref <ref:role:...> [--support-artifact <redacted-json>] [--out <path>] [--json|--plain]\n\nBuilds a public-safe ${SUPPORT_DRY_RUN_SUMMARY_SCHEMA} artifact for the public beta support dry-run evidence item. --out writes JSON evidence; --plain controls stdout only.\n`;
 }
 
 function readArg(argv, index, flag) {
@@ -26,7 +26,7 @@ function readArg(argv, index, flag) {
 }
 
 export function parseSupportDryRunArgs(argv = process.argv.slice(2)) {
-  const options = { json: false, out: null };
+  const options = { json: false, plain: false, out: null };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--scenario-id' || arg === '--scenarioId') {
@@ -55,12 +55,16 @@ export function parseSupportDryRunArgs(argv = process.argv.slice(2)) {
       i += 1;
     } else if (arg === '--json') {
       options.json = true;
+    } else if (arg === '--plain' || arg === '--text' || arg === '--format=text' || (arg === '--format' && argv[i + 1] === 'text')) {
+      options.plain = true;
+      if (arg === '--format') i += 1;
     } else if (arg === '--help' || arg === '-h') {
       options.help = true;
     } else {
       throw new Error(`Unknown argument: ${arg}`);
     }
   }
+  if (options.json && options.plain) throw new Error('Choose only one output format: --json or --plain.');
   return options;
 }
 
@@ -228,6 +232,23 @@ export function buildSupportDryRunSummary(options = {}) {
   return summary;
 }
 
+export function renderSupportDryRunPlain(summary) {
+  const lines = [
+    'Enigma support dry-run',
+    `Status: ${summary.bundle_privacy_check_status === 'pass' ? 'Ready' : 'Needs attention'}`,
+    `Evidence item: ${summary.evidence_item_id ?? SUPPORT_DRY_RUN_EVIDENCE_ITEM_ID}`,
+    `Scenario: ${summary.scenario_id ?? '<scenario-id>'}`,
+    `Issue: ${summary.issue_code ?? '<issue-code>'}`,
+    `Triage: ${summary.triage_result ?? '<triage-result>'}`,
+    `Bundle privacy check: ${summary.bundle_privacy_check_status ?? '<status>'}`,
+    `Support owner: ${summary.support_owner_ref ?? '<support-owner-ref>'}`,
+    `Support artifact: ${summary.support_artifact?.artifact_hash ? 'attached by hash' : 'none'}`,
+  ];
+  lines.push('Boundary: public-safe support dry-run evidence only; no raw logs, screenshots, transcripts, credentials, account identifiers, owner names, local paths, raw support artifacts, hosted service, provider deletion, model behavior, beta-ready, production-ready, compliance, benchmark superiority, or token ROI claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+
 export async function runSupportDryRunSummary(argv = process.argv.slice(2), io = { stdout: process.stdout, stderr: process.stderr }) {
   const options = parseSupportDryRunArgs(argv);
   if (options.help) {
@@ -238,12 +259,13 @@ export async function runSupportDryRunSummary(argv = process.argv.slice(2), io =
     options.support_artifact_snapshot = await readSupportArtifactSnapshot(options.support_artifact);
   }
   const summary = buildSupportDryRunSummary(options);
+  const evidenceJson = JSON.stringify(summary, null, 2);
   if (options.out) {
     const out = resolve(options.out);
     await mkdir(dirname(out), { recursive: true });
-    await writeFile(out, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
+    await writeFile(out, `${evidenceJson}\n`, 'utf8');
   }
-  io.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
+  io.stdout.write(options.plain ? renderSupportDryRunPlain(summary) : `${evidenceJson}\n`);
   return summary.bundle_privacy_check_status === 'pass' ? 0 : 1;
 }
 
