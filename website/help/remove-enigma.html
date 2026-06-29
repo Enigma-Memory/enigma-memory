@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Remove Enigma Memory from a connected AI app, uninstall the desktop app, and keep or remove the local vault safely.">
+  <title>Remove Enigma safely — Enigma Memory</title>
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="site-logo" href="../index.html">Enigma Memory</a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="../download.html">Download</a>
+        <a href="../setup.html">How it works</a>
+        <a href="../privacy.html">Privacy</a>
+        <a href="./index.html">Help</a>
+        <a href="../faq.html">FAQ</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <span class="eyebrow">Safe removal</span>
+      <h1>Remove Enigma without losing your local vault by accident.</h1>
+      <p>Disconnect an AI app first, then uninstall the desktop app only when you intend to remove the app itself. Your Memory Drive should be treated as user data and kept unless you choose a separate destructive removal path.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="disconnect-heading">
+      <h2 id="disconnect-heading">Remove Enigma from one connected app</h2>
+      <ol>
+        <li>Open Enigma Memory.</li>
+        <li>Open the connected apps or Memory Drive dashboard.</li>
+        <li>Select the app you want to remove from Enigma.</li>
+        <li>Choose <strong>Disconnect</strong> or the app-specific removal action.</li>
+        <li>Review the preview. Enigma should remove only its own connector entry and keep unrelated app settings intact.</li>
+        <li>Restart the AI app if Enigma asks you to.</li>
+        <li>Run the app connection test or health check again.</li>
+      </ol>
+      <div class="boundary-callout">
+        <strong>Boundary note:</strong> Disconnecting Enigma from an app affects Enigma-controlled local connector setup only. It does not delete the provider's own logs, caches, account history, or provider-native memory.
+      </div>
+    </section>
+
+    <section class="content-section" aria-labelledby="uninstall-heading">
+      <h2 id="uninstall-heading">Uninstall the desktop app</h2>
+      <div class="card-grid">
+        <article class="card">
+          <h3>Windows</h3>
+          <p>Use Windows Settings to uninstall the app package when signed installers are available. The normal uninstall path should remove app binaries and leave your local Memory Drive data alone.</p>
+        </article>
+        <article class="card">
+          <h3>macOS</h3>
+          <p>Remove the app from Applications when signed/notarized builds are available. Treat your local Memory Drive as separate user data unless you explicitly choose full removal.</p>
+        </article>
+        <article class="card">
+          <h3>Before reinstall</h3>
+          <p>Reopen Enigma after reinstall and let it detect the existing Memory Drive. Do not delete local vault data to fix a normal app update or reinstall issue.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="content-section" aria-labelledby="full-removal-heading">
+      <h2 id="full-removal-heading">Full removal is separate and destructive.</h2>
+      <p>Only remove the local Memory Drive when you intentionally want to delete Enigma-owned local memory data. This should be a separate explicit action, not part of the normal uninstall path.</p>
+      <ul>
+        <li>Export or back up anything you want to keep first.</li>
+        <li>Disconnect AI apps before destructive local data removal.</li>
+        <li>Do not send raw vault files, full logs, app configs, or local paths to support.</li>
+        <li>If you are unsure, use <a href="./support-safe-sharing.html">safe support sharing</a> and send only the support code or public-safe summary.</li>
+      </ul>
+    </section>
+
+    <section class="content-section" aria-labelledby="blocked-heading">
+      <h2 id="blocked-heading">If removal fails</h2>
+      <p>Use the dashboard repair or support summary first. Support should ask for the public-safe support code, not raw memory, local paths, complete MCP JSON, screenshots of provider conversations, or full logs.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="./support-safe-sharing.html">What to send support</a>
+        <a class="btn btn-secondary" href="./troubleshooting.html">Troubleshooting</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer__inner">
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="../download.html">Download</a></li>
+          <li><a href="../setup.html">How it works</a></li>
+          <li><a href="../privacy.html">Privacy</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Support</h4>
+        <ul>
+          <li><a href="./index.html">Help hub</a></li>
+          <li><a href="./troubleshooting.html">Troubleshooting</a></li>
+          <li><a href="./support-safe-sharing.html">Safe support sharing</a></li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

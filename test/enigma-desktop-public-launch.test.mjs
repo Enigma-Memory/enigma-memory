@@ -418,7 +418,7 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
 });
 
 test('public website explains consumer install path without unsupported claims', async () => {
-  const [home, download, setup, websiteStyles, help, launchStatus, installGuide, macosInstall, windowsInstall, connectApps, otherClients, developerCli, onboardingUx] = await Promise.all([
+  const [home, download, setup, websiteStyles, help, launchStatus, installGuide, macosInstall, windowsInstall, connectApps, otherClients, removalGuide, faq, developerCli, onboardingUx] = await Promise.all([
     readWebsiteFile('index.html'),
     readWebsiteFile('download.html'),
     readWebsiteFile('setup.html'),
@@ -430,10 +430,12 @@ test('public website explains consumer install path without unsupported claims',
     readWebsiteFile('help/install/windows.html'),
     readWebsiteFile('help/connect-apps.html'),
     readWebsiteFile('help/connect-apps/other-supported-clients.html'),
+    readWebsiteFile('help/remove-enigma.html'),
+    readWebsiteFile('faq.html'),
     readWebsiteFile('developers/cli.html'),
     readFile(new URL('../docs/public-launch/consumer-onboarding-ux.md', import.meta.url), 'utf8'),
   ]);
-  const publicWebsite = `${home}\n${download}\n${setup}\n${help}\n${launchStatus}\n${installGuide}\n${macosInstall}\n${windowsInstall}\n${connectApps}\n${otherClients}`;
+  const publicWebsite = `${home}\n${download}\n${setup}\n${help}\n${launchStatus}\n${installGuide}\n${macosInstall}\n${windowsInstall}\n${connectApps}\n${otherClients}\n${removalGuide}\n${faq}`;
   const funnelSpec = `${publicWebsite}\n${onboardingUx}`;
 
   assert.match(home, /Download the desktop app/);
@@ -461,6 +463,11 @@ test('public website explains consumer install path without unsupported claims',
   assert.doesNotMatch(connectApps, /Open Connections in Enigma/);
   assert.match(otherClients, /Desktop-detected path/);
   assert.match(otherClients, /Preview connection/);
+  assert.match(help, /Remove Enigma safely/);
+  assert.match(removalGuide, /Remove Enigma without losing your local vault by accident/);
+  assert.match(removalGuide, /Disconnecting Enigma from an app affects Enigma-controlled local connector setup only/);
+  assert.match(removalGuide, /Full removal is separate and destructive/);
+  assert.match(faq, /safe removal guide/);
   assert.match(onboardingUx, /Download the desktop app → create your Memory Drive → connect a supported AI app/);
   assert.match(funnelSpec, /Public copy must not imply signed distribution is complete until release evidence proves it/);
   assertPublicSafe(publicWebsite);
