@@ -736,6 +736,21 @@ function renderDisconnectPreview(client) {
 }
 
 
+function claudeMcpbClipboardText(handoff = {}) {
+  const health = handoff.health && typeof handoff.health === 'object' ? handoff.health : {};
+  const nextAction = handoff.next_action && typeof handoff.next_action === 'object' ? handoff.next_action : {};
+  return [
+    'Install Enigma for Claude',
+    '1. Open the Enigma Claude extension package in Claude Desktop.',
+    '2. Choose this local Memory Drive when Claude asks.',
+    '3. Restart Claude Desktop.',
+    '4. Return to Enigma and run Test connection.',
+    `Status: ${health.status || 'not_installed'}`,
+    `Next: ${nextAction.label || 'Install Claude extension'}`,
+    'Boundary: Enigma does not write Claude config for this extension handoff. No local paths, config JSON, provider responses, raw memory, or outside-Enigma control claims are included.',
+  ].join('\n');
+}
+
 function renderClaudeMcpbHandoff(client) {
   if (!claudeMcpbHandoff || client.id !== 'claude-desktop') return '';
   const plan = claudeMcpbHandoff.connection_plan && typeof claudeMcpbHandoff.connection_plan === 'object' ? claudeMcpbHandoff.connection_plan : {};
@@ -754,6 +769,9 @@ function renderClaudeMcpbHandoff(client) {
       <p class="note">Status: ${escapeHtml(health.status || 'not_installed')}. Next: ${escapeHtml(nextAction.label || 'Install Claude extension')}. ${escapeHtml(nextAction.description || 'Open the Enigma Claude extension package in Claude Desktop, then test the connection.')}</p>
       <p class="note">Remove or disable later: ${escapeHtml(disconnect.mcpb_path || 'Remove or disable the Enigma Memory extension in Claude Desktop.')}</p>
       <p class="note">If the extension path is unavailable, use Advanced config preview. It stays review-first and does not write until you approve.</p>
+      <div class="button-row">
+        <button type="button" class="secondary" data-action="copy-claude-steps" data-id="${escapeHtml(client.id)}">Copy Claude install steps</button>
+      </div>
     </div>
   `;
 }
@@ -1464,6 +1482,19 @@ async function handleAction(event) {
       busy = false;
       render();
       setStatus('Proof activity refreshed without exposing raw memory.');
+      return;
+    }
+    case 'copy-claude-steps': {
+      if (!claudeMcpbHandoff?.schema) {
+        setStatus('Open the Claude extension handoff before copying install steps.');
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(claudeMcpbClipboardText(claudeMcpbHandoff));
+        setStatus('Claude install steps copied without local paths or config JSON.');
+      } catch (_) {
+        setStatus('Clipboard copy is unavailable. The Claude install steps remain visible in the app.');
+      }
       return;
     }
     case 'copy-proof-summary': {

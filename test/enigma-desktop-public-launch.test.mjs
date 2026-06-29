@@ -346,6 +346,11 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(wizard, /If the extension path is unavailable, use Advanced config preview/);
   assert.match(wizard, /Open the Enigma Claude extension package in Claude Desktop, then test the connection/);
   assert.match(wizard, /Enigma does not write Claude config for this extension handoff/);
+  assert.match(wizard, /claudeMcpbClipboardText/);
+  assert.match(wizard, /data-action="copy-claude-steps"/);
+  assert.match(wizard, /Copy Claude install steps/);
+  assert.match(wizard, /Claude install steps copied without local paths or config JSON/);
+  assert.match(wizard.match(/function claudeMcpbClipboardText\(handoff = \{\}\) \{[\s\S]*?\n\}/)?.[0] || '', /No local paths, config JSON, provider responses, raw memory/);
   assert.doesNotMatch(wizard, /Config fallback test/);
   assert.match(tauriService, /pub async fn get_claude_mcpb_handoff/);
   assert.match(tauriService, /create_claude_desktop_mcpb_connection_plan/);
