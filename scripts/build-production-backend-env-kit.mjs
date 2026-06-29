@@ -102,7 +102,7 @@ class UsageError extends Error {
 }
 
 function usage() {
-  return 'Usage: node scripts/build-production-backend-env-kit.mjs --out-dir <dir> [--domain enigmamemory.com] [--tenant enigma-memory] [--environment production]\n\nWrites public-safe Docker Compose operator-env templates, operator-secrets placeholder manifest, hosted ref map, and blocked summary JSON. It creates no credentials, deploys nothing, and never marks launch ready.\n';
+  return 'Usage: node scripts/build-production-backend-env-kit.mjs --out-dir <dir> [--domain enigmamemory.com] [--tenant enigma-memory] [--environment production] [--plain]\n\nWrites public-safe Docker Compose operator-env templates, operator-secrets placeholder manifest, hosted ref map, and blocked summary JSON. It creates no credentials, deploys nothing, and never marks launch ready. --plain prints a human-readable summary.\n';
 }
 
 function requireValue(argv, index, token) {
@@ -112,7 +112,7 @@ function requireValue(argv, index, token) {
 }
 
 export function parseProductionBackendEnvKitArgs(argv = process.argv.slice(2)) {
-  const options = { ...DEFAULTS, outDir: null, help: false };
+  const options = { ...DEFAULTS, outDir: null, help: false, plain: false };
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (token === '--help' || token === '-h') options.help = true;
@@ -132,6 +132,10 @@ export function parseProductionBackendEnvKitArgs(argv = process.argv.slice(2)) {
     else if (token.startsWith('--domain=')) options.domain = token.slice('--domain='.length);
     else if (token.startsWith('--tenant=')) options.tenant = token.slice('--tenant='.length);
     else if (token.startsWith('--environment=')) options.environment = token.slice('--environment='.length);
+    else if (token === '--plain' || token === '--text' || token === '--format=text' || (token === '--format' && argv[index + 1] === 'text')) {
+      options.plain = true;
+      if (token === '--format') index += 1;
+    }
     else throw new UsageError(`Unknown production backend env kit option: ${token}`);
   }
   return normalizeOptions(options);
@@ -365,6 +369,24 @@ export async function writeProductionBackendEnvKit(kit, outDir) {
   };
 }
 
+export function renderProductionBackendEnvKitPlain(result) {
+  const lines = [
+    'Enigma production backend env kit',
+    `Status: ${result.launch_ready ? 'Ready' : 'Needs attention'}`,
+    `Files: ${result.file_count ?? Object.keys(result.files ?? {}).length}`,
+    `Launch ready: ${result.launch_ready ? 'yes' : 'no'}`,
+    `Hosted live ready: ${result.hosted_live_ready ? 'yes' : 'no'}`,
+    `Deployment performed: ${result.deployment_performed ? 'yes' : 'no'}`,
+    `Output written: ${result.ok === true ? 'yes' : 'no'}`,
+  ];
+  const roles = Array.isArray(result.generated_file_roles) ? result.generated_file_roles : [];
+  for (const role of roles.slice(0, 6)) lines.push(`File role: ${role}`);
+  for (const command of (Array.isArray(result.next_validation_commands) ? result.next_validation_commands.slice(0, 5) : [])) lines.push(`Next: ${command}`);
+  lines.push('Boundary: public-safe backend env template kit only; no credentials, account ids, local paths, raw memory, prompts, transcripts, provider responses, hosted readiness completion, infrastructure deployment, operator approval, provider deletion, model behavior, compliance, benchmark superiority, token ROI, or provider invoice savings claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+
 const invokedPath = process.argv[1] ? resolve(process.argv[1]) : '';
 if (invokedPath === fileURLToPath(import.meta.url)) {
   (async () => {
@@ -375,7 +397,8 @@ if (invokedPath === fileURLToPath(import.meta.url)) {
         return;
       }
       const kit = buildProductionBackendEnvKit({ ...args, generated_at: new Date().toISOString() });
-      process.stdout.write(`${JSON.stringify(await writeProductionBackendEnvKit(kit, args.outDir), null, 2)}\n`);
+      const summary = await writeProductionBackendEnvKit(kit, args.outDir);
+      process.stdout.write(args.plain ? renderProductionBackendEnvKitPlain(summary) : `${JSON.stringify(summary, null, 2)}\n`);
     } catch (error) {
       process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
       process.exitCode = 1;
