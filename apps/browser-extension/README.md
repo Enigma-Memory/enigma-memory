@@ -124,13 +124,19 @@ Package preflight from the package root:
 node scripts/package-browser-extension.mjs
 ```
 
+For a readable, path-redacted preflight summary:
+
+```sh
+node scripts/package-browser-extension.mjs --plain
+```
+
 To also write a deterministic local ZIP for review:
 
 ```sh
-node scripts/package-browser-extension.mjs --zip ./dist/enigma-browser-extension.zip
+node scripts/package-browser-extension.mjs --zip ./dist/enigma-browser-extension.zip --plain
 ```
 
-The packager validates the unpacked extension, denies source maps/private files/credential-shaped content/local user paths, and emits public-safe JSON with file checksums. It does not submit to any browser store.
+The packager validates the unpacked extension, denies source maps/private files/credential-shaped content/local user paths, and emits public-safe JSON or plain text with file checksums. It does not submit to any browser store.
 
 1. Install the npm package, create the local bundle, and connect the MCP client you use most often:
 

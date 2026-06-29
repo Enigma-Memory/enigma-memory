@@ -19,10 +19,16 @@ From the package root, validate the extension before loading or zipping it:
 node scripts/package-browser-extension.mjs
 ```
 
-The command emits public-safe JSON with a deterministic file list, SHA-256 checksums, and safety fields. To also write a deterministic local ZIP for manual inspection or enterprise review:
+The command emits public-safe JSON with a deterministic file list, SHA-256 checksums, and safety fields. Use `--plain` when a release owner needs a readable, path-redacted summary:
 
 ```sh
-node scripts/package-browser-extension.mjs --zip ./dist/enigma-browser-extension.zip
+node scripts/package-browser-extension.mjs --plain
+```
+
+To also write a deterministic local ZIP for manual inspection or enterprise review:
+
+```sh
+node scripts/package-browser-extension.mjs --zip ./dist/enigma-browser-extension.zip --plain
 ```
 
 The ZIP command does not publish, sign, upload, or submit the extension.

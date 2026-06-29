@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import {
   BROWSER_EXTENSION_PACKAGE_SCHEMA,
   buildBrowserExtensionPackage,
+  renderBrowserExtensionPackagePlain,
   runPackageBrowserExtension,
   validateBrowserExtensionPackage,
 } from '../scripts/package-browser-extension.mjs';
@@ -111,6 +112,14 @@ test('browser extension package output and zip checksum are deterministic', asyn
   assert.equal(packageA.package.zip_path, '<zip-output>');
   assert.equal(packageA.package.zip_sha256, packageB.package.zip_sha256);
   assert.deepEqual(await readFile(zipA), await readFile(zipB));
+
+  const plainResult = await runPackageBrowserExtension(['--extension-dir', dir, '--zip', join(outDir, 'plain.zip'), '--plain']);
+  const plain = renderBrowserExtensionPackagePlain(plainResult);
+  assert.match(plain, /^Enigma browser extension package\n/);
+  assert.match(plain, /Status: Ready/);
+  assert.match(plain, /ZIP: written/);
+  assert.match(plain, /Boundary: local package validation only/);
+  assert.doesNotMatch(plain, new RegExp(dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.deepEqual(packageA.package.deterministic_order, [
     'manifest.json',
     'src/background.js',
