@@ -145,9 +145,10 @@ test('public beta QA npm script invokes the JSON matrix runner', async () => {
 });
 
 test('public beta QA runner accepts explicit plain output mode', () => {
-  assert.deepEqual(parseArgs(['--plain']), { json: false, plain: true, out: null, cleanMachineSmoke: null });
-  assert.deepEqual(parseArgs(['--format', 'text']), { json: false, plain: true, out: null, cleanMachineSmoke: null });
-  assert.deepEqual(parseArgs(['--clean-machine-smoke', 'smoke.json']), { json: false, plain: false, out: null, cleanMachineSmoke: 'smoke.json' });
+  assert.deepEqual(parseArgs(['--plain']), { json: false, plain: true, out: null, cleanMachineSmoke: null, supportDryRun: [] });
+  assert.deepEqual(parseArgs(['--format', 'text']), { json: false, plain: true, out: null, cleanMachineSmoke: null, supportDryRun: [] });
+  assert.deepEqual(parseArgs(['--clean-machine-smoke', 'smoke.json']), { json: false, plain: false, out: null, cleanMachineSmoke: 'smoke.json', supportDryRun: [] });
+  assert.deepEqual(parseArgs(['--support-dry-run', 'diag.json', '--support-dry-run', 'crash.json']), { json: false, plain: false, out: null, cleanMachineSmoke: null, supportDryRun: ['diag.json', 'crash.json'] });
   assert.throws(() => parseArgs(['--json', '--plain']), /Choose only one output format/);
 });
 
@@ -286,6 +287,58 @@ test('public beta QA matrix can consume clean-machine smoke evidence without cle
   assert.equal(install.issue_codes.includes('clean-machine-evidence-missing'), false);
   assert.equal(install.blocker_refs.includes('BLOCKER-WINDOWS-SIGNED-ARTIFACT'), true);
   assert.equal(install.blocker_refs.includes('BLOCKER-MACOS-NOTARIZED-ARTIFACT'), true);
+});
+
+test('public beta QA matrix can consume support dry-run evidence per scenario', () => {
+  const scenarios = buildScenarioRows({
+    tauriConfig: { bundle: { active: true, targets: ['msi', 'nsis', 'dmg', 'app'] } },
+    wizardUi: 'Create my Memory Drive Find my apps Connect your AI apps Run health check Your Memory Drive is ready Proof activity Export bundle Crash reporting Repair connection Rollback',
+    helpUi: 'Proof artifacts can show hashes',
+    desktopIndex: './wizard.js',
+    serviceCommands: 'create_vault detect_clients connect_client get_health offline_ready repair_client rollback_client malformed backup',
+    diagnosticsCommands: 'FORBIDDEN_KEYS export_diagnostics approve redact_path',
+    crashCommands: 'init_panic_hook opt-in required pending-crash-reports',
+    updateCommands: '"offline"',
+    libCommands: 'commands::service::get_health',
+    desktopReleaseWorkflow: 'Sign update manifest',
+    npmPublishWorkflow: 'npm publish --access public --provenance',
+    packageVersion: '0.1.19',
+    cleanMachineSmoke: {
+      schema: 'enigma.clean_machine_smoke.v1',
+      app_version: '0.1.19',
+      summary: { healthy: true },
+    },
+    supportDryRunSummaries: [
+      {
+        schema: 'enigma.support_dry_run_summary.v1',
+        evidence_item_id: 'EV-P10-SUPPORT-DRY-RUN-SUMMARY',
+        scenario_id: 'BETA-DIAG-001',
+        bundle_privacy_check_status: 'pass',
+        privacy_review: { status: 'pass' },
+        triage_result: 'resolved',
+      },
+      {
+        schema: 'enigma.support_dry_run_summary.v1',
+        evidence_item_id: 'EV-P10-SUPPORT-DRY-RUN-SUMMARY',
+        scenario_id: 'BETA-CRASH-001',
+        bundle_privacy_check_status: 'pass',
+        privacy_review: { status: 'pass' },
+        triage_result: 'needs_user_action',
+      },
+    ],
+  });
+
+  const diagnostics = scenarioById(scenarios, 'BETA-DIAG-001');
+  assert.equal(diagnostics.status, 'pass');
+  assert.equal(diagnostics.blocker_refs.length, 0);
+  assert.equal(diagnostics.issue_codes.length, 0);
+  assert.match(JSON.stringify(diagnostics.evidence_refs), /ref:evidence:support-dry-run:BETA-DIAG-001/);
+
+  const crash = scenarioById(scenarios, 'BETA-CRASH-001');
+  assert.equal(crash.status, 'pass');
+  assert.equal(crash.blocker_refs.length, 0);
+  assert.equal(crash.issue_codes.length, 0);
+  assert.match(JSON.stringify(crash.evidence_refs), /ref:evidence:support-dry-run:BETA-CRASH-001/);
 });
 
 test('public beta next actions are ranked and public-safe', async () => {

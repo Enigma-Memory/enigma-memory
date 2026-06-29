@@ -196,7 +196,7 @@ export function buildRankedNextActions(blockers) {
 }
 
 function usage() {
-  return `Usage: node scripts/run-public-beta-qa-matrix.mjs [--json|--plain] [--out <path>] [--clean-machine-smoke <path>]\n\nGenerates a public-safe ${PUBLIC_BETA_QA_MATRIX_SCHEMA} report from repository files plus optional public-safe QA evidence artifacts, including ranked next_actions for release owners.\n`;
+  return `Usage: node scripts/run-public-beta-qa-matrix.mjs [--json|--plain] [--out <path>] [--clean-machine-smoke <path>] [--support-dry-run <path>]\n\nGenerates a public-safe ${PUBLIC_BETA_QA_MATRIX_SCHEMA} report from repository files plus optional public-safe QA evidence artifacts, including ranked next_actions for release owners.\n`;
 }
 
 function readArg(argv, index, flag) {
@@ -205,7 +205,7 @@ function readArg(argv, index, flag) {
 }
 
 export function parseArgs(argv = process.argv.slice(2)) {
-  const options = { json: false, plain: false, out: null, cleanMachineSmoke: null };
+  const options = { json: false, plain: false, out: null, cleanMachineSmoke: null, supportDryRun: [] };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--json') {
@@ -218,6 +218,9 @@ export function parseArgs(argv = process.argv.slice(2)) {
       i += 1;
     } else if (arg === '--clean-machine-smoke') {
       options.cleanMachineSmoke = readArg(argv, i + 1, '--clean-machine-smoke');
+      i += 1;
+    } else if (arg === '--support-dry-run') {
+      options.supportDryRun.push(readArg(argv, i + 1, '--support-dry-run'));
       i += 1;
     } else if (arg === '--help' || arg === '-h') {
       options.help = true;
@@ -255,6 +258,11 @@ async function readPublicEvidenceJson(path, expectedSchema) {
     throw new Error(`Evidence artifact is not public-safe: ${safety.errors.join('; ')}`);
   }
   return artifact;
+}
+
+async function readPublicEvidenceJsonList(paths, expectedSchema) {
+  const list = Array.isArray(paths) ? paths : [];
+  return Promise.all(list.map((p) => readPublicEvidenceJson(p, expectedSchema)));
 }
 
 function hasText(text, needle) {
@@ -355,6 +363,7 @@ function publicSafeAssert(report) {
 
 export async function inspectPublicBetaQaInputs(options = {}) {
   const cleanMachineSmoke = await readPublicEvidenceJson(options.cleanMachineSmoke, 'enigma.clean_machine_smoke.v1');
+  const supportDryRunSummaries = await readPublicEvidenceJsonList(options.supportDryRun, 'enigma.support_dry_run_summary.v1');
   const [
     packageJson,
     tauriConfig,
@@ -433,6 +442,7 @@ export async function inspectPublicBetaQaInputs(options = {}) {
     releaseEvidenceScript,
     updateSignerScript,
     mcpbManifest,
+    supportDryRunSummaries,
     cleanMachineSmoke,
     mcpbConnectionPlan,
     mcpbHealth,
@@ -508,8 +518,32 @@ export function buildScenarioRows(inputs) {
   const cleanMachineEvidenceRefs = cleanMachineEvidenceReady ? ['ref:evidence:clean-machine-smoke'] : [];
   const withCleanMachineEvidence = (refs) => [...refs, ...cleanMachineEvidenceRefs];
   const cleanMachineBlockers = (...rest) => (cleanMachineEvidenceReady ? rest : [cleanMachine, ...rest]);
+  const supportEvidenceReadyFor = (scenarioId) => (Array.isArray(inputs.supportDryRunSummaries) ? inputs.supportDryRunSummaries : [])
+    .some((summary) => summary?.schema === 'enigma.support_dry_run_summary.v1'
+      && summary?.evidence_item_id === 'EV-P10-SUPPORT-DRY-RUN-SUMMARY'
+      && summary?.scenario_id === scenarioId
+      && summary?.bundle_privacy_check_status === 'pass'
+      && summary?.privacy_review?.status === 'pass'
+      && !['blocked', 'release_blocker'].includes(summary?.triage_result));
+  const withSupportEvidence = (scenarioId, refs) => (supportEvidenceReadyFor(scenarioId)
+    ? [...refs, `ref:evidence:support-dry-run:${scenarioId}`]
+    : refs);
+  const supportDryRunBlockers = (scenarioId, ...rest) => (supportEvidenceReadyFor(scenarioId) ? rest : [supportDryRun, ...rest]);
+  const supportDryRunIssues = (scenarioId, missingCode, ...rest) => (supportEvidenceReadyFor(scenarioId) ? rest : [missingCode, ...rest]);
   const cleanMachineIssues = (missingCode, ...rest) => (cleanMachineEvidenceReady ? rest : [missingCode, ...rest]);
   const cleanMachineStatus = (staticReady) => (staticReady ? (cleanMachineEvidenceReady ? 'pass' : 'blocked') : 'missing');
+  const statusFromBlockers = (staticReady, blockers) => (staticReady ? (blockers.length === 0 ? 'pass' : 'blocked') : 'missing');
+
+  const diagnosticSupportBlockers = cleanMachineBlockers(...supportDryRunBlockers('BETA-DIAG-001'));
+  const diagnosticSupportIssues = [
+    ...cleanMachineIssues('clean-machine-diagnostics-evidence-missing'),
+    ...supportDryRunIssues('BETA-DIAG-001', 'diagnostics-support-dry-run-missing'),
+  ];
+  const crashSupportBlockers = cleanMachineBlockers(...supportDryRunBlockers('BETA-CRASH-001'));
+  const crashSupportIssues = [
+    ...cleanMachineIssues('clean-machine-crash-evidence-missing'),
+    ...supportDryRunIssues('BETA-CRASH-001', 'crash-reporting-manual-evidence-missing'),
+  ];
 
   return [
     scenario({
@@ -595,18 +629,18 @@ export function buildScenarioRows(inputs) {
     scenario({
       scenario_id: 'BETA-DIAG-001',
       title: 'Diagnostic bundle preview',
-      status: diagnosticsStaticPresent ? 'blocked' : 'missing',
-      evidence_refs: withCleanMachineEvidence([REFS.diagnosticsCommands, REFS.wizardUi, REFS.qaScenarios, REFS.qaSupport]),
-      blocker_refs: cleanMachineBlockers(supportDryRun),
-      issue_codes: ['diagnostics-support-dry-run-missing'],
+      status: statusFromBlockers(diagnosticsStaticPresent, diagnosticSupportBlockers),
+      evidence_refs: withSupportEvidence('BETA-DIAG-001', withCleanMachineEvidence([REFS.diagnosticsCommands, REFS.wizardUi, REFS.qaScenarios, REFS.qaSupport])),
+      blocker_refs: diagnosticSupportBlockers,
+      issue_codes: diagnosticSupportIssues,
     }),
     scenario({
       scenario_id: 'BETA-CRASH-001',
       title: 'Crash before opt-in',
-      status: crashStaticPresent ? 'blocked' : 'missing',
-      evidence_refs: withCleanMachineEvidence([REFS.crashCommands, REFS.wizardUi, REFS.qaScenarios]),
-      blocker_refs: cleanMachineBlockers(supportDryRun),
-      issue_codes: ['crash-reporting-manual-evidence-missing'],
+      status: statusFromBlockers(crashStaticPresent, crashSupportBlockers),
+      evidence_refs: withSupportEvidence('BETA-CRASH-001', withCleanMachineEvidence([REFS.crashCommands, REFS.wizardUi, REFS.qaScenarios])),
+      blocker_refs: crashSupportBlockers,
+      issue_codes: crashSupportIssues,
     }),
     scenario({
       scenario_id: 'BETA-SIGNING-WINDOWS-001',
