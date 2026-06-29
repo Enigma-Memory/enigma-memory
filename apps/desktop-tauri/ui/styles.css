@@ -220,6 +220,15 @@ p {
   margin: 0;
 }
 
+
+.connection-preview {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(126, 226, 168, 0.08);
+}
+
 .client-actions {
   display: flex;
   align-items: center;

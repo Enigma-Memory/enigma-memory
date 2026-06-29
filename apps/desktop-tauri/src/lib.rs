@@ -87,6 +87,7 @@ pub fn run() {
             commands::service::get_memory_drive_status,
             commands::service::create_vault,
             commands::service::detect_clients,
+            commands::service::preview_client_config,
             commands::service::connect_client,
             commands::service::disconnect_client,
             commands::service::repair_client_config,

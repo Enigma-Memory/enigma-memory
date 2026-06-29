@@ -41,6 +41,7 @@
 - Claude `.mcpb` packages include a minimal root `package.json` with `type: "module"` for Node ESM scope; they do not copy repo scripts, dependency lists, local paths, secrets, provider responses, or memory content.
 - Backup, rollback, repair, disconnect, and local test flows with JSON-preserving config writes; `enigma connect --plain` and `enigma disconnect --plain` give path-redacted human-readable config summaries.
 - Desktop connector cards expose a local "Test connection" action that checks config parse, Enigma entry correctness, bundle reachability, and restart guidance without launching provider apps.
+- Desktop connector cards now require a path-redacted preview and explicit "Approve connection" click before writing MCP client config changes.
 
 ### Docs and website
 - Desktop-first `README.md`.

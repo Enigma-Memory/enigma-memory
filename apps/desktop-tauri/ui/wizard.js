@@ -63,6 +63,7 @@ let importSandbox = {
 };
 let proofActivity = {};
 let supportSummary = {};
+let connectionPreview = null;
 
 let busy = false;
 
@@ -597,10 +598,27 @@ function renderClientActions(client, status) {
       <button type="button" class="link" data-action="rollback" data-id="${id}">Rollback</button>
     `;
   }
-  const actionLabel = status === 'connected' ? 'Disconnect' : status === 'skipped' ? 'Connect later' : 'Connect';
-  const action = status === 'connected' ? 'disconnect' : 'connect';
-  return `<button type="button" class="link" data-action="${action}" data-id="${id}">${escapeHtml(actionLabel)}</button>`;
+  const actionLabel = status === 'skipped' ? 'Connect later' : 'Preview connection';
+  return `<button type="button" class="link" data-action="connect" data-id="${id}">${escapeHtml(actionLabel)}</button>`;
 }
+
+function renderConnectionPreview(client) {
+  if (!connectionPreview || connectionPreview.id !== client.id) return '';
+  const plan = connectionPreview.plan && typeof connectionPreview.plan === 'object' ? connectionPreview.plan : {};
+  const changed = plan.changed === false ? 'No config change needed' : 'Config change planned';
+  const restart = plan.restart_guidance ? `Restart: ${safePublicLabel(plan.restart_guidance, 'Restart the app after approval.')}` : 'Restart: app may need a restart after approval.';
+  return `
+    <div class="connection-preview">
+      <p class="note"><strong>Review first.</strong> ${escapeHtml(changed)}. Writes performed: ${plan.writes_performed === true ? 'yes' : 'no'}.</p>
+      <p class="note">${escapeHtml(restart)}</p>
+      <div class="client-actions">
+        <button type="button" class="client-primary" data-action="approve-connect" data-id="${escapeHtml(client.id)}">Approve connection</button>
+        <button type="button" class="link" data-action="cancel-connect-preview" data-id="${escapeHtml(client.id)}">Cancel</button>
+      </div>
+    </div>
+  `;
+}
+
 
 function renderClientList(emptyCopy = 'No apps scanned yet.') {
   return clients.length
@@ -612,6 +630,7 @@ function renderClientList(emptyCopy = 'No apps scanned yet.') {
             <div class="meta">
               <div class="name">${escapeHtml(client.name)}</div>
               <p class="note">${escapeHtml(copy.body)}</p>
+              ${renderConnectionPreview(client)}
             </div>
             <span class="status-pill ${escapeHtml(status)}">${escapeHtml(copy.badge)}</span>
             <div class="client-actions">${renderClientActions(client, status)}</div>
@@ -1040,15 +1059,38 @@ async function handleAction(event) {
       return;
     case 'connect': {
       const id = event.currentTarget.dataset.id;
+      busy = true;
+      setStatus('Preparing a path-redacted connection preview...');
+      try {
+        connectionPreview = await call('preview_client_config', { id });
+        busy = false;
+        render();
+        setStatus('Review the connection preview, then approve before Enigma writes anything.');
+      } catch (_) {
+        connectionPreview = null;
+        busy = false;
+        render();
+        setStatus('Connection preview could not complete. No config details were shown.');
+      }
+      return;
+    }
+    case 'approve-connect': {
+      const id = event.currentTarget.dataset.id;
+      connectionPreview = null;
       await runClientCommand({
         command: 'connect_client',
         args: { id },
-        pending: 'Connecting...',
+        pending: 'Writing approved connection...',
         success: 'Connection updated. Restart the app if it asks.',
         failure: 'Connection could not complete. No config details were shown.',
       });
       return;
     }
+    case 'cancel-connect-preview':
+      connectionPreview = null;
+      render();
+      setStatus('Connection preview cancelled. No config was written.');
+      return;
     case 'disconnect': {
       const id = event.currentTarget.dataset.id;
       await runClientCommand({
