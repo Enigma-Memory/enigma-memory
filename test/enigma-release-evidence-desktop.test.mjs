@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { promisify } from 'node:util';
-import { buildDesktopReleaseEvidence, parseArgs, runReleaseEvidenceDesktop } from '../scripts/release-evidence-desktop.mjs';
+import { buildDesktopReleaseEvidence, parseArgs, renderDesktopReleaseEvidencePlain, runReleaseEvidenceDesktop } from '../scripts/release-evidence-desktop.mjs';
 import { signManifest } from '../scripts/sign-update-manifest.mjs';
 const execFileAsync = promisify(execFile);
 const PROJECT_ROOT = fileURLToPath(new URL('../', import.meta.url));
@@ -53,6 +53,7 @@ test('parseArgs recognizes installer, manifest, artifacts-dir, and dry-run flags
     '--out', 'dist/evidence.json',
     '--dry-run',
     '--write',
+    '--plain',
   ]);
   assert.equal(args.windowsInstaller, 'dist/app.exe');
   assert.equal(args.macosInstaller, 'dist/app.dmg');
@@ -62,6 +63,7 @@ test('parseArgs recognizes installer, manifest, artifacts-dir, and dry-run flags
   assert.equal(args.out, 'dist/evidence.json');
   assert.equal(args.dryRun, true);
   assert.equal(args.write, true);
+  assert.equal(args.plain, true);
 });
 
 test('buildDesktopReleaseEvidence dry-run emits valid public-safe JSON without artifacts', () => {
@@ -320,4 +322,41 @@ test('runReleaseEvidenceDesktop supports explicit dry-run output', async () => {
     assert.equal(existsSync(out), false);
     assertPublicSafe(record);
   });
+});
+
+test('runReleaseEvidenceDesktop supports plain human output without writing evidence by default', async () => {
+  await withTempDirAsync(async (dir) => {
+    const out = join(dir, 'evidence.json');
+    const originalStdoutWrite = process.stdout.write.bind(process.stdout);
+    let captured = '';
+    process.stdout.write = (chunk, encoding, callback) => {
+      captured += chunk;
+      if (typeof callback === 'function') callback();
+      return true;
+    };
+    try {
+      await runReleaseEvidenceDesktop(['--out', out, '--plain']);
+    } finally {
+      process.stdout.write = originalStdoutWrite;
+    }
+    assert.match(captured, /^Enigma desktop release evidence\n/);
+    assert.match(captured, /Status: Needs attention/);
+    assert.match(captured, /Blockers: /);
+    assert.match(captured, /Boundary: public desktop release evidence only/);
+    assert.doesNotMatch(captured, /^\s*\{/);
+    assert.equal(captured.includes(dir), false);
+    assert.equal(captured.includes(out), false);
+    assert.equal(existsSync(out), false);
+  });
+});
+
+test('renderDesktopReleaseEvidencePlain summarizes release evidence without private paths', () => {
+  const record = buildDesktopReleaseEvidence({});
+  const plain = renderDesktopReleaseEvidencePlain(record, false);
+
+  assert.match(plain, /^Enigma desktop release evidence\n/);
+  assert.match(plain, /Version: 0\.1\.19/);
+  assert.match(plain, /Evidence written: no/);
+  assert.match(plain, /Boundary: public desktop release evidence only/);
+  assert.doesNotMatch(plain, /C:\\Users\\|\/home\/|\/tmp\/|api[_-]?key|password/i);
 });

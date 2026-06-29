@@ -33,6 +33,7 @@ Options:
   --artifacts-dir <dir>        Directory with additional release artifacts to hash.
   --out <path>                 Output path for the evidence JSON (default: dist/desktop-release-evidence.json).
   --write                      Persist the evidence file (default is dry-run).
+  --plain                     Print a human-readable, path-redacted summary.
   --dry-run                    Print the full public-safe evidence packet to stdout.
   --help, -h                   Show this help.
 
@@ -58,6 +59,7 @@ export function parseArgs(argv = process.argv.slice(2)) {
   let artifactsDir = null;
   let out = 'dist/desktop-release-evidence.json';
   let write = false;
+  let plain = false;
   let dryRun = false;
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -83,6 +85,9 @@ export function parseArgs(argv = process.argv.slice(2)) {
       write = true;
     } else if (arg === '--dry-run') {
       dryRun = true;
+    } else if (arg === '--plain' || arg === '--text' || arg === '--format=text' || (arg === '--format' && argv[i + 1] === 'text')) {
+      plain = true;
+      if (arg === '--format') i += 1;
     } else if (arg === '--help' || arg === '-h') {
       console.log(usage());
       process.exit(0);
@@ -95,6 +100,7 @@ export function parseArgs(argv = process.argv.slice(2)) {
     macosInstaller,
     manifest,
     manifestSig,
+    plain,
     artifactsDir,
     out,
     write,
@@ -444,6 +450,25 @@ export function buildDesktopReleaseEvidence(options = {}) {
   return record;
 }
 
+export function renderDesktopReleaseEvidencePlain(record, wrote = false) {
+  const installerCount = Array.isArray(record.installers) ? record.installers.filter((installer) => installer.present).length : 0;
+  const blockers = Array.isArray(record.blockers) ? record.blockers : [];
+  const lines = [
+    'Enigma desktop release evidence',
+    `Status: ${blockers.length === 0 ? 'Ready' : 'Needs attention'}`,
+    `Version: ${record.release_version ?? 'unknown'}`,
+    `Artifacts: ${record.artifact_count ?? 0}`,
+    `Installers present: ${installerCount}`,
+    `Updater manifest: ${record.manifest ? 'present' : 'missing'}`,
+    `Blockers: ${blockers.length}`,
+    `Evidence written: ${wrote ? 'yes' : 'no'}`,
+  ];
+  for (const blocker of blockers.slice(0, 5)) lines.push(`Blocker: ${blocker}`);
+  for (const next of (Array.isArray(record.next_steps) ? record.next_steps.slice(0, 5) : [])) lines.push(`Next: ${next}`);
+  lines.push('Boundary: public desktop release evidence only; no signing keys, certificates, account IDs, raw memory, local paths, provider deletion, model behavior, hosted service, signing completion, notarization completion, benchmark superiority, token ROI, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
 function writeEvidence(outPath, record) {
   const resolved = path.resolve(outPath);
   fs.mkdirSync(path.dirname(resolved), { recursive: true });
@@ -469,7 +494,9 @@ export async function runReleaseEvidenceDesktop(argv = process.argv.slice(2)) {
     out: outRel,
     wrote: args.write,
   };
-  if (args.dryRun) {
+  if (args.plain) {
+    console.log(renderDesktopReleaseEvidencePlain(record, args.write).trimEnd());
+  } else if (args.dryRun) {
     console.log(JSON.stringify(record, null, 2));
   } else {
     console.log(JSON.stringify(summary, null, 2));
