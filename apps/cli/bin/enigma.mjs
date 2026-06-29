@@ -3738,6 +3738,28 @@ function printChainVerifyReport(report, flags, io) {
   else print(report, io);
 }
 
+function renderSolanaSubmitPlain(report) {
+  const lines = [
+    'Enigma proof network Solana submit',
+    `Status: ${report.ok ? 'Ready' : 'Needs attention'}`,
+    `Mode: ${report.mode ?? 'dry-run'}`,
+    `Cluster: ${report.cluster ?? '<cluster>'}`,
+    `Transaction submitted: ${report.transaction_submitted === true ? 'yes' : 'no'}`,
+    `Raw memory on-chain: ${report.raw_memory_on_chain === true ? 'yes' : 'no'}`,
+    `Artifact type: ${report.artifact_type ?? '<artifact-type>'}`,
+    `Proof commitment: ${report.proof_commitment ?? '<proof-commitment>'}`,
+    `Memo payload: ${report.would_submit?.payload ?? 'memo_ref'}`,
+  ];
+  if (report.signature) lines.push(`Signature: ${report.signature}`);
+  lines.push('Boundary: Solana Memo carries compact public memo_ref only; no raw memory, artifact body, prompts, transcripts, embeddings, provider responses, private keys, local paths, provider deletion, model behavior, hosted service, benchmark superiority, token ROI, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printSolanaSubmitReport(report, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderSolanaSubmitPlain(report));
+  else print(report, io);
+}
+
 function chainWriteOrPrint(flags, io, artifact, summary) {
   if (flags.has('out')) {
     const outPath = resolve(String(requireFlag(flags, ['out'])));
@@ -3922,7 +3944,7 @@ export async function chainSubmitSolanaCommand(flags, io, positionalFile = undef
   const memoRef = createSolanaProofMemoRef(schema, artifact, cluster);
   const execute = booleanFlag(flags, ['execute'], false);
   if (!execute) {
-    print({
+    const report = {
       ok: true,
       command: 'chain submit-solana',
       mode: 'dry-run',
@@ -3943,11 +3965,12 @@ export async function chainSubmitSolanaCommand(flags, io, positionalFile = undef
       },
       validation: result,
       explanation: solanaSubmitDryRunExplanation(),
-    }, io);
+    };
+    printSolanaSubmitReport(report, flags, io);
     return 0;
   }
   const signature = await submitSolanaMemoTransaction(flags, cluster, memoRef);
-  print({
+  const report = {
     ok: true,
     command: 'chain submit-solana',
     mode: 'execute',
@@ -3963,7 +3986,8 @@ export async function chainSubmitSolanaCommand(flags, io, positionalFile = undef
     memo_program: SOLANA_MEMO_PROGRAM_ID,
     memo_ref: memoRef,
     validation: result,
-  }, io);
+  };
+  printSolanaSubmitReport(report, flags, io);
   return 0;
 }
 
@@ -4734,7 +4758,7 @@ function usage() {
       verify: 'enigma chain verify --file <proof-artifact.json> [--plain]',
       register: 'enigma chain register --entry-type <anchor_batch|benchmark_attestation|connector_conformance|health_report|operator_receipt|settlement_job> (--artifact-hash <sha256:...> | --artifact-file <artifact.json>) --artifact-schema-ref <schema-id> [--digest-ref <sha256:...>] [--signer <public-ref>] [--registry-ref <public-ref>] [--entry-ref <public-ref>] [--entry-count <n>] [--out <file>] [--plain]',
       registry: 'enigma chain registry --entry <registry-entry.json> [--entry <registry-entry.json>] [--registry-ref <public-ref>] [--out <file>] [--plain]',
-      submit_solana: 'enigma chain submit-solana --file <proof-artifact.json> --cluster <devnet|testnet|mainnet-beta|localnet> [--rpc <url>] [--execute --keypair <solana-cli-64-byte-keypair.json>]',
+      submit_solana: 'enigma chain submit-solana --file <proof-artifact.json> --cluster <devnet|testnet|mainnet-beta|localnet> [--rpc <url>] [--execute --keypair <solana-cli-64-byte-keypair.json>] [--plain]',
       '--plain': 'Print a path-redacted proof-network summary instead of JSON. Alias: --text or --format text.',
       boundary: 'Proof Network chain commands default to local planning and dry-run validation. submit-solana only submits a Solana Memo transaction when --execute is passed; it carries compact public-safe commitment/ref JSON, never raw memory or artifact bodies.',
     },

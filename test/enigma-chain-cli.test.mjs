@@ -360,6 +360,28 @@ test('chain submit-solana dry-run validates a proof artifact and emits only a co
   assert.equal(report.memo_ref.proof_commitment, report.proof_commitment);
   assert.equal(report.would_submit.payload, 'memo_ref');
   assertTextOmits(result.text(), artifactPath, unusedKeypairPath, dir, privateRpc, ROOT_A, publicRef, PRIVATE_SENTINEL);
+
+  const plain = await runCli([
+    'chain',
+    'submit-solana',
+    '--file',
+    artifactPath,
+    '--cluster',
+    'devnet',
+    '--rpc',
+    privateRpc,
+    '--plain',
+  ]);
+  assert.equal(plain.code, 0, plain.io.stderr());
+  assert.match(plain.io.stdout(), /^Enigma proof network Solana submit\n/);
+  assert.match(plain.io.stdout(), /Status: Ready/);
+  assert.match(plain.io.stdout(), /Mode: dry-run/);
+  assert.match(plain.io.stdout(), /Transaction submitted: no/);
+  assert.match(plain.io.stdout(), /Raw memory on-chain: no/);
+  assert.match(plain.io.stdout(), /Memo payload: memo_ref/);
+  assert.match(plain.io.stdout(), /Boundary: Solana Memo carries compact public memo_ref only/);
+  assert.doesNotMatch(plain.io.stdout(), /^\s*\{/);
+  assertTextOmits(plain.io.stdout(), artifactPath, unusedKeypairPath, dir, privateRpc, ROOT_A, publicRef, PRIVATE_SENTINEL);
 });
 
 test('chain submit-solana rejects private artifacts without echoing payloads or paths', async () => {
