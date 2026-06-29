@@ -875,6 +875,22 @@ function publicProofClipboardText(activity = {}) {
   ].join('\n');
 }
 
+function publicSupportClipboardText(summary = {}) {
+  const setupState = summary.setup_status?.state || 'not_collected';
+  const issueCodes = Array.isArray(summary.issue_codes) ? summary.issue_codes : [];
+  const next = summary.next_action && typeof summary.next_action === 'object' ? summary.next_action : {};
+  return [
+    'Enigma support summary',
+    `Support code: ${summary.support_code || '<not-collected>'}`,
+    `Setup state: ${setupState}`,
+    `Issue codes: ${issueCodes.length > 0 ? issueCodes.join(', ') : 'none'}`,
+    `Next action: ${next.label || 'Collect support summary'}`,
+    `Next command: ${next.command || '<none>'}`,
+    'Redaction: public-safe summary only; no raw memory, prompts, transcripts, credentials, provider responses, complete app settings, or local paths.',
+    'Boundary: local Enigma status only; no outside-provider changes, model behavior changes, hosted service readiness, benchmark, token ROI, or compliance claims.',
+  ].join('\n');
+}
+
 
 function renderProofActivitySection() {
   const activity = proofActivity?.schema ? proofActivity : health.proof_activity || {};
@@ -931,6 +947,7 @@ function renderSupportSummarySection() {
       <div class="button-row">
         ${primaryButton('Collect support summary', 'collect-support-summary')}
         <button type="button" class="secondary" data-action="copy-support-code" ${summary.support_code ? '' : 'disabled'}>Copy support code</button>
+        <button type="button" class="secondary" data-action="copy-support-summary" ${summary.schema ? '' : 'disabled'}>Copy support summary</button>
         <button type="button" class="secondary" data-action="export-support-summary" ${summary.schema && scan.exportAllowed ? '' : 'disabled'}>Export support summary</button>
       </div>
     </section>
@@ -1621,6 +1638,19 @@ async function handleAction(event) {
         setStatus('Support code copied. It contains no raw memory or local paths.');
       } catch (_) {
         setStatus('Clipboard copy is unavailable. The support code remains visible in the dashboard.');
+      }
+      return;
+    }
+    case 'copy-support-summary': {
+      if (!supportSummary?.schema) {
+        setStatus('Collect a support summary before copying it.');
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(publicSupportClipboardText(supportSummary));
+        setStatus('Support summary copied without raw memory, app settings, or local paths.');
+      } catch (_) {
+        setStatus('Clipboard copy is unavailable. The public-safe support summary remains visible in the dashboard.');
       }
       return;
     }

@@ -428,6 +428,11 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(wizard, /collect-support-summary/);
   assert.match(wizard, /copy-support-code/);
   assert.match(wizard, /Copy support code/);
+  assert.match(wizard, /copy-support-summary/);
+  assert.match(wizard, /Copy support summary/);
+  assert.match(wizard, /publicSupportClipboardText/);
+  assert.match(wizard, /Support summary copied without raw memory, app settings, or local paths/);
+  assert.match(wizard.match(/function publicSupportClipboardText\(summary = \{\}\) \{[\s\S]*?\n\}/)?.[0] || '', /no raw memory, prompts, transcripts, credentials, provider responses, complete app settings, or local paths/);
   assert.match(wizard, /navigator\.clipboard\.writeText/);
   assert.match(wizard, /Support code copied/);
   assert.match(wizard, /Clipboard copy is unavailable/);
