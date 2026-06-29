@@ -1,16 +1,35 @@
 #!/usr/bin/env node
 import { access, mkdir, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { buildPublicBetaEvidenceManifest } from './build-public-beta-evidence-manifest.mjs';
+import { buildSupportDryRunSummary } from './build-support-dry-run-summary.mjs';
 import { buildPublicBetaQaMatrix, renderPublicBetaQaPlain } from './run-public-beta-qa-matrix.mjs';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
+const GENERATED_SUPPORT_DRY_RUNS = Object.freeze([
+  {
+    fileName: 'support-dry-run-diagnostics.json',
+    scenario_id: 'BETA-DIAG-001',
+    issue_code: 'DIAG-BUNDLE-PREVIEWED',
+    triage_result: 'needs_user_action',
+    bundle_privacy_check_status: 'pass',
+    support_owner_ref: 'ref:role:beta-support',
+  },
+  {
+    fileName: 'support-dry-run-crash.json',
+    scenario_id: 'BETA-CRASH-001',
+    issue_code: 'CRASH-REPORTING-MANUAL-EVIDENCE',
+    triage_result: 'needs_user_action',
+    bundle_privacy_check_status: 'pass',
+    support_owner_ref: 'ref:role:beta-support',
+  },
+]);
 const DEFAULT_OUT_DIR = '.enigma/public-beta';
 
 function usage() {
-  return `Usage: node scripts/run-public-beta-review.mjs [--out-dir <path>] [--plain|--json]\n\nRuns the local public beta Advisor with one command. It writes a path-only evidence manifest and a public-safe QA matrix, then prints a bounded human Advisor summary. Missing evidence files are treated as blockers, not fatal script errors.\n\nOutputs:\n  <out-dir>/evidence-manifest.json\n  <out-dir>/qa-matrix.json\n\nNo PR approval, merge, npm publish, signing, upload, provider launch, or network action is performed.\n`;
+  return `Usage: node scripts/run-public-beta-review.mjs [--out-dir <path>] [--plain|--json]\n\nRuns the local public beta Advisor with one command. It writes a path-only evidence manifest, generated public-safe support dry-run summaries, and a public-safe QA matrix, then prints a bounded human Advisor summary. Missing external evidence files are treated as blockers, not fatal script errors.\n\nOutputs:\n  <out-dir>/evidence-manifest.json\n  <out-dir>/support-dry-run-diagnostics.json\n  <out-dir>/support-dry-run-crash.json\n  <out-dir>/qa-matrix.json\n\nNo PR approval, merge, npm publish, signing, upload, provider launch, or network action is performed.\n`;
 }
 
 function readArg(argv, index, flag) {
@@ -56,6 +75,40 @@ async function exists(path) {
   }
 }
 
+function isRepositoryRelativePath(value) {
+  const normalized = String(value ?? '').replace(/\\/g, '/');
+  return normalized.length > 0
+    && !isAbsolute(normalized)
+    && !/^[A-Za-z]:\//u.test(normalized)
+    && normalized !== '..'
+    && !normalized.startsWith('../')
+    && !normalized.includes('/../')
+    && !/[\0\r\n]/u.test(normalized);
+}
+
+function joinPathLabel(dir, fileName) {
+  const cleanDir = String(dir || DEFAULT_OUT_DIR).replace(/\\/g, '/').replace(/\/+$/u, '');
+  return `${cleanDir || '.'}/${fileName}`;
+}
+
+function uniqueList(values) {
+  return [...new Set(values.filter(Boolean))];
+}
+
+function generatedSupportDryRunPaths(outDir) {
+  return GENERATED_SUPPORT_DRY_RUNS.map((spec) => joinPathLabel(outDir, spec.fileName));
+}
+
+async function writeGeneratedSupportDryRunSummaries(paths) {
+  for (let index = 0; index < GENERATED_SUPPORT_DRY_RUNS.length; index += 1) {
+    const spec = GENERATED_SUPPORT_DRY_RUNS[index];
+    const out = paths[index];
+    const summary = buildSupportDryRunSummary(spec);
+    await mkdir(dirname(resolve(out)), { recursive: true });
+    await writeFile(resolve(out), `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
+  }
+}
+
 export async function existingEvidenceOptionsFromManifest(manifest) {
   const options = {
     supportDryRun: [],
@@ -77,6 +130,7 @@ export function renderPublicBetaReviewPlain(result) {
     `Manifest: written to ${result.paths.manifest}`,
     `QA matrix: written to ${result.paths.matrix}`,
     `Evidence files used: ${result.evidence_files_used}`,
+    `Generated support dry-runs: ${result.generated_evidence_files ?? 0}`,
     '',
     renderPublicBetaQaPlain(result.matrix).trim(),
     'Boundary: one-command local review only; no PR approval, merge, npm publication, signed installer, hosted service, provider deletion, model behavior, benchmark superiority, token ROI, compliance, upload, or network claims.',
@@ -86,11 +140,33 @@ export function renderPublicBetaReviewPlain(result) {
 
 export async function runPublicBetaReview(options = {}) {
   const outDir = String(options.outDir || DEFAULT_OUT_DIR);
-  const manifestPath = `${outDir.replace(/\\/g, '/')}/evidence-manifest.json`;
-  const matrixPath = `${outDir.replace(/\\/g, '/')}/qa-matrix.json`;
-  const manifest = buildPublicBetaEvidenceManifest({ out: manifestPath });
-  const evidenceOptions = await existingEvidenceOptionsFromManifest(manifest);
+  const normalizedOutDir = outDir.replace(/\\/g, '/').replace(/\/+$/u, '');
+  const manifestPath = `${normalizedOutDir}/evidence-manifest.json`;
+  const matrixPath = `${normalizedOutDir}/qa-matrix.json`;
+  const supportDryRunPaths = generatedSupportDryRunPaths(normalizedOutDir);
+  const manifest = buildPublicBetaEvidenceManifest({
+    out: manifestPath,
+    supportDryRun: isRepositoryRelativePath(normalizedOutDir) ? supportDryRunPaths : undefined,
+  });
+
+  await mkdir(resolve(outDir), { recursive: true });
+  await mkdir(dirname(resolve(manifestPath)), { recursive: true });
+  await writeGeneratedSupportDryRunSummaries(supportDryRunPaths);
+  await writeFile(resolve(manifestPath), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+
+  const manifestEvidenceOptions = isRepositoryRelativePath(normalizedOutDir) ? await existingEvidenceOptionsFromManifest(manifest) : { supportDryRun: [] };
+  const evidenceOptions = {
+    ...manifestEvidenceOptions,
+    supportDryRun: uniqueList([...(manifestEvidenceOptions.supportDryRun || []), ...supportDryRunPaths]),
+  };
   const matrix = await buildPublicBetaQaMatrix(evidenceOptions);
+  const evidenceFilesUsed = [
+    evidenceOptions.cleanMachineSmoke,
+    evidenceOptions.registryInstall,
+    evidenceOptions.desktopReleaseEvidence,
+    evidenceOptions.productionHandoffPacket,
+    ...(evidenceOptions.supportDryRun || []),
+  ].filter(Boolean).length;
   const result = {
     schema: 'enigma.public_beta_review.v1',
     ok: true,
@@ -99,26 +175,20 @@ export async function runPublicBetaReview(options = {}) {
       manifest: '<public-beta-evidence-manifest>',
       matrix: '<public-beta-qa-matrix>',
     },
-    evidence_files_used: [
-      evidenceOptions.cleanMachineSmoke,
-      evidenceOptions.registryInstall,
-      evidenceOptions.desktopReleaseEvidence,
-      evidenceOptions.productionHandoffPacket,
-      ...(evidenceOptions.supportDryRun || []),
-    ].filter(Boolean).length,
+    evidence_files_used: evidenceFilesUsed,
+    generated_evidence_files: supportDryRunPaths.length,
+    generated_evidence_items: ['EV-P10-SUPPORT-DRY-RUN-SUMMARY'],
     matrix,
     safety: {
       release_action_performed: false,
       network_performed: false,
       artifact_contents_embedded_in_manifest: false,
+      generated_support_dry_run_public_safe: true,
       local_paths_hidden_in_stdout: true,
     },
     claim_boundary: 'Local public beta review only. It does not approve PRs, merge branches, publish npm, sign installers, upload artifacts, launch hosted services, prove provider deletion, or prove model behavior.',
   };
 
-  await mkdir(resolve(outDir), { recursive: true });
-  await mkdir(dirname(resolve(manifestPath)), { recursive: true });
-  await writeFile(resolve(manifestPath), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
   await writeFile(resolve(matrixPath), `${JSON.stringify(matrix, null, 2)}\n`, 'utf8');
   return result;
 }
