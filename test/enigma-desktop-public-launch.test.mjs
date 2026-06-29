@@ -365,6 +365,11 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(wizard, /Support summary/);
   assert.match(wizard, /Shareable status without private memory/);
   assert.match(wizard, /collect-support-summary/);
+  assert.match(wizard, /copy-support-code/);
+  assert.match(wizard, /Copy support code/);
+  assert.match(wizard, /navigator\.clipboard\.writeText/);
+  assert.match(wizard, /Support code copied/);
+  assert.match(wizard, /Clipboard copy is unavailable/);
   assert.match(wizard, /export-support-summary/);
   assert.match(wizard, /Export support summary/);
   assert.match(wizard, /Support summary exported/);

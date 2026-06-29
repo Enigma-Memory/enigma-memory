@@ -830,6 +830,7 @@ function renderSupportSummarySection() {
       ${exported ? `<p class="note">Support summary export ready. File location is hidden in this view.</p>` : ''}
       <div class="button-row">
         ${primaryButton('Collect support summary', 'collect-support-summary')}
+        <button type="button" class="secondary" data-action="copy-support-code" ${summary.support_code ? '' : 'disabled'}>Copy support code</button>
         <button type="button" class="secondary" data-action="export-support-summary" ${summary.schema && scan.exportAllowed ? '' : 'disabled'}>Export support summary</button>
       </div>
     </section>
@@ -1480,6 +1481,20 @@ async function handleAction(event) {
       busy = false;
       render();
       setStatus('Support summary collected without raw memory or local paths.');
+      return;
+    }
+    case 'copy-support-code': {
+      const code = supportSummary?.support_code;
+      if (!code) {
+        setStatus('Collect a support summary before copying its support code.');
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(String(code));
+        setStatus('Support code copied. It contains no raw memory or local paths.');
+      } catch (_) {
+        setStatus('Clipboard copy is unavailable. The support code remains visible in the dashboard.');
+      }
       return;
     }
     case 'export-support-summary': {
