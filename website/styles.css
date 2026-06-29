@@ -366,6 +366,69 @@ h1 {
   margin-bottom: 0.5rem;
 }
 
+/* First-run visual map */
+
+.first-run-map {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.35fr);
+  gap: 2rem;
+  align-items: start;
+}
+
+.setup-map {
+  display: grid;
+  grid-template-columns: 0.95fr 1.15fr;
+  gap: 0.85rem;
+}
+
+.setup-map__card {
+  min-height: 10rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 1.25);
+  background:
+    linear-gradient(135deg, rgba(47, 93, 80, 0.08), transparent 58%),
+    var(--surface);
+  box-shadow: 0 1rem 2.5rem rgba(64, 44, 24, 0.08);
+}
+
+.setup-map__card--wide {
+  grid-column: span 2;
+  min-height: 8rem;
+  background:
+    linear-gradient(135deg, rgba(47, 93, 80, 0.14), rgba(255, 253, 248, 0.72)),
+    var(--surface);
+}
+
+.setup-map__label {
+  display: inline-flex;
+  margin-bottom: 1rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.setup-map__card h3 {
+  margin: 0 0 0.35rem;
+}
+
+.setup-map__card p {
+  margin: 0;
+}
+
+@media (max-width: 800px) {
+  .first-run-map,
+  .setup-map {
+    grid-template-columns: 1fr;
+  }
+
+  .setup-map__card--wide {
+    grid-column: auto;
+  }
+}
+
 /* Steps */
 
 .steps {

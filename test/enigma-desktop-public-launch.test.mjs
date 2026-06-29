@@ -408,9 +408,11 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
 });
 
 test('public website explains consumer install path without unsupported claims', async () => {
-  const [home, download, help, launchStatus, installGuide, macosInstall, windowsInstall, connectApps, otherClients, onboardingUx] = await Promise.all([
+  const [home, download, setup, websiteStyles, help, launchStatus, installGuide, macosInstall, windowsInstall, connectApps, otherClients, onboardingUx] = await Promise.all([
     readWebsiteFile('index.html'),
     readWebsiteFile('download.html'),
+    readWebsiteFile('setup.html'),
+    readWebsiteFile('styles.css'),
     readWebsiteFile('help/index.html'),
     readWebsiteFile('launch-status.html'),
     readWebsiteFile('help/install.html'),
@@ -420,7 +422,7 @@ test('public website explains consumer install path without unsupported claims',
     readWebsiteFile('help/connect-apps/other-supported-clients.html'),
     readFile(new URL('../docs/public-launch/consumer-onboarding-ux.md', import.meta.url), 'utf8'),
   ]);
-  const publicWebsite = `${home}\n${download}\n${help}\n${launchStatus}\n${installGuide}\n${macosInstall}\n${windowsInstall}\n${connectApps}\n${otherClients}`;
+  const publicWebsite = `${home}\n${download}\n${setup}\n${help}\n${launchStatus}\n${installGuide}\n${macosInstall}\n${windowsInstall}\n${connectApps}\n${otherClients}`;
   const funnelSpec = `${publicWebsite}\n${onboardingUx}`;
 
   assert.match(home, /Download the desktop app/);
@@ -428,6 +430,12 @@ test('public website explains consumer install path without unsupported claims',
   assert.match(home, /Connect an AI app/);
   assert.match(download, /After the download/);
   assert.match(download, /open Enigma Memory/i);
+  assert.match(setup, /Four screens\. No terminal\. No JSON\./);
+  assert.match(setup, /Create Memory Drive/);
+  assert.match(setup, /Preview, then approve/);
+  assert.match(setup, /Memory Drive dashboard/);
+  assert.match(websiteStyles, /setup-map/);
+  assert.match(websiteStyles, /first-run-map/);
   assert.match(help, /Start here/);
   assert.match(help, /You should not need Node, npm, terminal commands, or JSON edits/);
   assert.match(launchStatus, /How this page stays public-safe/);
