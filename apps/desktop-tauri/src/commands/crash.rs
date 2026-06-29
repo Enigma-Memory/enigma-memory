@@ -87,9 +87,13 @@ impl CrashReportingConfig {
 
     pub fn save(&self) -> Result<(), String> {
         let path = Self::path();
-        fs::create_dir_all(path.parent().expect("crash config parent")).map_err(|e| e.to_string())?;
-        fs::write(path, serde_json::to_string_pretty(self).map_err(|e| e.to_string())?)
-            .map_err(|e| e.to_string())
+        fs::create_dir_all(path.parent().expect("crash config parent"))
+            .map_err(|e| e.to_string())?;
+        fs::write(
+            path,
+            serde_json::to_string_pretty(self).map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string())
     }
 }
 
@@ -115,7 +119,9 @@ fn uuid_like_id() -> String {
 fn rand_u32() -> u32 {
     use std::sync::atomic::{AtomicU32, Ordering};
     static COUNTER: AtomicU32 = AtomicU32::new(0);
-    COUNTER.fetch_add(1, Ordering::Relaxed).wrapping_add(rand_seed())
+    COUNTER
+        .fetch_add(1, Ordering::Relaxed)
+        .wrapping_add(rand_seed())
 }
 
 fn rand_seed() -> u32 {
@@ -130,8 +136,11 @@ fn write_pending_report(report: &CrashReport) -> Result<PathBuf, String> {
     let dir = crash_reports_dir();
     fs::create_dir_all(dir.as_path()).map_err(|e| e.to_string())?;
     let path = dir.join(format!("crash-{}.json", report.report_id));
-    fs::write(path.as_path(), serde_json::to_string_pretty(report).map_err(|e| e.to_string())?)
-        .map_err(|e| e.to_string())?;
+    fs::write(
+        path.as_path(),
+        serde_json::to_string_pretty(report).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())?;
     Ok(path)
 }
 
@@ -286,6 +295,9 @@ mod tests {
         let serialized = serde_json::to_string(&cfg).unwrap();
         let deserialized: CrashReportingConfig = serde_json::from_str(&serialized).unwrap();
         assert!(deserialized.enabled);
-        assert_eq!(deserialized.endpoint.as_deref().unwrap(), "https://example.com/crash");
+        assert_eq!(
+            deserialized.endpoint.as_deref().unwrap(),
+            "https://example.com/crash"
+        );
     }
 }

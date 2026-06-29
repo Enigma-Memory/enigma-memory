@@ -112,7 +112,8 @@ pub async fn export_diagnostics(
 
 async fn build_bundle(state: &AppState) -> Result<DiagnosticsBundle, String> {
     let bundle_path = state.config.bundle_path.to_string_lossy();
-    let drive = run_cli(&state.config,
+    let drive = run_cli(
+        &state.config,
         &["drive", "health", "--bundle", &bundle_path],
     )
     .await

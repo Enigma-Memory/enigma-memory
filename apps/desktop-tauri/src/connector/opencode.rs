@@ -4,7 +4,10 @@ pub fn profile(ctx: &EngineContext) -> ClientProfile {
     build_profile(ClientId::Opencode, ctx)
 }
 
-pub fn detect(engine: &ConnectorEngine, ctx: &EngineContext) -> Result<DetectResult, ConnectorError> {
+pub fn detect(
+    engine: &ConnectorEngine,
+    ctx: &EngineContext,
+) -> Result<DetectResult, ConnectorError> {
     engine.detect(ClientId::Opencode, ctx)
 }
 

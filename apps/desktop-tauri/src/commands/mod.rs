@@ -15,11 +15,17 @@ pub(crate) async fn run_cli(config: &DesktopConfig, args: &[&str]) -> Result<Val
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
-    let output = cmd.output().await.map_err(|e| format!("failed to spawn CLI: {e}"))?;
+    let output = cmd
+        .output()
+        .await
+        .map_err(|e| format!("failed to spawn CLI: {e}"))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("CLI exited with status {:?}: {stderr}", output.status.code()));
+        return Err(format!(
+            "CLI exited with status {:?}: {stderr}",
+            output.status.code()
+        ));
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
