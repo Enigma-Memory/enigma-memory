@@ -2299,6 +2299,45 @@ function printInstallSummary(summary, flags, io) {
 }
 
 
+function renderCapsuleExportPlain(result) {
+  const artifacts = result.public_artifacts ?? {};
+  const lines = [
+    'Enigma capsule export',
+    `Status: ${result.ok ? 'Ready' : 'Needs attention'}`,
+    `Capsule: ${result.capsule_id ?? '<capsule-id>'}`,
+    `Manifest root: ${artifacts.active_set_root ?? '<active-set-root>'}`,
+    `Receipt root: ${artifacts.receipt_log_root ?? '<receipt-log-root>'}`,
+    `Candidates: ${result.verifier_metadata?.candidate_count ?? 0}`,
+    `Custody: ${result.verifier_metadata?.custody_status ?? '<custody-status>'}`,
+    'Capsule file: written to <out>',
+  ];
+  lines.push('Boundary: public-safe local import capsule export only; no raw memory, local paths, provider calls, provider deletion, model behavior, hosted service, benchmark, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printCapsuleExportResult(result, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderCapsuleExportPlain(result));
+  else print(result, io);
+}
+
+function renderCapsuleImportPlain(result) {
+  const lines = [
+    'Enigma capsule import',
+    `Status: ${result.ok ? 'Ready' : 'Needs attention'}`,
+    `Vault writes: ${Array.isArray(result.vault_writes) ? result.vault_writes.length : result.vault_write_count ?? 0}`,
+    `Limitations: ${Array.isArray(result.limitations) && result.limitations.length ? result.limitations.join(', ') : 'none'}`,
+  ];
+  if (result.bundle_written) lines.push('Memory Drive: updated');
+  else lines.push('Memory Drive: not written');
+  lines.push('Boundary: public-safe local import capsule verification only; no raw memory, local paths, provider calls, provider deletion, model behavior, hosted service, benchmark, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printCapsuleImportResult(result, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderCapsuleImportPlain(result));
+  else print(result, io);
+}
+
 function nextPlainRequested(flags) {
   const format = getFlag(flags, ['format']);
   return booleanFlag(flags, ['plain', 'text'], false) || format === 'plain' || format === 'text';
@@ -3383,14 +3422,15 @@ export async function capsuleExportCommand(flags, io, positionalFile = undefined
   });
   const out = resolve(String(getFlag(flags, ['out'], 'enigma-capsule.json')));
   await writeJson(out, capsule);
-  print({
+  const output = {
     ok: capsule.schema === 'enigma.import_capsule.v1',
     schema: capsule.schema,
     capsule_id: capsule.capsule_id,
     out,
     public_artifacts: capsule.public_artifacts,
     verifier_metadata: capsule.verifier_metadata,
-  }, io);
+  };
+  printCapsuleExportResult(output, flags, io);
   return 0;
 }
 
@@ -3409,7 +3449,7 @@ export async function capsuleImportCommand(flags, io, positionalFile = undefined
   }
   const result = importEnigmaCapsule(capsule, options);
   if (vault) await persistState(bundlePath, vault, { passphrase: getFlag(flags, ['passphrase']) });
-  print({ ...publicCapsuleImportResult(result), source_file: file, bundle: vault ? bundlePath : undefined }, io);
+  printCapsuleImportResult({ ...publicCapsuleImportResult(result), source_file: file, bundle: vault ? bundlePath : undefined, bundle_written: Boolean(vault) }, flags, io);
   return result.ok ? 0 : 1;
 }
 
@@ -4566,6 +4606,8 @@ function usage() {
       'enigma import <source> --file <export.json>': 'Preview import candidates locally without printing memory plaintext.',
       'enigma import rollback --file <raw-import-report.json> --bundle <bundle.json>': 'Tombstone memories written by a prior import report and emit a public-safe rollback receipt.',
       '--out <path>': 'Write the raw local import report for capsule export or review. CLI stdout remains a public-safe preview.',
+      'enigma capsule export --file <raw-import-report.json> --out <capsule.json> --plain': 'Export a path-redacted, claim-bounded capsule summary while writing the local capsule file.',
+      'enigma capsule import --file <capsule.json> --plain': 'Verify an import capsule and print a path-redacted summary without writing to the Memory Drive unless --write-vault is present.',
       '--write-vault': 'Explicitly write accepted importer candidates into the selected local bundle.',
       '--bundle <path>': 'Bundle JSON to write when --write-vault is present. Defaults to .enigma/bundle.json.',
       '--plain': 'Print a human-readable import or rollback summary instead of JSON. Alias: --text or --format text.',

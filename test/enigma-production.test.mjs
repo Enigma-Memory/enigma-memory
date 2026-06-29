@@ -2442,6 +2442,36 @@ test('importer capsules keep custody roots private and fail closed before vault 
   ]);
   assert.equal(forgedReceiptCapsule.verifier_metadata.canonical_candidate_count, 0);
   assert.equal(forgedReceiptCapsule.verifier_metadata.candidate_only_count, 1);
+
+  await withTempDir('enigma-capsule-plain-', async (dir) => {
+    const { main: cliMain } = await import(`${CLI_BIN_URL.href}?capsulePlain=${Date.now()}`);
+    const reportPath = join(dir, 'report.json');
+    const capsulePath = join(dir, 'capsule.json');
+    await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+
+    const exported = makeIo();
+    assert.equal(await cliMain(['capsule', 'export', '--file', reportPath, '--out', capsulePath, '--plain'], exported.io), 0, exported.stderr());
+    assert.match(exported.stdout(), /^Enigma capsule export\n/);
+    assert.match(exported.stdout(), /Status: Ready/);
+    assert.match(exported.stdout(), /Capsule file: written to <out>/);
+    assert.match(exported.stdout(), /Boundary: public-safe local import capsule export only/);
+    assert.doesNotMatch(exported.stdout(), /^\s*\{/);
+    assert.equal(exported.stdout().includes(dir), false);
+    assert.equal(exported.stdout().includes(reportPath), false);
+    assert.equal(exported.stdout().includes(capsulePath), false);
+    assertNoTextLeak(exported.stdout(), RAW_MEMORY);
+
+    const imported = makeIo();
+    assert.equal(await cliMain(['capsule', 'import', '--file', capsulePath, '--plain'], imported.io), 1, imported.stderr());
+    assert.match(imported.stdout(), /^Enigma capsule import\n/);
+    assert.match(imported.stdout(), /Status: Needs attention/);
+    assert.match(imported.stdout(), /Memory Drive: not written/);
+    assert.match(imported.stdout(), /Boundary: public-safe local import capsule verification only/);
+    assert.doesNotMatch(imported.stdout(), /^\s*\{/);
+    assert.equal(imported.stdout().includes(dir), false);
+    assert.equal(imported.stdout().includes(capsulePath), false);
+    assertNoTextLeak(imported.stdout(), RAW_MEMORY);
+  });
 });
 
 test('package vault receipts verify prefix roots and redact source ref plaintext', async () => {
