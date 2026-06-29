@@ -239,16 +239,38 @@ export async function runSmoke() {
   return report;
 }
 
-function usage() {
-  return `Usage: node scripts/run-clean-machine-smoke.mjs [--json] [--out <path>]
+export function renderSmokePlain(report) {
+  const counts = report.summary?.counts ?? {};
+  const lines = [
+    'Enigma clean-machine smoke',
+    `Status: ${report.summary?.healthy ? 'Ready' : 'Needs attention'}`,
+    `Version: ${report.app_version ?? 'unknown'}`,
+    `Platform: ${report.platform ?? '<platform>'}/${report.arch ?? '<arch>'}`,
+    `Scenarios: ${report.summary?.total ?? 0}`,
+    `Pass: ${counts.pass ?? 0}`,
+    `Fail: ${counts.fail ?? 0}`,
+    `Skip: ${counts.skip ?? 0}`,
+  ];
+  for (const scenario of Array.isArray(report.scenarios) ? report.scenarios : []) {
+    lines.push(`Scenario: ${scenario.scenario_id} — ${scenario.status}`);
+  }
+  lines.push('Boundary: local clean-machine smoke evidence only; no raw memory, local paths, account identifiers, screenshots, transcripts, provider responses, provider deletion, model behavior, hosted service, signing, notarization, benchmark superiority, token ROI, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
 
-Run clean-machine smoke checks and emit a public-safe report.
+
+function usage() {
+  return `Usage: node scripts/run-clean-machine-smoke.mjs [--json|--plain] [--out <path>]
+
+Run clean-machine smoke checks and emit a public-safe report. --out always writes JSON evidence; --plain controls stdout only.
 `;
 }
 
 async function main() {
   const argv = process.argv.slice(2);
   const json = argv.includes('--json');
+  const plain = argv.includes('--plain') || argv.includes('--text') || argv.includes('--format=text') || argv.some((arg, index) => arg === '--format' && argv[index + 1] === 'text');
+  if (json && plain) throw new Error('Choose only one output format: --json or --plain.');
   const outIndex = argv.indexOf('--out');
   const outPath = outIndex >= 0 ? argv[outIndex + 1] : null;
 
@@ -259,14 +281,15 @@ async function main() {
   }
 
   const report = await runSmoke();
-  const output = json ? JSON.stringify(report, null, 2) : JSON.stringify(report, null, 2);
+  const evidenceJson = JSON.stringify(report, null, 2);
+  const output = plain ? renderSmokePlain(report) : `${evidenceJson}\n`;
 
   if (outPath) {
     const resolved = path.resolve(outPath);
     await mkdir(path.dirname(resolved), { recursive: true });
-    await writeFile(resolved, `${output}\n`, 'utf8');
+    await writeFile(resolved, `${evidenceJson}\n`, 'utf8');
   }
-  console.log(output);
+  process.stdout.write(output);
 
   process.exitCode = 0;
 }

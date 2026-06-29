@@ -5,7 +5,7 @@ import { mkdtemp, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { promisify } from 'node:util';
-import { CLEAN_MACHINE_SMOKE_SCHEMA, publicSafePath, runSmoke } from '../scripts/run-clean-machine-smoke.mjs';
+import { CLEAN_MACHINE_SMOKE_SCHEMA, publicSafePath, renderSmokePlain, runSmoke } from '../scripts/run-clean-machine-smoke.mjs';
 
 const execFileAsync = promisify(execFile);
 const SCRIPT = resolve('scripts/run-clean-machine-smoke.mjs');
@@ -41,6 +41,31 @@ test('clean-machine smoke report is public-safe even when local checks fail', as
   }
 });
 
+test('clean-machine smoke plain output is readable and path-redacted', async () => {
+  const previousManifestUrl = process.env.UPDATER_MANIFEST_URL;
+  process.env.UPDATER_MANIFEST_URL = 'http://127.0.0.1:9/manifest.json';
+  try {
+    const report = await runSmoke();
+    const plain = renderSmokePlain(report);
+
+    assert.match(plain, /^Enigma clean-machine smoke\n/);
+    assert.match(plain, /Status: Needs attention|Status: Ready/);
+    assert.match(plain, /Scenarios: 6/);
+    assert.match(plain, /Scenario: SMOKE-INSTALL-001/);
+    assert.match(plain, /Boundary: local clean-machine smoke evidence only/);
+    assert.doesNotMatch(plain, /^\s*\{/);
+    assert.doesNotMatch(plain, /C:\\Users\\|\/home\/|\/tmp\/|AppData\\Local/i);
+    assert.doesNotMatch(plain, /raw_memory|prompt:|transcript:|provider_response|api[_-]?key|password/i);
+  } finally {
+    if (previousManifestUrl === undefined) {
+      delete process.env.UPDATER_MANIFEST_URL;
+    } else {
+      process.env.UPDATER_MANIFEST_URL = previousManifestUrl;
+    }
+  }
+});
+
+
 test('clean-machine smoke CLI writes public-safe report', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'enigma-clean-machine-smoke-'));
   const out = join(dir, 'smoke.json');
@@ -55,4 +80,22 @@ test('clean-machine smoke CLI writes public-safe report', async () => {
   assert.deepEqual(printed, written);
   assert.equal(printed.schema, CLEAN_MACHINE_SMOKE_SCHEMA);
   assert.equal(JSON.stringify(printed).includes(dir), false);
+});
+
+test('clean-machine smoke CLI plain stdout writes JSON evidence separately', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-clean-machine-smoke-plain-'));
+  const out = join(dir, 'smoke.json');
+  const { stdout, stderr } = await execFileAsync(process.execPath, [SCRIPT, '--plain', '--out', out], {
+    windowsHide: true,
+    env: { ...process.env, UPDATER_MANIFEST_URL: 'http://127.0.0.1:9/manifest.json' },
+  });
+
+  assert.equal(stderr.trim(), '');
+  assert.match(stdout, /^Enigma clean-machine smoke\n/);
+  assert.match(stdout, /Boundary: local clean-machine smoke evidence only/);
+  assert.doesNotMatch(stdout, /^\s*\{/);
+  const written = JSON.parse(await readFile(out, 'utf8'));
+  assert.equal(written.schema, CLEAN_MACHINE_SMOKE_SCHEMA);
+  assert.equal(stdout.includes(dir), false);
+  assert.equal(stdout.includes(out), false);
 });
