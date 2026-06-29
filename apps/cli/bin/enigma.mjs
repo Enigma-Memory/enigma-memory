@@ -2211,6 +2211,46 @@ function printControllerBubbleResult(bubble, action, flags, io, outWritten = fal
   else print(bubble, io);
 }
 
+function renderNativeHostManifestPlain(summary) {
+  const lines = [
+    'Enigma native host manifest',
+    `Status: ${summary.ok ? 'Ready' : 'Needs attention'}`,
+    `Browser: ${summary.browser ?? '<browser>'}`,
+    `Host: ${summary.host_name ?? 'com.enigma.native_host'}`,
+    `Allowed apps: ${summary.allowed_app_count ?? 0}`,
+  ];
+  if (summary.out_written) lines.push('Manifest: written to <out>');
+  else lines.push('Manifest: generated; write with --out <manifest.json>');
+  lines.push(`Next: enigma native-host install-plan --browser ${summary.browser ?? '<browser>'} --manifest <manifest-path> --plain`);
+  lines.push('Boundary: local native-host manifest planning only; no browser registration writes, raw memory, local paths, provider calls, provider deletion, model behavior, hosted service, or signing claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printNativeHostManifestResult(summary, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderNativeHostManifestPlain(summary));
+  else print(summary.result, io);
+}
+
+function renderNativeHostInstallPlanPlain(plan) {
+  const lines = [
+    'Enigma native host install plan',
+    'Status: Ready',
+    `Browser: ${plan.browser ?? '<browser>'}`,
+    `OS: ${plan.os ?? '<os>'}`,
+    `Writes performed: ${plan.writes_performed === true ? 'yes' : 'no'}`,
+    `Registration targets: ${Array.isArray(plan.target_manifest_paths) ? plan.target_manifest_paths.length : 0}`,
+    `Registry commands: ${Array.isArray(plan.registry_command_preview) ? plan.registry_command_preview.length : 0}`,
+  ];
+  lines.push('Next: copy <manifest-path> to the browser native messaging host location shown in JSON mode, or use the desktop app when signed installers are available.');
+  lines.push('Boundary: local native-host registration plan only; no registry writes, filesystem writes, raw memory, local paths, provider calls, provider deletion, model behavior, hosted service, or signing claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printNativeHostInstallPlan(plan, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderNativeHostInstallPlanPlain(plan));
+  else print(plan, io);
+}
+
 
 
 function renderInstallPlain(summary) {
@@ -3409,17 +3449,20 @@ export async function claudeMcpbPackageCommand(flags, io) {
 }
 
 export async function nativeHostManifestCommand(flags, io) {
+  const browser = String(requireFlag(flags, ['browser'])).toLowerCase();
   const manifest = createNativeHostManifest({
-    browser: requireFlag(flags, ['browser']),
+    browser,
     hostPath: requireFlag(flags, ['host-path', 'hostPath'], 'host-path'),
     extensionId: requireFlag(flags, ['extension-id', 'extensionId'], 'extension-id'),
   });
+  const allowedAppCount = (Array.isArray(manifest.allowed_origins) ? manifest.allowed_origins.length : 0)
+    + (Array.isArray(manifest.allowed_extensions) ? manifest.allowed_extensions.length : 0);
   if (flags.has('out')) {
     const outPath = resolve(String(requireFlag(flags, ['out'])));
     await writeJson(outPath, manifest);
-    print({ ok: true, path: outPath }, io);
+    printNativeHostManifestResult({ ok: true, browser, host_name: manifest.name, allowed_app_count: allowedAppCount, out_written: true, result: { ok: true, path: outPath } }, flags, io);
   } else {
-    print(manifest, io);
+    printNativeHostManifestResult({ ok: true, browser, host_name: manifest.name, allowed_app_count: allowedAppCount, out_written: false, result: manifest }, flags, io);
   }
   return 0;
 }
@@ -3443,7 +3486,7 @@ export async function nativeHostInstallPlanCommand(flags, io) {
     os,
     homeDir: getFlag(flags, ['home', 'home-dir', 'homeDir'], defaultNativeHostInstallPlanHome(os)),
   });
-  print(plan, io);
+  printNativeHostInstallPlan(plan, flags, io);
   return 0;
 }
 
@@ -4444,12 +4487,14 @@ function usage() {
         '--host-path <absolute path>': 'Absolute path to the installed enigma-native-host executable.',
         '--extension-id <id>': 'Browser extension id allowed to connect to the native host.',
         '--out <file>': 'Write manifest JSON to a file instead of stdout.',
+        '--plain': 'Print a path-redacted native-host manifest summary instead of manifest JSON. Alias: --text or --format text.',
       },
       install_plan_options: {
         '--browser <chrome|edge|firefox>': 'Browser whose native messaging registration targets should be planned.',
         '--manifest <absolute path>': 'Absolute path to the generated native messaging manifest to register manually.',
         '--os <windows|macos|linux>': 'Target operating system. Defaults to the current operating system.',
         '--home <absolute path>': 'Target user home directory used to compute per-user manifest locations.',
+        '--plain': 'Print a path-redacted native-host install-plan summary instead of JSON. Alias: --text or --format text.',
       },
       boundary: 'Browser native messaging returns local context plus receipt summaries only; provider-native memory remains cache only.',
     },
