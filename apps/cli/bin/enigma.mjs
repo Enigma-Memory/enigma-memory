@@ -2801,7 +2801,7 @@ export async function testDriveCommand(flags, io) {
     out_dir: outDirInput,
     bundle: bundleInput,
     install_command: `npm install -g ${packageJson.name ?? 'enigma-memory'}`,
-    release_target: '0.1.18',
+    release_target: packageJson.version ?? '0.1.19',
     artifacts_written: !dryRun,
     client_configs_written: false,
     client_config_write_required: false,

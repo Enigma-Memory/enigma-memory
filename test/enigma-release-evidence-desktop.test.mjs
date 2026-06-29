@@ -220,7 +220,7 @@ test('buildDesktopReleaseEvidence records signing identity presence from env var
       const record = buildDesktopReleaseEvidence({
         windowsInstaller,
         macosInstaller,
-        version: '0.1.18',
+        version: '0.1.19',
       });
 
       assert.equal(record.signing_evidence.windows.configured, true);

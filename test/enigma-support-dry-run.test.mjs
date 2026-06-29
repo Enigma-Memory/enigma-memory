@@ -142,7 +142,7 @@ test('support dry-run CLI reads a redacted support artifact without leaking its 
   const artifact = {
     schema: 'enigma.diagnostics.v1',
     generated_at: '2026-06-28T12:00:00.000Z',
-    app_version: '0.1.18',
+    app_version: '0.1.19',
     service_running: true,
     memory_drive_status: 'healthy',
     issue_codes: ['DIAG-BUNDLE-PREVIEWED'],

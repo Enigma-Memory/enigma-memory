@@ -14,7 +14,7 @@ const execFileAsync = promisify(execFile);
 
 const PACKAGE_JSON = Object.freeze({
   name: 'enigma-memory',
-  version: '0.1.18',
+  version: '0.1.19',
   engines: { node: '>=24' },
   bin: {
     enigma: 'apps/cli/bin/enigma.mjs',
@@ -36,9 +36,9 @@ test('production unblocker emits complete public-safe planning report', () => {
   assert.equal(report.mutates_external_systems, false);
   assert.equal(report.overall_status, 'blocked_external_dependency');
   assert.equal(report.package.name, 'enigma-memory');
-  assert.equal(report.package.version, '0.1.18');
-  assert.equal(report.package.source_version, '0.1.18');
-  assert.equal(report.package.current_public_version, '0.1.18');
+  assert.equal(report.package.version, '0.1.19');
+  assert.equal(report.package.source_version, '0.1.19');
+  assert.equal(report.package.current_public_version, '0.1.19');
   assert.deepEqual(report.sections.map((section) => section.id), [
     'npm_install_readiness',
     'hosted_cloud_external_blockers',
@@ -60,7 +60,7 @@ test('production unblocker emits complete public-safe planning report', () => {
   assert.equal(byId(report, 'installer_distribution_status').status, 'blocked_external_dependency');
   assert.equal(byId(report, 'monitoring_ops_status').status, 'operator_evidence_required');
   assert.ok(report.operator_next_commands.some((entry) => entry.command === 'npm run production:unblocker -- --out .enigma/production-unblocker.json'));
-  assert.ok(report.operator_next_commands.some((entry) => entry.command === 'npm run registry:verify -- --package enigma-memory --version 0.1.18 --execute'));
+  assert.ok(report.operator_next_commands.some((entry) => entry.command === 'npm run registry:verify -- --package enigma-memory --version 0.1.19 --execute'));
   assert.ok(report.operator_next_commands.some((entry) => entry.command.includes('npm run production:evidence-starter')));
   assert.ok(report.operator_next_commands.some((entry) => entry.command.includes('enigma chain verify --file')));
   assert.ok(report.operator_next_commands.some((entry) => entry.command.includes('npm run benchmark:standard')));

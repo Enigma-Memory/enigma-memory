@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const PRODUCTION_UNBLOCKER_SCHEMA = 'enigma.production_unblocker.v1';
-export const CURRENT_PUBLIC_PACKAGE_VERSION = '0.1.18';
+export const CURRENT_PUBLIC_PACKAGE_VERSION = '0.1.19';
 
 const STATUS_VALUES = Object.freeze([
   'ready_now',

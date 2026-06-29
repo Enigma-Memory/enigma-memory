@@ -55,7 +55,7 @@
 | Item | Why it matters | Owner / path to close |
 |---|---|---|
 | PR #60 review/merge | `main` cannot receive the public-ready branch until review-required branch protection is satisfied. | PR #60 is open with `reviewDecision: REVIEW_REQUIRED`; a reviewer with merge rights must approve and merge. |
-| Publish `enigma-memory@0.1.19` | Public beta matrix requires `0.1.19`; package is still `0.1.18`. | Publish only after PR #60 is merged and the release owner approves the package contents. |
+| Publish `enigma-memory@0.1.19` | Public beta matrix requires `0.1.19`; source package is prepared at `0.1.19`, but registry publication evidence is still absent. | Publish only after PR #60 is merged and the release owner approves the package contents. |
 | Signed Windows installer / MSIX | Public launch definition of done requires signed distribution. | Upgrade or switch Azure to an Artifact Signing-eligible paid subscription. Portal creation for `Azure subscription 1` was rejected as free/trial/sponsored before account creation, identity validation, or Public Trust profile setup could proceed. |
 | Signed/macOS notarized app | Gatekeeper will block unsigned apps. | Enroll in Apple Developer Program; see `docs/public-launch/code-signing-setup.md` for fast-track steps and timeline. |
 | Clean-machine Windows/macOS beta evidence | Public beta requires observed install, first run, connector, proof, diagnostics, offline, update-check, and uninstall paths without developer tools. | Run the public beta QA matrix on clean Windows/macOS profiles with signed artifacts once signing is available. |
@@ -74,8 +74,8 @@
 - `npm run check` at repo root: **pass**.
 - `npm run secret-scan` at repo root: **pass**.
 - `npm test` at repo root: **622/622 pass**.
-- `npm pack --dry-run` at repo root: **pass** (`enigma-memory-0.1.18.tgz` dry-run output).
-- `npm run public-beta-qa` at repo root: **hold**, `21 blocked / 0 missing`, required public beta version `0.1.19`.
+- `npm pack --dry-run` at repo root: **pass** (`enigma-memory-0.1.19.tgz` dry-run output).
+- `npm run public-beta-qa` at repo root: **hold**, `20 blocked / 1 pending / 0 missing`, required public beta version `0.1.19`.
 - Hosted PR checks must still pass after each pushed branch commit; local gates do not replace PR approval/merge or signing evidence.
 
 ---
