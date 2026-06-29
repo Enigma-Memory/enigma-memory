@@ -17,6 +17,7 @@ test('public beta evidence manifest defaults to relative public-safe artifact la
   assert.equal(manifest.schema, 'enigma.public_beta_evidence_manifest.v1');
   assert.equal(manifest.public_safe, true);
   assert.equal(manifest.clean_machine_smoke, '.enigma/public-beta/clean-machine-smoke.json');
+  assert.equal(manifest.clean_machine_smoke_plan, '.enigma/public-beta/clean-machine-smoke-plan.json');
   assert.deepEqual(manifest.support_dry_run, [
     '.enigma/public-beta/support-dry-run-diagnostics.json',
     '.enigma/public-beta/support-dry-run-crash.json',
@@ -33,6 +34,7 @@ test('public beta evidence manifest defaults to relative public-safe artifact la
 test('public beta evidence manifest accepts repeatable support summaries and rejects unsafe paths', () => {
   const options = parseArgs([
     '--clean-machine-smoke', 'evidence/smoke.json',
+    '--clean-machine-smoke-plan', 'evidence/smoke-plan.json',
     '--support-dry-run', 'evidence/diag.json',
     '--support-dry-run', 'evidence/crash.json',
     '--registry-install', 'evidence/registry.json',
@@ -41,6 +43,7 @@ test('public beta evidence manifest accepts repeatable support summaries and rej
     '--plain',
   ]);
   const manifest = buildPublicBetaEvidenceManifest(options, ISO_NOW);
+  assert.equal(manifest.clean_machine_smoke_plan, 'evidence/smoke-plan.json');
   assert.deepEqual(manifest.support_dry_run, ['evidence/diag.json', 'evidence/crash.json']);
   assert.equal(manifest.registry_install, 'evidence/registry.json');
   assert.equal(options.plain, true);
@@ -59,6 +62,7 @@ test('public beta evidence manifest CLI writes JSON and plain output without loc
     assert.equal(code, 0);
     assert.match(stdout, /^Enigma public beta evidence manifest\n/);
     assert.match(stdout, /Manifest: written to <out>/);
+    assert.match(stdout, /Clean-machine smoke plan: \.enigma\/public-beta\/clean-machine-smoke-plan\.json/);
     assert.match(stdout, /Boundary: path-only manifest/);
     assert.doesNotMatch(stdout, /^\s*\{/);
     assert.equal(stdout.includes(dir), false);
@@ -66,6 +70,7 @@ test('public beta evidence manifest CLI writes JSON and plain output without loc
     const manifest = JSON.parse(await readFile(out, 'utf8'));
     assert.equal(manifest.schema, 'enigma.public_beta_evidence_manifest.v1');
     assert.equal(manifest.next_command, 'npm run public-beta-qa -- --evidence-manifest <manifest.json>');
+    assert.equal(manifest.clean_machine_smoke_plan, '.enigma/public-beta/clean-machine-smoke-plan.json');
     assert.equal(renderPublicBetaEvidenceManifestPlain(manifest).includes('public-beta readiness claim'), true);
   } finally {
     await rm(dir, { recursive: true, force: true });

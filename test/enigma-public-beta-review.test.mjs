@@ -44,6 +44,7 @@ test('public beta review writes generated support dry-run evidence and keeps ext
     const cleanMachinePlan = JSON.parse(await readFile(join(dir, 'clean-machine-smoke-plan.json'), 'utf8'));
     const matrix = JSON.parse(await readFile(join(dir, 'qa-matrix.json'), 'utf8'));
     assert.equal(manifest.schema, 'enigma.public_beta_evidence_manifest.v1');
+    assert.equal(manifest.clean_machine_smoke_plan, '.enigma/public-beta/clean-machine-smoke-plan.json');
     assert.equal(diagnosticSupport.schema, 'enigma.support_dry_run_summary.v1');
     assert.equal(diagnosticSupport.scenario_id, 'BETA-DIAG-001');
     assert.equal(crashSupport.schema, 'enigma.support_dry_run_summary.v1');

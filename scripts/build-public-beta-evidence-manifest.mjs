@@ -8,6 +8,7 @@ export const PUBLIC_BETA_EVIDENCE_MANIFEST_SCHEMA = 'enigma.public_beta_evidence
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const DEFAULTS = Object.freeze({
   cleanMachineSmoke: '.enigma/public-beta/clean-machine-smoke.json',
+  cleanMachineSmokePlan: '.enigma/public-beta/clean-machine-smoke-plan.json',
   supportDryRun: [
     '.enigma/public-beta/support-dry-run-diagnostics.json',
     '.enigma/public-beta/support-dry-run-crash.json',
@@ -18,7 +19,7 @@ const DEFAULTS = Object.freeze({
 });
 
 function usage() {
-  return `Usage: node scripts/build-public-beta-evidence-manifest.mjs [--out <path>] [--plain] [evidence path overrides]\n\nBuilds a path-only ${PUBLIC_BETA_EVIDENCE_MANIFEST_SCHEMA} input manifest for npm run public-beta-qa -- --evidence-manifest <manifest.json>.\n\nEvidence path overrides:\n  --clean-machine-smoke <relative-json>\n  --support-dry-run <relative-json>     Repeatable.\n  --registry-install <relative-json>\n  --desktop-release-evidence <relative-json>\n  --production-handoff-packet <relative-json>\n\nPaths must be relative repository-local labels. The manifest embeds no artifact contents and performs no release action.\n`;
+  return `Usage: node scripts/build-public-beta-evidence-manifest.mjs [--out <path>] [--plain] [evidence path overrides]\n\nBuilds a path-only ${PUBLIC_BETA_EVIDENCE_MANIFEST_SCHEMA} input manifest for npm run public-beta-qa -- --evidence-manifest <manifest.json>.\n\nEvidence path overrides:\n  --clean-machine-smoke <relative-json>\n  --clean-machine-smoke-plan <relative-json>\n  --support-dry-run <relative-json>     Repeatable.\n  --registry-install <relative-json>\n  --desktop-release-evidence <relative-json>\n  --production-handoff-packet <relative-json>\n\nPaths must be relative repository-local labels. The manifest embeds no artifact contents and performs no release action.\n`;
 }
 
 function readArg(argv, index, flag) {
@@ -32,6 +33,7 @@ export function parseArgs(argv = process.argv.slice(2)) {
     plain: false,
     help: false,
     cleanMachineSmoke: null,
+    cleanMachineSmokePlan: null,
     supportDryRun: [],
     registryInstall: null,
     desktopReleaseEvidence: null,
@@ -49,6 +51,9 @@ export function parseArgs(argv = process.argv.slice(2)) {
       i += 1;
     } else if (arg === '--clean-machine-smoke') {
       options.cleanMachineSmoke = readArg(argv, i + 1, arg);
+      i += 1;
+    } else if (arg === '--clean-machine-smoke-plan') {
+      options.cleanMachineSmokePlan = readArg(argv, i + 1, arg);
       i += 1;
     } else if (arg === '--support-dry-run') {
       options.supportDryRun.push(readArg(argv, i + 1, arg));
@@ -92,6 +97,7 @@ export function buildPublicBetaEvidenceManifest(options = {}, generatedAt = new 
     generated_at: generatedAt,
     public_safe: true,
     clean_machine_smoke: publicRelativePath(options.cleanMachineSmoke ?? DEFAULTS.cleanMachineSmoke, 'clean_machine_smoke'),
+    clean_machine_smoke_plan: publicRelativePath(options.cleanMachineSmokePlan ?? DEFAULTS.cleanMachineSmokePlan, 'clean_machine_smoke_plan'),
     support_dry_run: supportDryRun,
     registry_install: publicRelativePath(options.registryInstall ?? DEFAULTS.registryInstall, 'registry_install'),
     desktop_release_evidence: publicRelativePath(options.desktopReleaseEvidence ?? DEFAULTS.desktopReleaseEvidence, 'desktop_release_evidence'),
@@ -115,6 +121,7 @@ export function renderPublicBetaEvidenceManifestPlain(manifest, wrote = false) {
     'Enigma public beta evidence manifest',
     'Status: Ready',
     `Clean-machine smoke: ${manifest.clean_machine_smoke ?? '<path>'}`,
+    `Clean-machine smoke plan: ${manifest.clean_machine_smoke_plan ?? '<path>'}`,
     `Support dry-runs: ${supportCount}`,
     `Registry install: ${manifest.registry_install ?? '<path>'}`,
     `Desktop release evidence: ${manifest.desktop_release_evidence ?? '<path>'}`,
