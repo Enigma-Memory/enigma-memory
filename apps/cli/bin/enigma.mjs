@@ -2679,6 +2679,23 @@ function printQuickstartSummary(summary, flags, io) {
 }
 
 
+function doctorSetupExplanation(summary) {
+  const reasons = new Set(Array.isArray(summary.setup_status?.reasons) ? summary.setup_status.reasons : []);
+  const connectorReasons = (Array.isArray(summary.connectors?.clients) ? summary.connectors.clients : [])
+    .flatMap((client) => Array.isArray(client.repair_reasons) ? client.repair_reasons : []);
+  for (const reason of connectorReasons) reasons.add(`connector_${reason}`);
+  if (reasons.has('bundle_missing')) {
+    return 'Why: the target Enigma bundle does not exist yet. Run quickstart for this bundle, then rerun doctor.';
+  }
+  if (reasons.has('connector_bundle_env_missing') || reasons.has('connector_bundle_env_mismatch')) {
+    return 'Why: an existing MCP client config points at a missing or different bundle. Initialize this bundle, then preview or repair the connector.';
+  }
+  if (summary.setup_status?.state === 'setup_needed') {
+    return 'Why: doctor is the final green check after local setup, not the first install step.';
+  }
+  return null;
+}
+
 function renderDoctorPlain(summary) {
   const lines = [
     'Enigma doctor',
@@ -2687,6 +2704,8 @@ function renderDoctorPlain(summary) {
   ];
   const reasons = Array.isArray(summary.setup_status?.reasons) ? summary.setup_status.reasons : [];
   if (reasons.length > 0) lines.push(`Issue: ${reasons.join(', ')}`);
+  const explanation = doctorSetupExplanation(summary);
+  if (explanation) lines.push(explanation);
   if (summary.first_run_hint?.command) lines.push(`Run: ${summary.first_run_hint.command}`);
   const followUps = Array.isArray(summary.next_commands) ? summary.next_commands.slice(1, 3) : [];
   for (const command of followUps) lines.push(`Then: ${command}`);

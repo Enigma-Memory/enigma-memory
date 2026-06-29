@@ -595,6 +595,7 @@ test('doctor plain output gives one readable next action without JSON or paths',
     assert.match(stdout, /^Enigma doctor\n/);
     assert.match(stdout, /Status: Needs attention/);
     assert.match(stdout, /Setup: setup_needed/);
+    assert.match(stdout, /Why: the target Enigma bundle does not exist yet/);
     assert.match(stdout, /Run: enigma quickstart --bundle "<bundle-path>"/);
     assert.match(stdout, /Boundary: local Enigma checks only/);
     assert.doesNotMatch(stdout, /^\s*\{/);
