@@ -37,6 +37,7 @@ function parseArgs(argv) {
     expectTitle: DEFAULT_EXPECT_TITLE,
     out: null,
     envFile: null,
+    plain: false,
   };
   for (let index = 0; index < argv.length;) {
     const token = argv[index];
@@ -54,13 +55,17 @@ function parseArgs(argv) {
     else if (token === '--expect-title') out.expectTitle = readValue(token);
     else if (token === '--cloudflare-env-file') out.envFile = readValue(token);
     else if (token === '--out') out.out = readValue(token);
+    else if (token === '--plain' || token === '--text' || token === '--format=text' || (token === '--format' && argv[index + 1] === 'text')) {
+      out.plain = true;
+      index += token === '--format' ? 2 : 1;
+    }
     else throw new UsageError(`unknown option ${token}`);
   }
   return out;
 }
 
 function usage() {
-  return `Usage: node scripts/build-cloudflare-pages-release-packet.mjs --site <dir> --project-name <name> [options]\n\nOptions:\n  --domain <host>                  Public domain expected for deployment evidence.\n  --live-url <https-url>           Optional non-mutating fetch of the currently live page.\n  --expect-title <text>            Expected text in the live page title. Default: ${DEFAULT_EXPECT_TITLE}.\n  --cloudflare-env-file <path>     Optional local .env-style Cloudflare secret file; values are loaded but never printed.\n  --out <file>                     Write packet JSON to a file and print the same JSON.\n\nThe packet is public-safe: it contains file hashes, counts, dry-run deploy command metadata,\nsecurity validation results, and optional live-page title observation. It never prints tokens or raw Cloudflare credential values.`;
+  return `Usage: node scripts/build-cloudflare-pages-release-packet.mjs --site <dir> --project-name <name> [options]\n\nOptions:\n  --domain <host>                  Public domain expected for deployment evidence.\n  --live-url <https-url>           Optional non-mutating fetch of the currently live page.\n  --expect-title <text>            Expected text in the live page title. Default: ${DEFAULT_EXPECT_TITLE}.\n  --cloudflare-env-file <path>     Optional local .env-style Cloudflare secret file; values are loaded but never printed.\n  --out <file>                     Write packet JSON evidence.\n  --plain                          Print a human-readable Pages packet summary.\n\nThe packet is public-safe: it contains file hashes, counts, dry-run deploy command metadata,\nsecurity validation results, and optional live observation metadata. It never prints tokens or local paths.\n`;
 }
 
 function normalizeRelativePath(root, absolutePath) {
@@ -253,6 +258,28 @@ export async function buildCloudflarePagesReleasePacket(input = {}, options = {}
   };
 }
 
+export function renderCloudflarePagesReleasePacketPlain(packet) {
+  const lines = [
+    'Enigma Cloudflare Pages release packet',
+    `Status: ${packet.automated_deploy_ready ? 'Ready' : 'Needs attention'}`,
+    `Project: ${packet.project_name ?? '<project>'}`,
+    `Domain: ${packet.domain ?? '<domain>'}`,
+    `Local artifact ready: ${packet.local_artifact_ready ? 'yes' : 'no'}`,
+    `Automated deploy ready: ${packet.automated_deploy_ready ? 'yes' : 'no'}`,
+    `Credential present: ${packet.credential_present ? 'yes' : 'no'}`,
+    `Files: ${packet.artifact?.file_count ?? 0}`,
+    `Bytes: ${packet.artifact?.byte_count ?? 0}`,
+    `Security: ${packet.security?.ok ? 'ready' : 'blocked'} (${packet.security?.blocker_count ?? 0} blockers)`,
+    `Live observation: ${packet.live_observation === null ? 'not requested' : packet.live_observation.ok ? 'ready' : 'blocked'}`,
+    `Deployment blockers: ${Array.isArray(packet.deployment_blockers) ? packet.deployment_blockers.length : 0}`,
+  ];
+  for (const blocker of (Array.isArray(packet.blockers) ? packet.blockers.slice(0, 5) : [])) lines.push(`Local blocker: ${blocker}`);
+  for (const blocker of (Array.isArray(packet.deployment_blockers) ? packet.deployment_blockers.slice(0, 5) : [])) lines.push(`Deploy blocker: ${blocker}`);
+  lines.push('Boundary: public-safe Cloudflare Pages release packet only; no Cloudflare token, account id, local paths, deploy execution, hosted relay/gateway readiness, durable storage, KMS, SIEM, backups, raw memory, prompts, transcripts, provider responses, provider deletion, model behavior, compliance, benchmark superiority, token ROI, or provider invoice savings claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+
 function redactCliMessage(value) {
   return String(value)
     .replace(SECRET_OUTPUT_RE, '[redacted]')
@@ -271,7 +298,7 @@ export async function runCli(argv = process.argv.slice(2), options = {}) {
     await mkdir(dirname(outPath), { recursive: true });
     await writeFile(outPath, json, 'utf8');
   }
-  return { json: packet };
+  return parsed.plain ? { text: renderCloudflarePagesReleasePacketPlain(packet), json: packet } : { json: packet };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

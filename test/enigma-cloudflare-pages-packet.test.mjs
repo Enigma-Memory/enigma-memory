@@ -8,6 +8,7 @@ import { promisify } from 'node:util';
 import {
   CLOUDFLARE_PAGES_RELEASE_PACKET_SCHEMA,
   buildCloudflarePagesReleasePacket,
+  renderCloudflarePagesReleasePacketPlain,
 } from '../scripts/build-cloudflare-pages-release-packet.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -71,6 +72,34 @@ test('Cloudflare Pages release packet accepts secure local artifact and records 
   assert.doesNotMatch(JSON.stringify(packet), /Bearer|PRIVATE KEY|sk-/i);
 });
 
+test('Cloudflare Pages release packet plain output is readable and claim-bounded', async () => {
+  const site = await writeSite();
+  const packet = await buildCloudflarePagesReleasePacket({
+    site,
+    projectName: 'enigma-memory',
+    domain: 'enigmamemory.com',
+    liveUrl: 'https://enigmamemory.com/',
+    expectTitle: 'Enigma',
+  }, {
+    env: {},
+    generated_at: '2026-06-24T00:00:00.000Z',
+    fetchImpl: fakeFetch({ title: 'Engram — The old page' }),
+  });
+  const plain = renderCloudflarePagesReleasePacketPlain(packet);
+
+  assert.match(plain, /^Enigma Cloudflare Pages release packet\n/);
+  assert.match(plain, /Status: Needs attention/);
+  assert.match(plain, /Project: enigma-memory/);
+  assert.match(plain, /Local artifact ready: yes/);
+  assert.match(plain, /Automated deploy ready: no/);
+  assert.match(plain, /Credential present: no/);
+  assert.match(plain, /Deploy blocker: CLOUDFLARE_API_TOKEN is absent/);
+  assert.match(plain, /Boundary: public-safe Cloudflare Pages release packet only/);
+  assert.doesNotMatch(plain, /^\s*\{/);
+  assert.doesNotMatch(plain, new RegExp(escapeRegExp(site)));
+  assert.doesNotMatch(plain, /Bearer|PRIVATE KEY|sk-|cf-token|raw_memory|C:\\Users\\|\/home\/|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/i);
+});
+
 test('Cloudflare Pages release packet blocks unsafe static artifacts before deploy', async () => {
   const site = await writeSite({ personalInfo: true });
   const packet = await buildCloudflarePagesReleasePacket({
@@ -121,6 +150,42 @@ test('Cloudflare Pages release packet CLI writes public-safe JSON', async () => 
   assert.equal(stdoutPacket.deploy_plan.args.includes('<public-site>'), true);
   assert.doesNotMatch(result.stdout, new RegExp(escapeRegExp(site)));
   assert.doesNotMatch(result.stdout, /cf-token-present-but-not-printed|Bearer|PRIVATE KEY|sk-/i);
+});
+
+test('Cloudflare Pages release packet CLI writes JSON while printing plain output', async () => {
+  const site = await writeSite();
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-pages-packet-plain-'));
+  const outPath = join(dir, 'packet.json');
+  const result = await execFileAsync(process.execPath, [
+    'scripts/build-cloudflare-pages-release-packet.mjs',
+    '--site',
+    site,
+    '--project-name',
+    'enigma-memory',
+    '--domain',
+    'enigmamemory.com',
+    '--out',
+    outPath,
+    '--plain',
+  ], {
+    cwd: process.cwd(),
+    env: { ...process.env, CLOUDFLARE_API_TOKEN: 'cf-token-present-but-not-printed' },
+    timeout: 10000,
+    windowsHide: true,
+  });
+  assert.equal(result.stderr, '');
+  assert.match(result.stdout, /^Enigma Cloudflare Pages release packet\n/);
+  assert.match(result.stdout, /Status: Ready/);
+  assert.match(result.stdout, /Credential present: yes/);
+  assert.match(result.stdout, /Boundary: public-safe Cloudflare Pages release packet only/);
+  assert.doesNotMatch(result.stdout, /^\s*\{/);
+  assert.equal(result.stdout.includes(dir), false);
+  assert.equal(result.stdout.includes(site), false);
+  assert.equal(result.stdout.includes(outPath), false);
+  assert.doesNotMatch(result.stdout, /cf-token-present-but-not-printed|Bearer|PRIVATE KEY|sk-/i);
+  const filePacket = JSON.parse(await readFile(outPath, 'utf8'));
+  assert.equal(filePacket.schema, CLOUDFLARE_PAGES_RELEASE_PACKET_SCHEMA);
+  assert.equal(filePacket.automated_deploy_ready, true);
 });
 
 test('Cloudflare Pages release packet CLI redacts local paths on errors', async () => {
