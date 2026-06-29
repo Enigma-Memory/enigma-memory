@@ -255,6 +255,7 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
     readDesktopTauriSource('lib.rs'),
   ]);
   const ui = `${wizard}\n${help}\n${styles}`;
+  const runHealthBlock = wizard.match(/case 'run-health': \{[\s\S]*?return;\n    \}/)?.[0] || '';
 
   assert.match(wizard, /Memory Controller/);
   assert.match(wizard, /Memory Weather/);
@@ -343,6 +344,9 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(wizard, /call\('get_diagnostics'\)/);
   assert.match(wizard, /call\('check_update'\)/);
   assert.match(wizard, /currentStep === 6/);
+  assert.match(runHealthBlock, /call\('start_service'\)/);
+  assert.match(runHealthBlock, /health = await call\('get_health'\);[\s\S]*serviceStatus = await call\('start_service'\);[\s\S]*health = await call\('get_health'\);/);
+  assert.ok(runHealthBlock.indexOf("call('start_service')") < runHealthBlock.indexOf('currentStep = 5'));
   assert.match(wizard.match(/case 'go-dashboard': \{[\s\S]*?return;\n    \}/)?.[0] || '', /hydrateDashboardState/);
   assert.match(wizard.match(/async function init\(\) \{[\s\S]*?\n\}/)?.[0] || '', /hydrateDashboardState/);
   assert.match(tauriService, /pub async fn preview_import_text/);

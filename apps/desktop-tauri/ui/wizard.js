@@ -1492,17 +1492,34 @@ async function handleAction(event) {
     case 'run-health': {
       busy = true;
       setStatus('Checking vault...');
-      health = await call('get_health');
-      proofActivity = health.proof_activity?.schema ? health.proof_activity : await call('get_proof_activity');
-      serviceStatus = await call('get_service_status');
-      serviceLogs = await call('get_service_logs', { limit: 100 });
-      diagnostics = await call('get_diagnostics');
-      update = await call('check_update');
-      health.diagnostics_status = diagnostics.status;
-      health.update_status = update.status;
-      busy = false;
-      if (currentStep === 4) {
-        currentStep = 5;
+      try {
+        health = await call('get_health');
+        serviceStatus = await call('get_service_status');
+        const memoryDriveStatus = normalizeMemoryDriveStatus(health.memory_drive_status);
+        if (memoryDriveStatus === 'ready' && serviceStatus?.running !== true) {
+          setStatus('Starting local engine...');
+          serviceStatus = await call('start_service');
+          health = await call('get_health');
+        }
+        proofActivity = health.proof_activity?.schema ? health.proof_activity : await call('get_proof_activity');
+        serviceLogs = await call('get_service_logs', { limit: 100 });
+        diagnostics = await call('get_diagnostics');
+        update = await call('check_update');
+        health.diagnostics_status = diagnostics.status;
+        health.update_status = update.status;
+        busy = false;
+        if (currentStep === 4) {
+          const finalMemoryDriveStatus = normalizeMemoryDriveStatus(health.memory_drive_status);
+          const offlineReady = serviceStatus?.running === true && health.offline_ready === true;
+          if (finalMemoryDriveStatus === 'ready' && offlineReady) {
+            currentStep = 5;
+          } else {
+            setStatus('Memory Drive needs attention before Ready. Open the dashboard for the next safe action.');
+          }
+        }
+      } catch (_) {
+        busy = false;
+        setStatus('Health check could not finish. Open dashboard to retry or export diagnostics.');
       }
       render();
       return;
