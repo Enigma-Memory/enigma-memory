@@ -16,13 +16,13 @@ Supported connector IDs:
 
 ```sh
 npm install -g enigma-memory
-enigma init
-enigma setup --client auto --connect-installed --overwrite
-enigma drive health
-enigma status
-enigma remember --text-file ./memory.txt
-enigma search --query "project context"
-enigma context --query "project context" --optimize
+enigma quickstart --bundle ./.enigma/bundle.json
+enigma connect claude-desktop --bundle ./.enigma/bundle.json --dry-run
+enigma drive health --bundle ./.enigma/bundle.json
+enigma status --bundle ./.enigma/bundle.json
+enigma remember --bundle ./.enigma/bundle.json --text-file ./memory.txt
+enigma search --bundle ./.enigma/bundle.json --query "project context"
+enigma context --bundle ./.enigma/bundle.json --query "project context" --optimize
 enigma verify --export ./.enigma/export.json
 ```
 
@@ -35,11 +35,11 @@ enigma context --query "project context" --require-grant --grant-file ./.enigma/
 
 This is an Enigma-local permission check. It does not prove provider deletion, provider non-use, or model forgetting.
 
-One command connects every installed client: `enigma setup --client auto --connect-installed --overwrite` writes the `mcpServers.enigma` entry into every installed/config-present client it detects (Claude Desktop, Cursor, Kimi Code, VS Code/Cline, Roo, OpenCode, generic MCP). It skips clients that are not installed and never creates configs from scratch; preview with `--dry-run` first. `enigma drive health` reports a SMART-style memory-drive health packet (freshness, tombstone backlog, stale derived artifacts, receipt coverage, connector health) from local metadata only — it is part of the Memory Drive surface in this release, and `enigma status` plus `enigma doctor` cover local passport counts, roots, and connector readiness in every build. No setup command prints raw memory plaintext.
+Preview one intended client first: `enigma connect <client> --bundle ./.enigma/bundle.json --dry-run` shows the path-redacted local config plan without writing client settings. When the dry-run looks right, repeat the same command without `--dry-run` for that one client. `enigma drive health` reports a SMART-style memory-drive health packet (freshness, tombstone backlog, stale derived artifacts, receipt coverage, connector health) from local metadata only — it is part of the Memory Drive surface in this release, and `enigma status` plus `enigma doctor` cover local passport counts, roots, and connector readiness in every build. No setup command contacts a provider, creates hosted accounts, syncs cloud state, or proves provider deletion or model forgetting.
 
-Run setup or quickstart before using `enigma doctor` as the final green check. Doctor reads existing client configs as well as the local environment, so an already-present `generic-mcp` or other MCP config can make doctor red on a fresh install if its `ENIGMA_BUNDLE` points to a bundle that does not exist yet, or to a different bundle than the one passed to doctor. That is expected first-run connector state, not an npm install failure. In doctor JSON, `setup_status.state:"setup_needed"` means run `setup_status.next_command`; `attention_needed` means a real local install or connector issue remains. Use `enigma quickstart --bundle ./.enigma/bundle.json --overwrite` or `enigma setup --bundle ./.enigma/bundle.json --overwrite`, then rerun `enigma doctor --bundle ./.enigma/bundle.json`.
+Run quickstart before using `enigma doctor` as the final green check. Doctor reads existing client configs as well as the local environment, so an already-present `generic-mcp` or other MCP config can make doctor red on a fresh install if its `ENIGMA_BUNDLE` points to a bundle that does not exist yet, or to a different bundle than the one passed to doctor. That is expected first-run connector state, not an npm install failure. In doctor JSON, `setup_status.state:"setup_needed"` means run `setup_status.next_command`; `attention_needed` means a real local install or connector issue remains. Use `enigma quickstart --bundle ./.enigma/bundle.json`, then rerun `enigma doctor --bundle ./.enigma/bundle.json`.
 
-For a single client, or to preview before writing, use `enigma connect <client> --dry-run` and then drop `--dry-run`.
+For a single client, preview before writing with `enigma connect <client> --dry-run` and then drop `--dry-run`.
 
 Provider-native memory is non-canonical cache only in this architecture. The Enigma vault remains canonical, and Enigma receipts prove Enigma-controlled lifecycle events; they do not prove that a hosted provider deleted hidden copies or that a model forgot anything. Hosted cloud and BYOC operation are waitlist/operator-deploy only; the relay and gateway binaries are local bootstrap probes, not a live hosted service.
 
@@ -76,31 +76,15 @@ enigma connect opencode
 enigma connect generic-mcp
 ```
 
-Optional setup-time planning for installed/config-present connector targets remains available:
+To inspect installed/config-present connector targets without writing every client, use:
 
 ```sh
-enigma setup --client auto --overwrite
+enigma status --bundle ./.enigma/bundle.json
+enigma doctor --bundle ./.enigma/bundle.json
 ```
 
-Use the explicit setup-time write flag only when you want setup to write all installed/config-present client configs it discovers:
+Automatic setup-time connector writes are intentionally not the default path. Prefer one-client dry-run previews so users can review exactly what Enigma will change.
 
-```sh
-enigma setup --connect-installed --overwrite
-```
-
-`--connect-installed` skips missing client configs instead of creating every default client config. It is for installed/config-present clients only. Existing `enigma setup --write-connectors` behavior for explicit/default clients is unchanged.
-
-When the single-client dry run looks right, remove `--dry-run` for the client you want:
-
-```sh
-enigma connect claude-desktop
-enigma connect cursor
-enigma connect kimi-code
-enigma connect vscode-cline
-enigma connect roo
-enigma connect opencode
-enigma connect generic-mcp
-```
 
 Disconnect one client without touching unrelated client settings:
 

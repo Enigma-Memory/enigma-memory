@@ -429,7 +429,7 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
 });
 
 test('public website explains consumer install path without unsupported claims', async () => {
-  const [home, download, setup, websiteStyles, help, launchStatus, installGuide, macosInstall, windowsInstall, connectApps, otherClients, removalGuide, faq, developerCli, readme, installAnywhere, onboardingUx] = await Promise.all([
+  const [home, download, setup, websiteStyles, help, launchStatus, installGuide, macosInstall, windowsInstall, connectApps, otherClients, removalGuide, faq, developerCli, readme, installAnywhere, clientConnectors, onboardingUx] = await Promise.all([
     readWebsiteFile('index.html'),
     readWebsiteFile('download.html'),
     readWebsiteFile('setup.html'),
@@ -446,6 +446,7 @@ test('public website explains consumer install path without unsupported claims',
     readWebsiteFile('developers/cli.html'),
     readFile(new URL('../README.md', import.meta.url), 'utf8'),
     readFile(new URL('../docs/install-anywhere.md', import.meta.url), 'utf8'),
+    readFile(new URL('../docs/client-connectors.md', import.meta.url), 'utf8'),
     readFile(new URL('../docs/public-launch/consumer-onboarding-ux.md', import.meta.url), 'utf8'),
   ]);
   const publicWebsite = `${home}\n${download}\n${setup}\n${help}\n${launchStatus}\n${installGuide}\n${macosInstall}\n${windowsInstall}\n${connectApps}\n${otherClients}\n${removalGuide}\n${faq}`;
@@ -469,6 +470,9 @@ test('public website explains consumer install path without unsupported claims',
   assert.doesNotMatch(installAnywhere, /setup --client auto --connect-installed --overwrite/);
   assert.match(installAnywhere, /enigma quickstart --bundle \.\/\.enigma\/bundle\.json/);
   assert.match(installAnywhere, /enigma connect claude-desktop --bundle \.\/\.enigma\/bundle\.json --dry-run/);
+  assert.doesNotMatch(clientConnectors, /setup --client auto --connect-installed --overwrite/);
+  assert.match(clientConnectors, /Preview one intended client first/);
+  assert.match(clientConnectors, /enigma connect claude-desktop --dry-run/);
   assert.match(websiteStyles, /first-run-map/);
   assert.match(help, /Start here/);
   assert.match(help, /You should not need Node, npm, terminal commands, or JSON edits/);
