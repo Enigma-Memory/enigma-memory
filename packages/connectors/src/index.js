@@ -586,16 +586,17 @@ function publicDefaultConfigPath(clientId, platform) {
   return CLIENT_DEFINITIONS[clientId].default_config_paths[platform];
 }
 
-function connectCommandFor(clientId, platform) {
-  return `enigma connect ${clientId} --bundle "${publicBundlePlaceholder(platform)}"`;
+function connectCommandFor(clientId, platform, { dryRun = false } = {}) {
+  const suffix = dryRun ? ' --dry-run' : '';
+  return `enigma connect ${clientId} --bundle "${publicBundlePlaceholder(platform)}"${suffix}`;
 }
 
-function setupConnectCommandFor(clientId, platform) {
-  return `enigma setup --client ${clientId} --write-connectors --bundle "${publicBundlePlaceholder(platform)}" --overwrite`;
+function previewConnectCommandFor(clientId, platform) {
+  return connectCommandFor(clientId, platform, { dryRun: true });
 }
 
-function installConnectCommandFor(clientId, platform) {
-  return `npm install -g enigma-memory && ${setupConnectCommandFor(clientId, platform)}`;
+function installPreviewConnectCommandFor(clientId, platform) {
+  return `npm install -g enigma-memory && enigma quickstart --bundle "${publicBundlePlaceholder(platform)}" && ${previewConnectCommandFor(clientId, platform)}`;
 }
 
 
@@ -611,9 +612,9 @@ function wizardStepsForClient(clientId, platform) {
     {
       order: 2,
       id: 'create_local_bundle',
-      title: 'Create and verify the local Enigma bundle.',
+      title: 'Create and verify the local Memory Drive.',
       commands: [
-        `enigma quickstart --bundle "${publicBundlePlaceholder(platform)}" --overwrite`,
+        `enigma quickstart --bundle "${publicBundlePlaceholder(platform)}"`,
         `enigma verify --bundle "${publicBundlePlaceholder(platform)}"`,
       ],
       writes: 'local_enigma_bundle',
@@ -628,9 +629,9 @@ function wizardStepsForClient(clientId, platform) {
     {
       order: 4,
       id: 'connect_client',
-      title: 'Merge only the Enigma MCP server entry into the client config.',
-      command: connectCommandFor(clientId, platform),
-      writes: 'client_config_when_user_runs_command',
+      title: 'Preview the app connection before writing settings.',
+      command: previewConnectCommandFor(clientId, platform),
+      writes: false,
     },
     {
       order: 5,
@@ -644,8 +645,8 @@ function wizardStepsForClient(clientId, platform) {
       order: 5,
       id: 'kimi_gui_path_caveat',
       title: 'If Kimi Code was launched from the GUI and cannot find enigma-mcp, reconnect with an absolute command path.',
-      command: `${connectCommandFor(clientId, platform)} --mcp-command "/absolute/path/to/enigma-mcp"`,
-      writes: 'client_config_when_user_runs_command',
+      command: `${previewConnectCommandFor(clientId, platform)} --mcp-command "/absolute/path/to/enigma-mcp"`,
+      writes: false,
     });
     for (let index = 5; index < steps.length; index += 1) steps[index].order = index + 1;
   }
@@ -668,9 +669,9 @@ export function planConnectWizard(clientIdOrOptions = {}, maybeOptions = {}) {
       display_name: CLIENT_DEFINITIONS[clientId].display_name,
       default_config_path: publicDefaultConfigPath(clientId, platform),
       steps: wizardStepsForClient(clientId, platform),
-      one_command_install_connect: installConnectCommandFor(clientId, platform),
-      setup_connect_command: setupConnectCommandFor(clientId, platform),
-      connect_command: connectCommandFor(clientId, platform),
+      one_command_install_connect: installPreviewConnectCommandFor(clientId, platform),
+      setup_connect_command: `enigma quickstart --bundle "${publicBundlePlaceholder(platform)}" && ${previewConnectCommandFor(clientId, platform)}`,
+      connect_command: previewConnectCommandFor(clientId, platform),
       mcp_config_preview: renderMcpConfig(clientId, { platform, bundlePath: publicBundlePlaceholder(platform) }),
     })),
   };

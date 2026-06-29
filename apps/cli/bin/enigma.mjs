@@ -1163,16 +1163,17 @@ function publicSetupError(error, rawDisplays, publicDisplays) {
 }
 
 function oneCommandInstallConnect(bundleDisplay = DEFAULT_BUNDLE, outDirDisplay = dirname(bundleDisplay)) {
-  const parts = ['npm install -g enigma-memory && enigma setup'];
-  if (bundleDisplay !== DEFAULT_BUNDLE) parts.push(`--bundle ${commandPath(bundleDisplay)}`);
-  if (outDirDisplay !== dirname(bundleDisplay)) parts.push(`--out-dir ${commandPath(outDirDisplay)}`);
-  const base = parts.join(' ');
+  const bundleArg = `--bundle ${commandPath(bundleDisplay)}`;
+  const quickstartParts = ['npm install -g enigma-memory && enigma quickstart', bundleArg];
+  if (outDirDisplay !== dirname(bundleDisplay)) quickstartParts.push(`--out-dir ${commandPath(outDirDisplay)}`);
+  const base = quickstartParts.join(' ');
+  const preview = (clientId) => `${base} && enigma connect ${clientId} ${bundleArg} --dry-run`;
   return {
-    installed_clients: `${base} --client auto --connect-installed`,
-    claude_desktop: `${base} --client claude-desktop --write-connectors`,
-    cursor: `${base} --client cursor --write-connectors`,
-    kimi_code: `${base} --client kimi-code --write-connectors`,
-    vscode_cline: `${base} --client vscode-cline --write-connectors`,
+    installed_clients: `${base} && enigma doctor ${bundleArg}`,
+    claude_desktop: preview('claude-desktop'),
+    cursor: preview('cursor'),
+    kimi_code: preview('kimi-code'),
+    vscode_cline: preview('vscode-cline'),
   };
 }
 
@@ -4804,11 +4805,11 @@ function usage() {
       '--plain': 'Print a human-readable setup summary with next commands instead of JSON. Alias: --text or --format text.',
     },
     install_options: {
-      'one-command installed clients': 'npm install -g enigma-memory && enigma setup --client auto --connect-installed',
-      'one-command Claude Desktop': 'npm install -g enigma-memory && enigma setup --client claude-desktop --write-connectors',
-      'one-command Cursor': 'npm install -g enigma-memory && enigma setup --client cursor --write-connectors',
-      'one-command Kimi Code': 'npm install -g enigma-memory && enigma setup --client kimi-code --write-connectors',
-      'one-command VS Code Cline': 'npm install -g enigma-memory && enigma setup --client vscode-cline --write-connectors',
+      'one-command installed clients': 'npm install -g enigma-memory && enigma quickstart --bundle ./.enigma/bundle.json && enigma doctor --bundle ./.enigma/bundle.json',
+      'one-command Claude Desktop preview': 'npm install -g enigma-memory && enigma quickstart --bundle ./.enigma/bundle.json && enigma connect claude-desktop --bundle ./.enigma/bundle.json --dry-run',
+      'one-command Cursor preview': 'npm install -g enigma-memory && enigma quickstart --bundle ./.enigma/bundle.json && enigma connect cursor --bundle ./.enigma/bundle.json --dry-run',
+      'one-command Kimi Code preview': 'npm install -g enigma-memory && enigma quickstart --bundle ./.enigma/bundle.json && enigma connect kimi-code --bundle ./.enigma/bundle.json --dry-run',
+      'one-command VS Code Cline preview': 'npm install -g enigma-memory && enigma quickstart --bundle ./.enigma/bundle.json && enigma connect vscode-cline --bundle ./.enigma/bundle.json --dry-run',
       '--client <id>': 'Limit generated MCP snippets to one supported client.',
       '--out <path>': 'Write generated MCP snippets to a JSON file for review without hand-editing client config JSON.',
       '--plain': 'Print a path-redacted install/connect summary instead of JSON snippets. Alias: --text or --format text.',

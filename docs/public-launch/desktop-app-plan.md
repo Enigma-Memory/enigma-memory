@@ -598,7 +598,7 @@ The packet must fail if any default-path screenshot, copy block, support prompt,
 The desktop app replaces CLI-first onboarding for public consumers, but it should reuse the proven engine behavior behind UI actions:
 
 - `enigma setup` capability becomes **Set up Enigma Memory**.
-- `enigma setup --client auto --connect-installed --overwrite` capability becomes guided client detection plus one-button connect with preview, backup, validation, and rollback.
+- `enigma connect <client> --dry-run` capability becomes guided client detection plus one-button preview, explicit approval, backup, validation, and rollback.
 - `enigma doctor` capability becomes dashboard health cards plus **Export diagnostics**.
 - CLI install docs remain available for power users, support, and automation, but public quickstart material should lead with the signed desktop app.
 

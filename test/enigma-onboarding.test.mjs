@@ -93,7 +93,8 @@ test('setup default creates local Memory Passport artifacts without connector wr
     assert.ok(summary.next_commands.some((command) => command.startsWith('enigma verify ')));
     assert.ok(summary.next_commands.some((command) => command.startsWith('enigma connect generic-mcp ') && command.endsWith(' --dry-run')));
     assert.equal(summary.connectors.length, DEFAULT_SETUP_CLIENTS.length);
-    assert.equal(summary.one_command_install_connect.vscode_cline, 'npm install -g enigma-memory && enigma setup --client vscode-cline --write-connectors');
+    assert.match(summary.one_command_install_connect.vscode_cline, /^npm install -g enigma-memory && enigma quickstart --bundle .+ && enigma connect vscode-cline .+ --dry-run$/);
+    assert.doesNotMatch(summary.one_command_install_connect.vscode_cline, /setup --client|--write-connectors|--overwrite/);
     assert.equal(summary.connectors.every((connector) => connector.connect_plan.dry_run === true), true);
     assert.equal(summary.checks.npm.ok, true);
     assert.equal(summary.checks.vault_path.ok, true);
@@ -119,6 +120,9 @@ test('root help starts with non-overwrite setup and dry-run connection preview',
   assert.match(usage.human, /enigma quickstart --bundle "\$HOME\/\.enigma\/bundle\.json"/);
   assert.match(usage.human, /enigma connect claude-desktop --bundle "\$HOME\/\.enigma\/bundle\.json" --dry-run/);
   assert.doesNotMatch(installCommands, /--overwrite/);
+  assert.doesNotMatch(installCommands, /setup --client|--write-connectors/);
+  assert.match(installCommands, /enigma quickstart --bundle \.\/\.enigma\/bundle\.json/);
+  assert.match(installCommands, /enigma connect claude-desktop --bundle \.\/\.enigma\/bundle\.json --dry-run/);
 });
 
 test('setup fails closed when an artifact already exists', async () => {

@@ -112,10 +112,11 @@ test('Claude Desktop mcpb connection plan orders states and keeps manual JSON ad
   assertPublicSafe(plan);
 });
 
-test('Claude Desktop mcpb plan does not change existing config-writing wizard behavior', () => {
+test('Claude Desktop mcpb plan keeps connector wizard preview-first', () => {
   const wizard = planConnectWizard('claude-desktop', { platform: 'linux' }).clients[0];
 
-  assert.equal(wizard.connect_command, 'enigma connect claude-desktop --bundle "$HOME/.enigma/bundle.json"');
+  assert.equal(wizard.connect_command, 'enigma connect claude-desktop --bundle "$HOME/.enigma/bundle.json" --dry-run');
+  assert.doesNotMatch(wizard.one_command_install_connect, /setup --client|--write-connectors|--overwrite/);
   assert.equal(wizard.mcp_config_preview.mcpServers.enigma.command, 'enigma-mcp');
 });
 

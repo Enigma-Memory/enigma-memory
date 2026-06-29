@@ -3848,6 +3848,8 @@ test('public collateral keeps proof, token, hosted, and raw-memory claim boundar
     assert.match(checklist, new RegExp(statusLabel.replace(/[\/]/g, '\\$&'), 'i'), `checklist missing ${statusLabel} status`);
   }
 
+  assert.doesNotMatch(checklist, /quickstart --bundle \.\/\.enigma\/bundle\.json --overwrite/);
+  assert.match(checklist, /enigma connect claude-desktop --bundle \.\/\.enigma\/bundle\.json --dry-run/);
   for (const rel of hostedByocDocs) {
     assert.match(docs[rel], /hosted|BYOC|cloud|deployment/i, `${rel} should state hosted/BYOC deployment posture`);
     assert.match(docs[rel], /requires?|do not mark|do not market|before|only after|without/i, `${rel} should frame hosted/BYOC as blocked until prerequisites exist`);
