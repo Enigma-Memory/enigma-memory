@@ -32,7 +32,7 @@ jobs:
         run: npm ci
 
       - name: Run security audit
-        run: npm audit --audit-level=high
+        run: npm audit --audit-level=moderate
 
       - name: Run secret scan
         run: npm run secret-scan
@@ -51,6 +51,9 @@ jobs:
 
       - name: Verify package dry run
         run: npm pack --dry-run
+
+      - name: Verify local packed install
+        run: npm run package:install-smoke
 
   publish:
     name: Publish package
@@ -73,7 +76,7 @@ jobs:
         run: npm ci
 
       - name: Run security audit
-        run: npm audit --audit-level=high
+        run: npm audit --audit-level=moderate
 
       - name: Run secret scan
         run: npm run secret-scan
@@ -92,6 +95,9 @@ jobs:
 
       - name: Re-run package dry run
         run: npm pack --dry-run
+
+      - name: Re-run local packed install
+        run: npm run package:install-smoke
 
       - name: Publish package to npm
         run: npm publish --access public --provenance

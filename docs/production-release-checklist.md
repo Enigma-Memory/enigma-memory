@@ -109,7 +109,7 @@ Before enabling live monitoring, analytics, or token rotation, use [`live-endpoi
 
 ## CI package gate expectations
 
-- [ ] `.github/workflows/ci.yml` runs the same package gates expected locally: `npm run check`, `npm test`, and `npm pack --dry-run`.
+- [ ] `.github/workflows/ci.yml` and `.github/workflows/npm-publish.yml` run the same package gates expected locally: `npm run check`, `npm test`, `npm pack --dry-run`, and `npm run package:install-smoke`.
 - [ ] CI runs on Node 24 on Ubuntu and Windows where GitHub-hosted runners support the package gates.
 - [ ] Ubuntu CI runs `npm run release:audit` only when that script is present.
 - [ ] CI does not require Docker daemon access, cloud credentials, deployment credentials, npm publish credentials, domains, KMS/secrets, SIEM routes, or legal/compliance approvals.
@@ -117,7 +117,7 @@ Before enabling live monitoring, analytics, or token rotation, use [`live-endpoi
 - [ ] CI may upload `.enigma/release-provenance.json` as a build artifact when `npm run provenance:local -- --out ./.enigma/release-provenance.json` is present, but that artifact remains local/build-run checksum evidence unless a separate signing or registry attestation system is added.
 - [ ] CI may upload `.enigma-review-packet/` as a build artifact when `npm run review:packet -- --out ./.enigma-review-packet` is present, but that artifact remains local/build-run evidence unless a separate signing, registry provenance, deployment attestation, or legal/compliance process is added.
 - [ ] `docs/public-github-repo-setup.md` is followed before making a public GitHub repository, including branch protection that requires `Package gates (ubuntu-latest)` and `Package gates (windows-latest)` from `.github/workflows/ci.yml`; seed or refresh those statuses through push, pull request, or CI `workflow_dispatch`.
-- [ ] `.github/workflows/npm-publish.yml` remains manual-only through `workflow_dispatch`, runs on Node 24, requires a `package_version` input matching `package.json`, runs `npm run check`, `npm test`, and `npm pack --dry-run`, uses the `npm-publish` environment for manual approval, grants GitHub OIDC with `id-token: write`, and publishes with `npm publish --access public --provenance` without `NPM_TOKEN`, `NODE_AUTH_TOKEN`, or other npm publish token secrets.
+- [ ] `.github/workflows/npm-publish.yml` remains manual-only through `workflow_dispatch`, runs on Node 24, requires a `package_version` input matching `package.json`, runs `npm run check`, `npm test`, `npm pack --dry-run`, and `npm run package:install-smoke`, uses the `npm-publish` environment for manual approval, grants GitHub OIDC with `id-token: write`, and publishes with `npm publish --access public --provenance` without `NPM_TOKEN`, `NODE_AUTH_TOKEN`, or other npm publish token secrets.
 - [ ] npm publish evidence is bounded to registry publication/provenance for that package version. It does not prove provider deletion, model forgetting, hosted/BYOC readiness, Cloudflare/website deployment, legal approval, compliance certification, or guaranteed financial outcomes.
 
 Package inspection commands:
