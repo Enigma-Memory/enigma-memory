@@ -15,6 +15,7 @@ function parseArgs(argv = process.argv.slice(2)) {
     workplan: null,
     out: null,
     help: false,
+    plain: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
@@ -29,13 +30,17 @@ function parseArgs(argv = process.argv.slice(2)) {
     else if (token === '--workplan') out.workplan = readValue();
     else if (token === '--out') out.out = readValue();
     else if (token === '--help' || token === '-h') out.help = true;
+    else if (token === '--plain' || token === '--text' || token === '--format=text' || (token === '--format' && argv[index + 1] === 'text')) {
+      out.plain = true;
+      if (token === '--format') index += 1;
+    }
     else throw new Error(`Unknown production status board option: ${token}`);
   }
   return out;
 }
 
 function usage() {
-  return 'Usage: node scripts/build-production-status-board.mjs --goal-audit <goal.json> --dependencies <dependencies.json> --workplan <workplan.json> [--out <file>]\n\nBuilds a public-safe launch status board from current goal, dependency, and workplan evidence.\n';
+  return 'Usage: node scripts/build-production-status-board.mjs --goal-audit <goal.json> --dependencies <dependencies.json> --workplan <workplan.json> [--out <file>] [--plain]\n\nBuilds a public-safe launch status board from current goal, dependency, and workplan evidence. --plain prints a human-readable summary while --out preserves JSON evidence.\n';
 }
 
 async function readJson(path, label) {
@@ -267,6 +272,27 @@ export function buildProductionStatusBoard(inputs = {}, options = {}) {
   return report;
 }
 
+export function renderProductionStatusBoardPlain(report) {
+  const lines = [
+    'Enigma production status board',
+    `Status: ${report.status ?? 'blocked'}`,
+    `Launch ready: ${report.launch_ready ? 'yes' : 'no'}`,
+    `Goal complete: ${report.goal_complete ? 'yes' : 'no'}`,
+    `Local package ready: ${report.local_package_ready ? 'yes' : 'no'}`,
+    `Fresh evidence: ${report.fresh_input_evidence ? 'yes' : 'no'}`,
+    `Ready groups: ${report.ready_group_count ?? 0}`,
+    `Blocked groups: ${report.blocked_group_count ?? 0}`,
+    `Ready phases: ${report.ready_phase_count ?? 0}`,
+    `Blocked phases: ${report.blocked_phase_count ?? 0}`,
+    `Blocked deliverables: ${report.blocked_deliverable_count ?? 0}`,
+    `Next phase: ${report.next_phase_id ?? 'none'}`,
+  ];
+  for (const command of Array.isArray(report.immediate_operator_queue) ? report.immediate_operator_queue.slice(0, 5) : []) lines.push(`Next: ${command}`);
+  for (const blocker of Array.isArray(report.external_blockers) ? report.external_blockers.slice(0, 5) : []) lines.push(`External blocker: ${blocker.name} — ${blocker.blocker_count ?? 0} blockers`);
+  lines.push('Boundary: public-safe status summary only; no credentials, deploys, infrastructure approval, launch certification, raw memory, local paths, account ids, provider responses, provider deletion, model behavior, hosted service, compliance, benchmark superiority, token ROI, or provider invoice savings claims.');
+  return `${lines.join('\n')}\n`;
+}
+
 export async function main(argv = process.argv.slice(2)) {
   const args = parseArgs(argv);
   if (args.help) return { text: usage(), status: 0 };
@@ -283,7 +309,7 @@ export async function main(argv = process.argv.slice(2)) {
     await mkdir(dirname(args.out), { recursive: true });
     await writeFile(args.out, json, 'utf8');
   }
-  return { text: json, status: report.launch_ready ? 0 : 1 };
+  return { text: args.plain ? renderProductionStatusBoardPlain(report) : json, status: report.launch_ready ? 0 : 1 };
 }
 
 if (fileURLToPath(import.meta.url) === process.argv[1]) {
