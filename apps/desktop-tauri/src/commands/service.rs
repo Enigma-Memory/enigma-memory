@@ -303,11 +303,11 @@ pub(crate) fn dashboard_status_from_drive_health(
 }
 
 fn dashboard_offline_ready(
-    service: &ServiceStatus,
+    service_running: bool,
     memory_drive_status: &str,
     health_status: &str,
 ) -> bool {
-    service.running && memory_drive_status == "ready" && health_status == "healthy"
+    service_running && memory_drive_status == "ready" && health_status == "healthy"
 }
 
 fn readiness_action(
@@ -371,32 +371,32 @@ fn push_readiness_issue(
         )),
         "connector_repair_required" => {
             recovery_actions.push(readiness_action(
-                "repair_connector_config",
-                "Repair connector",
+                "repair_app_connection",
+                "Repair app connection",
                 "repair_client_config",
-                "Repair the local connector configuration after user approval.",
+                "Repair the app connection after user approval.",
                 Some(code),
             ));
             recovery_actions.push(readiness_action(
-                "rollback_connector_config",
-                "Rollback connector",
+                "rollback_app_connection",
+                "Restore app backup",
                 "rollback_client_config",
-                "Rollback the local connector configuration from its local backup if repair is not desired.",
+                "Restore the latest Enigma backup if repair is not desired.",
                 Some(code),
             ));
         }
         "connector_rollback_available" => recovery_actions.push(readiness_action(
-            "rollback_connector_config",
-            "Rollback connector",
+            "rollback_app_connection",
+            "Restore app backup",
             "rollback_client_config",
-            "Rollback the local connector configuration from its local backup.",
+            "Restore the latest Enigma backup.",
             Some(code),
         )),
         "pending_crash_reports" => recovery_actions.push(readiness_action(
             "review_pending_crash_reports",
             "Review pending crash reports",
             "get_crash_reporting_status",
-            "Review locally stored crash report metadata before deciding whether to submit or discard it.",
+            "Review locally stored crash report metadata before choosing a local recovery step.",
             Some(code),
         )),
         _ => recovery_actions.push(default_readiness_action()),
@@ -459,9 +459,11 @@ pub(crate) fn local_readiness_model(input: LocalReadinessInput<'_>) -> LocalRead
         );
     }
 
-    let offline_ready = input.service_running
-        && input.memory_drive_status == "ready"
-        && input.health_status == "healthy";
+    let offline_ready = dashboard_offline_ready(
+        input.service_running,
+        input.memory_drive_status,
+        input.health_status,
+    );
     let offline_ready_explanation = if offline_ready {
         "Local service is running and Memory Drive is healthy."
     } else if !input.service_running {
@@ -1540,22 +1542,10 @@ mod tests {
 
     #[test]
     fn offline_ready_requires_running_ready_and_healthy() {
-        let running = ServiceStatus {
-            running: true,
-            pid: 1,
-            restarts: 0,
-            uptime_secs: 1,
-        };
-        let stopped = ServiceStatus {
-            running: false,
-            pid: 0,
-            restarts: 0,
-            uptime_secs: 0,
-        };
-        assert!(dashboard_offline_ready(&running, "ready", "healthy"));
-        assert!(!dashboard_offline_ready(&stopped, "ready", "healthy"));
-        assert!(!dashboard_offline_ready(&running, "missing", "healthy"));
-        assert!(!dashboard_offline_ready(&running, "ready", "fix-needed"));
+        assert!(dashboard_offline_ready(true, "ready", "healthy"));
+        assert!(!dashboard_offline_ready(false, "ready", "healthy"));
+        assert!(!dashboard_offline_ready(true, "missing", "healthy"));
+        assert!(!dashboard_offline_ready(true, "ready", "fix-needed"));
     }
 
     #[test]
@@ -1600,14 +1590,28 @@ mod tests {
             .recovery_actions
             .iter()
             .any(|action| action.command == "create_memory_drive"));
-        assert!(missing
+        let repair_action = missing
             .recovery_actions
             .iter()
-            .any(|action| action.command == "repair_client_config"));
-        assert!(missing
+            .find(|action| action.command == "repair_client_config")
+            .expect("repair action");
+        assert_eq!(repair_action.id, "repair_app_connection");
+        assert_eq!(repair_action.label, "Repair app connection");
+        assert!(
+            !(repair_action.description.contains("connector")
+                && repair_action.description.contains("configuration"))
+        );
+        let rollback_action = missing
             .recovery_actions
             .iter()
-            .any(|action| action.command == "rollback_client_config"));
+            .find(|action| action.command == "rollback_client_config")
+            .expect("rollback action");
+        assert_eq!(rollback_action.id, "rollback_app_connection");
+        assert_eq!(rollback_action.label, "Restore app backup");
+        assert!(
+            !(rollback_action.description.contains("connector")
+                && rollback_action.description.contains("configuration"))
+        );
         assert!(missing
             .recovery_actions
             .iter()

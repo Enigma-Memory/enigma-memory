@@ -17,17 +17,17 @@ const SCREENS = [
 ];
 
 const CLIENT_COPY = {
-  ready: { badge: 'Ready', body: 'Enigma can connect this app now. A safe reset is available later if the app config changes.' },
+  ready: { badge: 'Ready', body: 'Enigma can connect this app now. A safe reset is available later if the app settings change.' },
   connected: { badge: 'Connected', body: 'This app can ask Enigma for memory. Enigma keeps an app-settings backup when it changes its own entry.' },
-  'not-installed': { badge: 'Not installed', body: 'No supported install found.' },
+  'not-installed': { badge: 'Not installed', body: 'Install this app, then scan again to connect it.' },
   'restart-needed': { badge: 'Restart needed', body: 'Connection is ready. Restart the app to finish.' },
   'permission-needed': { badge: 'Permission needed', body: 'Your system blocked access to this app\'s settings.' },
-  'repair-required': { badge: 'Repair needed', body: 'Safe reset can reapply only the Enigma connector entry while preserving unrelated MCP settings.' },
-  malformed: { badge: 'Malformed config', body: 'This app\'s MCP settings look malformed. Restore an Enigma-managed backup or use safe reset to reapply the Enigma entry.' },
-  'rollback-available': { badge: 'Backup ready', body: 'Rollback can restore the latest Enigma-managed backup without showing config JSON or local paths.' },
-  'test-passed': { badge: 'Test passed', body: 'Local connector config is present and points at the Enigma bundle. Provider apps may still need a restart.' },
+  'repair-required': { badge: 'Repair needed', body: 'Safe reset reapplies only the Enigma entry while preserving the app\'s other connection settings.' },
+  malformed: { badge: 'Connection needs repair', body: 'This app\'s connection settings need repair. Restore Enigma\'s backup or use safe reset to reapply only the Enigma entry.' },
+  'rollback-available': { badge: 'Backup ready', body: 'Rollback can restore the latest Enigma-managed backup without showing setup files or local paths.' },
+  'test-passed': { badge: 'Test passed', body: 'The Enigma connection is present and points at the Enigma bundle. The app may still need a restart.' },
   skipped: { badge: 'Skipped', body: 'This app will not use Enigma yet.' },
-  error: { badge: 'Needs attention', body: 'Enigma can try a public-safe repair without displaying config contents.' },
+  error: { badge: 'Needs attention', body: 'Enigma can try a public-safe repair without displaying setup details.' },
 };
 
 const tauri = window.__TAURI__;
@@ -662,7 +662,7 @@ function normalizeClientStatus(client) {
 function renderClientActions(client, status) {
   const id = escapeHtml(client.id);
   if (status === 'not-installed') {
-    return '<button type="button" class="link" disabled>Unavailable</button>';
+    return '<p class="note">Install this app, then select Scan apps.</p>';
   }
   if (status === 'malformed') {
     return `
@@ -694,7 +694,7 @@ function renderClientActions(client, status) {
   if (client.id === 'claude-desktop') {
     return `
       <button type="button" class="client-primary" data-action="claude-mcpb-handoff" data-id="${id}">Connect with Claude extension</button>
-      <button type="button" class="link" data-action="connect" data-id="${id}">Advanced config preview</button>
+      <button type="button" class="link" data-action="connect" data-id="${id}">Advanced setup preview</button>
     `;
   }
   const actionLabel = status === 'skipped' ? 'Connect later' : 'Preview connection';
@@ -704,11 +704,11 @@ function renderClientActions(client, status) {
 function renderConnectionPreview(client) {
   if (!connectionPreview || connectionPreview.id !== client.id) return '';
   const plan = connectionPreview.plan && typeof connectionPreview.plan === 'object' ? connectionPreview.plan : {};
-  const changed = plan.changed === false ? 'No config change needed' : 'Config change planned';
+  const changed = plan.changed === false ? 'No setup change needed' : 'Setup change planned';
   const restart = plan.restart_guidance ? `Restart: ${safePublicLabel(plan.restart_guidance, 'Restart the app after approval.')}` : 'Restart: app may need a restart after approval.';
   return `
     <div class="connection-preview">
-      <p class="note"><strong>Review first.</strong> ${escapeHtml(changed)}. Writes performed: ${plan.writes_performed === true ? 'yes' : 'no'}.</p>
+      <p class="note"><strong>Review first.</strong> ${escapeHtml(changed)}. Will change settings: ${plan.writes_performed === true ? 'yes' : 'no'}.</p>
       <p class="note">${escapeHtml(restart)}</p>
       <div class="client-actions">
         <button type="button" class="client-primary" data-action="approve-connect" data-id="${escapeHtml(client.id)}">Approve connection</button>
@@ -721,12 +721,12 @@ function renderConnectionPreview(client) {
 function renderDisconnectPreview(client) {
   if (!disconnectPreview || disconnectPreview.id !== client.id) return '';
   const plan = disconnectPreview.plan && typeof disconnectPreview.plan === 'object' ? disconnectPreview.plan : {};
-  const changed = plan.changed === false ? 'No config change needed' : 'Remove Enigma connector entry';
+  const changed = plan.changed === false ? 'No change needed' : 'Remove Enigma entry';
   const restart = plan.restart_guidance ? `Restart: ${safePublicLabel(plan.restart_guidance, 'Restart the app after approval.')}` : 'Restart: app may need a restart after approval.';
   return `
     <div class="connection-preview disconnect-preview">
-      <p class="note"><strong>Review disconnect.</strong> ${escapeHtml(changed)}. Writes performed: ${plan.writes_performed === true ? 'yes' : 'no'}.</p>
-      <p class="note">${escapeHtml(restart)} Enigma removes only its own local connector entry.</p>
+      <p class="note"><strong>Review disconnect.</strong> ${escapeHtml(changed)}. Will change settings: ${plan.writes_performed === true ? 'yes' : 'no'}.</p>
+      <p class="note">${escapeHtml(restart)} Enigma removes only its own local app entry.</p>
       <div class="client-actions">
         <button type="button" class="client-primary" data-action="approve-disconnect" data-id="${escapeHtml(client.id)}">Approve disconnect</button>
         <button type="button" class="link" data-action="cancel-disconnect-preview" data-id="${escapeHtml(client.id)}">Cancel</button>
@@ -747,7 +747,7 @@ function claudeMcpbClipboardText(handoff = {}) {
     '4. Return to Enigma and run Test connection.',
     `Status: ${health.status || 'not_installed'}`,
     `Next: ${nextAction.label || 'Install Claude extension'}`,
-    'Boundary: Enigma does not write Claude config for this extension handoff. No local paths, config JSON, provider responses, raw memory, or outside-Enigma control claims are included.',
+    'Boundary: Enigma does not write Claude settings for this extension handoff. No local paths, setup files, provider responses, raw memory, or outside-Enigma control claims are included.',
   ].join('\n');
 }
 
@@ -759,7 +759,7 @@ function renderClaudeMcpbHandoff(client) {
   const disconnect = plan.disconnect_boundaries && typeof plan.disconnect_boundaries === 'object' ? plan.disconnect_boundaries : {};
   return `
     <div class="connection-preview claude-mcpb-handoff">
-      <p class="note"><strong>Install Claude extension.</strong> Open the Enigma Claude extension package in Claude Desktop. Enigma does not write Claude config for this extension handoff.</p>
+      <p class="note"><strong>Install Claude extension.</strong> Open the Enigma Claude extension package in Claude Desktop. Enigma does not write Claude settings for this extension handoff.</p>
       <ol class="handoff-steps">
         <li>Open the Enigma Claude extension package in Claude Desktop.</li>
         <li>Choose this local Memory Drive when Claude asks.</li>
@@ -768,7 +768,7 @@ function renderClaudeMcpbHandoff(client) {
       </ol>
       <p class="note">Status: ${escapeHtml(health.status || 'not_installed')}. Next: ${escapeHtml(nextAction.label || 'Install Claude extension')}. ${escapeHtml(nextAction.description || 'Open the Enigma Claude extension package in Claude Desktop, then test the connection.')}</p>
       <p class="note">Remove or disable later: ${escapeHtml(disconnect.mcpb_path || 'Remove or disable the Enigma Memory extension in Claude Desktop.')}</p>
-      <p class="note">If the extension path is unavailable, use Advanced config preview. It stays review-first and does not write until you approve.</p>
+      <p class="note">If the extension path is unavailable, use Advanced setup preview. It stays review-first and does not write until you approve.</p>
       <div class="button-row">
         <button type="button" class="secondary" data-action="copy-claude-steps" data-id="${escapeHtml(client.id)}">Copy Claude install steps</button>
       </div>
@@ -976,7 +976,7 @@ function renderConnectApps() {
     <h1>Connect your AI apps</h1>
     <p>Choose which apps can ask Enigma for memory. You can change this later.</p>
     <div class="disclosure">
-      If a connector is malformed, Enigma can restore an Enigma-managed backup, run a safe reset to reapply only the Enigma entry, or rollback the last Enigma change. Config JSON and local paths stay hidden.
+      If a connection needs repair, Enigma can restore its backup, run safe reset to reapply only the Enigma entry, or roll back the last Enigma change. Setup details and local paths stay hidden.
     </div>
     <div class="client-list">${list}</div>
     <div class="button-row">
@@ -984,7 +984,7 @@ function renderConnectApps() {
       ${secondaryButton('What does connecting allow?', 'toggle-connection-info')}
     </div>
     <div id="connection-disclosure" class="disclosure hidden">
-      Connected apps can ask Enigma for relevant memory. Repair and rollback preserve unrelated MCP settings and do not alter provider memory.
+      Connected apps can ask Enigma for relevant memory. Repair and rollback preserve the app's other connection settings and do not alter provider memory.
     </div>
   `, 'connections');
 }
@@ -1040,7 +1040,7 @@ function dashboardNextAction({ memoryDriveStatus, offlineReady, serviceRunning, 
     return { label: 'Run health check', action: 'run-health', reason: 'Check local vault, privacy guardrails, and app connection readiness.' };
   }
   if (Number(health.connected_app_count ?? 0) === 0) {
-    return { label: 'Connect apps', action: 'detect-clients', reason: 'Find Claude, Cursor, or another supported app and connect it without editing JSON.' };
+    return { label: 'Connect apps', action: 'detect-clients', reason: 'Find Claude, Cursor, or another supported app and connect it without editing setup files.' };
   }
   if (diagnostics?.status === 'needs-review' || diagnostics?.status === 'error') {
     return { label: 'Run diagnostics', action: 'run-diagnostics', reason: 'Create a public-safe support summary before asking for help.' };
@@ -1106,7 +1106,7 @@ function renderDashboard() {
 
     <div class="dashboard-section">
       <h2>App connection recovery</h2>
-      <p class="note">Safe reset, restore, and rollback actions recover malformed connector settings without showing config JSON, local paths, or provider responses.</p>
+      <p class="note">Safe reset, restore, and rollback recover app connection settings without showing setup files, local paths, or provider responses.</p>
       <div class="client-list">${renderClientList('Run app detection to see recovery options.')}</div>
     </div>
 
@@ -1290,7 +1290,7 @@ async function handleAction(event) {
         connectionPreview = null;
         busy = false;
         render();
-        setStatus('Connection preview could not complete. No config details were shown.');
+        setStatus('Connection preview could not complete. No setup details were shown.');
       }
       return;
     }
@@ -1301,12 +1301,12 @@ async function handleAction(event) {
         claudeMcpbHandoff = await call('get_claude_mcpb_handoff');
         busy = false;
         render();
-        setStatus('Claude extension handoff ready. Enigma did not write Claude config.');
+        setStatus('Claude extension handoff ready. Enigma did not write Claude settings.');
       } catch (_) {
         claudeMcpbHandoff = null;
         busy = false;
         render();
-        setStatus('Claude extension handoff could not load. No config was written.');
+        setStatus('Claude extension handoff could not load. No setup was written.');
       }
       return;
     }
@@ -1318,14 +1318,14 @@ async function handleAction(event) {
         args: { id },
         pending: 'Writing approved connection...',
         success: 'Connection updated. Restart the app if it asks.',
-        failure: 'Connection could not complete. No config details were shown.',
+        failure: 'Connection could not complete. No setup details were shown.',
       });
       return;
     }
     case 'cancel-connect-preview':
       connectionPreview = null;
       render();
-      setStatus('Connection preview cancelled. No config was written.');
+      setStatus('Connection preview cancelled. No setup was written.');
       return;
     case 'disconnect': {
       const id = event.currentTarget.dataset.id;
@@ -1340,7 +1340,7 @@ async function handleAction(event) {
         disconnectPreview = null;
         busy = false;
         render();
-        setStatus('Disconnect preview could not complete. No config details were shown.');
+        setStatus('Disconnect preview could not complete. No setup details were shown.');
       }
       return;
     }
@@ -1351,30 +1351,30 @@ async function handleAction(event) {
         command: 'disconnect_client',
         args: { id },
         pending: 'Writing approved disconnect...',
-        success: 'Connection removed. Unrelated MCP settings were preserved.',
-        failure: 'Disconnect could not complete. No config details were shown.',
+        success: 'Connection removed. The app\'s other connection settings were preserved.',
+        failure: 'Disconnect could not complete. No setup details were shown.',
       });
       return;
     }
     case 'cancel-disconnect-preview':
       disconnectPreview = null;
       render();
-      setStatus('Disconnect preview cancelled. No config was written.');
+      setStatus('Disconnect preview cancelled. No setup was written.');
       return;
     case 'test-connection': {
       const id = event.currentTarget.dataset.id;
       await runClientCommand({
         command: 'test_client_config',
         args: { id },
-        pending: 'Testing local connector...',
-        success: 'Local connector test complete. If the app is open, restart it before using the connection.',
-        failure: 'Connector test could not complete. No config details were shown.',
+        pending: 'Testing app connection...',
+        success: 'App connection test complete. If the app is open, restart it before using the connection.',
+        failure: 'App connection test could not complete. No setup details were shown.',
       });
       return;
     }
     case 'repair': {
       const id = event.currentTarget.dataset.id;
-      if (!confirm('Safe reset this connection? Enigma will reapply only its connector entry, preserve unrelated MCP settings, and will not alter provider memory.')) {
+      if (!confirm('Safe reset this connection? Enigma will reapply only its entry, preserve the app\'s other connection settings, and will not alter provider memory.')) {
         return;
       }
       await runClientCommand({
@@ -1382,13 +1382,13 @@ async function handleAction(event) {
         args: { id },
         pending: 'Running safe reset...',
         success: 'Safe reset complete. Restart the app if it asks.',
-        failure: 'Safe reset could not complete. No config details were shown.',
+        failure: 'Safe reset could not complete. No setup details were shown.',
       });
       return;
     }
     case 'rollback': {
       const id = event.currentTarget.dataset.id;
-      if (!confirm('Rollback to the latest Enigma-managed backup? Enigma will restore the backup it created, preserve unrelated MCP settings where possible, and will not alter provider memory.')) {
+      if (!confirm('Rollback to the latest Enigma-managed backup? Enigma will restore the backup it created, preserve the app\'s other connection settings where possible, and will not alter provider memory.')) {
         return;
       }
       await runClientCommand({
@@ -1396,7 +1396,7 @@ async function handleAction(event) {
         args: { id },
         pending: 'Restoring backup...',
         success: 'Restore rollback complete. Restart the app if it asks.',
-        failure: 'Rollback could not complete. No config details were shown.',
+        failure: 'Rollback could not complete. No setup details were shown.',
       });
       return;
     }
@@ -1491,7 +1491,7 @@ async function handleAction(event) {
       }
       try {
         await navigator.clipboard.writeText(claudeMcpbClipboardText(claudeMcpbHandoff));
-        setStatus('Claude install steps copied without local paths or config JSON.');
+        setStatus('Claude install steps copied without local paths or setup files.');
       } catch (_) {
         setStatus('Clipboard copy is unavailable. The Claude install steps remain visible in the app.');
       }

@@ -90,18 +90,59 @@ function pathList(values, fallback, label) {
   return list.map((value, index) => publicRelativePath(value, `${label}[${index}]`));
 }
 
+function buildEvidenceCollection({ cleanMachineSmoke, supportDryRun, registryInstall, desktopReleaseEvidence, productionHandoffPacket }) {
+  return [
+    {
+      evidence_item_id: 'EV-P10-CLEAN-MACHINE-SMOKE',
+      manifest_field: 'clean_machine_smoke',
+      target_file: cleanMachineSmoke,
+      collect: 'clean-machine smoke JSON after fresh install, first-run, connector, proof, offline, diagnostics, and uninstall checks',
+    },
+    {
+      evidence_item_id: 'EV-P10-SUPPORT-DRY-RUN-SUMMARY',
+      manifest_field: 'support_dry_run',
+      target_file: supportDryRun,
+      collect: 'support dry-run summaries with scenario id, issue code, triage result, privacy-check status, and support owner ref',
+    },
+    {
+      evidence_item_id: 'EV-P10-REGISTRY-INSTALL',
+      manifest_field: 'registry_install',
+      target_file: registryInstall,
+      collect: 'npm package version, registry package ref, install command used, and public-safe install result',
+    },
+    {
+      evidence_item_id: 'EV-P10-DESKTOP-RELEASE-EVIDENCE',
+      manifest_field: 'desktop_release_evidence',
+      target_file: desktopReleaseEvidence,
+      collect: 'signed desktop artifact refs, public checksums, signature or notarization results, update rehearsal, and download refs',
+    },
+    {
+      evidence_item_id: 'EV-P10-PRODUCTION-HANDOFF-PACKET',
+      manifest_field: 'production_handoff_packet',
+      target_file: productionHandoffPacket,
+      collect: 'release PR ref or URL, reviewer approval ref, merge ref, public-safe release packet approval, and handoff status',
+    },
+  ];
+}
+
 export function buildPublicBetaEvidenceManifest(options = {}, generatedAt = new Date().toISOString()) {
+  const cleanMachineSmoke = publicRelativePath(options.cleanMachineSmoke ?? DEFAULTS.cleanMachineSmoke, 'clean_machine_smoke');
+  const cleanMachineSmokePlan = publicRelativePath(options.cleanMachineSmokePlan ?? DEFAULTS.cleanMachineSmokePlan, 'clean_machine_smoke_plan');
   const supportDryRun = pathList(options.supportDryRun, DEFAULTS.supportDryRun, 'support_dry_run');
+  const registryInstall = publicRelativePath(options.registryInstall ?? DEFAULTS.registryInstall, 'registry_install');
+  const desktopReleaseEvidence = publicRelativePath(options.desktopReleaseEvidence ?? DEFAULTS.desktopReleaseEvidence, 'desktop_release_evidence');
+  const productionHandoffPacket = publicRelativePath(options.productionHandoffPacket ?? DEFAULTS.productionHandoffPacket, 'production_handoff_packet');
   const manifest = {
     schema: PUBLIC_BETA_EVIDENCE_MANIFEST_SCHEMA,
     generated_at: generatedAt,
     public_safe: true,
-    clean_machine_smoke: publicRelativePath(options.cleanMachineSmoke ?? DEFAULTS.cleanMachineSmoke, 'clean_machine_smoke'),
-    clean_machine_smoke_plan: publicRelativePath(options.cleanMachineSmokePlan ?? DEFAULTS.cleanMachineSmokePlan, 'clean_machine_smoke_plan'),
+    clean_machine_smoke: cleanMachineSmoke,
+    clean_machine_smoke_plan: cleanMachineSmokePlan,
     support_dry_run: supportDryRun,
-    registry_install: publicRelativePath(options.registryInstall ?? DEFAULTS.registryInstall, 'registry_install'),
-    desktop_release_evidence: publicRelativePath(options.desktopReleaseEvidence ?? DEFAULTS.desktopReleaseEvidence, 'desktop_release_evidence'),
-    production_handoff_packet: publicRelativePath(options.productionHandoffPacket ?? DEFAULTS.productionHandoffPacket, 'production_handoff_packet'),
+    registry_install: registryInstall,
+    desktop_release_evidence: desktopReleaseEvidence,
+    production_handoff_packet: productionHandoffPacket,
+    evidence_collection: buildEvidenceCollection({ cleanMachineSmoke, supportDryRun, registryInstall, desktopReleaseEvidence, productionHandoffPacket }),
     next_command: 'npm run public-beta-qa -- --evidence-manifest <manifest.json>',
     safety: {
       embeds_artifact_contents: false,
@@ -119,7 +160,7 @@ export function renderPublicBetaEvidenceManifestPlain(manifest, wrote = false) {
   const supportCount = Array.isArray(manifest.support_dry_run) ? manifest.support_dry_run.length : 0;
   const lines = [
     'Enigma public beta evidence manifest',
-    'Status: Ready',
+    'Status: Path manifest ready; evidence still must be collected',
     `Clean-machine smoke: ${manifest.clean_machine_smoke ?? '<path>'}`,
     `Clean-machine smoke plan: ${manifest.clean_machine_smoke_plan ?? '<path>'}`,
     `Support dry-runs: ${supportCount}`,
@@ -128,6 +169,10 @@ export function renderPublicBetaEvidenceManifestPlain(manifest, wrote = false) {
     `Production handoff packet: ${manifest.production_handoff_packet ?? '<path>'}`,
     `Next: ${manifest.next_command ?? 'npm run public-beta-qa -- --evidence-manifest <manifest.json>'}`,
   ];
+  for (const item of Array.isArray(manifest.evidence_collection) ? manifest.evidence_collection : []) {
+    const target = Array.isArray(item.target_file) ? item.target_file.join(', ') : item.target_file;
+    lines.push(`Collect next: ${item.evidence_item_id} into ${target}: ${item.collect}`);
+  }
   if (wrote) lines.push('Manifest: written to <out>');
   lines.push('Boundary: path-only manifest; no artifact contents, credentials, local absolute paths, release action, signing claim, npm publish claim, PR approval claim, hosted-service claim, or public-beta readiness claim.');
   return `${lines.join('\n')}\n`;

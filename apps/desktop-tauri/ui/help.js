@@ -26,8 +26,8 @@ const HELP_ARTICLES = {
     title: 'Connecting AI apps',
     body: `
       <p>Enigma can connect to supported AI clients such as Claude Desktop and Cursor.</p>
-      <p>When you approve a connection, Enigma adds only the Enigma connector entry to that app's settings. Unrelated MCP settings are preserved.</p>
-      <p>If a client config is malformed, Enigma can restore an Enigma-managed backup or run a safe reset that reapplies the Enigma entry. Rollback and repair do not show config JSON or local file paths.</p>
+      <p>When you approve a connection, Enigma adds only its own entry to that app's settings. The app's other connection settings are preserved.</p>
+      <p>If a connection needs repair, Enigma can restore its backup or run a safe reset that reapplies the Enigma entry. Rollback and repair do not show setup files or local paths.</p>
       <p>Some apps need a restart before they can use Enigma Memory. The app will tell you when.</p>
     `,
   },
@@ -36,7 +36,7 @@ const HELP_ARTICLES = {
     body: `
       <p>The health dashboard shows whether your local vault, connected apps, and privacy checks are ready.</p>
       <p>If something needs attention, Enigma explains the issue and offers a fix-it action. Issue codes are safe to share with support.</p>
-      <p>Connection recovery can restore an Enigma-managed backup, rollback the last Enigma-managed connector change, or reapply Enigma's entry while preserving unrelated MCP settings.</p>
+      <p>Connection recovery can restore an Enigma-managed backup, rollback the last Enigma-managed connection change, or reapply Enigma's entry while preserving the app's other connection settings.</p>
       <p>Repair and rollback do not alter provider memory, model behavior, or provider-side logs. Local health checks work without network access.</p>
       <p>The Import Sandbox previews text, Markdown, and provider exports before any vault write, then shows duplicate groups, batch receipts, and rollback receipts as public-safe metadata.</p>
     `,
@@ -46,7 +46,7 @@ const HELP_ARTICLES = {
     body: `
       <p>Memory Weather is the plain-language status for what Enigma can share right now: clear, needs review, or sharing paused.</p>
       <p>Read the section like a traffic light: clear means local checks found no issue and you still approve each app request, needs review means check permissions, and sharing paused means fix the warning before Enigma shares local context.</p>
-      <p>App permissions use just-in-time consent. A connected app or MCP client may ask for local memory, but Enigma shows the decision before sharing context.</p>
+      <p>App permissions use just-in-time consent. A connected app may ask for local memory, but Enigma shows the decision before sharing context.</p>
       <p>Recall approval has two steps: review the local decision first, then explicitly approve this one recall or keep it not shared. Review alone never shares memory.</p>
       <p>A private memory bubble is a local review space for draft memory. Opening or closing it controls the local bubble only; provider records and model behavior require provider-side evidence.</p>
     `,

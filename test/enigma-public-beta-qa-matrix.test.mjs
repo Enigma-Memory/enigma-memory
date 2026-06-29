@@ -218,6 +218,8 @@ test('public beta QA plain output is readable, bounded, and non-JSON', async () 
   assert.match(plain, /Pending: /);
   assert.match(plain, /Collect: npm run public-beta:evidence-manifest -- --out \.enigma\/public-beta\/evidence-manifest\.json --plain/);
   assert.match(plain, /Review: npm run public-beta:advisor -- --evidence-manifest \.enigma\/public-beta\/evidence-manifest\.json/);
+  assert.match(plain, /Collect next: approve_merge_release_pr — EV-P10-PRODUCTION-HANDOFF-PACKET into \.enigma\/public-beta\/production-handoff-packet\.json: release PR ref or URL, reviewer approval ref, merge ref, and public-safe handoff approval status/);
+  assert.match(plain, /Collect next: publish_npm_0_1_19 — EV-P10-REGISTRY-INSTALL into \.enigma\/public-beta\/registry-install\.json: npm package version, registry package ref, install command used, and public-safe install result/);
   assert.match(plain, /Patchable evidence:/);
   assert.match(plain, /Evidence: record_support_dry_run — EV-P10-SUPPORT-DRY-RUN-SUMMARY/);
   assert.match(plain, /public-safe support dry-run summary/);
@@ -474,6 +476,10 @@ test('public beta next actions are ranked and public-safe', async () => {
   assertPublicSafe(matrix.next_actions);
   const direct = buildRankedNextActions(matrix.blockers);
   assert.deepEqual(direct, matrix.next_actions);
+  const firstAction = matrix.next_actions[0];
+  assert.equal(firstAction.collect_next.evidence_item_id, 'EV-P10-PRODUCTION-HANDOFF-PACKET');
+  assert.equal(firstAction.collect_next.target_file, '.enigma/public-beta/production-handoff-packet.json');
+  assert.match(firstAction.collect_next.collect, /release PR ref or URL/);
   assert.equal(matrix.next_actions.some((action) => action.action_id === 'record_support_dry_run'), true);
   const supportAction = matrix.next_actions.find((action) => action.action_id === 'record_support_dry_run');
   assert.equal(supportAction.missing_evidence_items[0].evidence_item_id, 'EV-P10-SUPPORT-DRY-RUN-SUMMARY');

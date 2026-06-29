@@ -123,54 +123,108 @@ const NEXT_ACTION_ORDER = Object.freeze([
     blocker_id: 'BLOCKER-PR-APPROVAL-MERGE-REVIEWER-APPROVAL',
     summary: 'Get release PR approval, reviewer approval, and merge evidence before publishing or announcing beta.',
     owner_ref: 'ref:role:release-owner',
+    collect_next: {
+      evidence_item_id: 'EV-P10-PRODUCTION-HANDOFF-PACKET',
+      manifest_field: 'production_handoff_packet',
+      target_file: '.enigma/public-beta/production-handoff-packet.json',
+      collect: 'release PR ref or URL, reviewer approval ref, merge ref, and public-safe handoff approval status',
+    },
   },
   {
     action_id: 'approve_public_safe_release_packet',
     blocker_id: 'BLOCKER-PUBLIC-SAFE-RELEASE-PACKET',
     summary: 'Approve the public-safe release packet after claim-boundary review.',
     owner_ref: 'ref:role:release-owner',
+    collect_next: {
+      evidence_item_id: 'EV-P10-PUBLIC-SAFE-RELEASE-PACKET-APPROVAL',
+      manifest_field: 'production_handoff_packet',
+      target_file: '.enigma/public-beta/production-handoff-packet.json',
+      collect: 'release-packet ref, claim-boundary reviewer ref, approval status, and date',
+    },
   },
   {
     action_id: 'publish_npm_0_1_19',
     blocker_id: 'BLOCKER-NPM-0.1.19-PUBLISH',
     summary: 'Publish enigma-memory 0.1.19 through the trusted npm workflow after the release PR is merged.',
     owner_ref: 'ref:role:release-owner',
+    collect_next: {
+      evidence_item_id: 'EV-P10-REGISTRY-INSTALL',
+      manifest_field: 'registry_install',
+      target_file: '.enigma/public-beta/registry-install.json',
+      collect: 'npm package version, registry package ref, install command used, and public-safe install result',
+    },
   },
   {
     action_id: 'complete_signing_identities',
     blocker_id: 'BLOCKER-APPLE-MICROSOFT-SIGNING-IDENTITIES',
     summary: 'Finish Apple/Microsoft signing identity setup and signing secret custody evidence.',
     owner_ref: 'ref:role:release-engineer',
+    collect_next: {
+      evidence_item_id: 'EV-P10-SIGNING-IDENTITY-READINESS',
+      manifest_field: 'desktop_release_evidence',
+      target_file: '.enigma/public-beta/desktop-release-evidence.json',
+      collect: 'Apple and Microsoft signing identity readiness refs plus signing custody approval ref',
+    },
   },
   {
     action_id: 'produce_signed_desktop_artifacts',
     blocker_id: 'BLOCKER-WINDOWS-SIGNED-ARTIFACT',
     summary: 'Produce signed Windows desktop artifact evidence.',
     owner_ref: 'ref:role:release-engineer',
+    collect_next: {
+      evidence_item_id: 'EV-P10-WINDOWS-SIGNED-DESKTOP-ARTIFACT',
+      manifest_field: 'desktop_release_evidence',
+      target_file: '.enigma/public-beta/desktop-release-evidence.json',
+      collect: 'Windows artifact filename, version, public checksum, signature verification result, and download ref',
+    },
   },
   {
     action_id: 'produce_notarized_macos_artifacts',
     blocker_id: 'BLOCKER-MACOS-NOTARIZED-ARTIFACT',
     summary: 'Produce signed, notarized, and stapled macOS artifact evidence.',
     owner_ref: 'ref:role:release-engineer',
+    collect_next: {
+      evidence_item_id: 'EV-P10-MACOS-NOTARIZED-DESKTOP-ARTIFACT',
+      manifest_field: 'desktop_release_evidence',
+      target_file: '.enigma/public-beta/desktop-release-evidence.json',
+      collect: 'macOS artifact filename, version, public checksum, notarization result, stapling result, and download ref',
+    },
   },
   {
     action_id: 'rehearse_update_rollback',
     blocker_id: 'BLOCKER-UPDATE-ROLLBACK-REHEARSAL',
     summary: 'Run signed update verification and rollback rehearsal evidence.',
     owner_ref: 'ref:role:release-engineer',
+    collect_next: {
+      evidence_item_id: 'EV-P10-UPDATE-ROLLBACK-REHEARSAL',
+      manifest_field: 'desktop_release_evidence',
+      target_file: '.enigma/public-beta/desktop-release-evidence.json',
+      collect: 'signed update verification result, rollback rehearsal result, updater manifest ref, and operator approval ref',
+    },
   },
   {
     action_id: 'run_clean_machine_qa',
     blocker_id: 'BLOCKER-CLEAN-MACHINE-QA',
     summary: 'Run clean-machine Windows/macOS install, first-run, connector, proof, offline, update, diagnostics, and uninstall QA.',
     owner_ref: 'ref:role:qa-owner',
+    collect_next: {
+      evidence_item_id: 'EV-P10-CLEAN-MACHINE-SMOKE',
+      manifest_field: 'clean_machine_smoke',
+      target_file: '.enigma/public-beta/clean-machine-smoke.json',
+      collect: 'clean-machine smoke JSON from the generated plan after install, first-run, connector, proof, offline, diagnostics, and uninstall checks',
+    },
   },
   {
     action_id: 'record_support_dry_run',
     blocker_id: 'BLOCKER-SUPPORT-DRY-RUN',
     summary: 'Record the public-safe support dry-run summary evidence item.',
     owner_ref: 'ref:role:beta-support',
+    collect_next: {
+      evidence_item_id: 'EV-P10-SUPPORT-DRY-RUN-SUMMARY',
+      manifest_field: 'support_dry_run',
+      target_file: '.enigma/public-beta/support-dry-run-<scenario>.json',
+      collect: 'scenario id, issue code, triage result, privacy-check status, and support owner ref',
+    },
   },
 ]);
 
@@ -190,6 +244,7 @@ export function buildRankedNextActions(blockers) {
         scenario_ids: blocker.scenario_ids,
         evidence_refs: blocker.evidence_refs,
         missing_evidence_items: blocker.missing_evidence_items ?? [],
+        collect_next: action.collect_next,
       };
     })
     .filter(Boolean);
@@ -862,7 +917,12 @@ export function renderPublicBetaQaPlain(report) {
     `Fail: ${counts.fail ?? 0}`,
   ];
   const actions = Array.isArray(report.next_actions) ? report.next_actions.slice(0, 5) : [];
-  for (const action of actions) lines.push(`Next: ${action.action_id} — ${action.summary}`);
+  for (const action of actions) {
+    lines.push(`Next: ${action.action_id} — ${action.summary}`);
+    if (action.collect_next?.target_file && action.collect_next?.collect) {
+      lines.push(`Collect next: ${action.action_id} — ${action.collect_next.evidence_item_id} into ${action.collect_next.target_file}: ${action.collect_next.collect}`);
+    }
+  }
   const patchableEvidence = (Array.isArray(report.next_actions) ? report.next_actions : [])
     .flatMap((action) => (Array.isArray(action.missing_evidence_items) ? action.missing_evidence_items : [])
       .map((item) => ({ action, item })));
