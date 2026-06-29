@@ -83,7 +83,8 @@ test('quickstart fails closed when an output file already exists', async () => {
   assert.match(plainIo.stdout(), /^Enigma quickstart\n/);
   assert.match(plainIo.stdout(), /Status: Needs attention/);
   assert.match(plainIo.stdout(), /Issue: Quickstart output already exists/);
-  assert.match(plainIo.stdout(), /Next: enigma quickstart --bundle <bundle-path> --out-dir <out-dir> --overwrite/);
+  assert.match(plainIo.stdout(), /Next: enigma quickstart --bundle <new-bundle-path> --out-dir <new-empty-out-dir>/);
+  assert.doesNotMatch(plainIo.stdout().split('\n').find((line) => line.startsWith('Next:')) ?? '', /--overwrite/);
   assert.match(plainIo.stdout(), /Boundary: local Enigma error summary only/);
   assert.doesNotMatch(plainIo.stdout(), /^\s*\{/);
   assert.equal(plainIo.stdout().includes(dir), false);

@@ -182,7 +182,8 @@ test('test-drive rerun without overwrite fails safely and preserves existing art
   assert.match(plain.stdout, /^Enigma test-drive\n/);
   assert.match(plain.stdout, /Status: Needs attention/);
   assert.match(plain.stdout, /Issue: Quickstart output already exists/);
-  assert.match(plain.stdout, /Next: enigma test-drive --out-dir <out-dir> --overwrite/);
+  assert.match(plain.stdout, /Next: enigma test-drive --out-dir <new-empty-out-dir>/);
+  assert.doesNotMatch(plain.stdout.split('\n').find((line) => line.startsWith('Next:')) ?? '', /--overwrite/);
   assert.match(plain.stdout, /Boundary: local Enigma error summary only/);
   assert.doesNotMatch(plain.stdout, /^\s*\{/);
   assert.equal(plain.stdout.includes(root), false);
