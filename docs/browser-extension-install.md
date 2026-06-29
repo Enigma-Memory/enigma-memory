@@ -35,22 +35,20 @@ The ZIP command does not publish, sign, upload, or submit the extension.
 
 ## Install the native host and MCP connector first
 
-Install the npm package, create the local bundle, and let Enigma merge the MCP server entry into the selected client config. Pick the command for the client you use:
+Install the npm package, create the local bundle, and preview the client you use most often before any write:
 
 ```sh
-npm install -g enigma-memory && enigma setup --client claude-desktop --write-connectors --overwrite
-npm install -g enigma-memory && enigma setup --client cursor --write-connectors --overwrite
-npm install -g enigma-memory && enigma setup --client kimi-code --write-connectors --overwrite
-npm install -g enigma-memory && enigma setup --client vscode-cline --write-connectors --overwrite
+npm install -g enigma-memory
+enigma quickstart --bundle ./.enigma/bundle.json
+enigma connect claude-desktop --bundle ./.enigma/bundle.json --dry-run
+enigma connect cursor --bundle ./.enigma/bundle.json --dry-run
+enigma connect kimi-code --bundle ./.enigma/bundle.json --dry-run
+enigma connect vscode-cline --bundle ./.enigma/bundle.json --dry-run
 ```
 
-If you want Enigma to touch only client config files that already exist, use:
+When the dry-run names the intended client and bundle, repeat that single `enigma connect <client> --bundle ./.enigma/bundle.json` command without `--dry-run`.
 
-```sh
-npm install -g enigma-memory && enigma setup --client auto --connect-installed --overwrite
-```
-
-Set `ENIGMA_BUNDLE` for the browser-launched host process to the same bundle path reported by setup, or point the native-host manifest at a small local wrapper that sets `ENIGMA_BUNDLE=<absolute-bundle-path>` before launching `enigma-native-host`. Native messaging manifests require an absolute executable path; they do not expand shell aliases, `~`, `$HOME`, `%USERPROFILE%`, or command arguments.
+Set `ENIGMA_BUNDLE` for the browser-launched host process to the same bundle path used with quickstart, or point the native-host manifest at a small local wrapper that sets `ENIGMA_BUNDLE=<absolute-bundle-path>` before launching `enigma-native-host`. Native messaging manifests require an absolute executable path; they do not expand shell aliases, `~`, `$HOME`, `%USERPROFILE%`, or command arguments.
 
 Resolve the absolute host executable path:
 

@@ -128,7 +128,7 @@ test('browser extension package output and zip checksum are deterministic', asyn
   ]);
 });
 
-test('browser and native-host docs show one-command MCP setup before manual JSON fallback', async () => {
+test('browser and native-host docs show dry-run MCP setup before manual JSON fallback', async () => {
   const docs = await Promise.all([
     readFile(new URL('../apps/browser-extension/README.md', import.meta.url), 'utf8'),
     readFile(new URL('../apps/native-host/README.md', import.meta.url), 'utf8'),
@@ -137,11 +137,15 @@ test('browser and native-host docs show one-command MCP setup before manual JSON
   ]);
   const mcpContract = await readFile(new URL('../packages/mcp-server/PACKAGE_CONTRACT.md', import.meta.url), 'utf8');
   for (const doc of docs) {
-    assert.match(doc, /npm install -g enigma-memory && enigma setup --client claude-desktop --write-connectors --overwrite/);
-    assert.match(doc, /npm install -g enigma-memory && enigma setup --client cursor --write-connectors --overwrite/);
-    assert.match(doc, /npm install -g enigma-memory && enigma setup --client kimi-code --write-connectors --overwrite/);
-    assert.match(doc, /npm install -g enigma-memory && enigma setup --client vscode-cline --write-connectors --overwrite/);
-    assert.match(doc, /npm install -g enigma-memory && enigma setup --client auto --connect-installed --overwrite/);
+    assert.match(doc, /npm install -g enigma-memory/);
+    assert.match(doc, /enigma quickstart --bundle \.\/\.enigma\/bundle\.json/);
+    assert.match(doc, /enigma connect claude-desktop --bundle \.\/\.enigma\/bundle\.json --dry-run/);
+    assert.match(doc, /enigma connect cursor --bundle \.\/\.enigma\/bundle\.json --dry-run/);
+    assert.match(doc, /enigma connect kimi-code --bundle \.\/\.enigma\/bundle\.json --dry-run/);
+    assert.match(doc, /enigma connect vscode-cline --bundle \.\/\.enigma\/bundle\.json --dry-run/);
+    assert.doesNotMatch(doc, /setup --client .*--overwrite/);
+    assert.doesNotMatch(doc, /connect-installed --overwrite/);
   }
-  assert.match(mcpContract, /npm install -g enigma-memory && enigma setup --client <id> --write-connectors --overwrite/);
+  assert.match(mcpContract, /enigma connect <id> --bundle \.\/\.enigma\/bundle\.json --dry-run/);
+  assert.doesNotMatch(mcpContract, /setup --client <id> --write-connectors --overwrite/);
 });

@@ -2,22 +2,20 @@
 
 `enigma-mcp` is the stdio MCP server installed by the `enigma-memory` package. Claude Desktop, Cursor, Kimi Code, and VS Code Cline users should prefer the CLI connector commands below instead of hand-editing MCP JSON.
 
-## One-command install and connect
+## Install and preview before connecting
 
-Pick the client you use:
-
-```sh
-npm install -g enigma-memory && enigma setup --client claude-desktop --write-connectors --overwrite
-npm install -g enigma-memory && enigma setup --client cursor --write-connectors --overwrite
-npm install -g enigma-memory && enigma setup --client kimi-code --write-connectors --overwrite
-npm install -g enigma-memory && enigma setup --client vscode-cline --write-connectors --overwrite
-```
-
-To write only MCP configs that already exist on the machine:
+Create the local bundle, then preview the client you use:
 
 ```sh
-npm install -g enigma-memory && enigma setup --client auto --connect-installed --overwrite
+npm install -g enigma-memory
+enigma quickstart --bundle ./.enigma/bundle.json
+enigma connect claude-desktop --bundle ./.enigma/bundle.json --dry-run
+enigma connect cursor --bundle ./.enigma/bundle.json --dry-run
+enigma connect kimi-code --bundle ./.enigma/bundle.json --dry-run
+enigma connect vscode-cline --bundle ./.enigma/bundle.json --dry-run
 ```
+
+When the dry-run names the intended client and bundle, repeat that single `enigma connect <client> --bundle ./.enigma/bundle.json` command without `--dry-run`.
 
 The generated server entry uses command `enigma-mcp`, no args, and `ENIGMA_BUNDLE` pointing at the local bundle. Existing sibling MCP servers are preserved.
 
