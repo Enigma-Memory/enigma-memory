@@ -50,6 +50,8 @@ test('public beta evidence templates are public-safe blockers, not fake evidence
     assert.equal(registry.evidence_status, 'template_only');
     assert.equal(registry.ok, false);
     assert.equal(registry.execute, false);
+    assert.equal(registry.install.command, 'npm install --prefix <temp-prefix> enigma-memory@0.1.19');
+    assert.doesNotMatch(registry.install.command, /npm install enigma-memory@|npm publish|npm token/i);
 
     const desktop = JSON.parse(await readFile(join(outDir, 'desktop-release-evidence.json'), 'utf8'));
     assert.equal(desktop.schema, 'enigma.desktop_release_evidence.v1');

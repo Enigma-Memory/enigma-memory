@@ -104,7 +104,7 @@ function buildRegistryInstallTemplate(generatedAt) {
       registry_ref: 'TBD-public-registry-package-ref',
     },
     install: {
-      command: `npm install enigma-memory@${REQUIRED_PUBLIC_BETA_VERSION}`,
+      command: `npm install --prefix <temp-prefix> enigma-memory@${REQUIRED_PUBLIC_BETA_VERSION}`,
       result: 'pending',
       evidence_ref: 'TBD-public-install-result-ref',
     },
