@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Current Enigma Memory public launch status: Azure subscription, Artifact Signing/Public Trust, Apple notarization, and unsigned build boundaries.">
+  <meta name="description" content="Current Enigma Memory public launch status: trusted installer readiness, testing-only build boundaries, and consumer download guidance.">
   <title>Public Launch Status — Enigma Memory</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -26,7 +26,7 @@
     <section class="hero">
       <span class="eyebrow">Public launch</span>
       <h1>Launch status and code-signing timeline.</h1>
-      <p>The desktop-first flow is the public-launch target, but general consumer release is still blocked by signed Windows and macOS installers. Azure Artifact Signing now requires an eligible paid subscription before Public Trust setup can continue; Apple notarization is not complete.</p>
+      <p>The desktop-first flow is the public-launch target, but general consumer release is still blocked by trusted Windows and macOS installers. Windows signing setup and Apple notarization are not complete, so the download page stays in status mode instead of presenting a general public installer.</p>
       <div class="cta-row">
         <a class="btn btn-primary" href="#status">See current status</a>
         <a class="btn btn-secondary" href="./download.html">Go to downloads</a>
@@ -38,24 +38,24 @@
       <h2 id="status-heading">Current status</h2>
       <div class="card-grid">
         <article class="card">
-          <h3>Tauri updater key</h3>
-          <span class="status-label status-label--ready">Configured</span>
-          <p>Configured. The updater signing key has a protected repository custody path and the matching public key is committed in the desktop app configuration, so future auto-updates can be verified after release signing is complete.</p>
+          <h3>Update verification key</h3>
+          <span class="status-label status-label--testing">Prepared</span>
+          <p>Prepared for future signed auto-updates. This does not mean signed installers are ready; it only means the desktop app already contains the public key needed to verify updates after the release signing path is complete.</p>
         </article>
         <article class="card">
-          <h3>Azure subscription</h3>
-          <span class="status-label status-label--pending">Upgrade required</span>
-          <p>Blocked. Azure Portal rejected the current subscription for Artifact Signing because free, trial, and sponsored subscriptions are not eligible. Upgrade or switch to an eligible paid subscription before creating the signing account.</p>
+          <h3>Windows trusted installer</h3>
+          <span class="status-label status-label--pending">Not ready</span>
+          <p>Blocked on trusted Windows signing setup. Until signing evidence exists, Windows builds remain testing-only and should not be recommended to general consumers.</p>
         </article>
         <article class="card">
-          <h3>Azure Artifact Signing / Public Trust</h3>
-          <span class="status-label status-label--pending">Blocked</span>
-          <p>Blocked before account creation. After an eligible paid subscription is available, the Artifact Signing account, Public Trust identity validation, and certificate profile still need to be completed before trusted Windows signing can be claimed.</p>
+          <h3>macOS trusted installer</h3>
+          <span class="status-label status-label--pending">Not ready</span>
+          <p>Blocked on Apple developer signing and notarization. Until notarization evidence exists, macOS builds remain testing-only and should not be recommended to general consumers.</p>
         </article>
         <article class="card">
-          <h3>Apple Developer enrollment</h3>
-          <span class="status-label status-label--pending">Pending</span>
-          <p>Pending. Enrollment in the Apple Developer Program is required before macOS Developer ID certificates, signing, and notarization can be completed.</p>
+          <h3>General consumer download</h3>
+          <span class="status-label status-label--pending">Waiting</span>
+          <p>Waiting for both trusted installer paths. The download page will switch from status guidance to installer links only after release evidence proves the builds are ready.</p>
         </article>
       </div>
     </section>
@@ -66,15 +66,15 @@
         <li class="step">
           <span class="step__number">1</span>
           <div class="step__content">
-            <h3>Windows signed installer</h3>
-            <p>Blocked on Azure subscription eligibility first, then Artifact Signing identity validation. Azure rejected the current subscription as free/trial/sponsored; after an eligible paid subscription is available, Public Trust validation typically takes minutes to hours and requires a mobile device for document and selfie capture.</p>
+            <h3>Windows trusted installer</h3>
+            <p>Blocked on Windows signing evidence. When a trusted Windows installer exists, the download page can label it ready and the beta QA matrix can move the Windows install scenario out of HOLD.</p>
           </div>
         </li>
         <li class="step">
           <span class="step__number">2</span>
           <div class="step__content">
             <h3>macOS signed and notarized installer</h3>
-            <p>Blocked on Apple Developer Program enrollment. After enrollment, Developer ID Application and Installer certificates must be created, exported, and added to the protected release-signing environment; then CI can sign, notarize, and staple the macOS build. Enrollment review usually takes 1–5 business days for individuals and 1–4 weeks for organizations.</p>
+            <p>Blocked on macOS signing and notarization evidence. When the signed and notarized installer exists, the download page can label it ready and the beta QA matrix can move the macOS install scenario out of HOLD.</p>
           </div>
         </li>
         <li class="step">

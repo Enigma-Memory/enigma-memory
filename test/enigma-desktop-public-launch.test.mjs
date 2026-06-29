@@ -554,6 +554,9 @@ test('public website explains consumer install path without unsupported claims',
   assert.match(help, /You should not need Node, npm, terminal commands, or JSON edits/);
   assert.match(launchStatus, /How this page stays public-safe/);
   assert.doesNotMatch(launchStatus, /GitHub Releases|code-signing-setup|production-readiness-status/);
+  assert.match(launchStatus, /Windows trusted installer/);
+  assert.match(launchStatus, /General consumer download/);
+  assert.doesNotMatch(launchStatus, /Azure|Artifact Signing|free\/trial\/sponsored|eligible paid subscription|Public Trust|repository custody path/i);
   assert.match(installGuide, /when your platform is marked ready/);
   assert.match(macosInstall, /when signing is ready/);
   assert.match(windowsInstall, /when signing is ready/);
