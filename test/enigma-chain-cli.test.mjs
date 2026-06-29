@@ -128,6 +128,44 @@ test('chain anchor creates and verifies a public-safe Solana-ready anchor batch'
   assertPublicSafeArtifact(artifact, 'enigma.proof_network.anchor_batch.v1');
   assert.equal(valuesForKey(artifact, 'commitment_count').includes(2), true);
   await assertVerifies(out);
+
+  const plainOut = join(dir, 'anchor-batch-plain.json');
+  const plainResult = await runCli([
+    'chain',
+    'anchor',
+    '--root',
+    ROOT_A,
+    '--root',
+    ROOT_B,
+    '--ref',
+    'memory-root://public/demo/a',
+    '--authority',
+    'did:key:z6mkpublicauthorityonly',
+    '--batch-ref',
+    'solana-anchor://planning/mainnet/demo-batch-plain',
+    '--out',
+    plainOut,
+    '--plain',
+  ]);
+  assert.equal(plainResult.code, 0, plainResult.io.stderr());
+  assert.match(plainResult.io.stdout(), /^Enigma proof network artifact\n/);
+  assert.match(plainResult.io.stdout(), /Status: Ready/);
+  assert.match(plainResult.io.stdout(), /Artifact type: enigma\.proof_network\.anchor_batch\.v1/);
+  assert.match(plainResult.io.stdout(), /Transaction submitted: no/);
+  assert.match(plainResult.io.stdout(), /Raw memory on-chain: no/);
+  assert.match(plainResult.io.stdout(), /Proof artifact: written to <out>/);
+  assert.match(plainResult.io.stdout(), /Boundary: local proof-network artifact only/);
+  assert.doesNotMatch(plainResult.io.stdout(), /^\s*\{/);
+  assertTextOmits(plainResult.io.stdout(), dir, plainOut, ROOT_A, ROOT_B, PRIVATE_SENTINEL, SECRET_REF_SENTINEL);
+
+  const plainVerify = await runCli(['chain', 'verify', '--file', plainOut, '--plain']);
+  assert.equal(plainVerify.code, 0, plainVerify.io.stderr());
+  assert.match(plainVerify.io.stdout(), /^Enigma proof network verify\n/);
+  assert.match(plainVerify.io.stdout(), /Status: Ready/);
+  assert.match(plainVerify.io.stdout(), /Errors: 0/);
+  assert.match(plainVerify.io.stdout(), /Boundary: local proof-network verification only/);
+  assert.doesNotMatch(plainVerify.io.stdout(), /^\s*\{/);
+  assertTextOmits(plainVerify.io.stdout(), dir, plainOut, ROOT_A, ROOT_B, PRIVATE_SENTINEL, SECRET_REF_SENTINEL);
 });
 
 test('chain grant and revoke create verifiable scoped capability artifacts without secrets', async () => {

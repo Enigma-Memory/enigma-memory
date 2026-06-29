@@ -3696,21 +3696,68 @@ function flagValues(flags, names) {
   return values;
 }
 
+function renderChainPlain(summary, outWritten = false) {
+  const idEntry = Object.entries(summary).find(([key]) => key.endsWith('_id'));
+  const hashEntry = Object.entries(summary).find(([key]) => key.endsWith('_hash'));
+  const lines = [
+    'Enigma proof network artifact',
+    'Status: Ready',
+    `Artifact type: ${summary.artifact_type ?? '<artifact-type>'}`,
+  ];
+  if (idEntry) lines.push(`Artifact id: ${idEntry[1]}`);
+  if (hashEntry) lines.push(`Artifact hash: ${hashEntry[1]}`);
+  lines.push(`Transaction submitted: ${summary.transaction_submitted === true ? 'yes' : 'no'}`);
+  lines.push(`Raw memory on-chain: ${summary.raw_memory_on_chain === true ? 'yes' : 'no'}`);
+  if (outWritten) lines.push('Proof artifact: written to <out>');
+  lines.push('Boundary: local proof-network artifact only; no raw memory, local paths, private keys, network submission, provider deletion, model behavior, hosted service, benchmark superiority, token ROI, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printChainArtifact(summary, flags, io, outWritten = false, jsonResult = summary) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderChainPlain(summary, outWritten));
+  else print(jsonResult, io);
+}
+
+function renderChainVerifyPlain(report) {
+  const errors = Array.isArray(report.validation?.errors) ? report.validation.errors : [];
+  const lines = [
+    'Enigma proof network verify',
+    `Status: ${report.ok ? 'Ready' : 'Needs attention'}`,
+    `Artifact type: ${report.artifact_type ?? '<artifact-type>'}`,
+    `Errors: ${errors.length}`,
+    `Transaction submitted: ${report.transaction_submitted === true ? 'yes' : 'no'}`,
+    `Raw memory on-chain: ${report.raw_memory_on_chain === true ? 'yes' : 'no'}`,
+  ];
+  for (const error of errors.slice(0, 3)) lines.push(`Issue: ${error}`);
+  lines.push('Boundary: local proof-network verification only; no raw memory, local paths, private keys, network submission, provider deletion, model behavior, hosted service, benchmark superiority, token ROI, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printChainVerifyReport(report, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderChainVerifyPlain(report));
+  else print(report, io);
+}
+
 function chainWriteOrPrint(flags, io, artifact, summary) {
   if (flags.has('out')) {
     const outPath = resolve(String(requireFlag(flags, ['out'])));
     return writeJson(outPath, artifact).then(() => {
-      print({
+      const jsonResult = {
         ok: true,
         path: publicPathDisplay(String(requireFlag(flags, ['out'])), 'proof-network-artifact'),
         transaction_submitted: false,
         raw_memory_on_chain: false,
         ...summary,
-      }, io);
+      };
+      printChainArtifact(jsonResult, flags, io, true, jsonResult);
       return 0;
     });
   }
-  print(artifact, io);
+  printChainArtifact({
+    transaction_submitted: false,
+    raw_memory_on_chain: false,
+    ...summary,
+  }, flags, io, false, artifact);
   return 0;
 }
 
@@ -4048,14 +4095,14 @@ export async function chainVerifyCommand(flags, io, positionalFile = undefined) 
   } catch (error) {
     result = { ok: false, error: { code: 'PROOF_NETWORK_INVALID', message: error.message } };
   }
-  print({
+  printChainVerifyReport({
     ok: result.ok === true,
     artifact_type: schema,
     artifact_hash: proofNetworkSha256Json(artifact),
     transaction_submitted: false,
     raw_memory_on_chain: false,
     validation: result,
-  }, io);
+  }, flags, io);
   return result.ok === true ? 0 : 1;
 }
 
@@ -4680,14 +4727,15 @@ function usage() {
       boundary: 'Settlement artifacts contain commitment roots, capacity profiles, hashes, refs, prices, and claim boundaries only; no raw memory, prompts, provider responses, credentials, token ROI/profit, decentralization, or provider-invoice savings claim.',
     },
     chain: {
-      anchor: 'enigma chain anchor --root <sha256:...> [--root <sha256:...>] [--ref <public-ref>] [--authority <public-authority-ref>] [--batch-ref <ref>] [--out <file>]',
-      grant: 'enigma chain grant --subject <public-subject-ref> --capability <capability-id> --scope <scope-id> [--resource-ref <sha256:...>] [--policy-hash <sha256:...>] --expires-at <iso> [--grant-ref <public-ref>] [--out <file>]',
-      revoke: 'enigma chain revoke --grant-hash <sha256:...> --reason <public-reason-code> [--revocation-ref <public-ref>] [--out <file>]',
-      attest: 'enigma chain attest (--report-hash <sha256:...> | --report-file <report.json>) --dataset-ref <sha256:...> --runner-ref <public-runner-ref> --package-ref <public-package-ref> [--score name=value] [--out <file>]',
-      verify: 'enigma chain verify --file <proof-artifact.json>',
-      register: 'enigma chain register --entry-type <anchor_batch|benchmark_attestation|connector_conformance|health_report|operator_receipt|settlement_job> (--artifact-hash <sha256:...> | --artifact-file <artifact.json>) --artifact-schema-ref <schema-id> [--digest-ref <sha256:...>] [--signer <public-ref>] [--registry-ref <public-ref>] [--entry-ref <public-ref>] [--entry-count <n>] [--out <file>]',
-      registry: 'enigma chain registry --entry <registry-entry.json> [--entry <registry-entry.json>] [--registry-ref <public-ref>] [--out <file>]',
+      anchor: 'enigma chain anchor --root <sha256:...> [--root <sha256:...>] [--ref <public-ref>] [--authority <public-authority-ref>] [--batch-ref <ref>] [--out <file>] [--plain]',
+      grant: 'enigma chain grant --subject <public-subject-ref> --capability <capability-id> --scope <scope-id> [--resource-ref <sha256:...>] [--policy-hash <sha256:...>] --expires-at <iso> [--grant-ref <public-ref>] [--out <file>] [--plain]',
+      revoke: 'enigma chain revoke --grant-hash <sha256:...> --reason <public-reason-code> [--revocation-ref <public-ref>] [--out <file>] [--plain]',
+      attest: 'enigma chain attest (--report-hash <sha256:...> | --report-file <report.json>) --dataset-ref <sha256:...> --runner-ref <public-runner-ref> --package-ref <public-package-ref> [--score name=value] [--out <file>] [--plain]',
+      verify: 'enigma chain verify --file <proof-artifact.json> [--plain]',
+      register: 'enigma chain register --entry-type <anchor_batch|benchmark_attestation|connector_conformance|health_report|operator_receipt|settlement_job> (--artifact-hash <sha256:...> | --artifact-file <artifact.json>) --artifact-schema-ref <schema-id> [--digest-ref <sha256:...>] [--signer <public-ref>] [--registry-ref <public-ref>] [--entry-ref <public-ref>] [--entry-count <n>] [--out <file>] [--plain]',
+      registry: 'enigma chain registry --entry <registry-entry.json> [--entry <registry-entry.json>] [--registry-ref <public-ref>] [--out <file>] [--plain]',
       submit_solana: 'enigma chain submit-solana --file <proof-artifact.json> --cluster <devnet|testnet|mainnet-beta|localnet> [--rpc <url>] [--execute --keypair <solana-cli-64-byte-keypair.json>]',
+      '--plain': 'Print a path-redacted proof-network summary instead of JSON. Alias: --text or --format text.',
       boundary: 'Proof Network chain commands default to local planning and dry-run validation. submit-solana only submits a Solana Memo transaction when --execute is passed; it carries compact public-safe commitment/ref JSON, never raw memory or artifact bodies.',
     },
     memory_drive_health: {
