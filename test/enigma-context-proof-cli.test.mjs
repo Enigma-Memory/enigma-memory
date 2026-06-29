@@ -267,3 +267,58 @@ test('controller weather plain output is readable and path-redacted', async () =
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('controller bubble plain output opens and closes without paths or memory', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-controller-bubble-'));
+  const bubbleFile = join(dir, 'bubble.json');
+  const closedFile = join(dir, 'bubble.closed.json');
+  try {
+    const opened = makeIo();
+    assert.equal(await main([
+      'controller',
+      'bubble',
+      '--app-ref',
+      'ref:app:plain-bubble',
+      '--purpose-ref',
+      'ref:purpose:temporary_review',
+      '--candidate-count',
+      '3',
+      '--out',
+      bubbleFile,
+      '--plain',
+    ], opened.io), 0, opened.stderr());
+    assert.match(opened.stdout(), /^Enigma private memory bubble open\n/);
+    assert.match(opened.stdout(), /Status: open/);
+    assert.match(opened.stdout(), /Bubble: ref:/);
+    assert.match(opened.stdout(), /Candidates: 3/);
+    assert.match(opened.stdout(), /Bubble file: written to <out>/);
+    assert.match(opened.stdout(), /Boundary: public-safe local private-bubble receipt only/);
+    assert.doesNotMatch(opened.stdout(), /^\s*\{/);
+    assert.equal(opened.stdout().includes(dir), false);
+    assert.equal(opened.stdout().includes(bubbleFile), false);
+
+    const closed = makeIo();
+    assert.equal(await main([
+      'controller',
+      'bubble',
+      '--action',
+      'discard',
+      '--bubble-file',
+      bubbleFile,
+      '--out',
+      closedFile,
+      '--plain',
+    ], closed.io), 0, closed.stderr());
+    assert.match(closed.stdout(), /^Enigma private memory bubble discard\n/);
+    assert.match(closed.stdout(), /Status: discarded/);
+    assert.match(closed.stdout(), /Discarded: 3/);
+    assert.match(closed.stdout(), /Bubble file: written to <out>/);
+    assert.match(closed.stdout(), /Boundary: public-safe local private-bubble receipt only/);
+    assert.doesNotMatch(closed.stdout(), /^\s*\{/);
+    assert.equal(closed.stdout().includes(dir), false);
+    assert.equal(closed.stdout().includes(bubbleFile), false);
+    assert.equal(closed.stdout().includes(closedFile), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 import { createVault, remember, recall, updateMemory, deleteMemory, exportBundle, decryptKeyring, KEYRING_ENCRYPTED_TYPE } from '../../../packages/vault/src/index.js';
 import { createPassport, compileContextPack, createContextPassport, createProofOfNonUse, createMemoryDriveHealthReport } from '../../../packages/passport/src/index.js';
 import { runBoundarySimulation } from '../../../packages/boundary/src/index.js';
-import { assertMemoryControllerPublicSafe, createConsentGrant, createMemoryWeatherReport, createRecallVetoDecision } from '../../../packages/controller/src/index.js';
+import { assertMemoryControllerPublicSafe, closePrivateMemoryBubble, createConsentGrant, createMemoryWeatherReport, createPrivateMemoryBubble, createRecallVetoDecision } from '../../../packages/controller/src/index.js';
 import { startStdioServer } from '../../../packages/mcp-server/src/index.js';
 import { runMeshDemo } from '../../../packages/mesh/src/index.js';
 import { runEnterpriseDemo } from '../../../packages/enterprise/src/index.js';
@@ -2188,6 +2188,29 @@ function printControllerWeatherResult(report, flags, io, outWritten = false) {
   else print(report, io);
 }
 
+function renderControllerBubblePlain(bubble, action, outWritten = false) {
+  const appRefs = Array.isArray(bubble.app_refs) ? bubble.app_refs : [];
+  const lines = [
+    `Enigma private memory bubble ${action}`,
+    `Status: ${bubble.status ?? 'unknown'}`,
+    `Bubble: ${bubble.bubble_ref ?? '<bubble-ref>'}`,
+    `Apps: ${appRefs.length}`,
+    `Purpose: ${bubble.purpose_ref ?? '<purpose-ref>'}`,
+    `Candidates: ${bubble.candidate_count ?? 0}`,
+    `Kept: ${bubble.kept_count ?? 0}`,
+    `Discarded: ${bubble.discarded_count ?? 0}`,
+  ];
+  if (bubble.closed_at) lines.push(`Closed: ${bubble.closed_at}`);
+  if (outWritten) lines.push('Bubble file: written to <out>');
+  lines.push('Boundary: public-safe local private-bubble receipt only; no raw memory, local paths, provider calls, provider deletion, model behavior, hosted service, benchmark, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printControllerBubbleResult(bubble, action, flags, io, outWritten = false) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderControllerBubblePlain(bubble, action, outWritten));
+  else print(bubble, io);
+}
+
 
 
 function renderInstallPlain(summary) {
@@ -4135,6 +4158,41 @@ export async function controllerWeatherCommand(flags, io) {
   return 0;
 }
 
+export async function controllerBubbleCommand(flags, io, positionalFile) {
+  const action = String(getFlag(flags, ['action'], getFlag(flags, ['bubble-file', 'bubbleFile', 'in'], positionalFile) ? 'discard' : 'open'));
+  const out = getFlag(flags, ['out']);
+  if (action === 'open') {
+    const appRefs = parseList(getFlag(flags, ['app-refs', 'appRefs']));
+    const receiptRefs = parseList(getFlag(flags, ['receipt-refs', 'receiptRefs']));
+    const bubble = createPrivateMemoryBubble({
+      app_ref: appRefs.length === 0 ? getFlag(flags, ['app-ref', 'appRef'], 'ref:app:cli') : undefined,
+      app_refs: appRefs.length === 0 ? undefined : appRefs,
+      purpose_ref: getFlag(flags, ['purpose-ref', 'purposeRef'], 'ref:purpose:private_bubble'),
+      candidate_count: parseOptionalNumber(getFlag(flags, ['candidate-count', 'candidateCount'])) ?? 0,
+      started_at: getFlag(flags, ['started-at', 'startedAt', 'now'], new Date().toISOString()),
+      bubble_ref: getFlag(flags, ['bubble-ref', 'bubbleRef']),
+      receipt_refs: receiptRefs.length === 0 ? undefined : receiptRefs,
+    });
+    if (out && out !== true) await writeJson(resolve(String(out)), bubble);
+    printControllerBubbleResult(bubble, 'open', flags, io, out && out !== true);
+    return 0;
+  }
+  if (action !== 'keep' && action !== 'discard') throw new Error('controller bubble --action must be open, keep, or discard');
+  const bubblePath = resolve(String(requireFileArg(flags, ['bubble-file', 'bubbleFile', 'in'], positionalFile, 'bubble-file')));
+  const bubble = await readJson(bubblePath);
+  const receiptRefs = parseList(getFlag(flags, ['receipt-refs', 'receiptRefs']));
+  const closed = closePrivateMemoryBubble(bubble, {
+    outcome: action,
+    closed_at: getFlag(flags, ['closed-at', 'closedAt', 'now'], new Date().toISOString()),
+    kept_count: parseOptionalNumber(getFlag(flags, ['kept-count', 'keptCount'])),
+    discarded_count: parseOptionalNumber(getFlag(flags, ['discarded-count', 'discardedCount'])),
+    receipt_refs: receiptRefs.length === 0 ? undefined : receiptRefs,
+  });
+  if (out && out !== true) await writeJson(resolve(String(out)), closed);
+  printControllerBubbleResult(closed, action, flags, io, out && out !== true);
+  return 0;
+}
+
 function humanUsage() {
   return `Enigma Memory CLI — local-first AI Memory Passport
 
@@ -4271,6 +4329,7 @@ function usage() {
       'controller grant': 'Create a public-safe Memory Controller consent grant for local context recall.',
       'controller revoke': 'Mark an existing public-safe Memory Controller grant revoked without exposing memory.',
       'controller weather': 'Create a public-safe Memory Weather report for dashboard/review status.',
+      'controller bubble': 'Open or close a public-safe Private Memory Bubble receipt without exposing memory.',
       '--grant-file <path>': 'Grant JSON to revoke for controller revoke. Positional file is also accepted.',
       '--app-ref <ref>': 'Opaque connected-app ref. Defaults to ref:app:cli.',
       '--purpose-ref <ref>': 'Opaque purpose ref. Defaults to ref:purpose:cli_context.',
@@ -4279,11 +4338,15 @@ function usage() {
       '--ttl-seconds <n>': 'Grant lifetime in seconds when --expires-at is omitted.',
       '--issued-at/--now <iso>': 'Grant issue timestamp. Defaults to current local time.',
       '--expires-at <iso>': 'Explicit grant expiration timestamp. If omitted, ttl-seconds is applied.',
-      '--out <path>': 'Write grant or weather JSON for later review without printing local paths.',
+      '--out <path>': 'Write grant, weather, or bubble JSON for later review without printing local paths.',
       '--status <sunny|needs_attention|storm_warning>': 'Optional Memory Weather status override for controller weather.',
       '--issue-code <code>': 'Optional public-safe weather issue code; repeat or comma-separate.',
       '--tile-status/--metric/--count': 'Optional single weather tile fields for controller weather.',
-      '--plain': 'Print a path-redacted consent/weather summary instead of JSON. Alias: --text or --format text.',
+      '--action <open|keep|discard>': 'Private Bubble action. Open is default unless a bubble file is supplied; discard is default for close.',
+      '--bubble-file <path>': 'Open Private Bubble JSON to close. Positional file is also accepted.',
+      '--candidate-count <n>': 'Candidate count for an opened Private Bubble.',
+      '--kept-count/--discarded-count <n>': 'Optional close counts for keep/discard actions.',
+      '--plain': 'Print a path-redacted consent/weather/bubble summary instead of JSON. Alias: --text or --format text.',
     },
     search_options: {
       '--query <text>': 'Required local query. Output redacts the query and memory plaintext by default. Alias: --q.',
@@ -4459,7 +4522,7 @@ function usage() {
     },
     connector_write_behavior: 'Config writes preserve unrelated settings and sibling MCP servers. Existing configs are backed up only when the semantic JSON config changes; reconnecting an identical config is idempotent.',
     claim_boundaries: 'Connectors configure local MCP access to an Enigma bundle. They do not make provider-native memory canonical and do not prove provider deletion or model forgetting.',
-    claude_mcpb_options: {
+    claude_mcpb_package: {
       command: 'enigma claude-mcpb package [--mcpb <path>] [--out <report.json>] [--version <semver>]',
       boundary: 'Builds a deterministic Claude Desktop MCPB review package locally. It does not install, launch Claude, write client config, or perform network calls.',
     },
@@ -4488,7 +4551,7 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     io.stdout.write(`${humanUsage()}\n`);
     return 0;
   }
-  if ((command === 'chain' && (!subcommand || subcommand === '--help' || subcommand === '-h' || flags.has('help'))) || ((flags.has('help') || argv.includes('-h')) && (command === 'init' || command === 'setup' || command === 'start' || command === 'next' || command === 'quickstart' || command === 'test-drive' || command === 'search' || command === 'context' || command === 'status' || (command === 'passport' && subcommand === 'status') || ((command === 'relay' || command === 'gateway') && (subcommand === 'serve' || subcommand === 'demo')) || (command === 'native-host' && (subcommand === 'manifest' || subcommand === 'install-plan')) || (command === 'claude-mcpb' && subcommand === 'package') || (command === 'demo' && subcommand === 'cross-model') || (command === 'drive' && subcommand === 'health') || (command === 'controller' && (subcommand === 'grant' || subcommand === 'revoke' || subcommand === 'weather'))))) {
+  if ((command === 'chain' && (!subcommand || subcommand === '--help' || subcommand === '-h' || flags.has('help'))) || ((flags.has('help') || argv.includes('-h')) && (command === 'init' || command === 'setup' || command === 'start' || command === 'next' || command === 'quickstart' || command === 'test-drive' || command === 'search' || command === 'context' || command === 'status' || (command === 'passport' && subcommand === 'status') || ((command === 'relay' || command === 'gateway') && (subcommand === 'serve' || subcommand === 'demo')) || (command === 'native-host' && (subcommand === 'manifest' || subcommand === 'install-plan')) || (command === 'claude-mcpb' && subcommand === 'package') || (command === 'demo' && subcommand === 'cross-model') || (command === 'drive' && subcommand === 'health') || (command === 'controller' && (subcommand === 'grant' || subcommand === 'revoke' || subcommand === 'weather' || subcommand === 'bubble'))))) {
     print(usage(), io);
     return 0;
   }
@@ -4513,6 +4576,7 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     if (command === 'controller' && subcommand === 'grant') return await controllerGrantCommand(flags, io);
     if (command === 'controller' && subcommand === 'revoke') return await controllerRevokeCommand(flags, io, positionalFile);
     if (command === 'controller' && subcommand === 'weather') return await controllerWeatherCommand(flags, io);
+    if (command === 'controller' && subcommand === 'bubble') return await controllerBubbleCommand(flags, io, positionalFile);
     if (command === 'next') return await nextCommand(flags, io);
     if (command === 'status') return await statusCommand(flags, io);
     if (command === 'passport' && subcommand === 'status') return await statusCommand(flags, io);

@@ -46,7 +46,7 @@
 - Desktop-first `README.md`.
 - Updated `docs/install-anywhere.md`.
 - Static `website/` pages: home, download, setup, help hub, install/connect/troubleshooting guides, privacy, proofs, FAQ, and developer CLI appendix. Home/download pages now present a consumer setup path, local trust boundary, Import Sandbox, Proof Activity, and unsigned-build caveat without claiming signed public release.
-- CLI-first fallback is still supported for power users: `enigma init --plain`, `enigma test-drive --plain`, `enigma demo cross-model --plain`, `enigma install --plain`, `enigma quickstart --plain`, `enigma setup --plain`, `enigma controller grant --plain`, `enigma controller revoke --plain`, `enigma controller weather --plain`, `enigma remember --plain`, `enigma update --plain`, `enigma delete --plain`, `enigma search --plain`, `enigma context --plain`, `enigma export --plain`, `enigma verify --plain`, `enigma connect --plain`, `enigma disconnect --plain`, `enigma import --plain`, `enigma import rollback --plain`, `enigma status --plain`, `enigma drive health --plain`, `enigma support summary --plain`, `enigma doctor --plain`, and `enigma next --plain` give one-screen, path-redacted summaries instead of JSON or raw-memory output.
+- CLI-first fallback is still supported for power users: `enigma init --plain`, `enigma test-drive --plain`, `enigma demo cross-model --plain`, `enigma install --plain`, `enigma quickstart --plain`, `enigma setup --plain`, `enigma controller grant --plain`, `enigma controller revoke --plain`, `enigma controller weather --plain`, `enigma controller bubble --plain`, `enigma remember --plain`, `enigma update --plain`, `enigma delete --plain`, `enigma search --plain`, `enigma context --plain`, `enigma export --plain`, `enigma verify --plain`, `enigma connect --plain`, `enigma disconnect --plain`, `enigma import --plain`, `enigma import rollback --plain`, `enigma status --plain`, `enigma drive health --plain`, `enigma support summary --plain`, `enigma doctor --plain`, and `enigma next --plain` give one-screen, path-redacted summaries instead of JSON or raw-memory output.
 
 ---
 
@@ -66,14 +66,14 @@
 ## Verification run for latest local public-readiness slice
 
 - `node --check apps/cli/bin/enigma.mjs` at repo root: **pass**.
-- `node --test test/enigma-context-proof-cli.test.mjs` at repo root: **5/5 pass**.
+- `node --test test/enigma-context-proof-cli.test.mjs` at repo root: **6/6 pass**.
 - `node --test test/enigma-cross-model-demo.test.mjs` at repo root: **5/5 pass**.
 - `node --test test/enigma-onboarding.test.mjs` at repo root: **23/23 pass**.
 - `node --test test/enigma-test-drive.test.mjs` at repo root: **4/4 pass**.
 - `node --test test/enigma-search-status.test.mjs` at repo root: **10/10 pass**.
 - `npm run check` at repo root: **pass**.
 - `npm run secret-scan` at repo root: **pass**.
-- `npm test` at repo root: **623/623 pass**.
+- `npm test` at repo root: **624/624 pass**.
 - `npm pack --dry-run` at repo root: **pass** (`enigma-memory-0.1.19.tgz` dry-run output).
 - `npm run public-beta-qa` at repo root: **hold**, `20 blocked / 1 pending / 0 missing`, required public beta version `0.1.19`.
 - Hosted PR checks must still pass after each pushed branch commit; local gates do not replace PR approval/merge or signing evidence.
