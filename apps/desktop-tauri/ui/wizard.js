@@ -64,6 +64,7 @@ let importSandbox = {
 let proofActivity = {};
 let supportSummary = {};
 let connectionPreview = null;
+let claudeMcpbHandoff = null;
 let dashboardHydration = { status: 'idle', error: null, last_updated: null };
 
 let busy = false;
@@ -187,6 +188,39 @@ async function mockInvoke(cmd, args = {}) {
       if (c) c.status = 'ready';
       return c || { id: args.id, name: args.id, status: 'ready' };
     }
+    case 'get_claude_mcpb_handoff':
+      return {
+        ok: true,
+        schema: 'enigma.desktop_claude_mcpb_handoff.v1',
+        client_id: 'claude-desktop',
+        display_name: 'Claude Desktop',
+        preferred_path: 'mcpb_extension',
+        writes_performed: false,
+        automatic_config_write: false,
+        connection_plan: {
+          schema: 'enigma.claude_desktop_mcpb_connection_plan.v1',
+          preferred_path: 'mcpb_extension',
+          automatic_config_write: false,
+          install_handoff: {
+            artifact: '.mcpb',
+            user_confirms_in_claude: true,
+            enigma_writes_claude_config: false,
+          },
+        },
+        health: {
+          schema: 'enigma.claude_desktop_mcpb_health.v1',
+          status: 'not_installed',
+        },
+        next_action: {
+          id: 'install_mcpb',
+          label: 'Install Claude extension',
+        },
+        claim_boundaries: {
+          local_handoff_only: true,
+          enigma_writes_claude_config: false,
+          provider_launched: false,
+        },
+      };
     case 'repair_client_config': {
       const c = clients.find((c) => c.id === args.id);
       if (c) c.status = 'restart-needed';
@@ -630,7 +664,10 @@ function renderClientActions(client, status) {
     `;
   }
   const actionLabel = status === 'skipped' ? 'Connect later' : 'Preview connection';
-  return `<button type="button" class="link" data-action="connect" data-id="${id}">${escapeHtml(actionLabel)}</button>`;
+  const claudeHandoff = client.id === 'claude-desktop'
+    ? `<button type="button" class="link" data-action="claude-mcpb-handoff" data-id="${id}">Claude extension handoff</button>`
+    : '';
+  return `<button type="button" class="link" data-action="connect" data-id="${id}">${escapeHtml(actionLabel)}</button>${claudeHandoff}`;
 }
 
 function renderConnectionPreview(client) {
@@ -650,6 +687,20 @@ function renderConnectionPreview(client) {
   `;
 }
 
+function renderClaudeMcpbHandoff(client) {
+  if (!claudeMcpbHandoff || client.id !== 'claude-desktop') return '';
+  const plan = claudeMcpbHandoff.connection_plan && typeof claudeMcpbHandoff.connection_plan === 'object' ? claudeMcpbHandoff.connection_plan : {};
+  const health = claudeMcpbHandoff.health && typeof claudeMcpbHandoff.health === 'object' ? claudeMcpbHandoff.health : {};
+  return `
+    <div class="connection-preview claude-mcpb-handoff">
+      <p class="note"><strong>Claude-first path.</strong> Preferred install: ${escapeHtml(claudeMcpbHandoff.preferred_path || 'mcpb_extension')}. Writes performed: ${claudeMcpbHandoff.writes_performed === true ? 'yes' : 'no'}.</p>
+      <p class="note">Claude confirms install: ${plan.install_handoff?.user_confirms_in_claude === true ? 'yes' : 'review required'} · Enigma writes Claude config: ${plan.install_handoff?.enigma_writes_claude_config === true ? 'yes' : 'no'} · Status: ${escapeHtml(health.status || 'not_installed')}</p>
+      <p class="note">Next: ${escapeHtml(claudeMcpbHandoff.next_action?.label || 'Install Claude extension')}</p>
+    </div>
+  `;
+}
+
+
 
 function renderClientList(emptyCopy = 'No apps scanned yet.') {
   return clients.length
@@ -662,6 +713,7 @@ function renderClientList(emptyCopy = 'No apps scanned yet.') {
               <div class="name">${escapeHtml(client.name)}</div>
               <p class="note">${escapeHtml(copy.body)}</p>
               ${renderConnectionPreview(client)}
+              ${renderClaudeMcpbHandoff(client)}
             </div>
             <span class="status-pill ${escapeHtml(status)}">${escapeHtml(copy.badge)}</span>
             <div class="client-actions">${renderClientActions(client, status)}</div>
@@ -1152,6 +1204,22 @@ async function handleAction(event) {
         busy = false;
         render();
         setStatus('Connection preview could not complete. No config details were shown.');
+      }
+      return;
+    }
+    case 'claude-mcpb-handoff': {
+      busy = true;
+      setStatus('Preparing Claude extension handoff...');
+      try {
+        claudeMcpbHandoff = await call('get_claude_mcpb_handoff');
+        busy = false;
+        render();
+        setStatus('Claude extension handoff ready. Enigma did not write Claude config.');
+      } catch (_) {
+        claudeMcpbHandoff = null;
+        busy = false;
+        render();
+        setStatus('Claude extension handoff could not load. No config was written.');
       }
       return;
     }

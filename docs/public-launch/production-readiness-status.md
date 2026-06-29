@@ -38,6 +38,7 @@
 - Cross-platform connector engine with OS-agnostic path resolution.
 - Per-client modules: Claude Desktop (`.mcpb` manifest + config fallback), Cursor, Kimi Code, VS Code/Cline, Roo, OpenCode, Generic MCP.
 - Claude `.mcpb` manifest helper aligns with MCPB manifest `0.3` fields (`server.type: "node"`, `server.entry_point`, `server.mcp_config`, `user_config`) and remains public-safe.
+- Desktop Claude cards now expose a Claude `.mcpb` extension handoff as the preferred non-writing path before falling back to manual config writes.
 - Deterministic Claude `.mcpb` package builder is available as both `enigma claude-mcpb package` and `npm run claude:mcpb:package`; it creates a reviewable package with `manifest.json` and local Enigma MCP node runtime source, performs no install, provider launch, network call, or config write, and redacts the output path in reports.
 - Claude `.mcpb` packages include a minimal root `package.json` with `type: "module"` for Node ESM scope; they do not copy repo scripts, dependency lists, local paths, secrets, provider responses, or memory content.
 - Backup, rollback, repair, disconnect, and local test flows with JSON-preserving config writes; `enigma connect --plain` and `enigma disconnect --plain` give path-redacted human-readable config summaries.

@@ -722,6 +722,54 @@ pub async fn disconnect_client(
 }
 
 #[tauri::command]
+pub async fn get_claude_mcpb_handoff(_state: tauri::State<'_, AppState>) -> Result<Value, String> {
+    use crate::connector::claude::{
+        create_claude_desktop_mcpb_connection_plan, create_claude_desktop_mcpb_health,
+        create_claude_desktop_mcpb_manifest, McpbHealthOptions,
+    };
+    use crate::connector::engine::EngineContext;
+
+    let ctx = EngineContext::from_env().map_err(redact_command_error)?;
+    let manifest = create_claude_desktop_mcpb_manifest(env!("CARGO_PKG_VERSION"));
+    let connection_plan = create_claude_desktop_mcpb_connection_plan(ctx.platform);
+    let health = create_claude_desktop_mcpb_health(McpbHealthOptions {
+        mcpb_installed: false,
+        testing: false,
+        restart_required: false,
+        advanced_fallback: false,
+        test_evidence: None,
+        repair_required: false,
+        repair_reasons: Vec::new(),
+    });
+
+    Ok(json!({
+        "ok": true,
+        "schema": "enigma.desktop_claude_mcpb_handoff.v1",
+        "client_id": "claude-desktop",
+        "display_name": "Claude Desktop",
+        "preferred_path": "mcpb_extension",
+        "writes_performed": false,
+        "automatic_config_write": false,
+        "manifest": manifest,
+        "connection_plan": connection_plan,
+        "health": health,
+        "next_action": {
+            "id": "install_mcpb",
+            "label": "Install Claude extension",
+            "description": "Open the Enigma Claude extension package in Claude Desktop, then test the connection."
+        },
+        "claim_boundaries": {
+            "local_handoff_only": true,
+            "enigma_writes_claude_config": false,
+            "provider_launched": false,
+            "provider_deletion_proof": false,
+            "model_forgetting_proof": false,
+            "hosted_saas_live": false
+        }
+    }))
+}
+
+#[tauri::command]
 pub async fn repair_client_config(
     _state: tauri::State<'_, AppState>,
     id: String,

@@ -311,6 +311,17 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(tauriService, /preview_connect/);
   assert.match(tauriService, /ConnectOptions::dry_run/);
   assert.match(tauriService, /"writes_performed": false/);
+  assert.match(wizard, /Claude extension handoff/);
+  assert.match(wizard, /claude-mcpb-handoff/);
+  assert.match(wizard, /get_claude_mcpb_handoff/);
+  assert.match(wizard, /Enigma did not write Claude config/);
+  assert.match(wizard, /enigma\.desktop_claude_mcpb_handoff\.v1/);
+  assert.match(tauriService, /pub async fn get_claude_mcpb_handoff/);
+  assert.match(tauriService, /create_claude_desktop_mcpb_connection_plan/);
+  assert.match(tauriService, /create_claude_desktop_mcpb_manifest/);
+  assert.match(tauriService, /"preferred_path": "mcpb_extension"/);
+  assert.match(tauriService, /"enigma_writes_claude_config": false/);
+  assert.match(tauriLib, /commands::service::get_claude_mcpb_handoff/);
   assert.match(tauriLib, /commands::service::preview_client_config/);
   assert.match(styles, /connection-preview/);
   assert.match(wizard, /hydrateDashboardState/);
