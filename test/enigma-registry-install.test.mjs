@@ -6,6 +6,7 @@ import {
   buildRegistryInstallPlan,
   parseRegistryInstallArgs,
   redactPublicPath,
+  renderRegistryInstallPlain,
   registryInstallCliOutput,
   runRegistryInstallVerification,
   summarizeRegistryInstallResult,
@@ -51,6 +52,26 @@ test('registry verifier defaults to public-safe dry-run command planning', async
   ]);
   assert.deepEqual(registryInstallCliOutput(result), result.commands);
   assert.equal(JSON.stringify(result).includes('/operator/private'), false);
+});
+
+test('registry verifier plain output is readable and path-redacted', async () => {
+  const result = await runRegistryInstallVerification(['--plain'], {
+    nodeVersion: '24.1.0',
+    platform: 'linux',
+    cwd: '/operator/private/enigma',
+    nodeCommand: '/operator/private/node/bin/node',
+  });
+  const plain = renderRegistryInstallPlain(result);
+
+  assert.match(plain, /^Enigma registry install verifier\n/);
+  assert.match(plain, /Status: Ready/);
+  assert.match(plain, /Mode: dry-run/);
+  assert.match(plain, /Package: enigma-memory@0\.1\.19/);
+  assert.match(plain, /Commands: 6/);
+  assert.match(plain, /Preview: 6/);
+  assert.match(plain, /Boundary: public-safe registry install verification only/);
+  assert.doesNotMatch(plain, /^\s*\{/);
+  assert.doesNotMatch(plain, /\/operator\/private|node\/bin|raw_memory/u);
 });
 
 test('registry verifier skip-network validates the plan without running commands', async () => {
