@@ -145,10 +145,11 @@ test('public beta QA npm script invokes the JSON matrix runner', async () => {
 });
 
 test('public beta QA runner accepts explicit plain output mode', () => {
-  assert.deepEqual(parseArgs(['--plain']), { json: false, plain: true, out: null, cleanMachineSmoke: null, supportDryRun: [] });
-  assert.deepEqual(parseArgs(['--format', 'text']), { json: false, plain: true, out: null, cleanMachineSmoke: null, supportDryRun: [] });
-  assert.deepEqual(parseArgs(['--clean-machine-smoke', 'smoke.json']), { json: false, plain: false, out: null, cleanMachineSmoke: 'smoke.json', supportDryRun: [] });
-  assert.deepEqual(parseArgs(['--support-dry-run', 'diag.json', '--support-dry-run', 'crash.json']), { json: false, plain: false, out: null, cleanMachineSmoke: null, supportDryRun: ['diag.json', 'crash.json'] });
+  assert.deepEqual(parseArgs(['--plain']), { json: false, plain: true, out: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: null });
+  assert.deepEqual(parseArgs(['--format', 'text']), { json: false, plain: true, out: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: null });
+  assert.deepEqual(parseArgs(['--clean-machine-smoke', 'smoke.json']), { json: false, plain: false, out: null, cleanMachineSmoke: 'smoke.json', supportDryRun: [], registryInstall: null });
+  assert.deepEqual(parseArgs(['--support-dry-run', 'diag.json', '--support-dry-run', 'crash.json']), { json: false, plain: false, out: null, cleanMachineSmoke: null, supportDryRun: ['diag.json', 'crash.json'], registryInstall: null });
+  assert.deepEqual(parseArgs(['--registry-install', 'registry.json']), { json: false, plain: false, out: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: 'registry.json' });
   assert.throws(() => parseArgs(['--json', '--plain']), /Choose only one output format/);
 });
 
@@ -339,6 +340,35 @@ test('public beta QA matrix can consume support dry-run evidence per scenario', 
   assert.equal(crash.blocker_refs.length, 0);
   assert.equal(crash.issue_codes.length, 0);
   assert.match(JSON.stringify(crash.evidence_refs), /ref:evidence:support-dry-run:BETA-CRASH-001/);
+});
+
+test('public beta QA matrix can consume registry install evidence without clearing release approval', () => {
+  const scenarios = buildScenarioRows({
+    packageJson: { name: 'enigma-memory' },
+    packageVersion: '0.1.19',
+    npmPublishWorkflow: 'npm publish --access public --provenance',
+    registryInstall: {
+      schema: 'enigma.registry_install_verifier.v1',
+      ok: true,
+      mode: 'execute',
+      execute: true,
+      skip_network: false,
+      package: {
+        name: 'enigma-memory',
+        version: '0.1.19',
+      },
+    },
+  });
+
+  const npm = scenarioById(scenarios, 'BETA-NPM-001');
+  assert.equal(npm.status, 'pass');
+  assert.equal(npm.blocker_refs.length, 0);
+  assert.equal(npm.issue_codes.length, 0);
+  assert.match(JSON.stringify(npm.evidence_refs), /ref:evidence:registry-install/);
+
+  const merge = scenarioById(scenarios, 'BETA-MERGE-001');
+  assert.equal(merge.status, 'blocked');
+  assert.equal(merge.blocker_refs.includes('BLOCKER-PR-APPROVAL-MERGE-REVIEWER-APPROVAL'), true);
 });
 
 test('public beta next actions are ranked and public-safe', async () => {

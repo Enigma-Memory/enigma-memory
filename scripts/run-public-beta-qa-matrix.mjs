@@ -196,7 +196,7 @@ export function buildRankedNextActions(blockers) {
 }
 
 function usage() {
-  return `Usage: node scripts/run-public-beta-qa-matrix.mjs [--json|--plain] [--out <path>] [--clean-machine-smoke <path>] [--support-dry-run <path>]\n\nGenerates a public-safe ${PUBLIC_BETA_QA_MATRIX_SCHEMA} report from repository files plus optional public-safe QA evidence artifacts, including ranked next_actions for release owners.\n`;
+  return `Usage: node scripts/run-public-beta-qa-matrix.mjs [--json|--plain] [--out <path>] [--clean-machine-smoke <path>] [--support-dry-run <path>] [--registry-install <path>]\n\nGenerates a public-safe ${PUBLIC_BETA_QA_MATRIX_SCHEMA} report from repository files plus optional public-safe QA evidence artifacts, including ranked next_actions for release owners.\n`;
 }
 
 function readArg(argv, index, flag) {
@@ -205,7 +205,7 @@ function readArg(argv, index, flag) {
 }
 
 export function parseArgs(argv = process.argv.slice(2)) {
-  const options = { json: false, plain: false, out: null, cleanMachineSmoke: null, supportDryRun: [] };
+  const options = { json: false, plain: false, out: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: null };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--json') {
@@ -221,6 +221,9 @@ export function parseArgs(argv = process.argv.slice(2)) {
       i += 1;
     } else if (arg === '--support-dry-run') {
       options.supportDryRun.push(readArg(argv, i + 1, '--support-dry-run'));
+      i += 1;
+    } else if (arg === '--registry-install') {
+      options.registryInstall = readArg(argv, i + 1, '--registry-install');
       i += 1;
     } else if (arg === '--help' || arg === '-h') {
       options.help = true;
@@ -364,6 +367,7 @@ function publicSafeAssert(report) {
 export async function inspectPublicBetaQaInputs(options = {}) {
   const cleanMachineSmoke = await readPublicEvidenceJson(options.cleanMachineSmoke, 'enigma.clean_machine_smoke.v1');
   const supportDryRunSummaries = await readPublicEvidenceJsonList(options.supportDryRun, 'enigma.support_dry_run_summary.v1');
+  const registryInstall = await readPublicEvidenceJson(options.registryInstall, 'enigma.registry_install_verifier.v1');
   const [
     packageJson,
     tauriConfig,
@@ -444,6 +448,7 @@ export async function inspectPublicBetaQaInputs(options = {}) {
     mcpbManifest,
     supportDryRunSummaries,
     cleanMachineSmoke,
+    registryInstall,
     mcpbConnectionPlan,
     mcpbHealth,
   };
@@ -533,6 +538,14 @@ export function buildScenarioRows(inputs) {
   const cleanMachineIssues = (missingCode, ...rest) => (cleanMachineEvidenceReady ? rest : [missingCode, ...rest]);
   const cleanMachineStatus = (staticReady) => (staticReady ? (cleanMachineEvidenceReady ? 'pass' : 'blocked') : 'missing');
   const statusFromBlockers = (staticReady, blockers) => (staticReady ? (blockers.length === 0 ? 'pass' : 'blocked') : 'missing');
+  const registryInstallEvidenceReady = inputs.registryInstall?.schema === 'enigma.registry_install_verifier.v1'
+    && inputs.registryInstall?.ok === true
+    && inputs.registryInstall?.mode === 'execute'
+    && inputs.registryInstall?.execute === true
+    && inputs.registryInstall?.skip_network === false
+    && inputs.registryInstall?.package?.name === (inputs.packageJson?.name ?? 'enigma-memory')
+    && inputs.registryInstall?.package?.version === REQUIRED_PUBLIC_BETA_VERSION;
+  const registryEvidenceRefs = registryInstallEvidenceReady ? ['ref:evidence:registry-install'] : [];
 
   const diagnosticSupportBlockers = cleanMachineBlockers(...supportDryRunBlockers('BETA-DIAG-001'));
   const diagnosticSupportIssues = [
@@ -669,10 +682,10 @@ export function buildScenarioRows(inputs) {
     scenario({
       scenario_id: 'BETA-NPM-001',
       title: 'npm package availability evidence',
-      status: inputs.packageVersion === REQUIRED_PUBLIC_BETA_VERSION && npmWorkflowReady ? 'pending' : 'blocked',
-      evidence_refs: [REFS.packageVersion, REFS.npmPublishWorkflow, REFS.qaSupport],
-      blocker_refs: [npmPublish],
-      issue_codes: ['npm-required-version-unpublished'],
+      status: registryInstallEvidenceReady ? 'pass' : (inputs.packageVersion === REQUIRED_PUBLIC_BETA_VERSION && npmWorkflowReady ? 'pending' : 'blocked'),
+      evidence_refs: [REFS.packageVersion, REFS.npmPublishWorkflow, REFS.qaSupport, ...registryEvidenceRefs],
+      blocker_refs: registryInstallEvidenceReady ? [] : [npmPublish],
+      issue_codes: registryInstallEvidenceReady ? [] : ['npm-required-version-unpublished'],
     }),
     scenario({
       scenario_id: 'BETA-MERGE-001',
