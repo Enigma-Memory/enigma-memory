@@ -183,9 +183,10 @@ Published-package quickstart:
 
 ```sh
 npm install -g enigma-memory
-enigma quickstart --bundle ./.enigma/bundle.json --overwrite
-enigma demo cross-model
+enigma quickstart --bundle ./.enigma/bundle.json
 enigma doctor --bundle ./.enigma/bundle.json
+enigma connect claude-desktop --bundle ./.enigma/bundle.json --dry-run
+enigma demo cross-model
 enigma-relay demo
 enigma-gateway demo
 ```
@@ -193,7 +194,7 @@ enigma-gateway demo
 One-off quickstart without a global install:
 
 ```sh
-npx --yes --package enigma-memory enigma quickstart --bundle ./.enigma/bundle.json --overwrite
+npx --yes --package enigma-memory enigma quickstart --bundle ./.enigma/bundle.json
 npx --yes --package enigma-memory enigma doctor --bundle ./.enigma/bundle.json
 npx --yes --package enigma-memory enigma demo cross-model
 ```
@@ -246,7 +247,7 @@ Common local options and outputs:
 
 | Command | Inputs | Output boundary |
 | --- | --- | --- |
-| `enigma quickstart --bundle <path> --overwrite` | `--bundle`, optional `--overwrite` | Creates a local review workspace with a vault bundle, context pack, export proof bundle, and verify report. The result proves only local Enigma-controlled state and receipt verification. |
+| `enigma quickstart --bundle <path>` | `--bundle`, optional `--overwrite` only when intentionally replacing an existing local review workspace | Creates a local review workspace with a vault bundle, context pack, export proof bundle, and verify report. The result proves only local Enigma-controlled state and receipt verification. |
 | `enigma demo cross-model [--bundle <path>] [--memory-file <path>] [--out <path>]` | Optional local bundle, optional explicit local memory file, optional report path | Emits `enigma.cross_model_demo.v1` with profile context-pack refs, receipt counts, memory counts, `provider_native_memory_canonical:false`, and claim boundaries. It calls no providers and does not prove provider deletion, model forgetting, hosted availability, ROI/savings, or compliance status. |
 | `enigma next` | optional `--bundle`, `--plain`, `--format text` | Emits `enigma.next_action.v1`, a no-error next-step artifact. Missing bundles return a setup action; existing bundles reuse `first_run_status` to point at import/remember or app connection. JSON is default for automation; plain/text mode prints one readable next step. Output redacts local paths and returns no raw memory. |
 | `enigma init --bundle <path>` | `--subject`/`--subject-id`, `--display-name`/`--name`, `--passphrase` | Creates local `enigma.vault_bundle.v1` state and prints `{ ok, bundle, schema, subject_id }`. |
@@ -308,7 +309,7 @@ Common local options and outputs:
 | `npm run proof:packet` | required `-- --active-root <sha256> --receipt-root <sha256> --benchmark-report <file> --dataset-hash <sha256> --runner-hash <sha256> --operator-ref <ref>`, optional `--out <file>` | Secondary helper that emits an `enigma.proof_network.packet.v1` combining an anchor batch and benchmark attestation. It hashes the benchmark report file but never copies the report body/path into the packet, sets `transaction_submitted:false` and `raw_memory_on_chain:false`, and does not call a network, deploy contracts, create accounts, sign transactions, or write raw memory/prompts/transcripts/completions/embeddings/provider responses. |
 | `enigma export --bundle <path> --out <file>` | none beyond paths | Writes an exported bundle with encrypted/committed vault state and receipt metadata. |
 | `enigma verify --bundle <exported-bundle.json>` | `--file` or `--export` aliases | Prints `enigma.verification_report.v1`. |
-| `enigma doctor` | `--bundle <path>`, `--client`, connector options | Checks Node version, bins, schemas, MCP command name, local bundle path readiness, and connector state. A fresh install can be `ok:false` until `enigma quickstart --bundle <path> --overwrite` or `enigma setup --bundle <path> --overwrite` creates the bundle and connector configs point to it. |
+| `enigma doctor` | `--bundle <path>`, `--client`, connector options | Checks Node version, bins, schemas, MCP command name, local bundle path readiness, and connector state. A fresh install can be `ok:false` until `enigma quickstart --bundle <path>` creates the bundle and connector configs point to it. |
 | `enigma install` | `--bundle`, `--client`, `--out`, connector options | Creates bundle if needed and prints MCP config snippets. |
 | `enigma meter event` | `--tenant <id>`, `--provider <id>`, `--model <id>`, token-count flags, pricing flags, optional `--out <file>` | Emits `enigma.usage_event.v1` with counts, hashes, pricing inputs, settlement boundary, and no raw prompts/completions/provider responses. |
 | `enigma meter aggregate` | `--events <events.json>`, optional `--tenant <id>`, `--out <file>` | Emits `enigma.usage_aggregate.v1` over usage events, with deterministic totals and claim boundaries; not provider invoice or token ROI evidence. |
