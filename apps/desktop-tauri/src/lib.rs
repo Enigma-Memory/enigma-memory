@@ -88,6 +88,7 @@ pub fn run() {
             commands::service::create_vault,
             commands::service::detect_clients,
             commands::service::preview_client_config,
+            commands::service::preview_disconnect_client,
             commands::service::get_claude_mcpb_handoff,
             commands::service::connect_client,
             commands::service::disconnect_client,

@@ -704,6 +704,37 @@ pub async fn connect_client(
 }
 
 #[tauri::command]
+pub async fn preview_disconnect_client(
+    _state: tauri::State<'_, AppState>,
+    id: String,
+) -> Result<Value, String> {
+    use crate::connector::engine::{ConnectOptions, ConnectorEngine, EngineContext};
+
+    let client = parse_public_client_id(&id)?;
+    let ctx = EngineContext::from_env().map_err(redact_command_error)?;
+    let engine = ConnectorEngine::new();
+    let plan = engine
+        .preview_disconnect(client, &ctx, &ConnectOptions::dry_run())
+        .map_err(redact_command_error)?;
+
+    Ok(json!({
+        "id": client.as_str(),
+        "ok": plan.ok,
+        "action": plan.action,
+        "status": "disconnect-preview-ready",
+        "plan": plan.public_preview(),
+        "claim_boundaries": {
+            "local_config_only": true,
+            "writes_performed": false,
+            "removes_only_enigma_entry": true,
+            "provider_launched": false,
+            "provider_deletion_proof": false,
+            "model_forgetting_proof": false,
+        },
+    }))
+}
+
+#[tauri::command]
 pub async fn disconnect_client(
     _state: tauri::State<'_, AppState>,
     id: String,

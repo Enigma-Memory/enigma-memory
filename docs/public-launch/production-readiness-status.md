@@ -44,6 +44,7 @@
 - Backup, rollback, repair, disconnect, and local test flows with JSON-preserving config writes; `enigma connect --plain` and `enigma disconnect --plain` give path-redacted human-readable config summaries.
 - Desktop connector cards expose a local "Test connection" action that checks config parse, Enigma entry correctness, bundle reachability, and restart guidance without launching provider apps.
 - Desktop connector cards now require a path-redacted preview and explicit "Approve connection" click before writing MCP client config changes.
+- Desktop disconnect now uses the same preview-then-approve pattern as connect: users review a path-redacted plan before Enigma removes its own connector entry.
 
 - Desktop dashboard entry now hydrates current health, service, logs, diagnostics, update, proof, client, and crash state before presenting the Memory Drive dashboard.
 - Desktop support-summary and proof-activity exports now fail closed behind a shared public-export privacy scan; the UI shows scan status and disables export until the scan passes.

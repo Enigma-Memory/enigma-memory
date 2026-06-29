@@ -64,6 +64,7 @@ let importSandbox = {
 let proofActivity = {};
 let supportSummary = {};
 let connectionPreview = null;
+let disconnectPreview = null;
 let claudeMcpbHandoff = null;
 let dashboardHydration = { status: 'idle', error: null, last_updated: null };
 
@@ -183,6 +184,25 @@ async function mockInvoke(cmd, args = {}) {
       if (c) c.status = 'connected';
       return c || { id: args.id, name: args.id, status: 'connected' };
     }
+    case 'preview_disconnect_client':
+      return {
+        id: args.id,
+        ok: true,
+        action: 'disconnect',
+        status: 'disconnect-preview-ready',
+        plan: {
+          action: 'disconnect',
+          changed: true,
+          writes_performed: false,
+          restart_guidance: 'Restart the app after approving disconnect.',
+        },
+        claim_boundaries: {
+          local_config_only: true,
+          writes_performed: false,
+          removes_only_enigma_entry: true,
+          provider_launched: false,
+        },
+      };
     case 'disconnect_client': {
       const c = clients.find((c) => c.id === args.id);
       if (c) c.status = 'ready';
@@ -657,7 +677,7 @@ function renderClientActions(client, status) {
   }
   if (status === 'connected') {
     return `
-      <button type="button" class="client-primary" data-action="disconnect" data-id="${id}">Disconnect</button>
+      <button type="button" class="client-primary" data-action="disconnect" data-id="${id}">Preview disconnect</button>
       <button type="button" class="link" data-action="repair" data-id="${id}">Repair connection</button>
       <button type="button" class="link" data-action="test-connection" data-id="${id}">Test connection</button>
       <button type="button" class="link" data-action="rollback" data-id="${id}">Rollback</button>
@@ -687,6 +707,24 @@ function renderConnectionPreview(client) {
   `;
 }
 
+function renderDisconnectPreview(client) {
+  if (!disconnectPreview || disconnectPreview.id !== client.id) return '';
+  const plan = disconnectPreview.plan && typeof disconnectPreview.plan === 'object' ? disconnectPreview.plan : {};
+  const changed = plan.changed === false ? 'No config change needed' : 'Remove Enigma connector entry';
+  const restart = plan.restart_guidance ? `Restart: ${safePublicLabel(plan.restart_guidance, 'Restart the app after approval.')}` : 'Restart: app may need a restart after approval.';
+  return `
+    <div class="connection-preview disconnect-preview">
+      <p class="note"><strong>Review disconnect.</strong> ${escapeHtml(changed)}. Writes performed: ${plan.writes_performed === true ? 'yes' : 'no'}.</p>
+      <p class="note">${escapeHtml(restart)} Enigma removes only its own local connector entry.</p>
+      <div class="client-actions">
+        <button type="button" class="client-primary" data-action="approve-disconnect" data-id="${escapeHtml(client.id)}">Approve disconnect</button>
+        <button type="button" class="link" data-action="cancel-disconnect-preview" data-id="${escapeHtml(client.id)}">Cancel</button>
+      </div>
+    </div>
+  `;
+}
+
+
 function renderClaudeMcpbHandoff(client) {
   if (!claudeMcpbHandoff || client.id !== 'claude-desktop') return '';
   const plan = claudeMcpbHandoff.connection_plan && typeof claudeMcpbHandoff.connection_plan === 'object' ? claudeMcpbHandoff.connection_plan : {};
@@ -713,6 +751,7 @@ function renderClientList(emptyCopy = 'No apps scanned yet.') {
               <div class="name">${escapeHtml(client.name)}</div>
               <p class="note">${escapeHtml(copy.body)}</p>
               ${renderConnectionPreview(client)}
+              ${renderDisconnectPreview(client)}
               ${renderClaudeMcpbHandoff(client)}
             </div>
             <span class="status-pill ${escapeHtml(status)}">${escapeHtml(copy.badge)}</span>
@@ -1258,15 +1297,38 @@ async function handleAction(event) {
       return;
     case 'disconnect': {
       const id = event.currentTarget.dataset.id;
+      busy = true;
+      setStatus('Preparing a path-redacted disconnect preview...');
+      try {
+        disconnectPreview = await call('preview_disconnect_client', { id });
+        busy = false;
+        render();
+        setStatus('Review the disconnect preview, then approve before Enigma writes anything.');
+      } catch (_) {
+        disconnectPreview = null;
+        busy = false;
+        render();
+        setStatus('Disconnect preview could not complete. No config details were shown.');
+      }
+      return;
+    }
+    case 'approve-disconnect': {
+      const id = event.currentTarget.dataset.id;
+      disconnectPreview = null;
       await runClientCommand({
         command: 'disconnect_client',
         args: { id },
-        pending: 'Disconnecting...',
+        pending: 'Writing approved disconnect...',
         success: 'Connection removed. Unrelated MCP settings were preserved.',
         failure: 'Disconnect could not complete. No config details were shown.',
       });
       return;
     }
+    case 'cancel-disconnect-preview':
+      disconnectPreview = null;
+      render();
+      setStatus('Disconnect preview cancelled. No config was written.');
+      return;
     case 'test-connection': {
       const id = event.currentTarget.dataset.id;
       await runClientCommand({

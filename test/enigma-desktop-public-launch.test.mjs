@@ -311,6 +311,17 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(tauriService, /preview_connect/);
   assert.match(tauriService, /ConnectOptions::dry_run/);
   assert.match(tauriService, /"writes_performed": false/);
+  assert.match(wizard, /Preview disconnect/);
+  assert.match(wizard, /preview_disconnect_client/);
+  assert.match(wizard, /Approve disconnect/);
+  assert.match(wizard, /disconnect-preview/);
+  assert.match(wizard.match(/case 'disconnect': \{[\s\S]*?return;\n    \}/)?.[0] || '', /preview_disconnect_client/);
+  assert.doesNotMatch(wizard.match(/case 'disconnect': \{[\s\S]*?return;\n    \}/)?.[0] || '', /call\('disconnect_client'/);
+  assert.match(wizard.match(/case 'approve-disconnect': \{[\s\S]*?return;\n    \}/)?.[0] || '', /disconnect_client/);
+  assert.match(tauriService, /pub async fn preview_disconnect_client/);
+  assert.match(tauriService, /preview_disconnect/);
+  assert.match(tauriService, /"removes_only_enigma_entry": true/);
+  assert.match(tauriLib, /commands::service::preview_disconnect_client/);
   assert.match(wizard, /Claude extension handoff/);
   assert.match(wizard, /claude-mcpb-handoff/);
   assert.match(wizard, /get_claude_mcpb_handoff/);
