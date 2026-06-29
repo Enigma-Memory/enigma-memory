@@ -70,6 +70,7 @@ test('public beta review plain output is bounded and path-redacted', async () =>
     assert.match(stdout, /Enigma public beta QA advisor/);
     assert.match(stdout, /Generated support dry-runs: 2/);
     assert.match(stdout, /Generated clean-machine plan: 1/);
+    assert.match(stdout, /Templates: npm run public-beta:evidence-templates -- --out-dir \.enigma\/public-beta --plain/);
     assert.doesNotMatch(stdout, /record_support_dry_run/);
     assert.match(stdout, /Boundary: one-command local review only/);
     assert.doesNotMatch(stdout, /^\s*\{/);

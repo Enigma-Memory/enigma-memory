@@ -133,6 +133,7 @@ export function renderPublicBetaReviewPlain(result) {
     `Evidence files used: ${result.evidence_files_used}`,
     `Generated support dry-runs: ${result.generated_evidence_files ?? 0}`,
     `Generated clean-machine plan: ${result.generated_plan_files ?? 0}`,
+    'Templates: npm run public-beta:evidence-templates -- --out-dir .enigma/public-beta --plain',
     '',
     renderPublicBetaQaPlain(result.matrix).trim(),
     'Boundary: one-command local review only; no PR approval, merge, npm publication, signed installer, hosted service, provider deletion, model behavior, benchmark superiority, token ROI, compliance, upload, or network claims.',
