@@ -196,7 +196,7 @@ export function buildRankedNextActions(blockers) {
 }
 
 function usage() {
-  return `Usage: node scripts/run-public-beta-qa-matrix.mjs [--json|--plain] [--out <path>] [--clean-machine-smoke <path>] [--support-dry-run <path>] [--registry-install <path>]\n\nGenerates a public-safe ${PUBLIC_BETA_QA_MATRIX_SCHEMA} report from repository files plus optional public-safe QA evidence artifacts, including ranked next_actions for release owners.\n`;
+  return `Usage: node scripts/run-public-beta-qa-matrix.mjs [--json|--plain] [--out <path>] [--clean-machine-smoke <path>] [--support-dry-run <path>] [--registry-install <path>] [--desktop-release-evidence <path>]\n\nGenerates a public-safe ${PUBLIC_BETA_QA_MATRIX_SCHEMA} report from repository files plus optional public-safe QA evidence artifacts, including ranked next_actions for release owners.\n`;
 }
 
 function readArg(argv, index, flag) {
@@ -205,7 +205,7 @@ function readArg(argv, index, flag) {
 }
 
 export function parseArgs(argv = process.argv.slice(2)) {
-  const options = { json: false, plain: false, out: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: null };
+  const options = { json: false, plain: false, out: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: null, desktopReleaseEvidence: null };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--json') {
@@ -224,6 +224,9 @@ export function parseArgs(argv = process.argv.slice(2)) {
       i += 1;
     } else if (arg === '--registry-install') {
       options.registryInstall = readArg(argv, i + 1, '--registry-install');
+      i += 1;
+    } else if (arg === '--desktop-release-evidence') {
+      options.desktopReleaseEvidence = readArg(argv, i + 1, '--desktop-release-evidence');
       i += 1;
     } else if (arg === '--help' || arg === '-h') {
       options.help = true;
@@ -368,6 +371,7 @@ export async function inspectPublicBetaQaInputs(options = {}) {
   const cleanMachineSmoke = await readPublicEvidenceJson(options.cleanMachineSmoke, 'enigma.clean_machine_smoke.v1');
   const supportDryRunSummaries = await readPublicEvidenceJsonList(options.supportDryRun, 'enigma.support_dry_run_summary.v1');
   const registryInstall = await readPublicEvidenceJson(options.registryInstall, 'enigma.registry_install_verifier.v1');
+  const desktopReleaseEvidence = await readPublicEvidenceJson(options.desktopReleaseEvidence, 'enigma.desktop_release_evidence.v1');
   const [
     packageJson,
     tauriConfig,
@@ -449,6 +453,7 @@ export async function inspectPublicBetaQaInputs(options = {}) {
     supportDryRunSummaries,
     cleanMachineSmoke,
     registryInstall,
+    desktopReleaseEvidence,
     mcpbConnectionPlan,
     mcpbHealth,
   };
@@ -545,6 +550,18 @@ export function buildScenarioRows(inputs) {
     && inputs.registryInstall?.skip_network === false
     && inputs.registryInstall?.package?.name === (inputs.packageJson?.name ?? 'enigma-memory')
     && inputs.registryInstall?.package?.version === REQUIRED_PUBLIC_BETA_VERSION;
+  const desktopReleaseEvidenceReady = inputs.desktopReleaseEvidence?.schema === 'enigma.desktop_release_evidence.v1'
+    && inputs.desktopReleaseEvidence?.release_version === REQUIRED_PUBLIC_BETA_VERSION
+    && Array.isArray(inputs.desktopReleaseEvidence?.blockers)
+    && inputs.desktopReleaseEvidence.blockers.length === 0
+    && Array.isArray(inputs.desktopReleaseEvidence?.installers)
+    && inputs.desktopReleaseEvidence.installers.some((installer) => installer?.platform === 'windows' && installer?.present === true)
+    && inputs.desktopReleaseEvidence.installers.some((installer) => installer?.platform === 'macos' && installer?.present === true)
+    && inputs.desktopReleaseEvidence?.manifest?.signature?.status === 'verified';
+  const desktopReleaseEvidenceRefs = desktopReleaseEvidenceReady ? ['ref:evidence:desktop-release'] : [];
+  const desktopReleaseBlockers = (...rest) => (desktopReleaseEvidenceReady ? rest : [windowsSignedArtifact, macosNotarizedArtifact, ...rest]);
+  const desktopReleaseIssues = (...rest) => (desktopReleaseEvidenceReady ? rest : ['signed-artifact-evidence-missing', ...rest]);
+
   const registryEvidenceRefs = registryInstallEvidenceReady ? ['ref:evidence:registry-install'] : [];
 
   const diagnosticSupportBlockers = cleanMachineBlockers(...supportDryRunBlockers('BETA-DIAG-001'));
@@ -557,15 +574,21 @@ export function buildScenarioRows(inputs) {
     ...cleanMachineIssues('clean-machine-crash-evidence-missing'),
     ...supportDryRunIssues('BETA-CRASH-001', 'crash-reporting-manual-evidence-missing'),
   ];
+  const installBlockers = cleanMachineBlockers(...desktopReleaseBlockers());
+  const installIssues = [
+    ...cleanMachineIssues('clean-machine-evidence-missing'),
+    ...desktopReleaseIssues(),
+  ];
+
 
   return [
     scenario({
       scenario_id: 'BETA-INSTALL-001',
       title: 'Fresh desktop install',
-      status: hasDesktopBundle ? 'blocked' : 'missing',
-      evidence_refs: withCleanMachineEvidence([REFS.tauriBundle, REFS.desktopReleaseWorkflow, REFS.qaScenarios, REFS.signingPlan]),
-      blocker_refs: cleanMachineBlockers(windowsSignedArtifact, macosNotarizedArtifact),
-      issue_codes: cleanMachineIssues('clean-machine-evidence-missing', 'signed-artifact-evidence-missing'),
+      status: statusFromBlockers(hasDesktopBundle || desktopReleaseEvidenceReady, installBlockers),
+      evidence_refs: withCleanMachineEvidence([REFS.tauriBundle, REFS.desktopReleaseWorkflow, REFS.qaScenarios, REFS.signingPlan, ...desktopReleaseEvidenceRefs]),
+      blocker_refs: installBlockers,
+      issue_codes: installIssues,
     }),
     scenario({
       scenario_id: 'BETA-FIRST-001',
@@ -658,26 +681,26 @@ export function buildScenarioRows(inputs) {
     scenario({
       scenario_id: 'BETA-SIGNING-WINDOWS-001',
       title: 'Windows signing evidence',
-      status: windowsSigningConfigured ? 'pending' : 'blocked',
-      evidence_refs: [REFS.tauriBundle, REFS.desktopReleaseWorkflow, REFS.signingSetup, REFS.productionStatus],
-      blocker_refs: [windowsSignedArtifact, signingIdentities],
-      issue_codes: ['windows-signing-evidence-missing'],
+      status: desktopReleaseEvidenceReady ? 'pass' : (windowsSigningConfigured ? 'pending' : 'blocked'),
+      evidence_refs: [REFS.tauriBundle, REFS.desktopReleaseWorkflow, REFS.signingSetup, REFS.productionStatus, ...desktopReleaseEvidenceRefs],
+      blocker_refs: desktopReleaseEvidenceReady ? [] : [windowsSignedArtifact, signingIdentities],
+      issue_codes: desktopReleaseEvidenceReady ? [] : ['windows-signing-evidence-missing'],
     }),
     scenario({
       scenario_id: 'BETA-SIGNING-MACOS-001',
       title: 'macOS signing and notarization evidence',
-      status: macosSigningConfigured ? 'pending' : 'blocked',
-      evidence_refs: [REFS.tauriBundle, REFS.desktopReleaseWorkflow, REFS.signingSetup, REFS.productionStatus],
-      blocker_refs: [macosNotarizedArtifact, signingIdentities],
-      issue_codes: ['macos-notarization-evidence-missing'],
+      status: desktopReleaseEvidenceReady ? 'pass' : (macosSigningConfigured ? 'pending' : 'blocked'),
+      evidence_refs: [REFS.tauriBundle, REFS.desktopReleaseWorkflow, REFS.signingSetup, REFS.productionStatus, ...desktopReleaseEvidenceRefs],
+      blocker_refs: desktopReleaseEvidenceReady ? [] : [macosNotarizedArtifact, signingIdentities],
+      issue_codes: desktopReleaseEvidenceReady ? [] : ['macos-notarization-evidence-missing'],
     }),
     scenario({
       scenario_id: 'BETA-UPDATE-001',
       title: 'Signed update and rollback evidence',
-      status: updaterConfigured && updateSignerPresent ? 'blocked' : 'missing',
-      evidence_refs: [REFS.tauriUpdater, REFS.updateCommands, REFS.desktopReleaseWorkflow, REFS.updateSignerScript, REFS.signingPlan],
-      blocker_refs: [updateRollback, signingIdentities],
-      issue_codes: ['update-rollback-rehearsal-missing'],
+      status: desktopReleaseEvidenceReady ? 'pass' : (updaterConfigured && updateSignerPresent ? 'blocked' : 'missing'),
+      evidence_refs: [REFS.tauriUpdater, REFS.updateCommands, REFS.desktopReleaseWorkflow, REFS.updateSignerScript, REFS.signingPlan, ...desktopReleaseEvidenceRefs],
+      blocker_refs: desktopReleaseEvidenceReady ? [] : [updateRollback, signingIdentities],
+      issue_codes: desktopReleaseEvidenceReady ? [] : ['update-rollback-rehearsal-missing'],
     }),
     scenario({
       scenario_id: 'BETA-NPM-001',

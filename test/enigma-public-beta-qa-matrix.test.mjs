@@ -145,11 +145,12 @@ test('public beta QA npm script invokes the JSON matrix runner', async () => {
 });
 
 test('public beta QA runner accepts explicit plain output mode', () => {
-  assert.deepEqual(parseArgs(['--plain']), { json: false, plain: true, out: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: null });
-  assert.deepEqual(parseArgs(['--format', 'text']), { json: false, plain: true, out: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: null });
-  assert.deepEqual(parseArgs(['--clean-machine-smoke', 'smoke.json']), { json: false, plain: false, out: null, cleanMachineSmoke: 'smoke.json', supportDryRun: [], registryInstall: null });
-  assert.deepEqual(parseArgs(['--support-dry-run', 'diag.json', '--support-dry-run', 'crash.json']), { json: false, plain: false, out: null, cleanMachineSmoke: null, supportDryRun: ['diag.json', 'crash.json'], registryInstall: null });
-  assert.deepEqual(parseArgs(['--registry-install', 'registry.json']), { json: false, plain: false, out: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: 'registry.json' });
+  assert.deepEqual(parseArgs(['--plain']), { json: false, plain: true, out: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: null, desktopReleaseEvidence: null });
+  assert.deepEqual(parseArgs(['--format', 'text']), { json: false, plain: true, out: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: null, desktopReleaseEvidence: null });
+  assert.deepEqual(parseArgs(['--clean-machine-smoke', 'smoke.json']), { json: false, plain: false, out: null, cleanMachineSmoke: 'smoke.json', supportDryRun: [], registryInstall: null, desktopReleaseEvidence: null });
+  assert.deepEqual(parseArgs(['--support-dry-run', 'diag.json', '--support-dry-run', 'crash.json']), { json: false, plain: false, out: null, cleanMachineSmoke: null, supportDryRun: ['diag.json', 'crash.json'], registryInstall: null, desktopReleaseEvidence: null });
+  assert.deepEqual(parseArgs(['--registry-install', 'registry.json']), { json: false, plain: false, out: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: 'registry.json', desktopReleaseEvidence: null });
+  assert.deepEqual(parseArgs(['--desktop-release-evidence', 'desktop.json']), { json: false, plain: false, out: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: null, desktopReleaseEvidence: 'desktop.json' });
   assert.throws(() => parseArgs(['--json', '--plain']), /Choose only one output format/);
 });
 
@@ -288,6 +289,44 @@ test('public beta QA matrix can consume clean-machine smoke evidence without cle
   assert.equal(install.issue_codes.includes('clean-machine-evidence-missing'), false);
   assert.equal(install.blocker_refs.includes('BLOCKER-WINDOWS-SIGNED-ARTIFACT'), true);
   assert.equal(install.blocker_refs.includes('BLOCKER-MACOS-NOTARIZED-ARTIFACT'), true);
+});
+
+test('public beta QA matrix can consume signed desktop release evidence without clearing review gates', () => {
+  const scenarios = buildScenarioRows({
+    tauriConfig: { bundle: { active: true, targets: ['msi', 'nsis', 'dmg', 'app'] } },
+    desktopReleaseWorkflow: 'Sign update manifest',
+    updateSignerScript: 'present',
+    updateCommands: '"offline"',
+    cleanMachineSmoke: {
+      schema: 'enigma.clean_machine_smoke.v1',
+      app_version: '0.1.19',
+      summary: { healthy: true },
+    },
+    desktopReleaseEvidence: {
+      schema: 'enigma.desktop_release_evidence.v1',
+      release_version: '0.1.19',
+      blockers: [],
+      manifest: {
+        signature: { status: 'verified' },
+      },
+      installers: [
+        { platform: 'windows', present: true },
+        { platform: 'macos', present: true },
+      ],
+    },
+  });
+
+  for (const id of ['BETA-INSTALL-001', 'BETA-SIGNING-WINDOWS-001', 'BETA-SIGNING-MACOS-001', 'BETA-UPDATE-001']) {
+    const row = scenarioById(scenarios, id);
+    assert.equal(row.status, 'pass', id);
+    assert.equal(row.blocker_refs.length, 0, id);
+    assert.equal(row.issue_codes.length, 0, id);
+    assert.match(JSON.stringify(row.evidence_refs), /ref:evidence:desktop-release/);
+  }
+
+  const merge = scenarioById(scenarios, 'BETA-MERGE-001');
+  assert.equal(merge.status, 'blocked');
+  assert.equal(merge.blocker_refs.includes('BLOCKER-PUBLIC-SAFE-RELEASE-PACKET'), true);
 });
 
 test('public beta QA matrix can consume support dry-run evidence per scenario', () => {
