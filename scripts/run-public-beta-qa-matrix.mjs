@@ -196,7 +196,7 @@ export function buildRankedNextActions(blockers) {
 }
 
 function usage() {
-  return `Usage: node scripts/run-public-beta-qa-matrix.mjs [--json|--plain] [--out <path>] [--clean-machine-smoke <path>] [--support-dry-run <path>] [--registry-install <path>] [--desktop-release-evidence <path>] [--production-handoff-packet <path>]\n\nGenerates a public-safe ${PUBLIC_BETA_QA_MATRIX_SCHEMA} report from repository files plus optional public-safe QA evidence artifacts, including ranked next_actions for release owners.\n`;
+  return `Usage: node scripts/run-public-beta-qa-matrix.mjs [--json|--plain] [--out <path>] [--evidence-manifest <path>] [--clean-machine-smoke <path>] [--support-dry-run <path>] [--registry-install <path>] [--desktop-release-evidence <path>] [--production-handoff-packet <path>]\n\nGenerates a public-safe ${PUBLIC_BETA_QA_MATRIX_SCHEMA} report from repository files plus optional public-safe QA evidence artifacts, including ranked next_actions for release owners.\n`;
 }
 
 function readArg(argv, index, flag) {
@@ -205,7 +205,7 @@ function readArg(argv, index, flag) {
 }
 
 export function parseArgs(argv = process.argv.slice(2)) {
-  const options = { json: false, plain: false, out: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: null, desktopReleaseEvidence: null, productionHandoffPacket: null };
+  const options = { json: false, plain: false, out: null, evidenceManifest: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: null, desktopReleaseEvidence: null, productionHandoffPacket: null };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--json') {
@@ -215,6 +215,9 @@ export function parseArgs(argv = process.argv.slice(2)) {
       if (arg === '--format') i += 1;
     } else if (arg === '--out') {
       options.out = readArg(argv, i + 1, '--out');
+      i += 1;
+    } else if (arg === '--evidence-manifest') {
+      options.evidenceManifest = readArg(argv, i + 1, '--evidence-manifest');
       i += 1;
     } else if (arg === '--clean-machine-smoke') {
       options.cleanMachineSmoke = readArg(argv, i + 1, '--clean-machine-smoke');
@@ -272,6 +275,45 @@ async function readPublicEvidenceJson(path, expectedSchema) {
 async function readPublicEvidenceJsonList(paths, expectedSchema) {
   const list = Array.isArray(paths) ? paths : [];
   return Promise.all(list.map((p) => readPublicEvidenceJson(p, expectedSchema)));
+}
+
+export function normalizeEvidenceManifest(manifest = null) {
+  const empty = {
+    cleanMachineSmoke: null,
+    supportDryRun: [],
+    registryInstall: null,
+    desktopReleaseEvidence: null,
+    productionHandoffPacket: null,
+  };
+  if (manifest === null || manifest === undefined) return empty;
+  if (manifest?.schema !== 'enigma.public_beta_evidence_manifest.v1') {
+    throw new Error('Evidence manifest schema mismatch: expected enigma.public_beta_evidence_manifest.v1.');
+  }
+  const supportDryRun = manifest.support_dry_run ?? manifest.supportDryRun ?? [];
+  return {
+    cleanMachineSmoke: manifest.clean_machine_smoke ?? manifest.cleanMachineSmoke ?? null,
+    supportDryRun: Array.isArray(supportDryRun) ? supportDryRun : [supportDryRun].filter(Boolean),
+    registryInstall: manifest.registry_install ?? manifest.registryInstall ?? null,
+    desktopReleaseEvidence: manifest.desktop_release_evidence ?? manifest.desktopReleaseEvidence ?? null,
+    productionHandoffPacket: manifest.production_handoff_packet ?? manifest.productionHandoffPacket ?? null,
+  };
+}
+
+export function mergeEvidenceOptions(options = {}, manifest = null) {
+  const normalized = normalizeEvidenceManifest(manifest);
+  return {
+    ...options,
+    cleanMachineSmoke: options.cleanMachineSmoke ?? normalized.cleanMachineSmoke,
+    supportDryRun: [...normalized.supportDryRun, ...(Array.isArray(options.supportDryRun) ? options.supportDryRun : [])],
+    registryInstall: options.registryInstall ?? normalized.registryInstall,
+    desktopReleaseEvidence: options.desktopReleaseEvidence ?? normalized.desktopReleaseEvidence,
+    productionHandoffPacket: options.productionHandoffPacket ?? normalized.productionHandoffPacket,
+  };
+}
+
+async function readEvidenceManifest(path) {
+  if (!path) return null;
+  return JSON.parse(await readFile(resolve(String(path)), 'utf8'));
 }
 
 function hasText(text, needle) {
@@ -371,11 +413,12 @@ function publicSafeAssert(report) {
 }
 
 export async function inspectPublicBetaQaInputs(options = {}) {
-  const cleanMachineSmoke = await readPublicEvidenceJson(options.cleanMachineSmoke, 'enigma.clean_machine_smoke.v1');
-  const supportDryRunSummaries = await readPublicEvidenceJsonList(options.supportDryRun, 'enigma.support_dry_run_summary.v1');
-  const registryInstall = await readPublicEvidenceJson(options.registryInstall, 'enigma.registry_install_verifier.v1');
-  const desktopReleaseEvidence = await readPublicEvidenceJson(options.desktopReleaseEvidence, 'enigma.desktop_release_evidence.v1');
-  const productionHandoffPacket = await readPublicEvidenceJson(options.productionHandoffPacket, 'enigma.production_handoff_packet.v1');
+  const evidenceOptions = mergeEvidenceOptions(options, await readEvidenceManifest(options.evidenceManifest));
+  const cleanMachineSmoke = await readPublicEvidenceJson(evidenceOptions.cleanMachineSmoke, 'enigma.clean_machine_smoke.v1');
+  const supportDryRunSummaries = await readPublicEvidenceJsonList(evidenceOptions.supportDryRun, 'enigma.support_dry_run_summary.v1');
+  const registryInstall = await readPublicEvidenceJson(evidenceOptions.registryInstall, 'enigma.registry_install_verifier.v1');
+  const desktopReleaseEvidence = await readPublicEvidenceJson(evidenceOptions.desktopReleaseEvidence, 'enigma.desktop_release_evidence.v1');
+  const productionHandoffPacket = await readPublicEvidenceJson(evidenceOptions.productionHandoffPacket, 'enigma.production_handoff_packet.v1');
   const [
     packageJson,
     tauriConfig,
