@@ -2585,6 +2585,32 @@ function publicTestDriveSearchSummary(summary, bundleDisplay) {
   };
 }
 
+function renderTestDrivePlain(report) {
+  const setup = report.setup_summary ?? {};
+  const crossModel = report.cross_model_summary ?? {};
+  const lines = [
+    'Enigma test drive',
+    `Status: ${report.ok ? 'Ready' : 'Needs attention'}`,
+    `Mode: ${report.dry_run ? 'dry run; no files written' : 'local files written'}`,
+    `Artifacts: ${report.artifacts_written ? 'written' : 'planned only'}`,
+    `Memories: ${setup.memory_count ?? 0}`,
+    `Receipts: ${setup.receipt_count ?? 0}`,
+    `Verify: ${setup.verify_ok ? 'ready' : 'needs attention'}`,
+    `AI app profiles: ${crossModel.profile_count ?? 0}`,
+  ];
+  lines.push(`Install: ${report.install_command ?? 'npm install -g enigma-memory'}`);
+  lines.push('Next: enigma status --bundle <bundle-path>');
+  lines.push('Next: enigma search --bundle <bundle-path> --query "local proof bundle"');
+  lines.push('Next: enigma connect <client> --bundle <bundle-path>');
+  lines.push('Boundary: local demo artifacts only; no raw memory, local paths, client config writes, provider calls, provider deletion, model behavior, hosted service, benchmark, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printTestDriveReport(report, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderTestDrivePlain(report));
+  else print(report, io);
+}
+
 function staticSetupSelection(requestedSelection) {
   return {
     ...requestedSelection,
@@ -2692,7 +2718,7 @@ export async function testDriveCommand(flags, io) {
   const files = testDriveFileSummaries(outputs.artifacts, !dryRun);
   const packageJson = await readPackageJson();
   const ok = finalVerifyReport.ok === true && crossModelReport.ok === true && statusSummary.ok === true && searchSummary.ok === true;
-  print({
+  const report = {
     ok,
     schema: 'enigma.test_drive.v1',
     command: 'enigma test-drive',
@@ -2735,7 +2761,8 @@ export async function testDriveCommand(flags, io) {
     search_summary: searchSummary,
     cross_model_summary: crossModelReport,
     claim_boundaries: testDriveClaimBoundaries(),
-  }, io);
+  };
+  printTestDriveReport(report, flags, io);
   return ok ? 0 : 1;
 }
 
@@ -4198,6 +4225,7 @@ function usage() {
       '--client <id|auto>': 'Client setup planning passthrough. No client config files are written by test-drive.',
       '--overwrite': 'Replace existing test-drive artifact files.',
       '--dry-run': 'Plan the local test drive without writing artifacts.',
+      '--plain': 'Print a path-redacted consumer test-drive summary instead of JSON. Alias: --text or --format text.',
     },
     cross_model_demo_options: {
       '--memory-file <path>': 'Seed the demo from a local file without echoing plaintext. Alias: --text-file.',

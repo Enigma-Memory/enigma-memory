@@ -60,6 +60,13 @@ async function runTestDrive(args) {
   return { code, stdout: io.stdout(), stderr: io.stderr(), json: io.json() };
 }
 
+async function runTestDriveText(args) {
+  const io = makeIo();
+  const code = await main(['test-drive', ...args], io.io);
+  return { code, stdout: io.stdout(), stderr: io.stderr() };
+}
+
+
 test('test-drive dry-run writes nothing and reports public tester commands', async () => {
   const root = await mkdtemp(join(tmpdir(), 'enigma-test-drive-dry-run-'));
   const outDir = join(root, 'demo');
@@ -77,6 +84,24 @@ test('test-drive dry-run writes nothing and reports public tester commands', asy
   assert.deepEqual(json.next_commands, expectedNextCommands(json.bundle, json.files.find((file) => file.role === 'cross_model_report').path));
   assert.equal(json.next_commands.every((command) => command.startsWith('enigma ')), true);
   assert.equal(await pathExists(outDir), false);
+  assertPublicSafe(stdout, ['private test-drive canary']);
+});
+
+test('test-drive plain dry-run gives path-redacted consumer summary', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'enigma-test-drive-plain-'));
+  const outDir = join(root, 'demo');
+
+  const { code, stdout, stderr } = await runTestDriveText(['--out-dir', outDir, '--dry-run', '--plain']);
+
+  assert.equal(code, 0, stderr);
+  assert.match(stdout, /^Enigma test drive\n/);
+  assert.match(stdout, /Status: Ready/);
+  assert.match(stdout, /Mode: dry run; no files written/);
+  assert.match(stdout, /Artifacts: planned only/);
+  assert.match(stdout, /Next: enigma status --bundle <bundle-path>/);
+  assert.match(stdout, /Boundary: local demo artifacts only/);
+  assert.doesNotMatch(stdout, /^\s*\{/);
+  assert.equal(stdout.includes(root), false);
   assertPublicSafe(stdout, ['private test-drive canary']);
 });
 
