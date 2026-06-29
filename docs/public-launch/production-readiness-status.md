@@ -87,7 +87,8 @@
 - `node --test test/enigma-metering.test.mjs` at repo root: **6/6 pass**.
 - `node --test test/enigma-settlement.test.mjs` at repo root: **7/7 pass**.
 - `node --test test/enigma-chain-cli.test.mjs` at repo root: **8/8 pass**.
-- `node --test test/enigma-public-beta-qa-matrix.test.mjs` at repo root: **11/11 pass**.
+- `node --test test/enigma-public-beta-qa-matrix.test.mjs` at repo root: **17/17 pass**.
+- `node --test test/enigma-public-beta-evidence-manifest.test.mjs` at repo root: **3/3 pass**.
 - `node --test test/enigma-clean-machine-smoke.test.mjs` at repo root: **5/5 pass**.
 - `node --test test/enigma-support-dry-run.test.mjs` at repo root: **9/9 pass**.
 - `node --test test/enigma-release-evidence-desktop.test.mjs` at repo root: **13/13 pass**.
@@ -112,9 +113,12 @@
 - `node --test test/enigma-onboarding.test.mjs` at repo root: **23/23 pass**.
 - `node --test test/enigma-test-drive.test.mjs` at repo root: **4/4 pass**.
 - `node --test test/enigma-search-status.test.mjs` at repo root: **10/10 pass**.
+- `node --test test/enigma-desktop-public-launch.test.mjs` at repo root: **8/8 pass**.
+- `npm run public-beta:advisor` at repo root: **pass**; Advisor decision remains **HOLD** with evidence-manifest collection guidance.
+- `npm run production:site -- --site website` at repo root: **pass**.
 - `npm run check` at repo root: **pass**.
 - `npm run secret-scan` at repo root: **pass**.
-- `npm test` at repo root: **659/659 pass**.
+- `npm test` at repo root: **669/669 pass**.
 - `npm pack --dry-run` at repo root: **pass** (`enigma-memory-0.1.19.tgz` dry-run output).
 - `npm run public-beta-qa` at repo root: **hold**, `20 blocked / 1 pending / 0 missing`, required public beta version `0.1.19`.
 - Hosted PR checks must still pass after each pushed branch commit; local gates do not replace PR approval/merge or signing evidence.
