@@ -256,6 +256,7 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   ]);
   const ui = `${wizard}\n${help}\n${styles}`;
   const runHealthBlock = wizard.match(/case 'run-health': \{[\s\S]*?return;\n    \}/)?.[0] || '';
+  const approveImportBlock = wizard.match(/case 'approve-import-text': \{[\s\S]*?return;\n    \}/)?.[0] || '';
 
   assert.match(wizard, /Memory Controller/);
   assert.match(wizard, /Memory Weather/);
@@ -294,6 +295,10 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(wizard, /clear-import-text/);
   assert.match(wizard, /rollback-import-text/);
   assert.match(wizard, /Rollback last import/);
+  assert.match(wizard, /importReady = preview\?\.import_decision === 'ready_for_import'/);
+  assert.match(wizard, /Review required before writing/);
+  assert.match(approveImportBlock, /importSandbox\.preview\.import_decision !== 'ready_for_import'/);
+  assert.ok(approveImportBlock.indexOf("import_decision !== 'ready_for_import'") < approveImportBlock.indexOf("call('approve_import_text'"));
   assert.match(wizard, /Import rollback complete/);
   assert.match(wizard, /test-connection/);
   assert.match(wizard, /test_client_config/);

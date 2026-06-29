@@ -317,6 +317,9 @@ async function mockInvoke(cmd, args = {}) {
         schema: 'enigma.import_preview.v1',
         candidate_count: candidateCount,
         import_decision: candidateCount > 0 ? 'ready_for_import' : 'empty',
+        primary_action: candidateCount > 0
+          ? { id: 'approve_import', label: 'Import selected memories', description: 'Approve this local import batch before Enigma writes candidates into the vault.', writes_vault: true, requires_explicit_approval: true, public_safe: true }
+          : { id: 'choose_import_file', label: 'Choose memory file', description: 'Pick a local memory export or curated memory list to preview.', writes_vault: false, requires_explicit_approval: true, public_safe: true },
         counts: { dedupe: { duplicate_group_count: 0 } },
         preview_receipt: {
           schema: 'enigma.import_preview_receipt.v1',
@@ -786,6 +789,10 @@ function renderImportSandboxSection() {
   const resultCount = result?.import_batch_receipt?.candidate_count ?? result?.candidate_count ?? 0;
   const rollbackCount = rollback?.tombstoned_count ?? 0;
   const rollbackAvailable = result?.rollback_available === true;
+  const importReady = preview?.import_decision === 'ready_for_import';
+  const previewAction = preview?.primary_action;
+  const previewActionLabel = previewAction?.label || 'Review import preview';
+  const previewActionDescription = previewAction?.description || 'Review the preview before writing anything into the Memory Drive.';
   return `
     <section class="dashboard-section import-sandbox" aria-labelledby="import-sandbox-title">
       <p class="eyebrow">Import Sandbox</p>
@@ -794,11 +801,13 @@ function renderImportSandboxSection() {
       <textarea id="import-sandbox-text" rows="5" placeholder="One memory per line. Example: I prefer concise setup steps."></textarea>
       <div class="button-row">
         ${primaryButton('Preview import', 'preview-import-text')}
-        <button type="button" class="secondary" data-action="approve-import-text" ${preview ? '' : 'disabled'}>Approve preview</button>
+        <button type="button" class="secondary" data-action="approve-import-text" ${importReady ? '' : 'disabled'}>Approve preview</button>
         <button type="button" class="secondary" data-action="rollback-import-text" ${rollbackAvailable ? '' : 'disabled'}>Rollback last import</button>
         ${secondaryButton('Clear import', 'clear-import-text')}
       </div>
       ${preview ? `<p class="note">Preview ready: ${escapeHtml(String(previewCount))} candidates, ${escapeHtml(String(duplicateCount))} duplicate groups, decision ${escapeHtml(preview.import_decision || 'unknown')}.</p>` : ''}
+      ${preview ? `<p class="note">Next: ${escapeHtml(previewActionLabel)}. ${escapeHtml(previewActionDescription)}</p>` : ''}
+      ${preview && !importReady ? '<p class="note">Review required before writing: resolve duplicate, low-confidence, incomplete, or caveated items, then preview again.</p>' : ''}
       ${result ? `<p class="note">Import written locally: ${escapeHtml(String(resultCount))} candidates. Batch receipt returned without raw memory text. Rollback is available from the latest local import report.</p>` : ''}
       ${rollback ? `<p class="note">Rollback complete: ${escapeHtml(String(rollbackCount))} local memories tombstoned. Rollback receipt returned without raw memory text.</p>` : ''}
       ${importSandbox.error ? `<p class="note">Import needs attention: ${escapeHtml(importSandbox.error)}</p>` : ''}
@@ -1388,6 +1397,10 @@ async function handleAction(event) {
     case 'approve-import-text': {
       if (!importSandbox.preview || !importSandbox.pendingText) {
         setStatus('Preview an import before approving it.');
+        return;
+      }
+      if (importSandbox.preview.import_decision !== 'ready_for_import') {
+        setStatus('Review required before writing. Resolve duplicate or caveated items, then preview again.');
         return;
       }
       busy = true;
