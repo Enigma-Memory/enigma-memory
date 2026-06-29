@@ -258,6 +258,8 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   const runHealthBlock = wizard.match(/case 'run-health': \{[\s\S]*?return;\n    \}/)?.[0] || '';
   const approveImportBlock = wizard.match(/case 'approve-import-text': \{[\s\S]*?return;\n    \}/)?.[0] || '';
   const renderClientActionsBlock = wizard.match(/function renderClientActions\(client, status\) \{[\s\S]*?\n\}/)?.[0] || '';
+  const renderDashboardBlock = wizard.match(/function renderDashboard\(\) \{[\s\S]*?\n\}/)?.[0] || '';
+  const dashboardNextActionBlock = wizard.match(/function dashboardNextAction\(\{[\s\S]*?\n\}/)?.[0] || '';
 
   assert.match(wizard, /Memory Controller/);
   assert.match(wizard, /Memory Weather/);
@@ -281,6 +283,7 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(wizard, /offlineReady = serviceRunning && health\.offline_ready === true/);
   assert.match(wizard, /dashboardNextAction\(\{ memoryDriveStatus, offlineReady, serviceRunning, updateAvailable \}\)/);
   assert.doesNotMatch(wizard.match(/case 'create-vault': \{[\s\S]*?return;\n    \}/)?.[0] || '', /call\('create_vault'\)/);
+  assert.doesNotMatch(wizard, /choose-location|Choose a different location|Location chooser would open here/);
   assert.match(wizard, /WIZARD_STORAGE_KEY/);
   assert.match(wizard, /restoreWizardResumeState/);
   assert.match(wizard, /persistWizardResumeState/);
@@ -297,6 +300,7 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(wizard, /rollback-import-text/);
   assert.match(wizard, /Rollback last import/);
   assert.match(wizard, /importReady = preview\?\.import_decision === 'ready_for_import'/);
+  assert.match(wizard, /\$\{escapeHtml\(importSandbox\.pendingText \|\| ''\)\}<\/textarea>/);
   assert.match(wizard, /Review required before writing/);
   assert.match(approveImportBlock, /importSandbox\.preview\.import_decision !== 'ready_for_import'/);
   assert.ok(approveImportBlock.indexOf("import_decision !== 'ready_for_import'") < approveImportBlock.indexOf("call('approve_import_text'"));
@@ -338,9 +342,11 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(wizard, /Advanced config preview/);
   assert.ok(renderClientActionsBlock.indexOf('claude-mcpb-handoff') < renderClientActionsBlock.indexOf('Advanced config preview'));
   assert.match(wizard, /Remove or disable later/);
-  assert.match(wizard, /Config fallback test/);
+  assert.match(wizard, /Return here and run Test connection/);
+  assert.match(wizard, /If the extension path is unavailable, use Advanced config preview/);
   assert.match(wizard, /Open the Enigma Claude extension package in Claude Desktop, then test the connection/);
-  assert.match(wizard, /Enigma did not write Claude config for the extension handoff/);
+  assert.match(wizard, /Enigma does not write Claude config for this extension handoff/);
+  assert.doesNotMatch(wizard, /Config fallback test/);
   assert.match(tauriService, /pub async fn get_claude_mcpb_handoff/);
   assert.match(tauriService, /create_claude_desktop_mcpb_connection_plan/);
   assert.match(tauriService, /create_claude_desktop_mcpb_manifest/);
@@ -353,10 +359,16 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(wizard, /Promise\.allSettled/);
   assert.match(wizard, /call\('get_health'\)/);
   assert.match(wizard, /call\('get_service_status'\)/);
-  assert.match(wizard, /call\('get_service_logs'/);
+  assert.doesNotMatch(wizard, /call\('get_service_logs'/);
   assert.match(wizard, /call\('get_diagnostics'\)/);
   assert.match(wizard, /call\('check_update'\)/);
   assert.match(wizard, /currentStep === 6/);
+  assert.match(dashboardNextActionBlock, /action: 'refresh-proof-activity'/);
+  assert.match(renderDashboardBlock, /Local engine/);
+  assert.match(renderDashboardBlock, /Collect support summary/);
+  assert.doesNotMatch(renderDashboardBlock, /log-view|Refresh logs|Shutdown service|\bpid\b|Uptime|Restarts|Stop engine|Engine service/i);
+  assert.doesNotMatch(wizard, /case 'view-logs'|case 'shutdown'|case 'stop-service'/);
+  assert.doesNotMatch(styles, /log-view/);
   assert.match(runHealthBlock, /call\('start_service'\)/);
   assert.match(runHealthBlock, /health = await call\('get_health'\);[\s\S]*serviceStatus = await call\('start_service'\);[\s\S]*health = await call\('get_health'\);/);
   assert.ok(runHealthBlock.indexOf("call('start_service')") < runHealthBlock.indexOf('currentStep = 5'));
@@ -451,10 +463,11 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
 });
 
 test('public website explains consumer install path without unsupported claims', async () => {
-  const [home, download, setup, websiteStyles, help, launchStatus, installGuide, macosInstall, windowsInstall, connectApps, otherClients, removalGuide, faq, developerCli, readme, installAnywhere, clientConnectors, developerEcosystem, publicApiReference, onboardingUx] = await Promise.all([
+  const [home, download, setup, vaultNotReady, websiteStyles, help, launchStatus, installGuide, macosInstall, windowsInstall, connectApps, otherClients, removalGuide, faq, developerCli, readme, installAnywhere, clientConnectors, developerEcosystem, publicApiReference, onboardingUx] = await Promise.all([
     readWebsiteFile('index.html'),
     readWebsiteFile('download.html'),
     readWebsiteFile('setup.html'),
+    readWebsiteFile('help/troubleshooting/vault-not-ready.html'),
     readWebsiteFile('styles.css'),
     readWebsiteFile('help/index.html'),
     readWebsiteFile('launch-status.html'),
@@ -473,18 +486,28 @@ test('public website explains consumer install path without unsupported claims',
     readFile(new URL('../docs/public-api-reference.md', import.meta.url), 'utf8'),
     readFile(new URL('../docs/public-launch/consumer-onboarding-ux.md', import.meta.url), 'utf8'),
   ]);
-  const publicWebsite = `${home}\n${download}\n${setup}\n${help}\n${launchStatus}\n${installGuide}\n${macosInstall}\n${windowsInstall}\n${connectApps}\n${otherClients}\n${removalGuide}\n${faq}`;
+  const publicWebsite = `${home}\n${download}\n${setup}\n${vaultNotReady}\n${help}\n${launchStatus}\n${installGuide}\n${macosInstall}\n${windowsInstall}\n${connectApps}\n${otherClients}\n${removalGuide}\n${faq}`;
   const funnelSpec = `${publicWebsite}\n${onboardingUx}`;
+  const vaultBeforeAdvanced = vaultNotReady.slice(0, vaultNotReady.indexOf('Advanced command-line repair'));
 
-  assert.match(home, /Download the desktop app/);
+  assert.match(home, /Check installer status/);
+  assert.doesNotMatch(home, /Download the desktop app/);
+  assert.match(home, /Signed installers are not ready yet/);
   assert.match(home, /Create your Memory Drive/);
   assert.match(home, /Connect an AI app/);
-  assert.match(download, /After the download/);
+  assert.match(download, /Signed installers are not ready yet/);
+  assert.match(download, /Windows signed installer is not ready yet/);
+  assert.match(download, /Signed Windows and macOS installers are not ready yet/);
+  assert.match(download, /When you have an installer/);
   assert.match(download, /open Enigma Memory/i);
+  assert.doesNotMatch(download, /Azure Artifact Signing|eligible paid Azure subscription|free\/trial\/sponsored/i);
+  assert.doesNotMatch(download, /signed installers are ready|signed-ready|download-ready/i);
   assert.match(setup, /Four screens\. No terminal\. No JSON\./);
   assert.match(setup, /Create Memory Drive/);
   assert.match(setup, /Preview, then approve/);
+  assert.match(setup, /Enigma shows what it will change before you approve/);
   assert.match(setup, /Memory Drive dashboard/);
+  assert.doesNotMatch(setup, /connection boundary|local client config|Enigma-controlled vault|local app location|manual MCP JSON/i);
   assert.doesNotMatch(developerCli, /--overwrite/);
   assert.match(developerCli, /enigma connect claude-desktop --bundle \.\/\.enigma\/bundle\.json --dry-run/);
   assert.match(websiteStyles, /setup-map/);
@@ -507,6 +530,10 @@ test('public website explains consumer install path without unsupported claims',
   assert.match(faq, /help\/troubleshooting\/vault-not-ready\.html/);
   assert.match(faq, /Restore from backup, Safe reset/);
   assert.doesNotMatch(faq, /<p>Run Repair vault[^<]*<a href="\.\/developers\/cli\.html"/);
+  assert.match(vaultNotReady, /repair buttons inside the desktop app/);
+  assert.match(vaultNotReady, /Advanced command-line repair/);
+  assert.ok(vaultNotReady.indexOf('<strong>Repair vault</strong>') < vaultNotReady.indexOf('Advanced command-line repair'));
+  assert.doesNotMatch(vaultBeforeAdvanced, /readable|writable|app data folder|corrupted|app config/i);
   assert.match(websiteStyles, /first-run-map/);
   assert.match(help, /Start here/);
   assert.match(help, /You should not need Node, npm, terminal commands, or JSON edits/);

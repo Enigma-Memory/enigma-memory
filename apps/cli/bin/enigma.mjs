@@ -18,7 +18,7 @@ import * as relayServer from '../../relay/src/server.mjs';
 import * as gatewayServer from '../../gateway/src/server.mjs';
 import { verifyBundle } from '../../verifier/bin/enigma-verify.mjs';
 import { createNativeHostInstallPlan, createNativeHostManifest } from '../../native-host/bin/enigma-native-host.mjs';
-import { buildClaudeMcpbPackage } from '../../../scripts/build-claude-mcpb-package.mjs';
+import { buildClaudeMcpbPackage, renderClaudeMcpbPackagePlain } from '../../../scripts/build-claude-mcpb-package.mjs';
 import { aggregateUsageEvents, createUsageEvent } from '../../../packages/metering/src/index.js';
 import {
   createMemoryAccessReceipt,
@@ -2317,22 +2317,6 @@ function printNativeHostInstallPlan(plan, flags, io) {
   else print(plan, io);
 }
 
-function renderClaudeMcpbPackagePlain(report, outWritten = false) {
-  const lines = [
-    'Enigma Claude MCPB package',
-    `Status: ${report.ok ? 'Ready' : 'Needs attention'}`,
-    `Version: ${report.manifest?.version ?? '<version>'}`,
-    `Files: ${report.package?.file_count ?? 0}`,
-    `Bytes: ${report.package?.total_bytes ?? 0}`,
-    `Network: ${report.package?.network_performed ? 'performed' : 'not performed'}`,
-    `Install: ${report.package?.install_performed ? 'performed' : 'not performed'}`,
-    'Package: written to <mcpb-output>',
-  ];
-  if (outWritten) lines.push('Report: written to <out>');
-  lines.push('Next: import <mcpb-output> in Claude Desktop after PR approval and release-owner review.');
-  lines.push('Boundary: local Claude MCPB package artifact only; no Claude install, client config writes, provider launch, network calls, raw memory, local paths, provider deletion, model behavior, hosted service, or signing claims.');
-  return `${lines.join('\n')}\n`;
-}
 
 function printClaudeMcpbPackageReport(report, flags, io, outWritten = false) {
   if (nextPlainRequested(flags)) io.stdout.write(renderClaudeMcpbPackagePlain(report, outWritten));

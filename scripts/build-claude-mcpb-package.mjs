@@ -27,7 +27,7 @@ const RUNTIME_FILES = Object.freeze([
 ]);
 
 function usage() {
-  return 'Usage: node scripts/build-claude-mcpb-package.mjs [--mcpb <path>] [--out <path>] [--version <semver>]\n\nBuilds a deterministic Claude Desktop .mcpb package containing manifest.json and the local Enigma MCP node runtime source. No install, network, signing, or provider launch is performed.\n';
+  return 'Usage: node scripts/build-claude-mcpb-package.mjs [--mcpb <path>] [--out <path>] [--version <semver>] [--plain]\n\nBuilds a deterministic Claude Desktop .mcpb package containing manifest.json and the local Enigma MCP node runtime source. No install, network, signing, or provider launch is performed.\n';
 }
 
 function readValue(argv, index, flag) {
@@ -37,13 +37,14 @@ function readValue(argv, index, flag) {
 }
 
 export function parseClaudeMcpbPackageArgs(argv = process.argv.slice(2)) {
-  const options = { mcpb: DEFAULT_MCPB, out: null, version: null, help: false };
+  const options = { mcpb: DEFAULT_MCPB, out: null, version: null, plain: false, help: false };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--help' || arg === '-h') options.help = true;
     else if (arg === '--mcpb') { options.mcpb = readValue(argv, i, arg); i += 1; }
     else if (arg === '--out') { options.out = readValue(argv, i, arg); i += 1; }
     else if (arg === '--version') { options.version = readValue(argv, i, arg); i += 1; }
+    else if (arg === '--plain' || arg === '--text' || arg === '--format=text') options.plain = true;
     else throw new Error('Unknown argument.');
   }
   return options;
@@ -90,6 +91,71 @@ async function runtimeEntries() {
   return files;
 }
 
+export function createClaudeMcpbInstallHandoff() {
+  const copyableSteps = [
+    {
+      id: 'open_mcpb',
+      instruction: 'Open Claude Desktop and choose the option to install an MCPB extension package.',
+    },
+    {
+      id: 'select_bundle',
+      instruction: 'Select the Enigma .mcpb bundle shown as <mcpb-output> in this report.',
+    },
+    {
+      id: 'restart_claude',
+      instruction: 'Restart Claude Desktop so it can load the extension after you approve the install.',
+    },
+    {
+      id: 'test_connection',
+      instruction: 'In Claude Desktop, test the Enigma MCP connection before using it for real work.',
+    },
+  ];
+  const boundaries = {
+    install_performed: false,
+    automatic_config_write: false,
+    provider_launched: false,
+    network_performed: false,
+  };
+  return {
+    title: 'Claude Desktop MCPB install handoff',
+    summary: 'Copy these steps when a human is ready to install the reviewed .mcpb package in Claude Desktop.',
+    steps: copyableSteps,
+    copyable_text: [
+      'Claude Desktop MCPB install handoff',
+      ...copyableSteps.map((step, index) => `${index + 1}. [${step.id}] ${step.instruction}`),
+      'Boundaries: install_performed=false; automatic_config_write=false; provider_launched=false; network_performed=false.',
+    ].join('\n'),
+    boundaries,
+  };
+}
+
+export function renderClaudeMcpbPackagePlain(report, outWritten = false) {
+  const boundaries = report.install_handoff?.boundaries ?? report.package ?? {};
+  const lines = [
+    'Enigma Claude MCPB package',
+    `Status: ${report.ok ? 'Ready' : 'Needs attention'}`,
+    `Version: ${report.manifest?.version ?? '<version>'}`,
+    `Files: ${report.package?.file_count ?? 0}`,
+    `Bytes: ${report.package?.total_bytes ?? 0}`,
+    'Package: written to <mcpb-output>',
+  ];
+  if (outWritten) lines.push('Report: written to <out>');
+  lines.push('', 'How to install in Claude Desktop:');
+  for (const [index, step] of (report.install_handoff?.steps ?? []).entries()) {
+    lines.push(`${index + 1}. [${step.id}] ${step.instruction}`);
+  }
+  lines.push(
+    '',
+    'What this command did not do:',
+    `- Install performed: ${boundaries.install_performed ? 'yes' : 'no'}`,
+    `- Automatic config write: ${boundaries.automatic_config_write ? 'yes' : 'no'}`,
+    `- Provider launched: ${boundaries.provider_launched ? 'yes' : 'no'}`,
+    `- Network performed: ${boundaries.network_performed ? 'yes' : 'no'}`,
+    'Boundary: local Claude MCPB package artifact only; no Claude install, client config writes, provider launch, network calls, raw memory, local paths, provider deletion, model behavior, hosted service, or signing claims.',
+  );
+  return `${lines.join('\n')}\n`;
+}
+
 export async function buildClaudeMcpbPackage(options = {}) {
   if (options.help) return { help: usage() };
   const version = options.version ?? await readPackageVersion();
@@ -125,6 +191,7 @@ export async function buildClaudeMcpbPackage(options = {}) {
       deterministic_order: files.map((file) => file.path),
       total_bytes: files.reduce((sum, file) => sum + file.size, 0),
       install_performed: false,
+      automatic_config_write: false,
       provider_launched: false,
       network_performed: false,
     },
@@ -138,6 +205,7 @@ export async function buildClaudeMcpbPackage(options = {}) {
       local_paths_included: false,
     },
     files: files.map((file) => ({ path: file.path, size: file.size, sha256: file.sha256 })),
+    install_handoff: createClaudeMcpbInstallHandoff(),
     claim_boundaries: {
       local_package_artifact_only: true,
       claude_installed: false,
@@ -156,8 +224,10 @@ export async function buildClaudeMcpbPackage(options = {}) {
 
 async function main() {
   try {
-    const result = await buildClaudeMcpbPackage(parseClaudeMcpbPackageArgs());
+    const options = parseClaudeMcpbPackageArgs();
+    const result = await buildClaudeMcpbPackage(options);
     if (result.help) process.stdout.write(result.help);
+    else if (options.plain) process.stdout.write(renderClaudeMcpbPackagePlain(result, Boolean(options.out)));
     else process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   } catch (error) {
     process.stdout.write(`${JSON.stringify({ schema: CLAUDE_MCPB_PACKAGE_SCHEMA, ok: false, public_safe: true, error: { code: 'CLAUDE_MCPB_PACKAGE_BLOCKED', message: error instanceof Error ? error.message : 'Package build failed.' } }, null, 2)}\n`);

@@ -46,7 +46,6 @@ let diagnostics = {};
 let update = {};
 let crashReporting = {};
 let serviceStatus = {};
-let serviceLogs = [];
 let controllerUi = {
   grantsReviewed: false,
   recallDecision: 'ask',
@@ -745,11 +744,16 @@ function renderClaudeMcpbHandoff(client) {
   const disconnect = plan.disconnect_boundaries && typeof plan.disconnect_boundaries === 'object' ? plan.disconnect_boundaries : {};
   return `
     <div class="connection-preview claude-mcpb-handoff">
-      <p class="note"><strong>Claude-first path.</strong> Preferred install: ${escapeHtml(claudeMcpbHandoff.preferred_path || 'mcpb_extension')}. Writes performed: ${claudeMcpbHandoff.writes_performed === true ? 'yes' : 'no'}.</p>
-      <p class="note">Claude confirms install: ${plan.install_handoff?.user_confirms_in_claude === true ? 'yes' : 'review required'} · Enigma writes Claude config: ${plan.install_handoff?.enigma_writes_claude_config === true ? 'yes' : 'no'} · Status: ${escapeHtml(health.status || 'not_installed')}</p>
-      <p class="note">Next: ${escapeHtml(nextAction.label || 'Install Claude extension')}. ${escapeHtml(nextAction.description || 'Open the Enigma Claude extension package in Claude Desktop, then test the connection.')}</p>
+      <p class="note"><strong>Install Claude extension.</strong> Open the Enigma Claude extension package in Claude Desktop. Enigma does not write Claude config for this extension handoff.</p>
+      <ol class="handoff-steps">
+        <li>Open the Enigma Claude extension package in Claude Desktop.</li>
+        <li>Choose this local Memory Drive when Claude asks.</li>
+        <li>Restart Claude Desktop.</li>
+        <li>Return here and run Test connection.</li>
+      </ol>
+      <p class="note">Status: ${escapeHtml(health.status || 'not_installed')}. Next: ${escapeHtml(nextAction.label || 'Install Claude extension')}. ${escapeHtml(nextAction.description || 'Open the Enigma Claude extension package in Claude Desktop, then test the connection.')}</p>
       <p class="note">Remove or disable later: ${escapeHtml(disconnect.mcpb_path || 'Remove or disable the Enigma Memory extension in Claude Desktop.')}</p>
-      <p class="note">Config fallback test: use "Test connection" only after the advanced config preview path. Enigma did not write Claude config for the extension handoff.</p>
+      <p class="note">If the extension path is unavailable, use Advanced config preview. It stays review-first and does not write until you approve.</p>
     </div>
   `;
 }
@@ -811,7 +815,7 @@ function renderImportSandboxSection() {
       <p class="eyebrow">Import Sandbox</p>
       <h2 id="import-sandbox-title">Bring memories in safely</h2>
       <p>Paste plain text or Markdown, preview counts and duplicate groups, then approve one local write. Raw text stays inside this local screen and is cleared after approval.</p>
-      <textarea id="import-sandbox-text" rows="5" placeholder="One memory per line. Example: I prefer concise setup steps."></textarea>
+      <textarea id="import-sandbox-text" rows="5" placeholder="One memory per line. Example: I prefer concise setup steps.">${escapeHtml(importSandbox.pendingText || '')}</textarea>
       <div class="button-row">
         ${primaryButton('Preview import', 'preview-import-text')}
         <button type="button" class="secondary" data-action="approve-import-text" ${importReady ? '' : 'disabled'}>Approve preview</button>
@@ -927,7 +931,6 @@ function renderVault() {
     </div>
     <div class="button-row">
       ${primaryButton('Create vault', 'create-vault-action')}
-      ${secondaryButton('Choose a different location', 'choose-location')}
     </div>
   `, 'vault');
 }
@@ -1027,7 +1030,7 @@ function dashboardNextAction({ memoryDriveStatus, offlineReady, serviceRunning, 
   if (updateAvailable) {
     return { label: 'Check for updates', action: 'check-update', reason: 'A local desktop update may be available.' };
   }
-  return { label: 'Review proof activity', action: 'run-health', reason: 'Memory Drive is ready. Review receipts and proof status when you want assurance.' };
+  return { label: 'Review proof activity', action: 'refresh-proof-activity', reason: 'Memory Drive is ready. Review receipts and proof status when you want assurance.' };
 }
 
 function renderNextActionSection(action) {
@@ -1049,9 +1052,7 @@ function renderDashboard() {
     (code) => `<li>${escapeHtml(code)}</li>`
   ).join('');
   const serviceRunning = serviceStatus?.running;
-  const serviceAction = serviceRunning ? 'stop-service' : 'start-service';
-  const serviceLabel = serviceRunning ? 'Stop engine' : 'Start engine';
-  const logsText = serviceLogs?.length ? serviceLogs.slice(-5).join('\n') : 'No logs yet.';
+  const localEngineStatus = serviceRunning ? 'Ready' : 'Needs start';
   const updateStatus = update?.status || 'unknown';
   const updateAvailable = update?.available_version && update.available_version !== update.current_version;
   const crashEnabled = crashReporting.status?.enabled ?? false;
@@ -1091,16 +1092,14 @@ function renderDashboard() {
       <div class="client-list">${renderClientList('Run app detection to see recovery options.')}</div>
     </div>
 
-    <div class="dashboard-section">
-      <h2>Engine service</h2>
-      <p>Status: <strong>${serviceRunning ? 'Running' : 'Stopped'}</strong>
-        ${serviceStatus?.pid ? `(pid ${escapeHtml(String(serviceStatus.pid))})` : ''}</p>
-      <p class="note">Restarts: ${escapeHtml(String(serviceStatus?.restarts ?? 0))} · Uptime: ${escapeHtml(String(serviceStatus?.uptime_secs ?? 0))}s</p>
+    <div class="dashboard-section local-engine">
+      <h2>Local engine</h2>
+      <p>Status: <strong>${localEngineStatus}</strong></p>
+      <p class="note">This private background service lets approved apps request Enigma context from this computer.</p>
       <div class="button-row">
-        ${primaryButton(serviceLabel, serviceAction)}
-        ${secondaryButton('Refresh logs', 'view-logs')}
+        ${primaryButton('Run health check', 'run-health')}
+        ${secondaryButton('Collect support summary', 'collect-support-summary')}
       </div>
-      <pre class="log-view" aria-label="Recent engine logs">${escapeHtml(logsText)}</pre>
     </div>
 
     <div class="dashboard-section">
@@ -1134,10 +1133,7 @@ function renderDashboard() {
       </div>
     </div>
 
-    <div class="button-row">
-      ${primaryButton('Run health check', 'run-health')}
-      ${secondaryButton('Shutdown service', 'shutdown')}
-    </div>
+
   `, 'memoryController');
 }
 
@@ -1179,7 +1175,6 @@ async function hydrateDashboardState() {
     clientsResult,
     healthResult,
     serviceResult,
-    logsResult,
     diagnosticsResult,
     updateResult,
     proofResult,
@@ -1188,7 +1183,6 @@ async function hydrateDashboardState() {
     call('detect_clients'),
     call('get_health'),
     call('get_service_status'),
-    call('get_service_logs', { limit: 100 }),
     call('get_diagnostics'),
     call('check_update'),
     call('get_proof_activity'),
@@ -1198,7 +1192,6 @@ async function hydrateDashboardState() {
   clients = settledValue(clientsResult, clients);
   health = settledValue(healthResult, health);
   serviceStatus = settledValue(serviceResult, serviceStatus);
-  serviceLogs = settledValue(logsResult, serviceLogs);
   diagnostics = settledValue(diagnosticsResult, diagnostics);
   update = settledValue(updateResult, update);
   proofActivity = settledValue(proofResult, health.proof_activity?.schema ? health.proof_activity : proofActivity);
@@ -1252,9 +1245,6 @@ async function handleAction(event) {
       render();
       return;
     }
-    case 'choose-location':
-      setStatus('Location chooser would open here.');
-      return;
     case 'detect-clients': {
       busy = true;
       setStatus('Looking for supported apps...');
@@ -1530,7 +1520,6 @@ async function handleAction(event) {
           health = await call('get_health');
         }
         proofActivity = health.proof_activity?.schema ? health.proof_activity : await call('get_proof_activity');
-        serviceLogs = await call('get_service_logs', { limit: 100 });
         diagnostics = await call('get_diagnostics');
         update = await call('check_update');
         health.diagnostics_status = diagnostics.status;
@@ -1563,42 +1552,13 @@ async function handleAction(event) {
       setStatus('Dashboard refreshed with current local status.');
       return;
     }
-    case 'shutdown': {
-      busy = true;
-      setStatus('Shutting down...');
-      await call('shutdown_service');
-      health = await call('get_health');
-      busy = false;
-      render();
-      return;
-    }
     case 'start-service': {
       busy = true;
       setStatus('Starting engine...');
       serviceStatus = await call('start_service');
-      serviceLogs = await call('get_service_logs', { limit: 100 });
       busy = false;
       render();
       setStatus('Engine started.');
-      return;
-    }
-    case 'stop-service': {
-      busy = true;
-      setStatus('Stopping engine...');
-      serviceStatus = await call('stop_service');
-      serviceLogs = await call('get_service_logs', { limit: 100 });
-      busy = false;
-      render();
-      setStatus('Engine stopped.');
-      return;
-    }
-    case 'view-logs': {
-      busy = true;
-      setStatus('Loading logs...');
-      serviceLogs = await call('get_service_logs', { limit: 100 });
-      busy = false;
-      render();
-      setStatus('Logs refreshed.');
       return;
     }
     case 'run-diagnostics': {

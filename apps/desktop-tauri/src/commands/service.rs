@@ -1,4 +1,4 @@
-use crate::commands::{diagnostics, run_cli};
+use crate::commands::{crash, diagnostics, run_cli};
 use crate::{AppState, DesktopConfig};
 use chrono::Utc;
 use regex::Regex;
@@ -43,6 +43,35 @@ pub struct ServiceStatus {
     pub pid: u32,
     pub restarts: usize,
     pub uptime_secs: u64,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub(crate) struct ReadinessAction {
+    pub id: &'static str,
+    pub label: &'static str,
+    pub command: &'static str,
+    pub description: &'static str,
+    pub issue_code: Option<&'static str>,
+    pub local_only: bool,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub(crate) struct LocalReadinessModel {
+    pub diagnostics_status: &'static str,
+    pub offline_ready: bool,
+    pub offline_ready_explanation: &'static str,
+    pub issue_codes: Vec<&'static str>,
+    pub primary_action: ReadinessAction,
+    pub recovery_actions: Vec<ReadinessAction>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct LocalReadinessInput<'a> {
+    pub service_running: bool,
+    pub memory_drive_status: &'a str,
+    pub health_status: &'a str,
+    pub clients: Option<&'a Value>,
+    pub pending_crash_reports: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -261,9 +290,11 @@ impl ServiceHandle {
     }
 }
 
-fn dashboard_status_from_drive_health(status: Option<&str>) -> (&'static str, &'static str) {
+pub(crate) fn dashboard_status_from_drive_health(
+    status: Option<&str>,
+) -> (&'static str, &'static str) {
     match status.unwrap_or("unknown") {
-        "healthy" | "ready" => ("ready", "healthy"),
+        "healthy" | "ready" | "ok" => ("ready", "healthy"),
         "watch" | "degraded" | "critical" => ("ready", "fix-needed"),
         "missing" => ("missing", "needs-setup"),
         "error" => ("error", "error"),
@@ -277,6 +308,189 @@ fn dashboard_offline_ready(
     health_status: &str,
 ) -> bool {
     service.running && memory_drive_status == "ready" && health_status == "healthy"
+}
+
+fn readiness_action(
+    id: &'static str,
+    label: &'static str,
+    command: &'static str,
+    description: &'static str,
+    issue_code: Option<&'static str>,
+) -> ReadinessAction {
+    ReadinessAction {
+        id,
+        label,
+        command,
+        description,
+        issue_code,
+        local_only: true,
+    }
+}
+
+fn default_readiness_action() -> ReadinessAction {
+    readiness_action(
+        "open_memory_dashboard",
+        "Review local status",
+        "get_health",
+        "Review the local desktop health summary before taking action.",
+        None,
+    )
+}
+
+fn push_readiness_issue(
+    issue_codes: &mut Vec<&'static str>,
+    recovery_actions: &mut Vec<ReadinessAction>,
+    code: &'static str,
+) {
+    if issue_codes.iter().any(|existing| *existing == code) {
+        return;
+    }
+
+    issue_codes.push(code);
+    match code {
+        "service_stopped" => recovery_actions.push(readiness_action(
+            "start_local_service",
+            "Start local service",
+            "start_service",
+            "Start the local Enigma service on this device.",
+            Some(code),
+        )),
+        "memory_drive_missing" => recovery_actions.push(readiness_action(
+            "create_memory_drive",
+            "Create Memory Drive",
+            "create_memory_drive",
+            "Create the local Memory Drive bundle needed for offline memory.",
+            Some(code),
+        )),
+        "memory_drive_fix_needed" => recovery_actions.push(readiness_action(
+            "review_memory_drive_health",
+            "Review Memory Drive health",
+            "get_memory_drive_status",
+            "Run the local Memory Drive health check and repair the local bundle before continuing.",
+            Some(code),
+        )),
+        "connector_repair_required" => {
+            recovery_actions.push(readiness_action(
+                "repair_connector_config",
+                "Repair connector",
+                "repair_client_config",
+                "Repair the local connector configuration after user approval.",
+                Some(code),
+            ));
+            recovery_actions.push(readiness_action(
+                "rollback_connector_config",
+                "Rollback connector",
+                "rollback_client_config",
+                "Rollback the local connector configuration from its local backup if repair is not desired.",
+                Some(code),
+            ));
+        }
+        "connector_rollback_available" => recovery_actions.push(readiness_action(
+            "rollback_connector_config",
+            "Rollback connector",
+            "rollback_client_config",
+            "Rollback the local connector configuration from its local backup.",
+            Some(code),
+        )),
+        "pending_crash_reports" => recovery_actions.push(readiness_action(
+            "review_pending_crash_reports",
+            "Review pending crash reports",
+            "get_crash_reporting_status",
+            "Review locally stored crash report metadata before deciding whether to submit or discard it.",
+            Some(code),
+        )),
+        _ => recovery_actions.push(default_readiness_action()),
+    }
+}
+
+fn connector_recovery_issue(clients: Option<&Value>) -> Option<&'static str> {
+    let clients = clients.and_then(Value::as_array)?;
+    let mut needs_repair = false;
+
+    for client in clients {
+        let status = client.get("status").and_then(Value::as_str).unwrap_or("");
+        let action = client
+            .get("recommended_action")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        if status.contains("rollback") || action == "rollback" {
+            return Some("connector_rollback_available");
+        }
+        if status == "malformed" || status == "repair-required" || action == "repair" {
+            needs_repair = true;
+        }
+    }
+
+    if needs_repair {
+        Some("connector_repair_required")
+    } else {
+        None
+    }
+}
+
+pub(crate) fn local_readiness_model(input: LocalReadinessInput<'_>) -> LocalReadinessModel {
+    let mut issue_codes = Vec::new();
+    let mut recovery_actions = Vec::new();
+
+    if !input.service_running {
+        push_readiness_issue(&mut issue_codes, &mut recovery_actions, "service_stopped");
+    }
+    if input.memory_drive_status == "missing" || input.health_status == "needs-setup" {
+        push_readiness_issue(
+            &mut issue_codes,
+            &mut recovery_actions,
+            "memory_drive_missing",
+        );
+    } else if input.memory_drive_status != "ready" || input.health_status != "healthy" {
+        push_readiness_issue(
+            &mut issue_codes,
+            &mut recovery_actions,
+            "memory_drive_fix_needed",
+        );
+    }
+    if let Some(issue) = connector_recovery_issue(input.clients) {
+        push_readiness_issue(&mut issue_codes, &mut recovery_actions, issue);
+    }
+    if input.pending_crash_reports > 0 {
+        push_readiness_issue(
+            &mut issue_codes,
+            &mut recovery_actions,
+            "pending_crash_reports",
+        );
+    }
+
+    let offline_ready = input.service_running
+        && input.memory_drive_status == "ready"
+        && input.health_status == "healthy";
+    let offline_ready_explanation = if offline_ready {
+        "Local service is running and Memory Drive is healthy."
+    } else if !input.service_running {
+        "Offline memory is not ready because the local service is stopped."
+    } else if input.memory_drive_status == "missing" || input.health_status == "needs-setup" {
+        "Offline memory is not ready because Memory Drive is not set up on this device."
+    } else if input.memory_drive_status != "ready" || input.health_status != "healthy" {
+        "Offline memory is not ready because Memory Drive needs local attention."
+    } else {
+        "Offline memory is not ready because local readiness checks need attention."
+    };
+    let primary_action = recovery_actions
+        .first()
+        .cloned()
+        .unwrap_or_else(default_readiness_action);
+    let diagnostics_status = if issue_codes.is_empty() {
+        "passed"
+    } else {
+        "warning"
+    };
+
+    LocalReadinessModel {
+        diagnostics_status,
+        offline_ready,
+        offline_ready_explanation,
+        issue_codes,
+        primary_action,
+        recovery_actions,
+    }
 }
 
 async fn setup_bundle(config: &crate::DesktopConfig) -> Result<Value, String> {
@@ -430,7 +644,7 @@ fn connector_card_value(result: crate::connector::engine::DetectResult) -> Value
     value
 }
 
-async fn detect_clients_internal() -> Result<Value, String> {
+pub(crate) async fn detect_clients_internal() -> Result<Value, String> {
     use crate::connector::engine::{ConnectorEngine, EngineContext};
     let ctx = EngineContext::from_env().map_err(|e| e.to_string())?;
     let engine = ConnectorEngine::new();
@@ -638,15 +852,28 @@ pub async fn create_vault(state: tauri::State<'_, AppState>) -> Result<Value, St
     let setup_ok = drive.get("ok").and_then(|v| v.as_bool()).unwrap_or(false);
     let memory_drive_status = if setup_ok { "ready" } else { "error" };
     let health_status = if setup_ok { "healthy" } else { "error" };
+    let pending_crash_reports = pending_crash_report_count().await;
+    let clients = Value::Array(Vec::new());
+    let readiness = local_readiness_model(LocalReadinessInput {
+        service_running: service.running,
+        memory_drive_status,
+        health_status,
+        clients: Some(&clients),
+        pending_crash_reports,
+    });
     Ok(json!({
         "memory_drive_status": memory_drive_status,
         "health_status": health_status,
         "connected_app_count": 0,
         "proof_status": "idle",
         "update_status": "current",
-        "diagnostics_status": "passed",
-        "offline_ready": dashboard_offline_ready(&service, memory_drive_status, health_status),
-        "issue_codes": [],
+        "diagnostics_status": readiness.diagnostics_status,
+        "offline_ready": readiness.offline_ready,
+        "offline_ready_explanation": readiness.offline_ready_explanation,
+        "issue_codes": &readiness.issue_codes,
+        "primary_action": &readiness.primary_action,
+        "recovery_actions": &readiness.recovery_actions,
+        "pending_crash_reports": pending_crash_reports,
         "service": service,
     }))
 }
@@ -1124,6 +1351,14 @@ pub async fn export_proof_activity(
     }))
 }
 
+pub(crate) async fn pending_crash_report_count() -> usize {
+    crash::get_crash_reporting_status()
+        .await
+        .ok()
+        .and_then(|status| status.get("pending_count").and_then(Value::as_u64))
+        .unwrap_or(0) as usize
+}
+
 #[tauri::command]
 pub async fn get_health(state: tauri::State<'_, AppState>) -> Result<Value, String> {
     let service = state.service.status();
@@ -1157,6 +1392,15 @@ pub async fn get_health(state: tauri::State<'_, AppState>) -> Result<Value, Stri
         .and_then(|v| v.as_str())
         .unwrap_or("idle");
 
+    let pending_crash_reports = pending_crash_report_count().await;
+    let readiness = local_readiness_model(LocalReadinessInput {
+        service_running: service.running,
+        memory_drive_status,
+        health_status,
+        clients: Some(&clients),
+        pending_crash_reports,
+    });
+
     Ok(json!({
         "memory_drive_status": memory_drive_status,
         "health_status": health_status,
@@ -1164,9 +1408,13 @@ pub async fn get_health(state: tauri::State<'_, AppState>) -> Result<Value, Stri
         "proof_status": proof_status,
         "proof_activity": proof,
         "update_status": "current",
-        "diagnostics_status": "passed",
-        "offline_ready": dashboard_offline_ready(&service, memory_drive_status, health_status),
-        "issue_codes": [],
+        "diagnostics_status": readiness.diagnostics_status,
+        "offline_ready": readiness.offline_ready,
+        "offline_ready_explanation": readiness.offline_ready_explanation,
+        "issue_codes": &readiness.issue_codes,
+        "primary_action": &readiness.primary_action,
+        "recovery_actions": &readiness.recovery_actions,
+        "pending_crash_reports": pending_crash_reports,
         "service": service,
     }))
 }
@@ -1261,6 +1509,10 @@ mod tests {
             ("ready", "healthy")
         );
         assert_eq!(
+            dashboard_status_from_drive_health(Some("ok")),
+            ("ready", "healthy")
+        );
+        assert_eq!(
             dashboard_status_from_drive_health(Some("watch")),
             ("ready", "fix-needed")
         );
@@ -1304,6 +1556,71 @@ mod tests {
         assert!(!dashboard_offline_ready(&stopped, "ready", "healthy"));
         assert!(!dashboard_offline_ready(&running, "missing", "healthy"));
         assert!(!dashboard_offline_ready(&running, "ready", "fix-needed"));
+    }
+
+    #[test]
+    fn local_readiness_explains_stopped_service_and_primary_action() {
+        let model = local_readiness_model(LocalReadinessInput {
+            service_running: false,
+            memory_drive_status: "ready",
+            health_status: "healthy",
+            clients: None,
+            pending_crash_reports: 0,
+        });
+
+        assert!(!model.offline_ready);
+        assert!(model
+            .offline_ready_explanation
+            .contains("local service is stopped"));
+        assert!(model.issue_codes.contains(&"service_stopped"));
+        assert_eq!(model.primary_action.command, "start_service");
+        assert_eq!(model.diagnostics_status, "warning");
+    }
+
+    #[test]
+    fn local_readiness_lists_local_recovery_actions() {
+        let clients = json!([
+            {
+                "status": "repair-required",
+                "recommended_action": "repair"
+            }
+        ]);
+        let missing = local_readiness_model(LocalReadinessInput {
+            service_running: true,
+            memory_drive_status: "missing",
+            health_status: "needs-setup",
+            clients: Some(&clients),
+            pending_crash_reports: 1,
+        });
+
+        assert!(missing.issue_codes.contains(&"memory_drive_missing"));
+        assert!(missing.issue_codes.contains(&"connector_repair_required"));
+        assert!(missing.issue_codes.contains(&"pending_crash_reports"));
+        assert!(missing
+            .recovery_actions
+            .iter()
+            .any(|action| action.command == "create_memory_drive"));
+        assert!(missing
+            .recovery_actions
+            .iter()
+            .any(|action| action.command == "repair_client_config"));
+        assert!(missing
+            .recovery_actions
+            .iter()
+            .any(|action| action.command == "rollback_client_config"));
+        assert!(missing
+            .recovery_actions
+            .iter()
+            .any(|action| action.command == "get_crash_reporting_status"));
+
+        let fix_needed = local_readiness_model(LocalReadinessInput {
+            service_running: true,
+            memory_drive_status: "ready",
+            health_status: "fix-needed",
+            clients: None,
+            pending_crash_reports: 0,
+        });
+        assert!(fix_needed.issue_codes.contains(&"memory_drive_fix_needed"));
     }
 
     #[test]

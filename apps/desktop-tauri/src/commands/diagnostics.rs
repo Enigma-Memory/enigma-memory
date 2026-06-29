@@ -1,4 +1,4 @@
-use crate::commands::run_cli;
+use crate::commands::{run_cli, service};
 use crate::AppState;
 use chrono::Utc;
 use regex::Regex;
@@ -32,8 +32,14 @@ pub struct DiagnosticsBundle {
     pub service_running: bool,
     pub service_restarts: usize,
     pub memory_drive_status: String,
+    pub health_status: String,
     pub update_status: String,
     pub issue_codes: Vec<String>,
+    pub offline_ready: bool,
+    pub offline_ready_explanation: String,
+    pub primary_action: Value,
+    pub recovery_actions: Vec<Value>,
+    pub pending_crash_reports: usize,
 }
 
 /// Collect public-safe health metadata for preview.
@@ -41,17 +47,17 @@ pub struct DiagnosticsBundle {
 pub async fn get_diagnostics(state: tauri::State<'_, AppState>) -> Result<Value, String> {
     let bundle = build_bundle(&state).await?;
     Ok(json!({
-        "status": if bundle.memory_drive_status == "healthy" || bundle.memory_drive_status == "ok" {
-            "passed"
-        } else {
-            "warning"
-        },
+        "status": diagnostics_status(&bundle.issue_codes),
         "summary": format!(
             "Memory drive {}. Engine service running={}.",
             bundle.memory_drive_status, bundle.service_running
         ),
-        "issue_codes": bundle.issue_codes,
-        "metadata": bundle,
+        "issue_codes": &bundle.issue_codes,
+        "offline_ready": bundle.offline_ready,
+        "offline_ready_explanation": &bundle.offline_ready_explanation,
+        "primary_action": &bundle.primary_action,
+        "recovery_actions": &bundle.recovery_actions,
+        "metadata": &bundle,
     }))
 }
 
@@ -127,18 +133,54 @@ async fn build_bundle(state: &AppState) -> Result<DiagnosticsBundle, String> {
         .and_then(|v| v.as_str())
         .unwrap_or("unknown")
         .to_string();
-    let service = state.service.status();
+    let (memory_drive_status, health_status) =
+        service::dashboard_status_from_drive_health(Some(drive_status.as_str()));
+    let service_status = state.service.status();
+    let clients = service::detect_clients_internal().await.unwrap_or_default();
+    let pending_crash_reports = service::pending_crash_report_count().await;
+    let readiness = service::local_readiness_model(service::LocalReadinessInput {
+        service_running: service_status.running,
+        memory_drive_status,
+        health_status,
+        clients: Some(&clients),
+        pending_crash_reports,
+    });
+    let issue_codes = readiness
+        .issue_codes
+        .iter()
+        .map(|code| (*code).to_string())
+        .collect();
+    let primary_action = json!(&readiness.primary_action);
+    let recovery_actions = readiness
+        .recovery_actions
+        .iter()
+        .map(|action| json!(action))
+        .collect();
 
     Ok(DiagnosticsBundle {
         schema: "enigma.diagnostics.v1",
         generated_at: Utc::now().to_rfc3339(),
         app_version: state.config.version.clone(),
-        service_running: service.running,
-        service_restarts: service.restarts,
+        service_running: service_status.running,
+        service_restarts: service_status.restarts,
         memory_drive_status: drive_status,
+        health_status: health_status.to_string(),
         update_status: "current".to_string(),
-        issue_codes: Vec::new(),
+        issue_codes,
+        offline_ready: readiness.offline_ready,
+        offline_ready_explanation: readiness.offline_ready_explanation.to_string(),
+        primary_action,
+        recovery_actions,
+        pending_crash_reports,
     })
+}
+
+fn diagnostics_status(issue_codes: &[String]) -> &'static str {
+    if issue_codes.is_empty() {
+        "passed"
+    } else {
+        "warning"
+    }
 }
 
 pub(crate) fn find_forbidden_keys(value: &Value) -> Vec<String> {
@@ -210,6 +252,13 @@ mod tests {
         let found = find_forbidden_keys(&value);
         assert!(found.iter().any(|key| key == "secret"));
         assert!(found.iter().any(|key| key == "api_key"));
+    }
+
+    #[test]
+    fn service_stopped_diagnostics_status_is_not_passed() {
+        let issue_codes = vec!["service_stopped".to_string()];
+        assert_ne!(diagnostics_status(&issue_codes), "passed");
+        assert_eq!(diagnostics_status(&issue_codes), "warning");
     }
 
     #[test]

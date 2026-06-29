@@ -25,29 +25,29 @@
     <section class="hero">
       <span class="eyebrow">Troubleshooting</span>
       <h1>Vault not ready.</h1>
-      <p>Enigma cannot find or read your local vault. Use the in-app repair first; CLI repair is available only in the advanced panel.</p>
+      <p>Enigma cannot find or open your local Memory Drive. Start with the repair buttons inside the desktop app; command-line repair is an advanced fallback at the bottom of this page.</p>
     </section>
 
     <section class="content-section" aria-labelledby="symptom-heading">
       <h2 id="symptom-heading">Symptom</h2>
-      <p>The health dashboard shows a warning for the Memory Drive, or the setup wizard cannot create the vault.</p>
+      <p>The health dashboard shows a Memory Drive warning, or the setup wizard cannot finish creating your local drive.</p>
     </section>
 
     <section class="content-section" aria-labelledby="cause-heading">
       <h2 id="cause-heading">Likely causes</h2>
       <ul>
-        <li>First run was interrupted before the vault was created.</li>
-        <li>The vault location is not readable or writable.</li>
-        <li>An app or system setting is blocking Enigma from accessing its app data folder.</li>
+        <li>Setup closed before the Memory Drive was created.</li>
+        <li>The drive or folder that holds Enigma’s data is not available right now.</li>
+        <li>A system permission is stopping Enigma from opening its own folder.</li>
       </ul>
     </section>
 
     <section class="content-section" aria-labelledby="fix-heading">
       <h2 id="fix-heading">Try this first</h2>
       <ol>
-        <li>Open Enigma Memory and click <strong>Create local vault</strong> in the setup wizard.</li>
-        <li>If the vault already exists, click <strong>Repair vault</strong> on the health dashboard.</li>
-        <li>If you changed the vault location, make sure the new location is available and writable.</li>
+        <li>Open Enigma Memory and choose <strong>Create local vault</strong> in the setup wizard.</li>
+        <li>If you already created one, choose <strong>Repair vault</strong> on the health dashboard.</li>
+        <li>If you moved the vault folder, make sure that drive or folder is connected and available.</li>
       </ol>
     </section>
 
@@ -56,7 +56,7 @@
       <ol>
         <li>Restart Enigma Memory and check the health dashboard again.</li>
         <li>If a backup exists, choose <strong>Restore from backup</strong> in the recovery prompt.</li>
-        <li>If no backup exists and the vault is corrupted, choose <strong>Safe reset</strong>. This removes only Enigma app config and recreates the vault; it does not touch connected app settings.</li>
+        <li>If no backup exists and Enigma still cannot open the vault, choose <strong>Safe reset</strong>. This starts a fresh Enigma vault and does not change Claude, Cursor, or other connected app settings.</li>
       </ol>
     </section>
 
@@ -67,7 +67,7 @@
 
     <section class="content-section">
       <details>
-        <summary>CLI repair commands</summary>
+        <summary>Advanced command-line repair</summary>
         <p>If the desktop app repair options do not resolve the issue, see the <a href="../../developers/cli.html">CLI appendix</a> for terminal-based repair commands. Run these only if you are comfortable with the command line.</p>
       </details>
     </section>

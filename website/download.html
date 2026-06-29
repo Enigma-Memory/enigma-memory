@@ -25,17 +25,17 @@
   <main>
     <section class="hero">
       <span class="eyebrow">Download</span>
-      <h1>Download status for the desktop app.</h1>
-      <p>The default consumer path is a signed desktop app with a guided first-run wizard. Signing is still in progress, so current builds are labeled before you install.</p>
+      <h1>Installer status for the desktop app.</h1>
+      <p>Signed installers are not ready yet. The consumer path is still the desktop app with a guided first-run wizard, but today’s shared builds are testing-only until this page marks them signed and ready.</p>
       <div class="cta-row">
-        <a class="btn btn-primary" href="#platforms">See platform status</a>
-        <a class="btn btn-secondary" href="./launch-status.html">Code-signing status</a>
+        <a class="btn btn-primary" href="#platforms">See installer status</a>
+        <a class="btn btn-secondary" href="./launch-status.html">Launch status</a>
       </div>
-      <p class="trust-note">Do not treat unsigned development builds as the general consumer install. The desktop app bundles its runtime; Node, npm, and manual MCP JSON belong to advanced developer setup only.</p>
+      <p class="trust-note">Unsigned builds are for testing and development only. Developer command-line setup belongs in the advanced appendix.</p>
     </section>
 
     <section class="content-section" id="platforms" aria-labelledby="platforms-heading">
-      <h2 id="platforms-heading">Choose your platform</h2>
+      <h2 id="platforms-heading">Current platform status</h2>
       <div class="platform-grid">
         <article class="platform-card">
           <h3>macOS — signing in progress</h3>
@@ -46,8 +46,8 @@
         <article class="platform-card">
           <h3>Windows — signing in progress</h3>
           <span class="status-label status-label--pending">Unsigned/testing today</span>
-          <p>Windows signing depends on Azure Artifact Signing/Public Trust. Azure Portal rejected the current subscription for Artifact Signing as free/trial/sponsored, so an eligible paid subscription is required before the signing account can be created.</p>
-          <a class="btn btn-secondary" href="#signing">Windows signing notes</a>
+          <p>Windows signed installer is not ready yet. If a Windows build is shared before signing, treat it as testing-only and expect a Windows security warning. Wait until this page says signed and ready before recommending it to a general user.</p>
+          <a class="btn btn-secondary" href="./launch-status.html">Check launch status</a>
         </article>
         <article class="platform-card">
           <h3>Linux — verify package</h3>
@@ -58,17 +58,17 @@
       </div>
 
       <details>
-        <summary>Advanced: Developer CLI</summary>
-        <p>If you prefer the command line, see the <a href="./developers/cli.html">CLI appendix</a> for npm, Node, and manual MCP setup. This is advanced developer and troubleshooting material, not the default consumer path.</p>
+        <summary>Advanced: command line</summary>
+        <p>If you prefer terminal setup, see the <a href="./developers/cli.html">CLI appendix</a>. This is advanced developer and troubleshooting material, not the default consumer path.</p>
       </details>
     </section>
 
     <section class="content-section" aria-labelledby="next-heading">
-      <h2 id="next-heading">After the download</h2>
+      <h2 id="next-heading">When you have an installer</h2>
       <div class="card-grid">
         <article class="card">
           <h3>1. Open Enigma Memory</h3>
-          <p>Use the signed desktop app when available. If you test an unsigned build, the page labels that state before install.</p>
+          <p>Use a signed desktop app when available. If you intentionally test an unsigned build, confirm this page labeled it testing-only before install.</p>
         </article>
         <article class="card">
           <h3>2. Create your Memory Drive</h3>
@@ -76,18 +76,18 @@
         </article>
         <article class="card">
           <h3>3. Connect and test an app</h3>
-          <p>Pick an AI app, preview the setting Enigma will change, test the local connector, and restart the app only when Enigma asks.</p>
+          <p>Pick an AI app, preview what Enigma will change, test the local connection, and restart the app only when Enigma asks.</p>
         </article>
         <article class="card">
-          <h3>4. Import and prove</h3>
-          <p>Paste starter memories into the Import Sandbox, approve a local write, then check Proof Activity without exposing raw text.</p>
+          <h3>4. Import and review proof</h3>
+          <p>Paste starter memories, approve a local write, then check proof counts without exposing raw text.</p>
         </article>
       </div>
     </section>
 
     <section class="content-section" id="signing" aria-labelledby="signing-heading">
       <h2 id="signing-heading">About signing and security warnings</h2>
-      <p>Current status: Azure Artifact Signing/Public Trust is blocked until an eligible paid Azure subscription is available. macOS Developer ID signing, notarization, and stapling are also not complete. Until those steps are finished, current desktop builds must be treated as unsigned development builds.</p>
+      <p>Signed Windows and macOS installers are not ready yet. Until launch status shows signed installers, current desktop builds must be treated as unsigned testing and development builds.</p>
       <p>If you intentionally test an unsigned build and your operating system warns before launch:</p>
       <ul>
         <li><strong>macOS:</strong> Only continue if you meant to test an Enigma development build from an official Enigma distribution channel.</li>

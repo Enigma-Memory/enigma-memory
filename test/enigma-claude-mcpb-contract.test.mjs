@@ -10,7 +10,7 @@ import {
   createClaudeDesktopMcpbManifest,
   planConnectWizard,
 } from '../packages/connectors/src/index.js';
-import { buildClaudeMcpbPackage, createClaudeMcpbRuntimePackageJson } from '../scripts/build-claude-mcpb-package.mjs';
+import { buildClaudeMcpbPackage, createClaudeMcpbInstallHandoff, createClaudeMcpbRuntimePackageJson, parseClaudeMcpbPackageArgs, renderClaudeMcpbPackagePlain } from '../scripts/build-claude-mcpb-package.mjs';
 import { main } from '../apps/cli/bin/enigma.mjs';
 
 const PRIVATE_STRINGS = [
@@ -200,6 +200,33 @@ test('Claude Desktop mcpb package builder writes deterministic public-safe artif
   assert.equal(report.package.install_performed, false);
   assert.equal(report.package.provider_launched, false);
   assert.equal(report.package.network_performed, false);
+  assert.equal(report.package.automatic_config_write, false);
+  assert.deepEqual(report.install_handoff.steps.map((step) => step.id), [
+    'open_mcpb',
+    'select_bundle',
+    'restart_claude',
+    'test_connection',
+  ]);
+  assert.deepEqual(report.install_handoff.boundaries, {
+    install_performed: false,
+    automatic_config_write: false,
+    provider_launched: false,
+    network_performed: false,
+  });
+  assert.deepEqual(createClaudeMcpbInstallHandoff().boundaries, report.install_handoff.boundaries);
+  assert.match(report.install_handoff.copyable_text, /1\. \[open_mcpb\]/);
+  assert.ok(report.install_handoff.copyable_text.indexOf('[open_mcpb]') < report.install_handoff.copyable_text.indexOf('[select_bundle]'));
+  assert.ok(report.install_handoff.copyable_text.indexOf('[select_bundle]') < report.install_handoff.copyable_text.indexOf('[restart_claude]'));
+  assert.ok(report.install_handoff.copyable_text.indexOf('[restart_claude]') < report.install_handoff.copyable_text.indexOf('[test_connection]'));
+  assert.match(report.install_handoff.copyable_text, /automatic_config_write=false/);
+  assert.deepEqual(written.install_handoff, report.install_handoff);
+  const directPlain = renderClaudeMcpbPackagePlain(report, true);
+  assert.match(directPlain, /How to install in Claude Desktop:/);
+  assert.ok(directPlain.indexOf('[open_mcpb]') < directPlain.indexOf('[select_bundle]'));
+  assert.ok(directPlain.indexOf('[select_bundle]') < directPlain.indexOf('[restart_claude]'));
+  assert.ok(directPlain.indexOf('[restart_claude]') < directPlain.indexOf('[test_connection]'));
+  assert.match(directPlain, /Automatic config write: no/);
+  assert.equal(parseClaudeMcpbPackageArgs(['--plain']).plain, true);
   assert.equal(report.runtime_package.path, 'package.json');
   assert.equal(report.runtime_package.type, 'module');
   assert.equal(report.runtime_package.scripts_included, false);
@@ -230,6 +257,19 @@ test('Claude MCPB package is available through the Enigma CLI', async () => {
   assert.ok(mcpbStat.size > 0);
   assert.equal(report.package.provider_launched, false);
   assert.equal(report.package.network_performed, false);
+  assert.equal(report.package.automatic_config_write, false);
+  assert.deepEqual(report.install_handoff.steps.map((step) => step.id), [
+    'open_mcpb',
+    'select_bundle',
+    'restart_claude',
+    'test_connection',
+  ]);
+  assert.deepEqual(report.install_handoff.boundaries, {
+    install_performed: false,
+    automatic_config_write: false,
+    provider_launched: false,
+    network_performed: false,
+  });
   assert.doesNotMatch(io.stdout(), new RegExp(dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assertPublicSafe(report);
 
@@ -244,6 +284,18 @@ test('Claude MCPB package is available through the Enigma CLI', async () => {
   assert.match(plain, /Package: written to <mcpb-output>/);
   assert.match(plain, /Report: written to <out>/);
   assert.match(plain, /Boundary: local Claude MCPB package artifact only/);
+  assert.match(plain, /How to install in Claude Desktop:/);
+  assert.match(plain, /\[open_mcpb\]/);
+  assert.match(plain, /\[select_bundle\]/);
+  assert.match(plain, /\[restart_claude\]/);
+  assert.match(plain, /\[test_connection\]/);
+  assert.ok(plain.indexOf('Open Claude Desktop') < plain.indexOf('Select the Enigma .mcpb bundle'));
+  assert.ok(plain.indexOf('Select the Enigma .mcpb bundle') < plain.indexOf('Restart Claude Desktop'));
+  assert.ok(plain.indexOf('Restart Claude Desktop') < plain.indexOf('test the Enigma MCP connection'));
+  assert.match(plain, /Install performed: no/);
+  assert.match(plain, /Automatic config write: no/);
+  assert.match(plain, /Provider launched: no/);
+  assert.match(plain, /Network performed: no/);
   assert.doesNotMatch(plain, /^\s*\{/);
   assert.doesNotMatch(plain, new RegExp(dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assertPublicSafe(plain);

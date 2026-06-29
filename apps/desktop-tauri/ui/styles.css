@@ -631,16 +631,3 @@ p {
   font-size: 1rem;
 }
 
-.log-view {
-  margin-top: 0.75rem;
-  padding: 0.75rem;
-  max-height: 8rem;
-  overflow: auto;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-  font-size: 0.8rem;
-  line-height: 1.4;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
