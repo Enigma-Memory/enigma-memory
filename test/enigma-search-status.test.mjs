@@ -306,6 +306,25 @@ test('next gives setup action without requiring an existing bundle', async () =>
   }
 });
 
+test('next gives non-destructive writable bundle action when path is invalid', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-next-invalid-path-'));
+  try {
+    const fileParent = join(dir, 'not-a-directory');
+    await writeFile(fileParent, 'not a directory\n', 'utf8');
+    const bundlePath = join(fileParent, 'bundle.json');
+    const { code, json, stdout } = await runCli(['next', '--bundle', bundlePath]);
+    assert.equal(code, 0);
+    assert.equal(json.schema, 'enigma.next_action.v1');
+    assert.equal(json.state, 'attention_needed');
+    assert.equal(json.primary_action.id, 'choose_writable_bundle');
+    assert.equal(json.primary_action.command, 'enigma quickstart --bundle <writable-bundle-path>');
+    assert.doesNotMatch(json.primary_action.command, /--overwrite/);
+    assert.equal(stdout.includes(dir), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('next plain output is readable and path-redacted before setup', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'enigma-next-plain-missing-'));
   try {

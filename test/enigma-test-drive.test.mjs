@@ -42,7 +42,7 @@ function expectedNextCommands(bundle, crossModelReport) {
     `enigma drive health --bundle ${quoted(bundle)}`,
     `enigma search --bundle ${quoted(bundle)} --query "local proof bundle"`,
     `enigma demo cross-model --bundle ${quoted(bundle)} --out ${quoted(crossModelReport)}`,
-    'enigma setup --overwrite',
+    `enigma connect claude-desktop --bundle ${quoted(bundle)} --dry-run`,
   ];
 }
 
@@ -83,6 +83,8 @@ test('test-drive dry-run writes nothing and reports public tester commands', asy
   assert.equal(json.install_command, 'npm install -g enigma-memory');
   assert.deepEqual(json.next_commands, expectedNextCommands(json.bundle, json.files.find((file) => file.role === 'cross_model_report').path));
   assert.equal(json.next_commands.every((command) => command.startsWith('enigma ')), true);
+  assert.equal(json.next_commands.some((command) => /setup --overwrite/.test(command)), false);
+  assert.equal(json.next_commands.some((command) => /connect claude-desktop .* --dry-run/.test(command)), true);
   assert.equal(await pathExists(outDir), false);
   assertPublicSafe(stdout, ['private test-drive canary']);
 });
@@ -99,6 +101,8 @@ test('test-drive plain dry-run gives path-redacted consumer summary', async () =
   assert.match(stdout, /Mode: dry run; no files written/);
   assert.match(stdout, /Artifacts: planned only/);
   assert.match(stdout, /Next: enigma status --bundle <bundle-path>/);
+  assert.match(stdout, /Next: enigma connect <client> --bundle <bundle-path> --dry-run/);
+  assert.doesNotMatch(stdout, /setup --overwrite|Next: enigma connect <client> --bundle <bundle-path>\n/);
   assert.match(stdout, /Boundary: local demo artifacts only/);
   assert.doesNotMatch(stdout, /^\s*\{/);
   assert.equal(stdout.includes(root), false);

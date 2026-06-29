@@ -443,6 +443,8 @@ test('doctor reports first-run diagnostics without echoing local paths', async (
     assert.equal(summary.setup_status.state, 'setup_needed');
     assert.equal(summary.setup_status.setup_needed, true);
     assert.equal(summary.setup_status.next_command, 'enigma quickstart --bundle "<bundle-path>"');
+    assert.match(summary.setup_status.message, /Run quickstart/);
+    assert.doesNotMatch(summary.setup_status.message, /writing config/);
     assert.deepEqual(summary.setup_status.reasons, ['bundle_missing']);
     assert.deepEqual(summary.bundle_initialized, {
       ok: false,
@@ -450,7 +452,7 @@ test('doctor reports first-run diagnostics without echoing local paths', async (
       target_exists: false,
       schema: null,
       reason: 'bundle_missing',
-      hint: 'Run setup before using doctor as the final green check.',
+      hint: 'Run enigma quickstart --bundle <bundle-path> before using doctor as the final green check.',
     });
     assert.equal(summary.bundle_default_path.resolved, '<bundle-path>');
     assert.deepEqual(summary.connectors.clients.map((client) => client.config_path), ['[redacted:config_path]']);
@@ -474,6 +476,30 @@ test('doctor reports first-run diagnostics without echoing local paths', async (
   }
 });
 
+test('doctor explains invalid bundle recovery without destructive default', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-doctor-invalid-bundle-'));
+  const bundlePath = join(dir, 'bundle.json');
+  try {
+    await writeFile(bundlePath, '{invalid json\n', 'utf8');
+    const io = makeIo();
+    assert.equal(await main(['doctor', '--bundle', bundlePath], io.io), 1);
+    const stdout = io.stdout();
+    const summary = io.json();
+
+    assert.equal(stdout.includes(dir), false);
+    assert.equal(summary.ok, false);
+    assert.equal(summary.setup_status.state, 'setup_needed');
+    assert.ok(summary.setup_status.reasons.includes('bundle_json_invalid'));
+    assert.equal(summary.bundle_initialized.reason, 'bundle_json_invalid');
+    assert.match(summary.bundle_initialized.hint, /enigma quickstart --bundle <new-bundle-path>/);
+    assert.match(summary.bundle_initialized.hint, /--overwrite only if you intentionally replace/);
+    assert.doesNotMatch(summary.bundle_initialized.hint, /setup with --overwrite|quickstart or setup with --overwrite/);
+    assert.equal(summary.next_commands[0], 'enigma quickstart --bundle "<bundle-path>"');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('support summary is public-safe on fresh install and initialized bundles', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'enigma-support-summary-'));
   const bundlePath = join(dir, 'bundle.json');
@@ -487,7 +513,8 @@ test('support summary is public-safe on fresh install and initialized bundles', 
 
     assert.equal(fresh.schema, 'enigma.support_summary.v1');
     assert.equal(fresh.setup_status.state, 'setup_needed');
-    assert.equal(fresh.next_action.id, 'run_setup');
+    assert.equal(fresh.next_action.id, 'run_quickstart');
+    assert.equal(fresh.next_action.label, 'Create Memory Drive');
     assert.equal(fresh.bundle, '<bundle-path>');
     assert.equal(fresh.redaction.raw_memory_included, false);
     assert.equal(fresh.redaction.local_paths_redacted, true);

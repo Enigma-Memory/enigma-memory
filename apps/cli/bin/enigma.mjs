@@ -711,7 +711,7 @@ async function bundleInitializedCheck(bundlePath, vaultPath) {
       target_exists: false,
       schema: null,
       reason: 'bundle_missing',
-      hint: 'Run setup before using doctor as the final green check.',
+      hint: 'Run enigma quickstart --bundle <bundle-path> before using doctor as the final green check.',
     };
   }
   try {
@@ -724,7 +724,7 @@ async function bundleInitializedCheck(bundlePath, vaultPath) {
       target_exists: true,
       schema: schemaOk ? schema : null,
       reason: schemaOk ? null : 'bundle_schema_mismatch',
-      hint: schemaOk ? null : 'Run quickstart or setup with --overwrite to recreate the local Enigma bundle.',
+      hint: schemaOk ? null : 'Create a fresh bundle with enigma quickstart --bundle <new-bundle-path>, or use --overwrite only if you intentionally replace this local bundle.',
     };
   } catch {
     return {
@@ -733,7 +733,7 @@ async function bundleInitializedCheck(bundlePath, vaultPath) {
       target_exists: true,
       schema: null,
       reason: 'bundle_json_invalid',
-      hint: 'Run quickstart or setup with --overwrite to recreate the local Enigma bundle.',
+      hint: 'Create a fresh bundle with enigma quickstart --bundle <new-bundle-path>, or use --overwrite only if you intentionally replace this local bundle.',
     };
   }
 }
@@ -1256,7 +1256,7 @@ function doctorSetupStatus(checks, firstRunHint) {
     message: state === 'ready'
       ? 'Enigma local setup checks are green.'
       : state === 'setup_needed'
-        ? 'Run setup to create the local Memory Drive bundle and align connector bundle paths.'
+        ? 'Run quickstart to create the local Memory Drive bundle, then preview any app connection before approving changes.'
         : 'Fix the reported local install or connector issue before treating doctor as green.',
     reasons: state === 'attention_needed' ? uniqueAttentionReasons : uniqueSetupReasons,
     next_command: state === 'ready' ? null : firstRunHint.command,
@@ -2744,9 +2744,9 @@ function redactCliErrorMessage(error) {
 
 function recoveryCommandFor(command, error) {
   const existingArtifact = /already exists/i.test(String(error?.message ?? error ?? ''));
-  if (command === 'init' || command === 'setup') return existingArtifact ? 'enigma setup --bundle <new-bundle-path> --out-dir <new-empty-out-dir>' : 'enigma setup --bundle <bundle-path> --out-dir <out-dir> --overwrite';
-  if (command === 'start' || command === 'quickstart') return existingArtifact ? 'enigma quickstart --bundle <new-bundle-path> --out-dir <new-empty-out-dir>' : 'enigma quickstart --bundle <bundle-path> --out-dir <out-dir> --overwrite';
-  if (command === 'test-drive') return existingArtifact ? 'enigma test-drive --out-dir <new-empty-out-dir>' : 'enigma test-drive --out-dir <out-dir> --overwrite';
+  if (command === 'init' || command === 'setup') return existingArtifact ? 'enigma setup --bundle <new-bundle-path> --out-dir <new-empty-out-dir>' : 'enigma setup --bundle <bundle-path> --out-dir <out-dir>';
+  if (command === 'start' || command === 'quickstart') return existingArtifact ? 'enigma quickstart --bundle <new-bundle-path> --out-dir <new-empty-out-dir>' : 'enigma quickstart --bundle <bundle-path> --out-dir <out-dir>';
+  if (command === 'test-drive') return existingArtifact ? 'enigma test-drive --out-dir <new-empty-out-dir>' : 'enigma test-drive --out-dir <out-dir>';
   return 'enigma next --bundle <bundle-path>';
 }
 
@@ -2785,7 +2785,7 @@ async function nextCommand(flags, io) {
       primary_action: {
         id: 'choose_writable_bundle',
         label: 'Choose writable Memory Drive path',
-        command: 'enigma quickstart --bundle <writable-bundle-path> --overwrite',
+        command: 'enigma quickstart --bundle <writable-bundle-path>',
       },
       issue_codes: [vaultPath.reason || 'bundle_path_not_writable'],
       vault_path: vaultPath,
@@ -2914,7 +2914,7 @@ function testDriveNextCommands(bundleDisplay, crossModelReportDisplay) {
     `enigma drive health --bundle ${quotedBundle}`,
     `enigma search --bundle ${quotedBundle} --query "local proof bundle"`,
     `enigma demo cross-model --bundle ${quotedBundle} --out ${quotedReport}`,
-    'enigma setup --overwrite',
+    `enigma connect claude-desktop --bundle ${quotedBundle} --dry-run`,
   ];
 }
 
@@ -3021,7 +3021,7 @@ function renderTestDrivePlain(report) {
   lines.push(`Install: ${report.install_command ?? 'npm install -g enigma-memory'}`);
   lines.push('Next: enigma status --bundle <bundle-path>');
   lines.push('Next: enigma search --bundle <bundle-path> --query "local proof bundle"');
-  lines.push('Next: enigma connect <client> --bundle <bundle-path>');
+  lines.push('Next: enigma connect <client> --bundle <bundle-path> --dry-run');
   lines.push('Boundary: local demo artifacts only; no raw memory, local paths, client config writes, provider calls, provider deletion, model behavior, hosted service, benchmark, or compliance claims.');
   return `${lines.join('\n')}\n`;
 }
@@ -3408,7 +3408,7 @@ export async function supportSummaryCommand(flags, io) {
     },
     issue_codes: [...new Set(issueCodes.filter(Boolean))],
     next_action: setupStatus.next_command
-      ? { id: 'run_setup', label: 'Run setup', command: setupStatus.next_command }
+      ? { id: 'run_quickstart', label: 'Create Memory Drive', command: setupStatus.next_command }
       : firstRunStatus?.primary_action ?? { id: 'open_status', label: 'Open status', command: `enigma status --bundle ${commandPath('<bundle-path>')}` },
     redaction: {
       raw_memory_included: false,
