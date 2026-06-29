@@ -160,7 +160,10 @@ async function nodeTestInvocation() {
     .map((entry) => `test/${entry.name}`)
     .sort();
   if (testFiles.length === 0) throw new Error('No test/*.test.mjs files found.');
-  return { command: process.execPath, args: ['--test', ...testFiles], label: 'npm test' };
+  const args = ['--test'];
+  if (process.platform === 'win32') args.push('--test-concurrency=1');
+  args.push(...testFiles);
+  return { command: process.execPath, args, label: 'npm test' };
 }
 
 function localOnlyEnv(extra = {}) {
