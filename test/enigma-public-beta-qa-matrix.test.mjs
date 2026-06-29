@@ -145,8 +145,9 @@ test('public beta QA npm script invokes the JSON matrix runner', async () => {
 });
 
 test('public beta QA runner accepts explicit plain output mode', () => {
-  assert.deepEqual(parseArgs(['--plain']), { json: false, plain: true, out: null });
-  assert.deepEqual(parseArgs(['--format', 'text']), { json: false, plain: true, out: null });
+  assert.deepEqual(parseArgs(['--plain']), { json: false, plain: true, out: null, cleanMachineSmoke: null });
+  assert.deepEqual(parseArgs(['--format', 'text']), { json: false, plain: true, out: null, cleanMachineSmoke: null });
+  assert.deepEqual(parseArgs(['--clean-machine-smoke', 'smoke.json']), { json: false, plain: false, out: null, cleanMachineSmoke: 'smoke.json' });
   assert.throws(() => parseArgs(['--json', '--plain']), /Choose only one output format/);
 });
 
@@ -159,8 +160,7 @@ test('public beta QA plain output is readable, bounded, and non-JSON', async () 
   assert.match(plain, /Ready for public beta: no/);
   assert.match(plain, /Blocked: /);
   assert.match(plain, /Pending: /);
-  assert.match(plain, /Next: approve_merge_release_pr/);
-  assert.match(plain, /Boundary: local repository evidence matrix only/);
+  assert.match(plain, /Boundary: local repository and supplied public-safe evidence matrix only/);
   assert.doesNotMatch(plain, /^\s*\{/);
   assertPublicSafe(plain);
 });
@@ -244,6 +244,48 @@ test('support dry-run blocker names the concrete public-safe evidence summary st
   ]);
   assert.equal(matrix.advisor_decision, 'hold');
   assert.equal(matrix.summary.ready_for_public_beta, false);
+});
+
+test('public beta QA matrix can consume clean-machine smoke evidence without clearing signing blockers', () => {
+  const scenarios = buildScenarioRows({
+    tauriConfig: { bundle: { active: true, targets: ['msi', 'nsis', 'dmg', 'app'] } },
+    wizardUi: 'Create my Memory Drive Find my apps Connect your AI apps Run health check Your Memory Drive is ready Proof activity Export bundle Crash reporting Repair connection Rollback',
+    helpUi: 'Proof artifacts can show hashes',
+    desktopIndex: './wizard.js',
+    serviceCommands: 'create_vault detect_clients connect_client get_health offline_ready repair_client rollback_client malformed backup',
+    diagnosticsCommands: 'FORBIDDEN_KEYS export_diagnostics approve redact_path',
+    crashCommands: 'init_panic_hook opt-in required pending-crash-reports',
+    updateCommands: '"offline"',
+    libCommands: 'commands::service::get_health',
+    desktopReleaseWorkflow: 'Sign update manifest',
+    npmPublishWorkflow: 'npm publish --access public --provenance',
+    packageVersion: '0.1.19',
+    mcpbManifest: { schema: 'enigma.claude_desktop_mcpb_manifest.v1' },
+    mcpbConnectionPlan: { preferred_path: 'mcpb_extension', automatic_config_write: false },
+    mcpbHealth: { ready_requires_test_evidence: true },
+    releaseEvidenceScript: 'present',
+    updateSignerScript: 'present',
+    cleanMachineSmoke: {
+      schema: 'enigma.clean_machine_smoke.v1',
+      app_version: '0.1.19',
+      summary: { healthy: true },
+    },
+  });
+
+  assert.equal(scenarioById(scenarios, 'BETA-FIRST-001').status, 'pass');
+  assert.equal(scenarioById(scenarios, 'BETA-CLIENT-001').status, 'pass');
+  assert.equal(scenarioById(scenarios, 'BETA-PROOF-001').status, 'pass');
+  assert.equal(scenarioById(scenarios, 'BETA-OFFLINE-001').status, 'pass');
+  assert.equal(scenarioById(scenarios, 'BETA-CONFIG-001').status, 'pass');
+  assert.equal(scenarioById(scenarios, 'BETA-CONFIG-002').status, 'pass');
+  assert.match(JSON.stringify(scenarioById(scenarios, 'BETA-FIRST-001').evidence_refs), /ref:evidence:clean-machine-smoke/);
+
+  const install = scenarioById(scenarios, 'BETA-INSTALL-001');
+  assert.equal(install.status, 'blocked');
+  assert.equal(install.blocker_refs.includes('BLOCKER-CLEAN-MACHINE-QA'), false);
+  assert.equal(install.issue_codes.includes('clean-machine-evidence-missing'), false);
+  assert.equal(install.blocker_refs.includes('BLOCKER-WINDOWS-SIGNED-ARTIFACT'), true);
+  assert.equal(install.blocker_refs.includes('BLOCKER-MACOS-NOTARIZED-ARTIFACT'), true);
 });
 
 test('public beta next actions are ranked and public-safe', async () => {

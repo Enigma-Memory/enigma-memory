@@ -196,7 +196,7 @@ export function buildRankedNextActions(blockers) {
 }
 
 function usage() {
-  return `Usage: node scripts/run-public-beta-qa-matrix.mjs [--json|--plain] [--out <path>]\n\nGenerates a public-safe ${PUBLIC_BETA_QA_MATRIX_SCHEMA} report from repository files only, including ranked next_actions for release owners.\n`;
+  return `Usage: node scripts/run-public-beta-qa-matrix.mjs [--json|--plain] [--out <path>] [--clean-machine-smoke <path>]\n\nGenerates a public-safe ${PUBLIC_BETA_QA_MATRIX_SCHEMA} report from repository files plus optional public-safe QA evidence artifacts, including ranked next_actions for release owners.\n`;
 }
 
 function readArg(argv, index, flag) {
@@ -205,7 +205,7 @@ function readArg(argv, index, flag) {
 }
 
 export function parseArgs(argv = process.argv.slice(2)) {
-  const options = { json: false, plain: false, out: null };
+  const options = { json: false, plain: false, out: null, cleanMachineSmoke: null };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--json') {
@@ -215,6 +215,9 @@ export function parseArgs(argv = process.argv.slice(2)) {
       if (arg === '--format') i += 1;
     } else if (arg === '--out') {
       options.out = readArg(argv, i + 1, '--out');
+      i += 1;
+    } else if (arg === '--clean-machine-smoke') {
+      options.cleanMachineSmoke = readArg(argv, i + 1, '--clean-machine-smoke');
       i += 1;
     } else if (arg === '--help' || arg === '-h') {
       options.help = true;
@@ -239,6 +242,19 @@ async function readRepoJson(rel) {
   const text = await readRepoText(rel);
   if (text === null) return null;
   return JSON.parse(text);
+}
+
+async function readPublicEvidenceJson(path, expectedSchema) {
+  if (!path) return null;
+  const artifact = JSON.parse(await readFile(resolve(String(path)), 'utf8'));
+  if (artifact?.schema !== expectedSchema) {
+    throw new Error(`Evidence artifact schema mismatch: expected ${expectedSchema}.`);
+  }
+  const safety = verifyPublicSafeArtifact(artifact);
+  if (!safety.ok) {
+    throw new Error(`Evidence artifact is not public-safe: ${safety.errors.join('; ')}`);
+  }
+  return artifact;
 }
 
 function hasText(text, needle) {
@@ -334,10 +350,11 @@ function collectBlockers(rows) {
 
 function publicSafeAssert(report) {
   const result = verifyPublicSafeArtifact(report);
-  if (!result.ok) throw new Error(`public beta QA matrix is not public-safe: ${result.errors.join('; ')}`);
+  if (!result.ok) throw new Error(`Public beta QA matrix is not public-safe: ${result.errors.join('; ')}`);
 }
 
-export async function inspectPublicBetaQaInputs() {
+export async function inspectPublicBetaQaInputs(options = {}) {
+  const cleanMachineSmoke = await readPublicEvidenceJson(options.cleanMachineSmoke, 'enigma.clean_machine_smoke.v1');
   const [
     packageJson,
     tauriConfig,
@@ -416,6 +433,7 @@ export async function inspectPublicBetaQaInputs() {
     releaseEvidenceScript,
     updateSignerScript,
     mcpbManifest,
+    cleanMachineSmoke,
     mcpbConnectionPlan,
     mcpbHealth,
   };
@@ -484,102 +502,110 @@ export function buildScenarioRows(inputs) {
   const releaseApproval = BLOCKERS.releaseApproval.blocker_id;
   const publicSafePacket = BLOCKERS.publicSafePacket.blocker_id;
   const configRecovery = BLOCKERS.configRecovery.blocker_id;
+  const cleanMachineEvidenceReady = inputs.cleanMachineSmoke?.schema === 'enigma.clean_machine_smoke.v1'
+    && inputs.cleanMachineSmoke?.summary?.healthy === true
+    && inputs.cleanMachineSmoke?.app_version === REQUIRED_PUBLIC_BETA_VERSION;
+  const cleanMachineEvidenceRefs = cleanMachineEvidenceReady ? ['ref:evidence:clean-machine-smoke'] : [];
+  const withCleanMachineEvidence = (refs) => [...refs, ...cleanMachineEvidenceRefs];
+  const cleanMachineBlockers = (...rest) => (cleanMachineEvidenceReady ? rest : [cleanMachine, ...rest]);
+  const cleanMachineIssues = (missingCode, ...rest) => (cleanMachineEvidenceReady ? rest : [missingCode, ...rest]);
+  const cleanMachineStatus = (staticReady) => (staticReady ? (cleanMachineEvidenceReady ? 'pass' : 'blocked') : 'missing');
 
   return [
     scenario({
       scenario_id: 'BETA-INSTALL-001',
       title: 'Fresh desktop install',
       status: hasDesktopBundle ? 'blocked' : 'missing',
-      evidence_refs: [REFS.tauriBundle, REFS.desktopReleaseWorkflow, REFS.qaScenarios, REFS.signingPlan],
-      blocker_refs: [cleanMachine, windowsSignedArtifact, macosNotarizedArtifact],
-      issue_codes: ['clean-machine-evidence-missing', 'signed-artifact-evidence-missing'],
+      evidence_refs: withCleanMachineEvidence([REFS.tauriBundle, REFS.desktopReleaseWorkflow, REFS.qaScenarios, REFS.signingPlan]),
+      blocker_refs: cleanMachineBlockers(windowsSignedArtifact, macosNotarizedArtifact),
+      issue_codes: cleanMachineIssues('clean-machine-evidence-missing', 'signed-artifact-evidence-missing'),
     }),
     scenario({
       scenario_id: 'BETA-FIRST-001',
       title: 'Fresh first run',
-      status: firstRunUiPresent && serviceContractPresent ? 'blocked' : 'missing',
-      evidence_refs: [REFS.wizardUi, REFS.helpUi, REFS.serviceCommands, REFS.libCommands, REFS.qaScenarios],
-      blocker_refs: [cleanMachine],
-      issue_codes: ['clean-machine-first-run-missing'],
+      status: cleanMachineStatus(firstRunUiPresent && serviceContractPresent),
+      evidence_refs: withCleanMachineEvidence([REFS.wizardUi, REFS.helpUi, REFS.serviceCommands, REFS.libCommands, REFS.qaScenarios]),
+      blocker_refs: cleanMachineBlockers(),
+      issue_codes: cleanMachineIssues('clean-machine-first-run-missing'),
     }),
     scenario({
       scenario_id: 'BETA-CLIENT-CLAUDE-001',
       title: 'Claude Desktop connect path',
       status: claudeMcpbStaticReady ? 'blocked' : 'missing',
-      evidence_refs: [REFS.mcpbHelpers, REFS.serviceCommands, REFS.wizardUi, REFS.qaSupport],
-      blocker_refs: [cleanMachine, releaseApproval],
+      evidence_refs: withCleanMachineEvidence([REFS.mcpbHelpers, REFS.serviceCommands, REFS.wizardUi, REFS.qaSupport]),
+      blocker_refs: cleanMachineBlockers(releaseApproval),
       issue_codes: ['claude-manual-evidence-missing'],
     }),
     scenario({
       scenario_id: 'BETA-CLIENT-001',
       title: 'No supported client installed',
-      status: serviceContractPresent ? 'blocked' : 'missing',
-      evidence_refs: [REFS.serviceCommands, REFS.wizardUi, REFS.qaScenarios, REFS.qaSupport],
-      blocker_refs: [cleanMachine],
-      issue_codes: ['no-client-clean-machine-evidence-missing'],
+      status: cleanMachineStatus(serviceContractPresent),
+      evidence_refs: withCleanMachineEvidence([REFS.serviceCommands, REFS.wizardUi, REFS.qaScenarios, REFS.qaSupport]),
+      blocker_refs: cleanMachineBlockers(),
+      issue_codes: cleanMachineIssues('no-client-clean-machine-evidence-missing'),
     }),
     scenario({
       scenario_id: 'BETA-CLIENT-002',
       title: 'One supported client installed',
       status: claudeMcpbStaticReady && serviceContractPresent ? 'blocked' : 'missing',
-      evidence_refs: [REFS.mcpbHelpers, REFS.serviceCommands, REFS.wizardUi, REFS.qaScenarios],
-      blocker_refs: [cleanMachine, releaseApproval],
+      evidence_refs: withCleanMachineEvidence([REFS.mcpbHelpers, REFS.serviceCommands, REFS.wizardUi, REFS.qaScenarios]),
+      blocker_refs: cleanMachineBlockers(releaseApproval),
       issue_codes: ['one-client-manual-evidence-missing'],
     }),
     scenario({
       scenario_id: 'BETA-CLIENT-003',
       title: 'Existing unrelated MCP settings',
       status: serviceContractPresent ? 'blocked' : 'missing',
-      evidence_refs: [REFS.mcpbHelpers, REFS.serviceCommands, REFS.qaScenarios, REFS.qaSupport],
-      blocker_refs: [cleanMachine, releaseApproval],
+      evidence_refs: withCleanMachineEvidence([REFS.mcpbHelpers, REFS.serviceCommands, REFS.qaScenarios, REFS.qaSupport]),
+      blocker_refs: cleanMachineBlockers(releaseApproval),
       issue_codes: ['sibling-settings-manual-evidence-missing'],
     }),
     scenario({
       scenario_id: 'BETA-PROOF-001',
       title: 'Proof summary',
-      status: proofStaticPresent ? 'blocked' : 'missing',
-      evidence_refs: [REFS.wizardUi, REFS.helpUi, REFS.coreLedgerHelpers, REFS.qaScenarios],
-      blocker_refs: [cleanMachine],
-      issue_codes: ['proof-summary-evidence-missing'],
+      status: cleanMachineStatus(proofStaticPresent),
+      evidence_refs: withCleanMachineEvidence([REFS.wizardUi, REFS.helpUi, REFS.coreLedgerHelpers, REFS.qaScenarios]),
+      blocker_refs: cleanMachineBlockers(),
+      issue_codes: cleanMachineIssues('proof-summary-evidence-missing'),
     }),
     scenario({
       scenario_id: 'BETA-OFFLINE-001',
       title: 'Offline launch',
-      status: offlineStaticPresent ? 'blocked' : 'missing',
-      evidence_refs: [REFS.serviceCommands, REFS.updateCommands, REFS.wizardUi, REFS.qaScenarios],
-      blocker_refs: [cleanMachine],
-      issue_codes: ['offline-relaunch-evidence-missing'],
+      status: cleanMachineStatus(offlineStaticPresent),
+      evidence_refs: withCleanMachineEvidence([REFS.serviceCommands, REFS.updateCommands, REFS.wizardUi, REFS.qaScenarios]),
+      blocker_refs: cleanMachineBlockers(),
+      issue_codes: cleanMachineIssues('offline-relaunch-evidence-missing'),
     }),
     scenario({
       scenario_id: 'BETA-CONFIG-001',
       title: 'Config recovery',
-      status: configRecoveryStaticPresent ? 'blocked' : 'missing',
-      evidence_refs: [REFS.serviceCommands, REFS.wizardUi, REFS.qaSupport],
-      blocker_refs: configRecoveryStaticPresent ? [cleanMachine] : [configRecovery],
-      issue_codes: [configRecoveryStaticPresent ? 'config-recovery-manual-evidence-missing' : 'config-recovery-surface-missing'],
+      status: configRecoveryStaticPresent ? (cleanMachineEvidenceReady ? 'pass' : 'blocked') : 'missing',
+      evidence_refs: withCleanMachineEvidence([REFS.serviceCommands, REFS.wizardUi, REFS.qaSupport]),
+      blocker_refs: configRecoveryStaticPresent ? cleanMachineBlockers() : [configRecovery],
+      issue_codes: configRecoveryStaticPresent ? cleanMachineIssues('config-recovery-manual-evidence-missing') : ['config-recovery-surface-missing'],
     }),
     scenario({
       scenario_id: 'BETA-CONFIG-002',
       title: 'Corrupted third-party client config',
-      status: configRecoveryStaticPresent ? 'blocked' : 'missing',
-      evidence_refs: [REFS.mcpbHelpers, REFS.serviceCommands, REFS.wizardUi, REFS.qaSupport],
-      blocker_refs: configRecoveryStaticPresent ? [cleanMachine] : [configRecovery],
-      issue_codes: [configRecoveryStaticPresent ? 'third-party-config-manual-evidence-missing' : 'third-party-config-recovery-surface-missing'],
+      status: configRecoveryStaticPresent ? (cleanMachineEvidenceReady ? 'pass' : 'blocked') : 'missing',
+      evidence_refs: withCleanMachineEvidence([REFS.mcpbHelpers, REFS.serviceCommands, REFS.wizardUi, REFS.qaSupport]),
+      blocker_refs: configRecoveryStaticPresent ? cleanMachineBlockers() : [configRecovery],
+      issue_codes: configRecoveryStaticPresent ? cleanMachineIssues('third-party-config-manual-evidence-missing') : ['third-party-config-recovery-surface-missing'],
     }),
     scenario({
       scenario_id: 'BETA-DIAG-001',
       title: 'Diagnostic bundle preview',
       status: diagnosticsStaticPresent ? 'blocked' : 'missing',
-      evidence_refs: [REFS.diagnosticsCommands, REFS.wizardUi, REFS.qaScenarios, REFS.qaSupport],
-      blocker_refs: [cleanMachine, supportDryRun],
+      evidence_refs: withCleanMachineEvidence([REFS.diagnosticsCommands, REFS.wizardUi, REFS.qaScenarios, REFS.qaSupport]),
+      blocker_refs: cleanMachineBlockers(supportDryRun),
       issue_codes: ['diagnostics-support-dry-run-missing'],
     }),
     scenario({
       scenario_id: 'BETA-CRASH-001',
       title: 'Crash before opt-in',
       status: crashStaticPresent ? 'blocked' : 'missing',
-      evidence_refs: [REFS.crashCommands, REFS.wizardUi, REFS.qaScenarios],
-      blocker_refs: [cleanMachine, supportDryRun],
+      evidence_refs: withCleanMachineEvidence([REFS.crashCommands, REFS.wizardUi, REFS.qaScenarios]),
+      blocker_refs: cleanMachineBlockers(supportDryRun),
       issue_codes: ['crash-reporting-manual-evidence-missing'],
     }),
     scenario({
@@ -656,10 +682,9 @@ export function buildScenarioRows(inputs) {
     }),
   ];
 }
-
 export async function buildPublicBetaQaMatrix(options = {}) {
   const generatedAt = options.generated_at ?? options.generatedAt ?? new Date().toISOString();
-  const inputs = await inspectPublicBetaQaInputs();
+  const inputs = await inspectPublicBetaQaInputs(options);
   const scenarios = buildScenarioRows(inputs);
   const counts = statusCounts(scenarios);
   const blockers = collectBlockers(scenarios);
@@ -703,7 +728,7 @@ export function renderPublicBetaQaPlain(report) {
   ];
   const actions = Array.isArray(report.next_actions) ? report.next_actions.slice(0, 5) : [];
   for (const action of actions) lines.push(`Next: ${action.action_id} — ${action.summary}`);
-  lines.push('Boundary: local repository evidence matrix only; no PR approval, merge, npm publication, signed installer, clean-machine install, hosted service, provider deletion, model behavior, benchmark superiority, token ROI, or compliance claims.');
+  lines.push('Boundary: local repository and supplied public-safe evidence matrix only; no PR approval, merge, npm publication, signed installer, hosted service, provider deletion, model behavior, benchmark superiority, token ROI, or compliance claims.');
   return `${lines.join('\n')}\n`;
 }
 
@@ -713,7 +738,7 @@ async function main() {
     process.stdout.write(usage());
     return;
   }
-  const report = await buildPublicBetaQaMatrix();
+  const report = await buildPublicBetaQaMatrix(options);
   const json = `${JSON.stringify(report, null, 2)}\n`;
   if (options.out) {
     const outPath = resolve(options.out);
