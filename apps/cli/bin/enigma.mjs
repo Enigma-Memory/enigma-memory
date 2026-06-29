@@ -2116,6 +2116,29 @@ function printVerifyReport(report, flags, io) {
   else print(report, io);
 }
 
+function renderInstallPlain(summary) {
+  const clients = Array.isArray(summary.clients) ? summary.clients : [];
+  const firstClient = clients[0]?.client_id ?? '<client>';
+  const lines = [
+    'Enigma install',
+    `Status: ${summary.ok ? 'Ready' : 'Needs attention'}`,
+    'Memory Drive: <bundle-path>',
+    `Bundle: ${summary.bundle_created ? 'created' : 'already existed'}`,
+    `Clients: ${clients.length}`,
+    `MCP command: ${summary.mcp_command ?? 'enigma-mcp'}`,
+  ];
+  if (summary.out) lines.push('Snippets: written to <out>');
+  lines.push(`Next: enigma connect ${firstClient} --bundle <bundle-path>`);
+  lines.push('Boundary: local install snippet planning only; no raw memory, local paths, provider launch, provider deletion, model behavior, hosted service, or signing claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printInstallSummary(summary, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderInstallPlain(summary));
+  else print(summary, io);
+}
+
+
 function nextPlainRequested(flags) {
   const format = getFlag(flags, ['format']);
   return booleanFlag(flags, ['plain', 'text'], false) || format === 'plain' || format === 'text';
@@ -3024,7 +3047,7 @@ export async function installCommand(flags, io) {
   }
   const out = getFlag(flags, ['out']);
   if (out && out !== true) await writeJson(resolve(String(out)), { schema: 'enigma.install_snippets.v1', snippets });
-  print({
+  const summary = {
     ok: true,
     bundle: bundlePath,
     bundle_created: bundleState.created,
@@ -3034,7 +3057,8 @@ export async function installCommand(flags, io) {
     mcp_config_snippets: snippets,
     one_command_install_connect: oneCommandInstallConnect(bundlePath, dirname(bundlePath)),
     out: out && out !== true ? resolve(String(out)) : undefined,
-  }, io);
+  };
+  printInstallSummary(summary, flags, io);
   return 0;
 }
 
@@ -4208,6 +4232,7 @@ function usage() {
       'one-command VS Code Cline': 'npm install -g enigma-memory && enigma setup --client vscode-cline --write-connectors --overwrite',
       '--client <id>': 'Limit generated MCP snippets to one supported client.',
       '--out <path>': 'Write generated MCP snippets to a JSON file for review without hand-editing client config JSON.',
+      '--plain': 'Print a path-redacted install/connect summary instead of JSON snippets. Alias: --text or --format text.',
     },
     quickstart_options: {
       '--bundle <path>': 'Bundle JSON to create. Defaults to .enigma/bundle.json.',

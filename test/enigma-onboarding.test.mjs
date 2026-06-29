@@ -621,6 +621,32 @@ test('quickstart plain output summarizes outputs without JSON or local paths', a
   }
 });
 
+test('install plain output summarizes snippets without JSON or local paths', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-install-plain-'));
+  const bundlePath = join(dir, 'bundle.json');
+  const outPath = join(dir, 'snippets.json');
+  try {
+    const io = makeIo();
+    assert.equal(await main(['install', '--bundle', bundlePath, '--client', 'claude-desktop', '--out', outPath, '--plain'], io.io), 0, io.stderr());
+    const stdout = io.stdout();
+
+    assert.match(stdout, /^Enigma install\n/);
+    assert.match(stdout, /Status: Ready/);
+    assert.match(stdout, /Memory Drive: <bundle-path>/);
+    assert.match(stdout, /Clients: 1/);
+    assert.match(stdout, /MCP command: enigma-mcp/);
+    assert.match(stdout, /Snippets: written to <out>/);
+    assert.match(stdout, /Next: enigma connect claude-desktop --bundle <bundle-path>/);
+    assert.match(stdout, /Boundary: local install snippet planning only/);
+    assert.doesNotMatch(stdout, /^\s*\{/);
+    assert.equal(stdout.includes(dir), false);
+    assert.equal(stdout.includes(bundlePath), false);
+    assert.equal(stdout.includes(outPath), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('status plain output reports counters without JSON or local paths', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'enigma-status-plain-'));
   const bundlePath = join(dir, 'bundle.json');
