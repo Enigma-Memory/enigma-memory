@@ -360,13 +360,19 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
 });
 
 test('public website explains consumer install path without unsupported claims', async () => {
-  const [home, download, help, onboardingUx] = await Promise.all([
+  const [home, download, help, launchStatus, installGuide, macosInstall, windowsInstall, connectApps, otherClients, onboardingUx] = await Promise.all([
     readWebsiteFile('index.html'),
     readWebsiteFile('download.html'),
     readWebsiteFile('help/index.html'),
+    readWebsiteFile('launch-status.html'),
+    readWebsiteFile('help/install.html'),
+    readWebsiteFile('help/install/macos.html'),
+    readWebsiteFile('help/install/windows.html'),
+    readWebsiteFile('help/connect-apps.html'),
+    readWebsiteFile('help/connect-apps/other-supported-clients.html'),
     readFile(new URL('../docs/public-launch/consumer-onboarding-ux.md', import.meta.url), 'utf8'),
   ]);
-  const publicWebsite = `${home}\n${download}\n${help}`;
+  const publicWebsite = `${home}\n${download}\n${help}\n${launchStatus}\n${installGuide}\n${macosInstall}\n${windowsInstall}\n${connectApps}\n${otherClients}`;
   const funnelSpec = `${publicWebsite}\n${onboardingUx}`;
 
   assert.match(home, /Download the desktop app/);
@@ -376,6 +382,16 @@ test('public website explains consumer install path without unsupported claims',
   assert.match(download, /open Enigma Memory/i);
   assert.match(help, /Start here/);
   assert.match(help, /You should not need Node, npm, terminal commands, or JSON edits/);
+  assert.match(launchStatus, /How this page stays public-safe/);
+  assert.doesNotMatch(launchStatus, /GitHub Releases|code-signing-setup|production-readiness-status/);
+  assert.match(installGuide, /when your platform is marked ready/);
+  assert.match(macosInstall, /when signing is ready/);
+  assert.match(windowsInstall, /when signing is ready/);
+  assert.doesNotMatch(publicWebsite, /Download the (macOS|Windows) installer from the/);
+  assert.match(connectApps, /See setup walkthrough/);
+  assert.doesNotMatch(connectApps, /Open Connections in Enigma/);
+  assert.match(otherClients, /Desktop-detected path/);
+  assert.match(otherClients, /Preview connection/);
   assert.match(onboardingUx, /Download the desktop app → create your Memory Drive → connect a supported AI app/);
   assert.match(funnelSpec, /Public copy must not imply signed distribution is complete until release evidence proves it/);
   assertPublicSafe(publicWebsite);
