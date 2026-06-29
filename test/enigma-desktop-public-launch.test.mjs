@@ -347,6 +347,11 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(wizard, /refresh-proof-activity/);
   assert.match(wizard, /export-proof-activity/);
   assert.match(wizard, /Export proof activity/);
+  assert.match(wizard, /copy-proof-summary/);
+  assert.match(wizard, /Copy proof summary/);
+  assert.match(wizard, /publicProofClipboardText/);
+  assert.match(wizard, /Proof summary copied/);
+  assert.match(wizard, /Proof counts and roots remain visible/);
   assert.match(wizard, /Proof activity exported/);
   assert.match(wizard, /enigma\.desktop_proof_activity\.v1/);
   assert.match(tauriService, /pub async fn get_proof_activity/);

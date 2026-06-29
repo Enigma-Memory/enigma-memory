@@ -777,6 +777,20 @@ function publicExportScanStatus(surface = {}) {
   };
 }
 
+function publicProofClipboardText(activity = {}) {
+  const roots = activity.roots && typeof activity.roots === 'object' ? activity.roots : {};
+  return [
+    'Enigma proof activity',
+    `Receipts: ${activity.receipt_count ?? 0}`,
+    `Active memories: ${activity.active_memory_count ?? 0}`,
+    `Tombstones: ${activity.tombstoned_memory_count ?? 0}`,
+    `Active set root: ${roots.active_set_root || '<not-available>'}`,
+    `Receipt log root: ${roots.receipt_log_root || '<not-available>'}`,
+    'Boundary: local Enigma roots and counts only; no raw memory, local paths, outside-provider control, or model behavior claims.',
+  ].join('\n');
+}
+
+
 function renderProofActivitySection() {
   const activity = proofActivity?.schema ? proofActivity : health.proof_activity || {};
   const receiptCount = activity.receipt_count ?? 0;
@@ -801,6 +815,7 @@ function renderProofActivitySection() {
       ${exported ? `<p class="note">Proof activity export ready. File location is hidden in this view.</p>` : ''}
       <div class="button-row">
         ${primaryButton('Refresh proof activity', 'refresh-proof-activity')}
+        <button type="button" class="secondary" data-action="copy-proof-summary" ${activity.schema ? '' : 'disabled'}>Copy proof summary</button>
         <button type="button" class="secondary" data-action="export-proof-activity" ${activity.schema && scan.exportAllowed ? '' : 'disabled'}>Export proof activity</button>
       </div>
     </section>
@@ -1369,6 +1384,20 @@ async function handleAction(event) {
       busy = false;
       render();
       setStatus('Proof activity refreshed without exposing raw memory.');
+      return;
+    }
+    case 'copy-proof-summary': {
+      const activity = proofActivity?.schema ? proofActivity : health.proof_activity || {};
+      if (!activity?.schema) {
+        setStatus('Refresh proof activity before copying its summary.');
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(publicProofClipboardText(activity));
+        setStatus('Proof summary copied without raw memory or local paths.');
+      } catch (_) {
+        setStatus('Clipboard copy is unavailable. Proof counts and roots remain visible in the dashboard.');
+      }
       return;
     }
     case 'export-proof-activity': {

@@ -48,6 +48,7 @@
 - Desktop dashboard entry now hydrates current health, service, logs, diagnostics, update, proof, client, and crash state before presenting the Memory Drive dashboard.
 - Desktop support-summary and proof-activity exports now fail closed behind a shared public-export privacy scan; the UI shows scan status and disables export until the scan passes.
 - Desktop support summary now offers one-click support-code copy after collection, with a visible fallback if clipboard access is unavailable.
+- Desktop proof activity now offers one-click copy for local proof counts and roots, bounded to no raw memory, local paths, outside-provider control, or model-behavior claims.
 
 ### Docs and website
 - Desktop-first `README.md`.
