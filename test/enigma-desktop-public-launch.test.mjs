@@ -474,7 +474,7 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
 });
 
 test('public website explains consumer install path without unsupported claims', async () => {
-  const [home, download, setup, vaultNotReady, websiteStyles, help, launchStatus, installGuide, macosInstall, windowsInstall, connectApps, otherClients, removalGuide, faq, developerCli, readme, installAnywhere, clientConnectors, developerEcosystem, publicApiReference, onboardingUx] = await Promise.all([
+  const [home, download, setup, vaultNotReady, websiteStyles, help, launchStatus, installGuide, macosInstall, windowsInstall, connectApps, claudeConnect, cursorConnect, otherClients, troubleshooting, clientNotDetected, removalGuide, faq, developerCli, readme, installAnywhere, clientConnectors, developerEcosystem, publicApiReference, onboardingUx] = await Promise.all([
     readWebsiteFile('index.html'),
     readWebsiteFile('download.html'),
     readWebsiteFile('setup.html'),
@@ -486,7 +486,11 @@ test('public website explains consumer install path without unsupported claims',
     readWebsiteFile('help/install/macos.html'),
     readWebsiteFile('help/install/windows.html'),
     readWebsiteFile('help/connect-apps.html'),
+    readWebsiteFile('help/connect-apps/claude-desktop.html'),
+    readWebsiteFile('help/connect-apps/cursor.html'),
     readWebsiteFile('help/connect-apps/other-supported-clients.html'),
+    readWebsiteFile('help/troubleshooting.html'),
+    readWebsiteFile('help/troubleshooting/client-not-detected.html'),
     readWebsiteFile('help/remove-enigma.html'),
     readWebsiteFile('faq.html'),
     readWebsiteFile('developers/cli.html'),
@@ -497,7 +501,7 @@ test('public website explains consumer install path without unsupported claims',
     readFile(new URL('../docs/public-api-reference.md', import.meta.url), 'utf8'),
     readFile(new URL('../docs/public-launch/consumer-onboarding-ux.md', import.meta.url), 'utf8'),
   ]);
-  const publicWebsite = `${home}\n${download}\n${setup}\n${vaultNotReady}\n${help}\n${launchStatus}\n${installGuide}\n${macosInstall}\n${windowsInstall}\n${connectApps}\n${otherClients}\n${removalGuide}\n${faq}`;
+  const publicWebsite = `${home}\n${download}\n${setup}\n${vaultNotReady}\n${help}\n${launchStatus}\n${installGuide}\n${macosInstall}\n${windowsInstall}\n${connectApps}\n${claudeConnect}\n${cursorConnect}\n${otherClients}\n${troubleshooting}\n${clientNotDetected}\n${removalGuide}\n${faq}`;
   const funnelSpec = `${publicWebsite}\n${onboardingUx}`;
   const vaultBeforeAdvanced = vaultNotReady.slice(0, vaultNotReady.indexOf('Advanced command-line repair'));
 
@@ -558,6 +562,13 @@ test('public website explains consumer install path without unsupported claims',
   assert.doesNotMatch(connectApps, /Open Connections in Enigma/);
   assert.match(otherClients, /Desktop-detected path/);
   assert.match(otherClients, /Preview connection/);
+  assert.match(connectApps, /local helper/);
+  assert.match(claudeConnect, /advanced manual settings/);
+  assert.match(cursorConnect, /connection change in plain language/);
+  assert.match(otherClients, /advanced compatible apps/);
+  assert.match(troubleshooting, /settings area/);
+  assert.match(clientNotDetected, /advanced manual settings/);
+  assert.doesNotMatch(publicWebsite, /MCP settings change|MCP entry|MCP JSON|local MCP server|Manual MCP configuration|client config directory|complete client config files/i);
   assert.match(help, /Remove Enigma safely/);
   assert.match(removalGuide, /Remove Enigma without losing your local vault by accident/);
   assert.match(removalGuide, /Disconnecting Enigma from an app affects Enigma-controlled local connector setup only/);
