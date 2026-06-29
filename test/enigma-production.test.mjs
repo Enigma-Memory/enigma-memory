@@ -1779,10 +1779,12 @@ test('npm publish workflow reuses local pack install smoke before publication', 
   assert.match(workflow, /id-token:\s*write/);
   assert.doesNotMatch(workflow, /NPM_TOKEN|NODE_AUTH_TOKEN/);
 });
-test('CI blocks moderate dependency advisories before package gates pass', async () => {
+test('CI blocks moderate dependency advisories and runs packed install smoke', async () => {
   const ciWorkflow = await readFile(CI_WORKFLOW_URL, 'utf8');
   assert.match(ciWorkflow, /name:\s*Run security audit/);
   assert.match(ciWorkflow, /npm audit --audit-level=moderate/);
+  assert.match(ciWorkflow, /Verify local packed install[\s\S]*?npm run package:install-smoke/);
+  assert.match(ciWorkflow, /Run release audit when available[\s\S]*?npm run release:audit/);
   assert.doesNotMatch(ciWorkflow, /npm audit --audit-level=high/);
 });
 

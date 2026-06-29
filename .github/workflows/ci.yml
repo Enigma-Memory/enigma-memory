@@ -49,5 +49,8 @@ jobs:
       - name: Verify package dry run
         run: npm pack --dry-run
 
+      - name: Verify local packed install
+        run: npm run package:install-smoke
+
       - name: Run release audit when available
         run: npm run release:audit

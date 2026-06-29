@@ -136,9 +136,10 @@
 - `npm run production:site -- --site website` at repo root: **pass**.
 - `npm run check` at repo root: **pass**.
 - `npm run secret-scan` at repo root: **pass**.
-- `npm test` at repo root: **674/674 pass**.
+- `npm test` at repo root: **688/688 pass**.
 - `npm pack --dry-run` at repo root: **pass** (`enigma-memory-0.1.19.tgz` dry-run output).
-- `npm run release:audit` at repo root: **pass**; required gates include `npm-check`, `npm-test`, `npm-pack-dry-run`, direct bin smoke, review packet, MCP stdio smoke, and production manifest validators.
+- `npm run package:install-smoke` at repo root: **pass**; locally packs `enigma-memory-0.1.19.tgz`, installs it into a temporary npm prefix with scripts ignored, runs installed entrypoints, and removes the temp directory without publishing or using npm tokens.
+- `npm run release:audit` at repo root: **pass**; required gates include `npm-check`, `npm-test`, `npm-pack-dry-run`, `local-pack-install-smoke`, direct bin smoke, review packet, MCP stdio smoke, and production manifest validators.
 - `npm run public-beta-qa` at repo root: **hold**, `20 blocked / 1 pending / 0 missing`, required public beta version `0.1.19`.
 - Hosted PR checks must still pass after each pushed branch commit; local gates do not replace PR approval/merge or signing evidence.
 
