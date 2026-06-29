@@ -2142,6 +2142,31 @@ function printVerifyReport(report, flags, io) {
   else print(report, io);
 }
 
+function renderControllerGrantPlain(grant, action, outWritten) {
+  const operations = Array.isArray(grant.operations) ? grant.operations : [];
+  const zones = Array.isArray(grant.memory_zone_refs) ? grant.memory_zone_refs : [];
+  const lines = [
+    `Enigma controller ${action}`,
+    `Status: ${grant.status ?? 'active'}`,
+    `Grant: ${grant.grant_ref ?? '<grant-ref>'}`,
+    `App: ${grant.app_ref ?? '<app-ref>'}`,
+    `Purpose: ${grant.purpose_ref ?? '<purpose-ref>'}`,
+    `Policy: ${grant.policy_ref ?? '<policy-ref>'}`,
+    `Operations: ${operations.length === 0 ? 'none' : operations.join(', ')}`,
+    `Memory zones: ${zones.length === 0 ? 'none' : zones.join(', ')}`,
+  ];
+  if (grant.expires_at) lines.push(`Expires: ${grant.expires_at}`);
+  if (outWritten) lines.push('Grant file: written to <out>');
+  lines.push('Boundary: public-safe local consent grant only; no raw memory, local paths, provider calls, provider deletion, model behavior, hosted service, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printControllerGrantResult(grant, action, flags, io, outWritten = false) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderControllerGrantPlain(grant, action, outWritten));
+  else print(grant, io);
+}
+
+
 function renderInstallPlain(summary) {
   const clients = Array.isArray(summary.clients) ? summary.clients : [];
   const firstClient = clients[0]?.client_id ?? '<client>';
@@ -4032,7 +4057,7 @@ export async function controllerGrantCommand(flags, io) {
   });
   const out = getFlag(flags, ['out']);
   if (out && out !== true) await writeJson(resolve(String(out)), grant);
-  print(grant, io);
+  printControllerGrantResult(grant, 'grant', flags, io, out && out !== true);
   return 0;
 }
 
@@ -4056,7 +4081,7 @@ export async function controllerRevokeCommand(flags, io, positionalFile) {
   });
   const out = getFlag(flags, ['out']);
   if (out && out !== true) await writeJson(resolve(String(out)), revoked);
-  print(revoked, io);
+  printControllerGrantResult(revoked, 'revoke', flags, io, out && out !== true);
   return 0;
 }
 
@@ -4204,6 +4229,7 @@ function usage() {
       '--issued-at/--now <iso>': 'Grant issue timestamp. Defaults to current local time.',
       '--expires-at <iso>': 'Explicit grant expiration timestamp. If omitted, ttl-seconds is applied.',
       '--out <path>': 'Write grant JSON for later enigma context --require-grant --grant-file use.',
+      '--plain': 'Print a path-redacted consent grant/revocation summary instead of JSON. Alias: --text or --format text.',
     },
     search_options: {
       '--query <text>': 'Required local query. Output redacts the query and memory plaintext by default. Alias: --q.',

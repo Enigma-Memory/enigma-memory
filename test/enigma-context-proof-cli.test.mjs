@@ -180,3 +180,49 @@ test('context --require-grant fails closed until matching controller grant is su
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('controller grant and revoke plain output is readable and path-redacted', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-controller-plain-'));
+  const grantFile = join(dir, 'grant.json');
+  const revokedGrantFile = join(dir, 'grant.revoked.json');
+  try {
+    const grant = makeIo();
+    assert.equal(await main([
+      'controller',
+      'grant',
+      '--app-ref',
+      'ref:app:plain-test',
+      '--purpose-ref',
+      'ref:purpose:plain_context',
+      '--memory-zone-ref',
+      'ref:zone:default',
+      '--out',
+      grantFile,
+      '--plain',
+    ], grant.io), 0, grant.stderr());
+    assert.match(grant.stdout(), /^Enigma controller grant\n/);
+    assert.match(grant.stdout(), /Status: active/);
+    assert.match(grant.stdout(), /Grant: ref:/);
+    assert.match(grant.stdout(), /App: ref:app:plain-test/);
+    assert.match(grant.stdout(), /Operations: recall_context/);
+    assert.match(grant.stdout(), /Grant file: written to <out>/);
+    assert.match(grant.stdout(), /Boundary: public-safe local consent grant only/);
+    assert.doesNotMatch(grant.stdout(), /^\s*\{/);
+    assert.equal(grant.stdout().includes(dir), false);
+    assert.equal(grant.stdout().includes(grantFile), false);
+
+    const revoked = makeIo();
+    assert.equal(await main(['controller', 'revoke', '--grant-file', grantFile, '--out', revokedGrantFile, '--plain'], revoked.io), 0, revoked.stderr());
+    assert.match(revoked.stdout(), /^Enigma controller revoke\n/);
+    assert.match(revoked.stdout(), /Status: revoked/);
+    assert.match(revoked.stdout(), /Grant: ref:/);
+    assert.match(revoked.stdout(), /Grant file: written to <out>/);
+    assert.match(revoked.stdout(), /Boundary: public-safe local consent grant only/);
+    assert.doesNotMatch(revoked.stdout(), /^\s*\{/);
+    assert.equal(revoked.stdout().includes(dir), false);
+    assert.equal(revoked.stdout().includes(grantFile), false);
+    assert.equal(revoked.stdout().includes(revokedGrantFile), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
