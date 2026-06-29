@@ -348,6 +348,7 @@ function parseArgs(argv = process.argv.slice(2)) {
   const args = {
     out: null,
     generatedAt: null,
+    plain: false,
     help: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -364,16 +365,41 @@ function parseArgs(argv = process.argv.slice(2)) {
     };
     if (token === '--out') args.out = readValue();
     else if (token === '--generated-at' || token === '--generatedAt') args.generatedAt = readValue();
-    else throw new UsageError(`unknown production unblocker option: ${token}`);
+    else if (token === '--plain' || token === '--text' || token === '--format=text' || (token === '--format' && argv[index + 1] === 'text')) {
+      args.plain = true;
+      if (token === '--format') index += 1;
+    } else throw new UsageError(`unknown production unblocker option: ${token}`);
   }
   return args;
 }
 
 function usage() {
-  return `Usage: node scripts/build-production-unblocker.mjs [--out <file>] [--generated-at <iso>]
+  return `Usage: node scripts/build-production-unblocker.mjs [--out <file>] [--generated-at <iso>] [--plain]
 
 Builds a dependency-free public-safe production unblocker report. The command is dry-run/planning by default: it requires no credentials, does not publish, does not deploy, does not submit Solana transactions, does not call providers, and does not mutate external systems.
 `;
+}
+
+export function renderProductionUnblockerPlain(report) {
+  const counts = report.status_counts ?? {};
+  const lines = [
+    'Enigma production unblocker',
+    `Status: ${report.overall_status ?? 'unknown'}`,
+    `Version: ${report.package?.source_version ?? report.package?.version ?? 'unknown'} / public ${report.package?.current_public_version ?? 'unknown'}`,
+    `Mode: ${report.mode ?? 'dry_run_planning'}`,
+    `Credentials required: ${report.credentials_required ? 'yes' : 'no'}`,
+    `External mutations: ${report.mutates_external_systems ? 'yes' : 'no'}`,
+    `Sections: ${Array.isArray(report.sections) ? report.sections.length : 0}`,
+    `Ready now: ${counts.ready_now ?? 0}`,
+    `Contract ready: ${counts.contract_ready ?? 0}`,
+    `External blockers: ${counts.blocked_external_dependency ?? 0}`,
+    `Operator evidence required: ${counts.operator_evidence_required ?? 0}`,
+    `Go-live blockers: ${Array.isArray(report.go_live_blockers) ? report.go_live_blockers.length : 0}`,
+  ];
+  for (const blocker of (Array.isArray(report.go_live_blockers) ? report.go_live_blockers.slice(0, 5) : [])) lines.push(`Blocker: ${blocker.section} — ${blocker.blocker}`);
+  for (const commandEntry of (Array.isArray(report.operator_next_commands) ? report.operator_next_commands.slice(0, 5) : [])) lines.push(`Next: ${commandEntry.id} — ${commandEntry.purpose}`);
+  lines.push('Boundary: public-safe planning evidence only; no publish, deploy, account creation, credentials, provider calls, Solana transaction submission, external mutations, raw memory, hosted SaaS live, compliance, provider deletion, model forgetting, benchmark leadership, token ROI, token profit, or provider invoice savings claims.');
+  return `${lines.join('\n')}\n`;
 }
 
 async function readPackageJson() {
@@ -389,13 +415,13 @@ export async function main(argv = process.argv.slice(2)) {
   const args = parseArgs(argv);
   if (args.help) return { text: usage(), code: 0 };
   const report = buildProductionUnblocker({ packageJson: await readPackageJson() }, { generated_at: args.generatedAt ?? new Date().toISOString() });
-  const text = `${JSON.stringify(report, null, 2)}\n`;
+  const jsonText = `${JSON.stringify(report, null, 2)}\n`;
   if (args.out) {
     const outPath = resolve(args.out);
     await mkdir(dirname(outPath), { recursive: true });
-    await writeFile(outPath, text, 'utf8');
+    await writeFile(outPath, jsonText, 'utf8');
   }
-  return { text, code: 0 };
+  return { text: args.plain ? renderProductionUnblockerPlain(report) : jsonText, code: 0 };
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {

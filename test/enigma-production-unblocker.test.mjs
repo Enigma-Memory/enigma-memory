@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import {
   buildProductionUnblocker,
+  renderProductionUnblockerPlain,
   PRODUCTION_UNBLOCKER_SCHEMA,
 } from '../scripts/build-production-unblocker.mjs';
 
@@ -71,6 +72,23 @@ test('production unblocker emits complete public-safe planning report', () => {
   assert.doesNotMatch(serialized, /[A-Za-z]:\\Users\\|\/Users\/|\/home\//);
 });
 
+test('production unblocker plain output is readable and claim-bounded', () => {
+  const report = buildProductionUnblocker({ packageJson: PACKAGE_JSON }, { generated_at: '2026-06-25T00:00:00.000Z' });
+  const plain = renderProductionUnblockerPlain(report);
+
+  assert.match(plain, /^Enigma production unblocker\n/);
+  assert.match(plain, /Status: blocked_external_dependency/);
+  assert.match(plain, /Version: 0\.1\.19 \/ public 0\.1\.19/);
+  assert.match(plain, /Credentials required: no/);
+  assert.match(plain, /External mutations: no/);
+  assert.match(plain, /Go-live blockers: /);
+  assert.match(plain, /Next: /);
+  assert.match(plain, /Boundary: public-safe planning evidence only/);
+  assert.doesNotMatch(plain, /^\s*\{/);
+  assert.doesNotMatch(plain, /Bearer\s+[A-Za-z0-9._~+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|sk-[A-Za-z0-9_-]{16}|AKIA[0-9A-Z]{16}/i);
+  assert.doesNotMatch(plain, /[A-Za-z]:\\Users\\|\/Users\/|\/home\//);
+});
+
 test('production unblocker is exposed through package metadata', async () => {
   const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
   assert.equal(pkg.scripts['production:unblocker'], 'node scripts/build-production-unblocker.mjs');
@@ -126,6 +144,27 @@ test('production unblocker CLI writes public-safe JSON without echoing output pa
   assert.equal(report.schema, PRODUCTION_UNBLOCKER_SCHEMA);
   assert.equal(report.credentials_required, false);
   assert.doesNotMatch(stdout, new RegExp(dir.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')));
+  const written = JSON.parse(await readFile(out, 'utf8'));
+  assert.equal(written.schema, PRODUCTION_UNBLOCKER_SCHEMA);
+  assert.equal(written.live_claims.transaction_submitted, false);
+});
+
+test('production unblocker CLI writes JSON and prints plain output separately', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-production-unblocker-plain-'));
+  const out = join(dir, 'unblocker.json');
+  const { stdout } = await execFileAsync(process.execPath, [
+    'scripts/build-production-unblocker.mjs',
+    '--generated-at', '2026-06-25T00:00:00.000Z',
+    '--out', out,
+    '--plain',
+  ], { cwd: process.cwd(), timeout: 10000, windowsHide: true });
+
+  assert.match(stdout, /^Enigma production unblocker\n/);
+  assert.match(stdout, /Status: blocked_external_dependency/);
+  assert.match(stdout, /Boundary: public-safe planning evidence only/);
+  assert.doesNotMatch(stdout, /^\s*\{/);
+  assert.doesNotMatch(stdout, new RegExp(dir.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')));
+  assert.equal(stdout.includes(out), false);
   const written = JSON.parse(await readFile(out, 'utf8'));
   assert.equal(written.schema, PRODUCTION_UNBLOCKER_SCHEMA);
   assert.equal(written.live_claims.transaction_submitted, false);
