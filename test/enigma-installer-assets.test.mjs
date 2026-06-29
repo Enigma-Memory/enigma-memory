@@ -8,6 +8,7 @@ import {
   buildInstallerAssets,
   nativeInstallerBlockers,
   parseInstallerAssetArgs,
+  renderInstallerAssetsPlain,
   runBuildInstallerAssets,
 } from '../scripts/build-installer-assets.mjs';
 import {
@@ -72,6 +73,24 @@ test('installer asset generator returns deterministic public manifest in dry-run
   assert.equal(manifest.safety.embeds_private_keys, false);
   assert.doesNotMatch(manifestContent, LOCAL_OR_SECRET_RE);
   assert.doesNotMatch(publicJson(first), LOCAL_OR_SECRET_RE);
+});
+
+test('installer asset plain output is readable and claim-bounded', () => {
+  const result = buildInstallerAssets({ outDir: 'private-output' });
+  const publicResult = { ...result };
+  delete publicResult.assets;
+  const plain = renderInstallerAssetsPlain(publicResult);
+
+  assert.match(plain, /^Enigma installer assets\n/);
+  assert.match(plain, /Status: Ready/);
+  assert.match(plain, /Version: 0\.1\.19/);
+  assert.match(plain, /Mode: dry-run/);
+  assert.match(plain, /Native installers generated: no/);
+  assert.match(plain, /Source assets only: yes/);
+  assert.match(plain, /Asset: install-linux\.sh/);
+  assert.match(plain, /Boundary: public-safe source installer assets only/);
+  assert.doesNotMatch(plain, /^\s*\{/);
+  assert.doesNotMatch(plain, /private-output|C:\\Users\\|\/home\/|raw_memory|api[_-]?key|password/i);
 });
 
 test('installer scripts are source installers with safe dry-run defaults', () => {
@@ -178,6 +197,20 @@ test('installer CLI writes requested source assets only with explicit write mode
   assert.equal(manifest.output_dir, '<requested-output-dir>');
   assert.deepEqual(manifest.files, summary.files);
   assert.equal((await readFile(join(dir, 'install-linux.sh'), 'utf8')).includes('npm install -g enigma-memory'), true);
+
+  let plainStdout = '';
+  stderr = '';
+  const plainCode = await runBuildInstallerAssets(['--out-dir', dir, '--plain'], {
+    stdout: { write: (chunk) => { plainStdout += chunk; } },
+    stderr: { write: (chunk) => { stderr += chunk; } },
+  });
+  assert.equal(plainCode, 0);
+  assert.equal(stderr, '');
+  assert.match(plainStdout, /^Enigma installer assets\n/);
+  assert.match(plainStdout, /Mode: dry-run/);
+  assert.match(plainStdout, /Boundary: public-safe source installer assets only/);
+  assert.doesNotMatch(plainStdout, /^\s*\{/);
+  assert.equal(plainStdout.includes(dir), false);
 
   assert.throws(() => parseInstallerAssetArgs(['--out-dir', '../leak']), /parent-directory traversal/);
   assert.throws(() => parseInstallerAssetArgs(['--dry-run', '--write']), /either --dry-run or --write/);

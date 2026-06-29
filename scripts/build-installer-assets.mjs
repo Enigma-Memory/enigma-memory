@@ -17,7 +17,7 @@ const POSIX_ABSOLUTE_RE = /(?:^|[\s"'`=:(])\/(?:Users|home|tmp|var|private|mnt|V
 const CONTROL_RE = /[\0\r]/u;
 
 function usage() {
-  return `Usage: node scripts/build-installer-assets.mjs --out-dir <dir> [--write|--dry-run]\n\nBuilds public-safe source installer assets for enigma-memory. Dry-run is the default and returns the deterministic manifest without writing files.\n`;
+  return `Usage: node scripts/build-installer-assets.mjs --out-dir <dir> [--write|--dry-run] [--plain]\n\nBuilds public-safe source installer assets for enigma-memory. Dry-run is the default and returns the deterministic manifest without writing files. --plain prints a human-readable installer asset summary.\n`;
 }
 
 function readRequiredValue(argv, index, flag) {
@@ -27,7 +27,7 @@ function readRequiredValue(argv, index, flag) {
 }
 
 export function parseInstallerAssetArgs(argv = process.argv.slice(2)) {
-  const options = { outDir: DEFAULT_OUTPUT_DIR, dryRun: true, write: false };
+  const options = { outDir: DEFAULT_OUTPUT_DIR, dryRun: true, write: false, plain: false };
   let sawDryRun = false;
   let sawWrite = false;
 
@@ -46,6 +46,9 @@ export function parseInstallerAssetArgs(argv = process.argv.slice(2)) {
       sawWrite = true;
       options.write = true;
       options.dryRun = false;
+    } else if (arg === '--plain' || arg === '--text' || arg === '--format=text' || (arg === '--format' && argv[index + 1] === 'text')) {
+      options.plain = true;
+      if (arg === '--format') index += 1;
     } else {
       throw new Error(`Unknown argument: ${arg}`);
     }
@@ -350,6 +353,24 @@ export function buildInstallerAssets(options = {}, runtime = {}) {
   });
 }
 
+export function renderInstallerAssetsPlain(result) {
+  const lines = [
+    'Enigma installer assets',
+    `Status: ${result.public_safe ? 'Ready' : 'Needs attention'}`,
+    `Version: ${result.version ?? '<version>'}`,
+    `Mode: ${result.mode ?? '<mode>'}`,
+    `Files: ${Array.isArray(result.files) ? result.files.length : 0}`,
+    `Native installers generated: ${result.generated_native_installers ? 'yes' : 'no'}`,
+    `Source assets only: ${result.source_assets_only ? 'yes' : 'no'}`,
+    `Default dry-run: ${result.safety?.default_dry_run ? 'yes' : 'no'}`,
+    `Writes require flag: ${result.safety?.requires_write_flag_for_filesystem_mutation ? 'yes' : 'no'}`,
+  ];
+  for (const file of (Array.isArray(result.files) ? result.files.slice(0, 8) : [])) lines.push(`Asset: ${file.path} — ${file.bytes} bytes`);
+  lines.push('Boundary: public-safe source installer assets only; no native signed installers, notarization, package-manager publication, credentials, account ids, local paths, raw memory, prompts, provider responses, provider deletion, model behavior, hosted service, compliance, benchmark superiority, token ROI, or provider invoice savings claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+
 async function writeAssets(outDir, assets) {
   const root = resolvePath(outDir);
   for (const item of assets) {
@@ -374,7 +395,7 @@ export async function runBuildInstallerAssets(argv = process.argv.slice(2), io =
     if (!result.dry_run) await writeAssets(options.outDir, result.assets);
     const publicResult = { ...result };
     delete publicResult.assets;
-    stdout.write(`${jsonStable(publicResult)}`);
+    stdout.write(options.plain ? renderInstallerAssetsPlain(publicResult) : `${jsonStable(publicResult)}`);
     return 0;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
