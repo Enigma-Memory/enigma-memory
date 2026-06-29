@@ -1165,9 +1165,10 @@ function setupNextCommands(bundleInput, exportDisplay, clients, writeConnectors)
   const commands = [
     `enigma status --bundle ${bundle}`,
     `enigma drive health --bundle ${bundle}`,
-    `enigma remember --bundle ${bundle} --text-file ./memory.txt`,
+    `enigma remember --bundle ${bundle} --text-file ./memory.txt --plain`,
     `enigma search --bundle ${bundle} --query "project context"`,
     `enigma context --bundle ${bundle} --query "project context"`,
+    `enigma export --bundle ${bundle} --out ${commandPath(exportDisplay)}`,
     `enigma verify --export ${commandPath(exportDisplay)}`,
   ];
   if (!writeConnectors) commands.push(`enigma connect ${primaryClient} --bundle ${bundle} --dry-run`);
@@ -1193,7 +1194,7 @@ function doctorNextCommands(bundleDisplay, client) {
   const clientId = client ?? DEFAULT_SETUP_CLIENTS[0];
   const bundle = commandPath(bundleDisplay);
   return [
-    `enigma setup --bundle ${bundle} --client auto --connect-installed --overwrite`,
+    `enigma quickstart --bundle ${bundle}`,
     `enigma doctor --bundle ${bundle} --client ${clientId}`,
     `enigma drive health --bundle ${bundle}`,
     `enigma status --bundle ${bundle}`,
@@ -1206,9 +1207,9 @@ function doctorFirstRunHint(_bundleDisplay, client) {
   const bundle = commandPath('<bundle-path>');
   return {
     bundle: '<bundle-path>',
-    command: `enigma setup --bundle ${bundle} --client auto --connect-installed --overwrite`,
+    command: `enigma quickstart --bundle ${bundle}`,
     commands: [
-      `enigma setup --bundle ${bundle} --client auto --connect-installed --overwrite`,
+      `enigma quickstart --bundle ${bundle}`,
       `enigma doctor --bundle ${bundle} --client ${clientId}`,
       `enigma drive health --bundle ${bundle}`,
     ],
@@ -2023,13 +2024,13 @@ function firstRunStatusSummary({ bundlePath, activeCount, tombstoneCount, receip
     primary_action: hasMemory
       ? {
         id: 'connect_ai_app',
-        label: 'Connect an AI app',
-        command: `enigma setup --bundle "${bundleDisplay}" --client auto --connect-installed --overwrite`,
+        label: 'Preview AI app connection',
+        command: 'enigma connect <client> --bundle "<bundle-path>" --dry-run',
       }
       : {
         id: 'import_or_remember_first_memory',
-        label: 'Import or remember first memory',
-        command: 'enigma import text --file <memories.md> --complete',
+        label: 'Remember first memory',
+        command: 'enigma remember --bundle "<bundle-path>" --text-file <memories.md> --plain',
       },
     lanes: {
       memory_drive: { status: 'ready', label: 'Memory Drive exists' },
@@ -2798,7 +2799,7 @@ async function nextCommand(flags, io) {
       primary_action: {
         id: 'run_quickstart',
         label: 'Create Memory Drive',
-        command: `enigma quickstart --bundle "${bundleDisplay}" --overwrite`,
+        command: `enigma quickstart --bundle "${bundleDisplay}" --plain`,
       },
       issue_codes: [bundleStatus.reason || 'bundle_missing'],
       bundle_initialized: bundleStatus,

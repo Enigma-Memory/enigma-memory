@@ -89,6 +89,7 @@ test('setup default creates local Memory Passport artifacts without connector wr
     assert.equal(summary.context_item_count, 1);
     assert.ok(summary.next_commands.some((command) => command.startsWith('enigma search ')));
     assert.ok(summary.next_commands.some((command) => command.startsWith('enigma context ')));
+    assert.ok(summary.next_commands.some((command) => command.startsWith('enigma export ')));
     assert.ok(summary.next_commands.some((command) => command.startsWith('enigma verify ')));
     assert.ok(summary.next_commands.some((command) => command.startsWith('enigma connect generic-mcp ') && command.endsWith(' --dry-run')));
     assert.equal(summary.connectors.length, DEFAULT_SETUP_CLIENTS.length);
@@ -428,7 +429,7 @@ test('doctor reports first-run diagnostics without echoing local paths', async (
     assert.equal(summary.ok, false);
     assert.equal(summary.setup_status.state, 'setup_needed');
     assert.equal(summary.setup_status.setup_needed, true);
-    assert.equal(summary.setup_status.next_command, 'enigma setup --bundle "<bundle-path>" --client auto --connect-installed --overwrite');
+    assert.equal(summary.setup_status.next_command, 'enigma quickstart --bundle "<bundle-path>"');
     assert.deepEqual(summary.setup_status.reasons, ['bundle_missing']);
     assert.deepEqual(summary.bundle_initialized, {
       ok: false,
@@ -440,17 +441,17 @@ test('doctor reports first-run diagnostics without echoing local paths', async (
     });
     assert.equal(summary.bundle_default_path.resolved, '<bundle-path>');
     assert.deepEqual(summary.connectors.clients.map((client) => client.config_path), ['[redacted:config_path]']);
-    assert.ok(summary.next_commands.some((command) => command.startsWith('enigma setup ')));
+    assert.ok(summary.next_commands.some((command) => command.startsWith('enigma quickstart ')));
     assert.ok(summary.next_commands.some((command) => command.startsWith('enigma connect generic-mcp ')));
     assert.equal(summary.first_run_hint.bundle, '<bundle-path>');
-    assert.equal(summary.first_run_hint.command, 'enigma setup --bundle "<bundle-path>" --client auto --connect-installed --overwrite');
+    assert.equal(summary.first_run_hint.command, 'enigma quickstart --bundle "<bundle-path>"');
     assert.deepEqual(summary.first_run_hint.commands, [
-      'enigma setup --bundle "<bundle-path>" --client auto --connect-installed --overwrite',
+      'enigma quickstart --bundle "<bundle-path>"',
       'enigma doctor --bundle "<bundle-path>" --client generic-mcp',
       'enigma drive health --bundle "<bundle-path>"',
     ]);
     assert.deepEqual(summary.fresh_install_hint, summary.first_run_hint);
-    assert.equal(summary.next_commands[0], 'enigma setup --bundle "<bundle-path>" --client auto --connect-installed --overwrite');
+    assert.equal(summary.next_commands[0], 'enigma quickstart --bundle "<bundle-path>"');
   } finally {
     if (previousUserAgent === undefined) {
       delete process.env.npm_config_user_agent;
@@ -574,9 +575,9 @@ test('doctor explains connector bundle mismatch as first-run state without local
   assert.deepEqual(summary.connectors.clients.map((client) => client.config_path), ['[redacted:config_path]']);
   assert.deepEqual(summary.connectors.clients[0].repair_reasons, ['bundle_env_mismatch']);
   assert.equal(summary.first_run_hint.bundle, '<bundle-path>');
-  assert.equal(summary.first_run_hint.command, 'enigma setup --bundle "<bundle-path>" --client auto --connect-installed --overwrite');
+  assert.equal(summary.first_run_hint.command, 'enigma quickstart --bundle "<bundle-path>"');
   assert.deepEqual(summary.first_run_hint.commands, [
-    'enigma setup --bundle "<bundle-path>" --client auto --connect-installed --overwrite',
+    'enigma quickstart --bundle "<bundle-path>"',
     'enigma doctor --bundle "<bundle-path>" --client generic-mcp',
     'enigma drive health --bundle "<bundle-path>"',
   ]);
@@ -594,7 +595,7 @@ test('doctor plain output gives one readable next action without JSON or paths',
     assert.match(stdout, /^Enigma doctor\n/);
     assert.match(stdout, /Status: Needs attention/);
     assert.match(stdout, /Setup: setup_needed/);
-    assert.match(stdout, /Run: enigma setup --bundle "<bundle-path>" --client auto --connect-installed --overwrite/);
+    assert.match(stdout, /Run: enigma quickstart --bundle "<bundle-path>"/);
     assert.match(stdout, /Boundary: local Enigma checks only/);
     assert.doesNotMatch(stdout, /^\s*\{/);
     assert.equal(stdout.includes(dir), false);

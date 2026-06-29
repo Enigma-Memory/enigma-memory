@@ -266,6 +266,7 @@ test('status reports passport counts and roots without raw memory', async () => 
       assert.equal(json.first_run_status.schema, 'enigma.first_run_status.v1');
       assert.equal(json.first_run_status.state, 'ready_for_app_connection');
       assert.equal(json.first_run_status.primary_action.id, 'connect_ai_app');
+      assert.equal(json.first_run_status.primary_action.command, 'enigma connect <client> --bundle "<bundle-path>" --dry-run');
       assert.equal(json.first_run_status.lanes.import_sandbox.status, 'ready');
       assert.equal(json.first_run_status.claim_boundaries.raw_memory_returned, false);
       assert.equal(JSON.stringify(json.first_run_status).includes(bundlePath), false);
@@ -283,7 +284,7 @@ test('status first-run summary points empty vaults to import sandbox', async () 
     assert.equal(json.first_run_status.state, 'needs_first_memory');
     assert.equal(json.first_run_status.primary_action.id, 'import_or_remember_first_memory');
     assert.equal(json.first_run_status.lanes.memory_inventory.status, 'empty');
-    assert.equal(json.first_run_status.lanes.import_sandbox.next_action, 'preview_text_or_markdown_import');
+    assert.equal(json.first_run_status.primary_action.command, 'enigma remember --bundle "<bundle-path>" --text-file <memories.md> --plain');
     assert.equal(JSON.stringify(json.first_run_status).includes(bundlePath), false);
     assert.doesNotMatch(stdout, /plaintext canary/);
   },
@@ -313,7 +314,7 @@ test('next plain output is readable and path-redacted before setup', async () =>
     assert.equal(code, 0);
     assert.match(stdout, /Enigma next/);
     assert.match(stdout, /Status: Create Memory Drive/);
-    assert.match(stdout, /Run: enigma quickstart --bundle "<bundle-path>" --overwrite/);
+    assert.match(stdout, /Run: enigma quickstart --bundle "<bundle-path>" --plain/);
     assert.doesNotMatch(stdout, /^\s*\{/);
     assert.equal(stdout.includes(dir), false);
   } finally {
@@ -330,6 +331,7 @@ test('next uses first-run status when the bundle exists', async () => withBundle
       assert.equal(json.schema, 'enigma.next_action.v1');
       assert.equal(json.state, 'ready_for_app_connection');
       assert.equal(json.primary_action.id, 'connect_ai_app');
+      assert.equal(json.primary_action.command, 'enigma connect <client> --bundle "<bundle-path>" --dry-run');
       assert.equal(json.lanes.import_sandbox.status, 'ready');
       assert.equal(stdout.includes('next command private canary'), false);
       assert.equal(stdout.includes(bundlePath), false);
@@ -343,7 +345,7 @@ test('next plain output summarizes populated setup without raw memory', async ()
     test: async (bundlePath) => {
       const { code, stdout } = await runCliText(['next', '--format', 'text', '--bundle', bundlePath]);
       assert.equal(code, 0);
-      assert.match(stdout, /Status: Connect an AI app/);
+      assert.match(stdout, /Status: Preview AI app connection/);
       assert.match(stdout, /memory drive: Memory Drive exists/);
       assert.match(stdout, /import sandbox: Import Sandbox ready/);
       assert.equal(stdout.includes('plain next private canary'), false);
