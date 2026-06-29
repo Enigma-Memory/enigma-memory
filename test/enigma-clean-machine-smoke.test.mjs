@@ -5,7 +5,7 @@ import { mkdtemp, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { promisify } from 'node:util';
-import { CLEAN_MACHINE_SMOKE_SCHEMA, publicSafePath, renderSmokePlain, runSmoke } from '../scripts/run-clean-machine-smoke.mjs';
+import { CLEAN_MACHINE_SMOKE_PLAN_SCHEMA, CLEAN_MACHINE_SMOKE_SCHEMA, buildCleanMachineSmokePlan, publicSafePath, renderSmokePlain, renderSmokePlanPlain, runSmoke } from '../scripts/run-clean-machine-smoke.mjs';
 
 const execFileAsync = promisify(execFile);
 const SCRIPT = resolve('scripts/run-clean-machine-smoke.mjs');
@@ -96,6 +96,50 @@ test('clean-machine smoke CLI plain stdout writes JSON evidence separately', asy
   assert.doesNotMatch(stdout, /^\s*\{/);
   const written = JSON.parse(await readFile(out, 'utf8'));
   assert.equal(written.schema, CLEAN_MACHINE_SMOKE_SCHEMA);
+  assert.equal(stdout.includes(dir), false);
+  assert.equal(stdout.includes(out), false);
+});
+
+test('clean-machine smoke dry-run plan is public-safe and non-inspecting', () => {
+  const plan = buildCleanMachineSmokePlan(new Date('2026-06-23T12:00:00.000Z'));
+  const plain = renderSmokePlanPlain(plan);
+  const serialized = JSON.stringify(plan);
+
+  assert.equal(plan.schema, CLEAN_MACHINE_SMOKE_PLAN_SCHEMA);
+  assert.equal(plan.safety.dry_run, true);
+  assert.equal(plan.safety.system_inspection_performed, false);
+  assert.equal(plan.safety.network_performed, false);
+  assert.equal(plan.safety.release_action_performed, false);
+  assert.match(plan.command, /run-clean-machine-smoke\.mjs --plain --out \.enigma\/public-beta\/clean-machine-smoke\.json/);
+  assert.deepEqual(plan.steps.map((step) => step.step_id), [
+    'install_desktop_app',
+    'create_memory_drive',
+    'connect_or_skip_client',
+    'run_health_check',
+    'export_public_safe_report',
+  ]);
+  assert.match(plain, /^Enigma clean-machine smoke plan\n/);
+  assert.match(plain, /Step: install_desktop_app/);
+  assert.match(plain, /Boundary: plan only/);
+  assert.doesNotMatch(plain, /^\s*\{/);
+  assert.doesNotMatch(serialized, /C:\\Users\\|\/home\/|\/tmp\/|AppData\\Local/i);
+  assert.doesNotMatch(serialized, /raw_memory|prompt:|transcript:|provider_response|api[_-]?key|password/i);
+});
+
+test('clean-machine smoke CLI dry-run writes plan without probing machine', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-clean-machine-smoke-plan-'));
+  const out = join(dir, 'plan.json');
+  const { stdout, stderr } = await execFileAsync(process.execPath, [SCRIPT, '--dry-run', '--plain', '--out', out], {
+    windowsHide: true,
+    env: { ...process.env, UPDATER_MANIFEST_URL: 'http://127.0.0.1:9/manifest.json' },
+  });
+
+  assert.equal(stderr.trim(), '');
+  assert.match(stdout, /^Enigma clean-machine smoke plan\n/);
+  assert.match(stdout, /no system inspection, network action, release action/);
+  const written = JSON.parse(await readFile(out, 'utf8'));
+  assert.equal(written.schema, CLEAN_MACHINE_SMOKE_PLAN_SCHEMA);
+  assert.equal(written.safety.network_performed, false);
   assert.equal(stdout.includes(dir), false);
   assert.equal(stdout.includes(out), false);
 });

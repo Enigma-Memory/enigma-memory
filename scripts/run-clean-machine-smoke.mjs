@@ -14,6 +14,7 @@ import { verifyPublicSafeArtifact } from '../packages/core/src/index.js';
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const ROOT = path.resolve(path.dirname(SCRIPT_PATH), '..');
 export const CLEAN_MACHINE_SMOKE_SCHEMA = 'enigma.clean_machine_smoke.v1';
+export const CLEAN_MACHINE_SMOKE_PLAN_SCHEMA = 'enigma.clean_machine_smoke_plan.v1';
 const DEFAULT_MANIFEST_URL = 'https://enigmamemory.com/releases/desktop/manifest.json';
 const STATUS_VALUES = new Set(['pass', 'fail', 'skip']);
 const LOCAL_PATH_RE = /(?:[A-Za-z]:[\\/](?:Users|Windows|ProgramData|Program Files)[\\/][^\s<>|?*]+|\/(?:Users|home|tmp|var|opt|usr|etc|private|Volumes)\/[^\s<>]*)/u;
@@ -239,6 +240,71 @@ export async function runSmoke() {
   return report;
 }
 
+export function buildCleanMachineSmokePlan(now = new Date()) {
+  const plan = {
+    schema: CLEAN_MACHINE_SMOKE_PLAN_SCHEMA,
+    generated_at: now.toISOString(),
+    command: 'node scripts/run-clean-machine-smoke.mjs --plain --out .enigma/public-beta/clean-machine-smoke.json',
+    steps: [
+      {
+        step_id: 'install_desktop_app',
+        title: 'Install the desktop app',
+        action: 'Use the desktop installer supplied by the release owner for this platform, then open Enigma Memory.',
+        expected_evidence: 'The app opens and the clean-machine smoke command can inspect the app without printing local paths.',
+      },
+      {
+        step_id: 'create_memory_drive',
+        title: 'Create the Memory Drive',
+        action: 'Click Create Memory Drive and keep the recommended local storage location.',
+        expected_evidence: 'The smoke report records a local vault check without exposing file names or memory contents.',
+      },
+      {
+        step_id: 'connect_or_skip_client',
+        title: 'Connect or skip an AI app',
+        action: 'Use the in-app preview-first connector path. If no supported app is installed, continue without connecting one.',
+        expected_evidence: 'The smoke report records connector presence, absence, or skip state without showing config JSON.',
+      },
+      {
+        step_id: 'run_health_check',
+        title: 'Run health check',
+        action: 'Click Run health check in the desktop app, then leave the local engine running.',
+        expected_evidence: 'The smoke report records local service readiness using status codes and hashes only.',
+      },
+      {
+        step_id: 'export_public_safe_report',
+        title: 'Export public-safe smoke evidence',
+        action: 'Run the clean-machine smoke command and attach only the JSON report it writes.',
+        expected_evidence: 'The report uses schema enigma.clean_machine_smoke.v1 and contains no raw memory, local paths, provider responses, credentials, screenshots, or account identifiers.',
+      },
+    ],
+    safety: {
+      dry_run: true,
+      system_inspection_performed: false,
+      network_performed: false,
+      release_action_performed: false,
+      local_paths_included: false,
+      memory_text_included: false,
+    },
+    claim_boundary: 'Clean-machine smoke plan only. It performs no release action, upload, external account action, AI-provider action, billing claim, or legal review.',
+  };
+  const safety = verifyPublicSafeArtifact(plan);
+  if (!safety.ok) throw new Error(`clean-machine smoke plan is not public-safe: ${safety.errors.join('; ')}`);
+  return plan;
+}
+
+export function renderSmokePlanPlain(plan) {
+  const lines = [
+    'Enigma clean-machine smoke plan',
+    `Command: ${plan.command}`,
+    `Steps: ${Array.isArray(plan.steps) ? plan.steps.length : 0}`,
+  ];
+  for (const step of Array.isArray(plan.steps) ? plan.steps : []) {
+    lines.push(`Step: ${step.step_id} — ${step.title}`);
+  }
+  lines.push('Boundary: plan only; no system inspection, network action, release action, raw memory, local paths, provider responses, credentials, screenshots, account identifiers, provider deletion, model behavior, signing, notarization, benchmark superiority, token ROI, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
 export function renderSmokePlain(report) {
   const counts = report.summary?.counts ?? {};
   const lines = [
@@ -260,9 +326,9 @@ export function renderSmokePlain(report) {
 
 
 function usage() {
-  return `Usage: node scripts/run-clean-machine-smoke.mjs [--json|--plain] [--out <path>]
+  return `Usage: node scripts/run-clean-machine-smoke.mjs [--json|--plain] [--out <path>] [--dry-run]
 
-Run clean-machine smoke checks and emit a public-safe report. --out always writes JSON evidence; --plain controls stdout only.
+Run clean-machine smoke checks and emit a public-safe report. --out always writes JSON evidence; --plain controls stdout only. --dry-run emits a public-safe collection plan and performs no system inspection, network request, or release action.
 `;
 }
 
@@ -270,6 +336,7 @@ async function main() {
   const argv = process.argv.slice(2);
   const json = argv.includes('--json');
   const plain = argv.includes('--plain') || argv.includes('--text') || argv.includes('--format=text') || argv.some((arg, index) => arg === '--format' && argv[index + 1] === 'text');
+  const dryRun = argv.includes('--dry-run') || argv.includes('--plan');
   if (json && plain) throw new Error('Choose only one output format: --json or --plain.');
   const outIndex = argv.indexOf('--out');
   const outPath = outIndex >= 0 ? argv[outIndex + 1] : null;
@@ -280,9 +347,9 @@ async function main() {
     return;
   }
 
-  const report = await runSmoke();
+  const report = dryRun ? buildCleanMachineSmokePlan() : await runSmoke();
   const evidenceJson = JSON.stringify(report, null, 2);
-  const output = plain ? renderSmokePlain(report) : `${evidenceJson}\n`;
+  const output = plain ? (dryRun ? renderSmokePlanPlain(report) : renderSmokePlain(report)) : `${evidenceJson}\n`;
 
   if (outPath) {
     const resolved = path.resolve(outPath);
