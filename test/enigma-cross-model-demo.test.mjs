@@ -110,3 +110,31 @@ test('cross-model demo writes optional public-safe report', async () => {
   assert.deepEqual(fileReport.profiles.map((profile) => profile.profile), EXPECTED_PROFILES);
   assert.equal(fileReport.claim_boundaries.compliance_certification, false);
 });
+
+test('cross-model demo plain output is readable, path-redacted, and claim-bounded', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-cross-model-demo-plain-'));
+  const bundlePath = join(dir, 'bundle.json');
+  const outPath = join(dir, 'report.json');
+  const memoryPath = join(dir, 'private-memory.txt');
+  const privateMemory = 'private cross model plain phrase must never be echoed';
+  await writeFile(memoryPath, privateMemory, 'utf8');
+
+  const io = makeIo();
+  assert.equal(await main(['demo', 'cross-model', '--bundle', bundlePath, '--out', outPath, '--memory-file', memoryPath, '--plain'], io.io), 0, io.stderr());
+  const stdout = io.stdout();
+
+  assert.match(stdout, /^Enigma cross-model demo\n/);
+  assert.match(stdout, /Status: Ready/);
+  assert.match(stdout, /Profiles: 5/);
+  assert.match(stdout, /Provider credentials: not required/);
+  assert.match(stdout, /Provider native memory: not claimed/);
+  assert.match(stdout, /Report: written to <out>/);
+  assert.match(stdout, /Profile: /);
+  assert.match(stdout, /Next: enigma context --bundle <bundle-path> --proof --plain/);
+  assert.match(stdout, /Boundary: local cross-model proof demo only/);
+  assert.doesNotMatch(stdout, /^\s*\{/);
+  assert.equal(stdout.includes(privateMemory), false);
+  assert.equal(stdout.includes(dir), false);
+  assert.equal(stdout.includes(bundlePath), false);
+  assert.equal(stdout.includes(outPath), false);
+});

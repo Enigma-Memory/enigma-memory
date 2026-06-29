@@ -1571,6 +1571,32 @@ function buildCrossModelProfileSummaries({ vault, passport, demoMemoryAddr, limi
   return profiles;
 }
 
+function renderCrossModelDemoPlain(report) {
+  const profiles = Array.isArray(report.profiles) ? report.profiles : [];
+  const lines = [
+    'Enigma cross-model demo',
+    `Status: ${report.ok ? 'Ready' : 'Needs attention'}`,
+    `Profiles: ${report.profile_count ?? profiles.length}`,
+    `Memories: ${report.memory_count ?? 0}`,
+    `Receipts: ${report.receipt_count ?? 0}`,
+    `Generated receipts: ${report.generated_receipt_count ?? 0}`,
+    `Memory source: ${report.memory_source ?? 'generic_demo'}`,
+    `Provider credentials: ${report.provider_credentials_required ? 'required' : 'not required'}`,
+    `Provider native memory: ${report.provider_native_memory_canonical ? 'claimed' : 'not claimed'}`,
+  ];
+  if (report.out_written) lines.push('Report: written to <out>');
+  for (const profile of profiles.slice(0, 5)) lines.push(`Profile: ${profile.label ?? profile.profile ?? 'AI app'} — ${profile.memory_count ?? 0} memory refs, ${profile.receipt_count ?? 0} receipts`);
+  lines.push('Next: enigma context --bundle <bundle-path> --proof --plain');
+  lines.push('Boundary: local cross-model proof demo only; no raw memory, local paths, provider calls, provider deletion, model behavior, hosted service, benchmark, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printCrossModelDemoReport(report, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderCrossModelDemoPlain(report));
+  else print(report, io);
+}
+
+
 export async function crossModelDemoCommand(flags, io) {
   const bundleFlag = getFlag(flags, ['bundle', 'file']);
   if (bundleFlag === true || bundleFlag === '') throw new Error('Missing required --bundle.');
@@ -1653,7 +1679,7 @@ export async function crossModelDemoCommand(flags, io) {
     claim_boundaries: { ...CROSS_MODEL_CLAIM_BOUNDARIES },
   };
   if (outPath !== undefined) await writeJson(outPath, report);
-  print(report, io);
+  printCrossModelDemoReport(report, flags, io);
   return 0;
 }
 
@@ -4256,6 +4282,7 @@ function usage() {
       '--memory-file <path>': 'Seed the demo from a local file without echoing plaintext. Alias: --text-file.',
       '--out <path>': 'Write the same public-safe JSON report to a local file.',
       '--limit <n>': 'Maximum active memories per generated profile context pack. Defaults to 1 for the same-memory demo story.',
+      '--plain': 'Print a path-redacted cross-model proof summary instead of JSON. Alias: --text or --format text.',
     },
     native_host: {
       bin: 'enigma-native-host',
