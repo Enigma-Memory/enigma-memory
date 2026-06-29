@@ -1151,11 +1151,11 @@ function oneCommandInstallConnect(bundleDisplay = DEFAULT_BUNDLE, outDirDisplay 
   if (outDirDisplay !== dirname(bundleDisplay)) parts.push(`--out-dir ${commandPath(outDirDisplay)}`);
   const base = parts.join(' ');
   return {
-    installed_clients: `${base} --client auto --connect-installed --overwrite`,
-    claude_desktop: `${base} --client claude-desktop --write-connectors --overwrite`,
-    cursor: `${base} --client cursor --write-connectors --overwrite`,
-    kimi_code: `${base} --client kimi-code --write-connectors --overwrite`,
-    vscode_cline: `${base} --client vscode-cline --write-connectors --overwrite`,
+    installed_clients: `${base} --client auto --connect-installed`,
+    claude_desktop: `${base} --client claude-desktop --write-connectors`,
+    cursor: `${base} --client cursor --write-connectors`,
+    kimi_code: `${base} --client kimi-code --write-connectors`,
+    vscode_cline: `${base} --client vscode-cline --write-connectors`,
   };
 }
 
@@ -2353,7 +2353,7 @@ function renderInstallPlain(summary) {
     `MCP command: ${summary.mcp_command ?? 'enigma-mcp'}`,
   ];
   if (summary.out) lines.push('Snippets: written to <out>');
-  lines.push(`Next: enigma connect ${firstClient} --bundle <bundle-path>`);
+  lines.push(`Next: enigma connect ${firstClient} --bundle <bundle-path> --dry-run`);
   lines.push('Boundary: local install snippet planning only; no raw memory, local paths, provider launch, provider deletion, model behavior, hosted service, or signing claims.');
   return `${lines.join('\n')}\n`;
 }
@@ -4589,13 +4589,13 @@ Usage: enigma <command> [options]
 
 Quick start:
   npm install -g enigma-memory
-  enigma setup --bundle "$HOME/.enigma/bundle.json" --client auto --connect-installed --overwrite
+  enigma quickstart --bundle "$HOME/.enigma/bundle.json"
   enigma doctor --bundle "$HOME/.enigma/bundle.json"
+  enigma connect claude-desktop --bundle "$HOME/.enigma/bundle.json" --dry-run
   echo "Your memory text" > memory.txt
   enigma remember --bundle "$HOME/.enigma/bundle.json" --text-file memory.txt
   enigma search  --bundle "$HOME/.enigma/bundle.json" --query "your topic"
   enigma context --bundle "$HOME/.enigma/bundle.json" --query "your topic" --out "$HOME/.enigma/context-pack.json"
-  enigma verify --export "$HOME/.enigma/export.json"
 
 Windows CMD uses %USERPROFILE% instead of $HOME:
   enigma remember --bundle "%USERPROFILE%\\.enigma\\bundle.json" --text-file memory.txt
@@ -4789,11 +4789,11 @@ function usage() {
       '--plain': 'Print a human-readable setup summary with next commands instead of JSON. Alias: --text or --format text.',
     },
     install_options: {
-      'one-command installed clients': 'npm install -g enigma-memory && enigma setup --client auto --connect-installed --overwrite',
-      'one-command Claude Desktop': 'npm install -g enigma-memory && enigma setup --client claude-desktop --write-connectors --overwrite',
-      'one-command Cursor': 'npm install -g enigma-memory && enigma setup --client cursor --write-connectors --overwrite',
-      'one-command Kimi Code': 'npm install -g enigma-memory && enigma setup --client kimi-code --write-connectors --overwrite',
-      'one-command VS Code Cline': 'npm install -g enigma-memory && enigma setup --client vscode-cline --write-connectors --overwrite',
+      'one-command installed clients': 'npm install -g enigma-memory && enigma setup --client auto --connect-installed',
+      'one-command Claude Desktop': 'npm install -g enigma-memory && enigma setup --client claude-desktop --write-connectors',
+      'one-command Cursor': 'npm install -g enigma-memory && enigma setup --client cursor --write-connectors',
+      'one-command Kimi Code': 'npm install -g enigma-memory && enigma setup --client kimi-code --write-connectors',
+      'one-command VS Code Cline': 'npm install -g enigma-memory && enigma setup --client vscode-cline --write-connectors',
       '--client <id>': 'Limit generated MCP snippets to one supported client.',
       '--out <path>': 'Write generated MCP snippets to a JSON file for review without hand-editing client config JSON.',
       '--plain': 'Print a path-redacted install/connect summary instead of JSON snippets. Alias: --text or --format text.',
