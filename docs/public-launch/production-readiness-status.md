@@ -58,6 +58,7 @@
 - First-run collisions now keep `--plain` output human-readable and path-redacted; setup, quickstart, and test-drive print a safe overwrite/different-output recovery action instead of falling back to JSON.
 - First-run `status`, `next`, and `doctor` guidance now defaults to non-destructive quickstart/remember/connect dry-run commands; export is recommended before verify so consumers do not see stale verification guidance.
 - `enigma doctor --plain` now explains first-run bundle-missing and connector-bundle mismatch causes directly before the next safe quickstart/connect dry-run action.
+- Release owners can run `npm run public-beta:review` for a single local command that writes `.enigma/public-beta/evidence-manifest.json`, writes `.enigma/public-beta/qa-matrix.json`, and prints the bounded Advisor summary while treating missing evidence files as blockers instead of script errors.
 - Release owners can generate the one-file QA evidence input manifest with `npm run public-beta:evidence-manifest -- --out .enigma/public-beta/evidence-manifest.json --plain`, then run `npm run public-beta:advisor -- --evidence-manifest .enigma/public-beta/evidence-manifest.json` for the one-screen Advisor hold/ship summary.
 - Release owners can also run `node scripts/run-public-beta-qa-matrix.mjs --plain` directly, `node scripts/run-clean-machine-smoke.mjs --plain --out <smoke.json>` for readable clean-machine QA stdout, `node scripts/build-support-dry-run-summary.mjs ... --plain --out <summary.json>` for readable support dry-run evidence, `node scripts/release-evidence-desktop.mjs --plain` for readable desktop release evidence, `npm run cloudflare:pages:packet -- --plain ...` for readable Cloudflare Pages release-packet output, `npm run cloudflare:token-policy -- --plain ...` for readable least-privilege Cloudflare token policy output, `npm run cloudflare:token-request -- --plain ...` for readable Cloudflare token request-body output, `npm run production:manifest -- --plain ...` for readable infrastructure readiness manifest output, `npm run production:storage -- --plain ...` for readable storage migration output, `npm run production:backend-env -- --plain ...` for readable backend env-template output, `npm run production:evidence-starter -- --plain ...` for readable operator evidence starter output, `npm run production:handoff -- --plain ...` for readable operator handoff output, `npm run production:goal-audit -- --plain ...` for readable objective/blocker audit output, `npm run production:dependencies -- --plain ...` for readable dependency blocker output, `npm run production:workplan -- --plain ...` for readable ordered launch planning, `npm run production:unblocker -- --plain` for readable go-live blocker guidance, `npm run production:status -- --plain ...` for readable launch-status board output, `npm run production:orchestration -- --plain ...` for readable Workflowz-style lane orchestration, `npm run registry:verify -- --plain --skip-network` for readable registry install planning, and `node scripts/build-installer-assets.mjs --plain` for readable source-installer asset planning while preserving JSON artifacts.
 - Browser extension packaging now supports `node scripts/package-browser-extension.mjs --plain` so release owners can review deterministic ZIP readiness, checksums, and safety boundaries without exposing local paths or claiming browser-store submission.
@@ -90,6 +91,7 @@
 - `node --test test/enigma-chain-cli.test.mjs` at repo root: **8/8 pass**.
 - `node --test test/enigma-public-beta-qa-matrix.test.mjs` at repo root: **17/17 pass**.
 - `node --test test/enigma-public-beta-evidence-manifest.test.mjs` at repo root: **3/3 pass**.
+- `node --test test/enigma-public-beta-review.test.mjs` at repo root: **4/4 pass**.
 - `node --test test/enigma-clean-machine-smoke.test.mjs` at repo root: **5/5 pass**.
 - `node --test test/enigma-support-dry-run.test.mjs` at repo root: **9/9 pass**.
 - `node --test test/enigma-release-evidence-desktop.test.mjs` at repo root: **13/13 pass**.
@@ -116,10 +118,11 @@
 - `node --test test/enigma-search-status.test.mjs` at repo root: **10/10 pass**.
 - `node --test test/enigma-desktop-public-launch.test.mjs` at repo root: **8/8 pass**.
 - `npm run public-beta:advisor` at repo root: **pass**; Advisor decision remains **HOLD** with evidence-manifest collection guidance.
+- `npm run public-beta:review` at repo root: **pass**; writes public-safe evidence manifest and QA matrix artifacts while Advisor decision remains **HOLD**.
 - `npm run production:site -- --site website` at repo root: **pass**.
 - `npm run check` at repo root: **pass**.
 - `npm run secret-scan` at repo root: **pass**.
-- `npm test` at repo root: **669/669 pass**.
+- `npm test` at repo root: **673/673 pass**.
 - `npm pack --dry-run` at repo root: **pass** (`enigma-memory-0.1.19.tgz` dry-run output).
 - `npm run public-beta-qa` at repo root: **hold**, `20 blocked / 1 pending / 0 missing`, required public beta version `0.1.19`.
 - Hosted PR checks must still pass after each pushed branch commit; local gates do not replace PR approval/merge or signing evidence.
