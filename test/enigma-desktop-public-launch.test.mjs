@@ -418,7 +418,7 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
 });
 
 test('public website explains consumer install path without unsupported claims', async () => {
-  const [home, download, setup, websiteStyles, help, launchStatus, installGuide, macosInstall, windowsInstall, connectApps, otherClients, onboardingUx] = await Promise.all([
+  const [home, download, setup, websiteStyles, help, launchStatus, installGuide, macosInstall, windowsInstall, connectApps, otherClients, developerCli, onboardingUx] = await Promise.all([
     readWebsiteFile('index.html'),
     readWebsiteFile('download.html'),
     readWebsiteFile('setup.html'),
@@ -430,6 +430,7 @@ test('public website explains consumer install path without unsupported claims',
     readWebsiteFile('help/install/windows.html'),
     readWebsiteFile('help/connect-apps.html'),
     readWebsiteFile('help/connect-apps/other-supported-clients.html'),
+    readWebsiteFile('developers/cli.html'),
     readFile(new URL('../docs/public-launch/consumer-onboarding-ux.md', import.meta.url), 'utf8'),
   ]);
   const publicWebsite = `${home}\n${download}\n${setup}\n${help}\n${launchStatus}\n${installGuide}\n${macosInstall}\n${windowsInstall}\n${connectApps}\n${otherClients}`;
@@ -444,6 +445,8 @@ test('public website explains consumer install path without unsupported claims',
   assert.match(setup, /Create Memory Drive/);
   assert.match(setup, /Preview, then approve/);
   assert.match(setup, /Memory Drive dashboard/);
+  assert.doesNotMatch(developerCli, /--overwrite/);
+  assert.match(developerCli, /enigma connect claude-desktop --bundle \.\/\.enigma\/bundle\.json --dry-run/);
   assert.match(websiteStyles, /setup-map/);
   assert.match(websiteStyles, /first-run-map/);
   assert.match(help, /Start here/);
