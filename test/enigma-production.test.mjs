@@ -36,6 +36,7 @@ const PUBLIC_BETA_QA_MATRIX_SCRIPT = 'scripts/run-public-beta-qa-matrix.mjs';
 const CLEAN_MACHINE_SMOKE_SCRIPT = 'scripts/run-clean-machine-smoke.mjs';
 const SUPPORT_DRY_RUN_SCRIPT = 'scripts/build-support-dry-run-summary.mjs';
 const CLAUDE_MCPB_PACKAGE_SCRIPT = 'scripts/build-claude-mcpb-package.mjs';
+const LOCAL_PACK_INSTALL_SCRIPT = 'scripts/verify-local-pack-install.mjs';
 const INFRASTRUCTURE_READINESS_SCHEMA = 'enigma.infrastructure_readiness.v1';
 const INFRASTRUCTURE_READINESS_MANIFEST_SCHEMA = 'enigma.infrastructure_readiness_manifest.v1';
 const INFRASTRUCTURE_READINESS_SCRIPT = 'scripts/infrastructure-readiness.mjs';
@@ -1565,12 +1566,17 @@ test('preflight release audit wiring is local-only and documented', async () => 
   assert.equal(packageFilesCover(pkg, SUPPORT_DRY_RUN_SCRIPT), true, 'support dry-run script must be included in the package file list');
   assert.equal(pkg.scripts?.['claude:mcpb:package'], `node ${CLAUDE_MCPB_PACKAGE_SCRIPT}`);
   assert.equal(packageFilesCover(pkg, CLAUDE_MCPB_PACKAGE_SCRIPT), true, 'Claude MCPB package script must be included in the package file list');
+  assert.equal(pkg.scripts?.['package:install-smoke'], `node ${LOCAL_PACK_INSTALL_SCRIPT}`);
+  assert.equal(packageFilesCover(pkg, LOCAL_PACK_INSTALL_SCRIPT), true, 'local pack install smoke script must be included in the package file list');
 
   const auditSource = await readFile(new URL(`../${RELEASE_AUDIT_SCRIPT}`, import.meta.url), 'utf8');
   assert.match(auditSource, /nodeTestInvocation/, 'release audit must run the Node test runner directly instead of nesting npm test inside npm run release:audit');
   assert.doesNotMatch(auditSource, /const test = npmInvocation\(\['test'\]\)/, 'release audit must avoid nested npm test lifecycle flake');
   assert.match(auditSource, /\.map\(\(entry\) => `test\/\$\{entry\.name\}`\)/, 'release audit must pass POSIX-style test paths to match npm test across Windows runners');
   assert.match(auditSource, /--test-concurrency=1/, 'release audit must serialize direct test-runner files on Windows to avoid child-process temp-path flake');
+  assert.match(auditSource, /local-pack-install-smoke/, 'release audit must include local packed install smoke coverage');
+  assert.match(auditSource, /verify-local-pack-install\.mjs/, 'release audit must execute the local packed install verifier');
+  assert.match(auditSource, /summarizeLocalPackInstall/, 'release audit must validate local packed install output');
   assert.match(auditSource, /runNativeHostInstallPlanGate/, 'release audit must include native install-plan coverage');
   assert.match(auditSource, /native-host['"],\s*['"]install-plan/, 'release audit must execute the native install-plan command shape');
   assert.match(auditSource, /writes_performed/, 'release audit must validate that install-plan does not write browser or OS registration state');

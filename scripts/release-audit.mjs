@@ -35,6 +35,7 @@ const RELEASE_PROVENANCE_SCHEMA = 'enigma.release_provenance.v1';
 const REVIEW_PACKET_SCHEMA = 'enigma.review_packet.v1';
 const MEMORY_OPTIMIZATION_BENCHMARK_SCHEMA = 'enigma.memory_optimization_benchmark.v1';
 const MEMORY_OPTIMIZATION_BENCHMARK_SCRIPT = join(PROJECT_ROOT, 'scripts', 'memory-optimization-benchmark.mjs');
+const LOCAL_PACK_INSTALL_SCRIPT = join(PROJECT_ROOT, 'scripts', 'verify-local-pack-install.mjs');
 const PRODUCTION_READINESS_MANIFEST_BUILDER_SCRIPT = join(PROJECT_ROOT, 'scripts', 'build-production-readiness-manifest.mjs');
 const PRODUCTION_STORAGE_MIGRATION_SCRIPT = join(PROJECT_ROOT, 'scripts', 'build-production-storage-migration.mjs');
 const OPERATOR_ACCEPTANCE_VALIDATOR_SCRIPT = join(PROJECT_ROOT, 'scripts', 'validate-operator-acceptance.mjs');
@@ -317,6 +318,24 @@ function summarizePack(stdout) {
   const tarball = lines(stdout).find((line) => line.endsWith('.tgz')) ?? null;
   if (!tarball) throw new Error('npm pack --dry-run did not report a .tgz tarball name.');
   return { tarball };
+}
+
+function summarizeLocalPackInstall(stdout) {
+  const json = parseJson(stdout);
+  requireJsonField(json, ['schema'], (value) => value === 'enigma.local_pack_install_smoke.v1', 'Local pack install smoke schema mismatch.');
+  requireJsonField(json, ['ok'], (value) => value === true, 'Local pack install smoke did not report ok: true.');
+  requireJsonField(json, ['install', 'global_install'], (value) => value === false, 'Local pack install smoke must not use global install.');
+  requireJsonField(json, ['install', 'registry_install'], (value) => value === false, 'Local pack install smoke must not use registry install.');
+  requireJsonField(json, ['install', 'npm_publish'], (value) => value === false, 'Local pack install smoke must not publish.');
+  const checks = requireJsonField(json, ['checks'], Array.isArray, 'Local pack install smoke omitted checks.');
+  if (checks.length < 3) throw new Error('Local pack install smoke did not run enough entrypoint checks.');
+  return {
+    schema: json.schema,
+    tarball: json.package?.tarball ?? null,
+    temp_prefix_install: json.install?.command === 'npm install --prefix <temp-prefix> --ignore-scripts <local-tarball>',
+    check_count: checks.length,
+    checked_entrypoints: checks.map((check) => check.entrypoint),
+  };
 }
 
 function requireJsonField(value, path, predicate, message) {
@@ -5561,6 +5580,7 @@ export async function runReleaseAudit() {
   gates.push(await runCommandGate('npm-check', check.command, check.args, { label: check.label, summarize: summarizeCheck }));
   gates.push(await runCommandGate('npm-test', test.command, test.args, { label: test.label, timeoutMs: TEST_TIMEOUT_MS, summarize: summarizeTests, summarizeFailure: summarizeNpmTestFailure }));
   gates.push(await runCommandGate('npm-pack-dry-run', pack.command, pack.args, { label: pack.label, summarize: summarizePack }));
+  gates.push(await runCommandGate('local-pack-install-smoke', process.execPath, [LOCAL_PACK_INSTALL_SCRIPT], { label: 'node scripts/verify-local-pack-install.mjs', timeoutMs: TEST_TIMEOUT_MS, summarize: summarizeLocalPackInstall }));
   gates.push(await runDirectBinSmokes());
   gates.push(await runNativeHostInstallPlanGate());
   gates.push(await runLocalProvenanceGate());
