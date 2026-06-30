@@ -8,11 +8,12 @@ Hosted cloud and BYOC operation are waitlist/operator-deploy only; they require 
 
 ## Default path: install the desktop app
 
-1. Download the signed installer for your platform from the Enigma Memory website or release page.
+1. Check the Enigma Memory launch status and download the signed installer only when your platform is marked ready for public install.
 2. Open the installer:
-   - **macOS:** Open the signed, notarized disk image or package. If Gatekeeper appears, right-click and choose Open.
-   - **Windows:** Run the signed installer. If SmartScreen appears, click More info, then Run anyway.
-   - **Linux:** Mark the AppImage executable or install the distribution package.
+   - **macOS:** Open the signed, notarized disk image or package. If Gatekeeper appears, stop and check launch status again.
+   - **Windows:** Run the signed installer. If SmartScreen appears, cancel the prompt and check launch status again.
+   - **Linux:** Verify the package signature or checksum with your distribution tools before opening the package.
+   Testing-only pre-launch builds from an official Enigma channel have separate OS-specific bypass steps in the installer-blocked help article. Do not use bypass steps for unknown sources, unofficial mirrors, email attachments, or copied links.
 3. Open Enigma Memory. The first-run setup creates your Memory Drive.
 4. Review detected AI clients, preview the connection change, and approve the clients you want to connect.
 5. Check the health dashboard and follow any fix-it guidance.

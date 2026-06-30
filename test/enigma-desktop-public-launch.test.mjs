@@ -625,6 +625,9 @@ test('public website explains consumer install path without unsupported claims',
   assert.match(readme, /enigma claude-mcpb package --plain/);
   assert.doesNotMatch(installAnywhere, /setup --client auto --connect-installed --overwrite/);
   assert.doesNotMatch(installAnywhereDefault, /canonical vault|local vault|vault bundle|Enigma-controlled local app location/i);
+  assert.match(installAnywhereDefault, /If Gatekeeper appears, stop and check launch status again/);
+  assert.match(installAnywhereDefault, /If SmartScreen appears, cancel the prompt and check launch status again/);
+  assert.doesNotMatch(installAnywhereDefault, /right-click and choose Open|More info, then Run anyway|click More info/i);
   assert.match(installAnywhere, /enigma quickstart --bundle \.\/\.enigma\/bundle\.json/);
   assert.match(installAnywhere, /enigma claude-mcpb package --plain/);
   assert.doesNotMatch(clientConnectors, /setup --client auto --connect-installed --overwrite/);
