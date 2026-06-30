@@ -28,7 +28,7 @@ Short launch line:
 
 | Audience | Problem they care about | Message | Launch CTA | Best asset |
 | --- | --- | --- | --- | --- |
-| AI application developers | Need a credible memory layer they can test without credentials or hosted setup. | Run a local test drive, generate proof artifacts, and verify them offline. | `npx --yes --package enigma-memory enigma test-drive --overwrite` | Five-command CLI walkthrough. |
+| AI application developers | Need a credible memory layer they can test without credentials or hosted setup. | Run a local test drive, generate proof artifacts, and verify them offline. | `npx --yes --package enigma-memory enigma test-drive` | Five-command CLI walkthrough. |
 | Agent framework maintainers | Need portable memory semantics across clients and tools. | Enigma can wrap agent memory with receipts, scoped grants, revocations, and proof packets. | Build against public-safe artifact schemas and refs. | Grant/revoke integration diagram. |
 | Solana builders | Need a blockchain-specific AI primitive that does not leak user data. | Anchor opaque roots and capability refs; never publish prompts, transcripts, embeddings, ACL bodies, tenant names, or raw memory. | Prototype against Solana-ready anchor batches as planning artifacts. | Private data plane / public proof rail diagram. |
 | Benchmark researchers | Need reproducible evidence without publishing private benchmark bodies. | Benchmark attestations bind report hashes to dataset, runner, package, environment, and verifier refs. | Create an attestation from a report hash and verify it locally. | Benchmark attestation packet. |
@@ -123,8 +123,7 @@ Actions:
 
    ```sh
    npx --yes --package enigma-memory enigma test-drive \
-     --out-dir .enigma/proof-network/test-drive \
-     --overwrite
+     --out-dir .enigma/proof-network/test-drive
    ```
 
 2. Explain that the command is local-only, zero-credential, and bounded to Enigma-controlled demo artifacts.
@@ -235,15 +234,14 @@ The npm hook is the public conversion path: every developer-facing launch asset 
 Primary command:
 
 ```sh
-npx --yes --package enigma-memory enigma test-drive --overwrite
+npx --yes --package enigma-memory enigma test-drive
 ```
 
 Proof-network demo variant:
 
 ```sh
 npx --yes --package enigma-memory enigma test-drive \
-  --out-dir .enigma/proof-network/test-drive \
-  --overwrite
+  --out-dir .enigma/proof-network/test-drive
 ```
 
 Required copy beside the command:
@@ -353,7 +351,7 @@ The launch should ship as one coordinated package, not as scattered claims. Each
 
 | Channel | Job | Asset to ship | CTA | Safety boundary |
 | --- | --- | --- | --- | --- |
-| NPM / install docs | Convert curiosity into a local proof trial. | Test-drive command block, expected output fields, next proof commands. | Run `npx --yes --package enigma-memory enigma test-drive --overwrite`. | No credentials, hosted account, wallet, provider call, or transaction claim. |
+| NPM / install docs | Convert curiosity into a local proof trial. | Test-drive command block, expected output fields, next proof commands. | Run `npx --yes --package enigma-memory enigma test-drive`. | No credentials, hosted account, wallet, provider call, or transaction claim. |
 | README / developer docs | Teach the artifact model. | Artifact family table, five-command walkthrough, verifier notes. | Generate and verify one local artifact. | Local verification checks shape and privacy boundaries, not real-world truth. |
 | Launch blog | Create the category. | Private data plane / public proof plane narrative. | Try the local test drive and read claim boundaries. | Solana is optional root/ref infrastructure, not raw-memory storage. |
 | Short demo video | Make the product tangible. | 90-second terminal path from test-drive to verify. | Install, test-drive, verify. | Show `transaction_submitted:false` and `raw_memory_on_chain:false`. |

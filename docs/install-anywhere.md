@@ -65,7 +65,7 @@ The local Enigma vault is the canonical memory passport. Provider-native memory 
 Optional public test drive without a global install:
 
 ```sh
-npx --yes --package enigma-memory enigma test-drive --overwrite
+npx --yes --package enigma-memory enigma test-drive
 ```
 
 ## Source checkout versus package install

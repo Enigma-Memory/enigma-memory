@@ -512,6 +512,12 @@ test('public website explains consumer install path without unsupported claims',
     readFile(new URL('../docs/public-api-reference.md', import.meta.url), 'utf8'),
     readFile(new URL('../docs/public-launch/consumer-onboarding-ux.md', import.meta.url), 'utf8'),
   ]);
+  const publicProofDocs = (await Promise.all([
+    readFile(new URL('../docs/demo-proof-network.md', import.meta.url), 'utf8'),
+    readFile(new URL('../docs/developer-proof-quickstart.md', import.meta.url), 'utf8'),
+    readFile(new URL('../docs/proof-network-demo-video-script.md', import.meta.url), 'utf8'),
+    readFile(new URL('../docs/proof-network-launch-plan.md', import.meta.url), 'utf8'),
+  ])).join('\n');
   const publicWebsite = `${home}\n${download}\n${setup}\n${vaultNotReady}\n${help}\n${launchStatus}\n${installGuide}\n${macosInstall}\n${windowsInstall}\n${connectApps}\n${claudeConnect}\n${cursorConnect}\n${otherClients}\n${troubleshooting}\n${clientNotDetected}\n${removalGuide}\n${faq}`;
   const funnelSpec = `${publicWebsite}\n${onboardingUx}`;
   const vaultBeforeAdvanced = vaultNotReady.slice(0, vaultNotReady.indexOf('Advanced command-line repair'));
@@ -551,6 +557,9 @@ test('public website explains consumer install path without unsupported claims',
   assert.match(developerEcosystem, /enigma quickstart --bundle \.\/\.enigma\/bundle\.json/);
   assert.match(developerEcosystem, /enigma connect claude-desktop --bundle \.\/\.enigma\/bundle\.json --dry-run/);
   assert.doesNotMatch(publicApiReference, /quickstart --bundle \.\/\.enigma\/bundle\.json --overwrite/);
+  assert.doesNotMatch(publicProofDocs, /test-drive --overwrite/);
+  assert.doesNotMatch(publicProofDocs, /test-drive\s+\\\n\s+--out-dir [^\n]+\\\n\s+--overwrite/);
+  assert.match(publicProofDocs, /npx --yes --package enigma-memory enigma test-drive/);
   assert.match(publicApiReference, /enigma quickstart --bundle \.\/\.enigma\/bundle\.json/);
   assert.match(publicApiReference, /enigma connect claude-desktop --bundle \.\/\.enigma\/bundle\.json --dry-run/);
   assert.match(faq, /help\/troubleshooting\/vault-not-ready\.html/);

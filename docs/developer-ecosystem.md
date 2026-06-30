@@ -25,10 +25,10 @@ enigma verify --export ./.enigma/export.json
 Optional public test-drive loop:
 
 ```sh
-npx --yes --package enigma-memory enigma test-drive --overwrite
+npx --yes --package enigma-memory enigma test-drive
 ```
 
-`enigma test-drive --overwrite` is zero-credential, local-only, and public-safe by default. It does not call external providers, contact hosted Enigma SaaS, require OpenAI/Anthropic/Cloudflare credentials, create accounts, or write third-party client configs.
+`enigma test-drive` is zero-credential, local-only, and public-safe by default when run in an empty or scratch directory. It does not call external providers, contact hosted Enigma SaaS, require OpenAI/Anthropic/Cloudflare credentials, create accounts, or write third-party client configs. If the output already exists, choose a new empty output directory; use `--overwrite` only when intentionally replacing local demo artifacts.
 
 ## Copyable starting points
 
@@ -56,7 +56,7 @@ The example app prints ids, counts, roots, and verification status only. It does
 The CI example installs Node 24, installs `enigma-memory` into a disposable npm project, exposes the package benchmark script, then runs:
 
 ```sh
-npx enigma test-drive --overwrite
+npx enigma test-drive
 npx enigma quickstart --bundle ./.enigma/bundle.json
 npx enigma doctor --bundle ./.enigma/bundle.json
 npm run benchmark:memory-suite -- --out benchmark-report.json
@@ -87,7 +87,7 @@ The proof-network path gives integrators a public, privacy-preserving adoption t
 5. Wire the same artifact contract into a connector, benchmark dashboard, or conformance test.
 
 ```sh
-npx --yes --package enigma-memory enigma test-drive --overwrite
+npx --yes --package enigma-memory enigma test-drive
 npx --yes --package enigma-memory enigma chain anchor --root sha256:8f8f... --root sha256:9a9a... --ref demo-local-vault --authority demo-public-authority --batch-ref demo-anchor-batch --out .enigma/proof-anchor-batch.json
 npx --yes --package enigma-memory enigma chain grant --subject did:example:agent --capability memory.read --scope demo-scope --resource-ref sha256:8f8f... --policy-hash sha256:7e7e... --expires-at 2026-07-01T00:00:00Z --grant-ref demo-grant --out .enigma/proof-capability-grant.json
 npx --yes --package enigma-memory enigma chain revoke --grant-hash sha256:6d6d... --reason scope-ended --revocation-ref demo-revocation --out .enigma/proof-capability-revocation.json
