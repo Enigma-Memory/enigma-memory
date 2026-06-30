@@ -598,6 +598,10 @@ test('doctor is green after bundle initialization when connector config is absen
   assert.equal(summary.setup_status.state, 'ready');
   assert.equal(summary.setup_status.setup_needed, false);
   assert.equal(summary.setup_status.next_command, null);
+  assert.equal(summary.next_commands.some((command) => command.includes('quickstart')), false);
+  assert.equal(summary.next_commands[0], 'enigma drive health --bundle "<bundle-path>"');
+  assert.equal(summary.next_commands[1], 'enigma status --bundle "<bundle-path>"');
+  assert.ok(summary.next_commands.some((command) => command === 'enigma connect generic-mcp --bundle "<bundle-path>" --dry-run'));
   assert.deepEqual(summary.bundle_initialized, {
     ok: true,
     bundle: '<bundle-path>',
@@ -607,6 +611,17 @@ test('doctor is green after bundle initialization when connector config is absen
     hint: null,
   });
   assert.deepEqual(summary.connectors.clients.map((client) => client.config_path), ['[redacted:config_path]']);
+
+  const plainIo = makeIo();
+  assert.equal(await main(['doctor', '--bundle', bundlePath, '--client', 'generic-mcp', '--config', configPath, '--plain'], plainIo.io), 0, plainIo.stderr());
+  const readyPlain = plainIo.stdout();
+  assert.match(readyPlain, /Status: Ready/);
+  assert.doesNotMatch(readyPlain, /Run: enigma quickstart/);
+  assert.match(readyPlain, /Next: enigma drive health --bundle "<bundle-path>"/);
+  assert.match(readyPlain, /Next: enigma status --bundle "<bundle-path>"/);
+  assert.match(readyPlain, /Next: enigma connect generic-mcp --bundle "<bundle-path>" --dry-run/);
+  assert.doesNotMatch(readyPlain, /^\s*\{/);
+  assert.equal(readyPlain.includes(dir), false);
 });
 
 test('doctor explains connector bundle mismatch as first-run state without local paths', async () => {

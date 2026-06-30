@@ -1223,12 +1223,19 @@ function initNextCommands({ dryRun, bundleDisplay, outDirDisplay, exportDisplay,
   return commands;
 }
 
-function doctorNextCommands(bundleDisplay, client) {
+function doctorNextCommands(bundleDisplay, client, setupState = 'setup_needed') {
   const clientId = client ?? DEFAULT_SETUP_CLIENTS[0];
   const bundle = commandPath(bundleDisplay);
+  if (setupState === 'setup_needed') {
+    return [
+      `enigma quickstart --bundle ${bundle}`,
+      `enigma doctor --bundle ${bundle} --client ${clientId}`,
+      `enigma drive health --bundle ${bundle}`,
+      `enigma status --bundle ${bundle}`,
+      nextClientPreviewCommand(clientId, `--bundle ${bundle}`),
+    ];
+  }
   return [
-    `enigma quickstart --bundle ${bundle}`,
-    `enigma doctor --bundle ${bundle} --client ${clientId}`,
     `enigma drive health --bundle ${bundle}`,
     `enigma status --bundle ${bundle}`,
     nextClientPreviewCommand(clientId, `--bundle ${bundle}`),
@@ -2741,9 +2748,14 @@ function renderDoctorPlain(summary) {
   if (reasons.length > 0) lines.push(`Issue: ${reasons.join(', ')}`);
   const explanation = doctorSetupExplanation(summary);
   if (explanation) lines.push(explanation);
-  if (summary.first_run_hint?.command) lines.push(`Run: ${summary.first_run_hint.command}`);
-  const followUps = Array.isArray(summary.next_commands) ? summary.next_commands.slice(1, 3) : [];
-  for (const command of followUps) lines.push(`Then: ${command}`);
+  if (summary.setup_status?.state === 'setup_needed' && summary.first_run_hint?.command) {
+    lines.push(`Run: ${summary.first_run_hint.command}`);
+    const followUps = Array.isArray(summary.next_commands) ? summary.next_commands.slice(1, 3) : [];
+    for (const command of followUps) lines.push(`Then: ${command}`);
+  } else {
+    const followUps = Array.isArray(summary.next_commands) ? summary.next_commands.slice(0, 3) : [];
+    for (const command of followUps) lines.push(`Next: ${command}`);
+  }
   const clients = Array.isArray(summary.connectors?.clients) ? summary.connectors.clients : [];
   if (clients.length > 0) {
     const ready = clients.filter((client) => client.status === 'ready' || client.action === 'already_configured').length;
@@ -3367,7 +3379,7 @@ export async function doctorCommand(flags, io) {
     setup_status: setupStatus,
     first_run_hint: firstRunHint,
     fresh_install_hint: firstRunHint,
-    next_commands: doctorNextCommands(checks.vault_path.path, doctorClient),
+    next_commands: doctorNextCommands(checks.vault_path.path, doctorClient, setupStatus.state),
     checks,
   };
   printDoctorSummary(summary, flags, io);
