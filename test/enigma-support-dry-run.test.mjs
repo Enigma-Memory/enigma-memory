@@ -209,6 +209,7 @@ test('support dry-run plain renderer summarizes attached artifact by hash only',
 
   assert.match(plain, /^Enigma support dry-run\n/);
   assert.match(plain, /Support artifact: attached by hash/);
+  assert.match(plain, /Support artifact hash: sha256:[a-f0-9]{64}/);
   assert.match(plain, /Allowed privacy statuses: pass, fail, blocked, not_applicable/);
   assert.match(plain, /Collection steps: run_selected_preset_with_observed_triage_result/);
   assert.doesNotMatch(plain, /memory_drive_status|service_running|C:\\Users|\/home\/|\/tmp\//i);
