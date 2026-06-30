@@ -114,6 +114,16 @@ test('public beta evidence templates are public-safe blockers, not fake evidence
     ]);
     assert.equal(diagnosticSupport.collection_guidance.support_artifact_input, 'optional_redacted_allowlisted_json_snapshot_hash_only');
     assert.match(diagnosticSupport.support_artifact_note, /hash and allowlisted status fields only/);
+    assert.deepEqual(diagnosticSupport.next_actions.map((action) => action.id), [
+      'run_support_dry_run_preset',
+      'review_support_privacy_scan',
+      'attach_support_artifact_if_safe',
+    ]);
+    assert.equal(diagnosticSupport.next_actions.find((action) => action.id === 'run_support_dry_run_preset').command, diagnosticSupport.replacement_command);
+    assert.deepEqual(diagnosticSupport.next_actions.find((action) => action.id === 'review_support_privacy_scan').required_fields, [
+      'privacy_scan.status',
+      'privacy_scan.detected_private_field_count',
+    ]);
 
     const crashSupport = JSON.parse(await readFile(join(outDir, 'support-dry-run-crash.json'), 'utf8'));
     assert.match(crashSupport.replacement_command, /--preset crash/);

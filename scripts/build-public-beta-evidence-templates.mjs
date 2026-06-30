@@ -340,6 +340,24 @@ function buildSupportDryRunTemplate({ generatedAt, scenarioId, issueCode, preset
       issue_codes: ['EVIDENCE-NEEDS-SUPPORT-RUN'],
     },
     support_artifact_snapshot: null,
+    next_actions: [
+      {
+        id: 'run_support_dry_run_preset',
+        collect: 'Run the replacement command with observed triage and privacy-check statuses.',
+        command: supportDryRunReplacementCommand({ preset, outPath }),
+        required_fields: ['triage_result', 'bundle_privacy_check_status'],
+      },
+      {
+        id: 'review_support_privacy_scan',
+        collect: 'Confirm privacy_scan.status is pass and detected_private_field_count is 0 before using evidence.',
+        required_fields: ['privacy_scan.status', 'privacy_scan.detected_private_field_count'],
+      },
+      {
+        id: 'attach_support_artifact_if_safe',
+        collect: 'Optional: attach only a redacted allowlisted support artifact snapshot; summary keeps hash/status fields only.',
+        required_fields: ['support_artifact_snapshot'],
+      },
+    ],
     claim_boundary: templateBoundary(),
   };
 }
