@@ -36,11 +36,15 @@ test('public beta evidence templates are public-safe blockers, not fake evidence
     assert.equal(report.files.length, 8);
     assert.equal(report.files.every((file) => file.path.startsWith(`${outDir}/`)), true);
     assert.match(plain, /templates only; no PR approval, merge, npm publish, signing, upload, network action/);
+    assert.equal(report.next_commands.some((command) => command.includes('production:clean-machine-smoke -- --dry-run --plain')), true);
+    assert.equal(report.next_commands.some((command) => command.includes('production:clean-machine-smoke -- --plain')), true);
     assert.equal(report.next_commands.some((command) => command.includes('--preset diagnostics')), true);
     assert.equal(report.next_commands.some((command) => command.includes('--preset crash')), true);
     assert.match(plain, /Support dry-run triage values: resolved, needs_user_action, escalated, release_blocker, blocked/);
     assert.match(plain, /Support dry-run privacy statuses: pass, fail, blocked, not_applicable/);
     assert.match(plain, /Support dry-run collection steps: run_selected_preset_with_observed_triage_result, record_bundle_privacy_check_status_from_redaction_review, attach_redacted_allowlisted_support_artifact_only_when_available, keep_private_material_out_of_public_artifact/);
+    assert.match(plain, new RegExp(`Next: npm run production:clean-machine-smoke -- --dry-run --plain --out ${outDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/clean-machine-smoke-plan\\.json`));
+    assert.match(plain, new RegExp(`Next: npm run production:clean-machine-smoke -- --plain --out ${outDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/clean-machine-smoke\\.json`));
     assert.doesNotMatch(plain, /C:\\Users|\/home\/|\/tmp\/|AppData\\Local/i);
 
     const manifest = JSON.parse(await readFile(join(outDir, 'evidence-manifest.json'), 'utf8'));
@@ -135,6 +139,8 @@ test('public beta evidence template CLI is non-destructive by default', async ()
     assert.match(first.stdout, /Enigma public beta evidence templates/);
     assert.match(first.stdout, /--preset diagnostics/);
     assert.match(first.stdout, /--preset crash/);
+    assert.match(first.stdout, /production:clean-machine-smoke -- --dry-run --plain/);
+    assert.match(first.stdout, /production:clean-machine-smoke -- --plain/);
     assert.match(first.stdout, new RegExp(`Evidence manifest: ${outDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\/evidence-manifest\.json`));
     assert.doesNotMatch(first.stdout, /C:\\Users|\/home\/|\/tmp\/|AppData\\Local/i);
 

@@ -216,6 +216,14 @@ function buildCleanMachineSmokeTemplate(generatedAt) {
   };
 }
 
+function cleanMachineSmokePlanCommand(outPath) {
+  return `npm run production:clean-machine-smoke -- --dry-run --plain --out ${outPath}`;
+}
+
+function cleanMachineSmokeEvidenceCommand(outPath) {
+  return `npm run production:clean-machine-smoke -- --plain --out ${outPath}`;
+}
+
 function supportDryRunReplacementCommand({ preset, outPath }) {
   return `npm run production:support-dry-run -- --preset ${preset} --triage-result <observed-result> --bundle-privacy-check-status <observed-status> --out ${outPath}`;
 }
@@ -368,6 +376,8 @@ export async function buildPublicBetaEvidenceTemplates(options = {}, now = new D
     await writeJsonFile(resolve(entry.path), entry.artifact, Boolean(options.overwrite));
   }
   const supportDryRunDiagnostics = `${outDir}/${TEMPLATE_FILES.supportDryRunDiagnostics}`;
+  const cleanMachineSmoke = `${outDir}/${TEMPLATE_FILES.cleanMachineSmoke}`;
+  const cleanMachineSmokePlan = `${outDir}/${TEMPLATE_FILES.cleanMachineSmokePlan}`;
   const supportDryRunCrash = `${outDir}/${TEMPLATE_FILES.supportDryRunCrash}`;
   const report = {
     schema: PUBLIC_BETA_EVIDENCE_TEMPLATES_SCHEMA,
@@ -381,6 +391,8 @@ export async function buildPublicBetaEvidenceTemplates(options = {}, now = new D
       evidence_status: entry.artifact.evidence_status ?? 'path_manifest',
     })),
     next_commands: [
+      cleanMachineSmokePlanCommand(cleanMachineSmokePlan),
+      cleanMachineSmokeEvidenceCommand(cleanMachineSmoke),
       `npm run public-beta:advisor -- --evidence-manifest ${evidenceManifest}`,
       supportDryRunReplacementCommand({ preset: 'diagnostics', outPath: supportDryRunDiagnostics }),
       supportDryRunReplacementCommand({ preset: 'crash', outPath: supportDryRunCrash }),
