@@ -20,11 +20,14 @@ enigma quickstart --bundle ./.enigma/bundle.json
 enigma claude-mcpb package --mcpb ./.enigma/claude/enigma-memory.mcpb --out ./.enigma/claude/enigma-memory-mcpb.json --plain
 enigma drive health --bundle ./.enigma/bundle.json
 enigma status --bundle ./.enigma/bundle.json
+enigma import text --file ./memories.md --complete --plain
 enigma remember --bundle ./.enigma/bundle.json --text-file ./memory.txt
 enigma search --bundle ./.enigma/bundle.json --query "project context"
 enigma context --bundle ./.enigma/bundle.json --query "project context" --optimize
 enigma verify --export ./.enigma/export.json
 ```
+
+The import command above is a preview-only first value step; it does not write the Memory Drive unless a later import uses explicit `--write-vault`.
 
 For Claude Desktop, the first supported path is the `.mcpb` extension package. The package command writes a local review artifact only; it does not install Claude, launch a provider, write Claude config, or contact a network. Open the generated `.mcpb` in Claude Desktop, choose the local Memory Drive when Claude asks, restart Claude, then test the connection from Enigma.
 

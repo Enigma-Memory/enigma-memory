@@ -285,9 +285,10 @@ test('status first-run summary points empty vaults to import sandbox', async () 
     const { code, json, stdout } = await runCli(['status', '--bundle', bundlePath]);
     assert.equal(code, 0);
     assert.equal(json.first_run_status.state, 'needs_first_memory');
-    assert.equal(json.first_run_status.primary_action.id, 'import_or_remember_first_memory');
+    assert.equal(json.first_run_status.primary_action.id, 'preview_first_import');
     assert.equal(json.first_run_status.lanes.memory_inventory.status, 'empty');
-    assert.equal(json.first_run_status.primary_action.command, 'enigma remember --bundle "<bundle-path>" --text-file <memories.md> --plain');
+    assert.equal(json.first_run_status.primary_action.command, 'enigma import text --file ./memories.md --complete --plain');
+    assert.equal(json.next_recommended_commands[0], 'enigma import text --file ./memories.md --complete --plain');
     assert.equal(JSON.stringify(json.first_run_status).includes(bundlePath), false);
     assert.doesNotMatch(stdout, /plaintext canary/);
   },

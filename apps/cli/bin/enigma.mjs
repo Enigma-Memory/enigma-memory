@@ -1192,12 +1192,15 @@ function oneCommandInstallConnect(bundleDisplay = DEFAULT_BUNDLE, outDirDisplay 
   };
 }
 
+const IMPORT_PREVIEW_COMMAND = 'enigma import text --file ./memories.md --complete --plain';
+
 function setupNextCommands(bundleInput, exportDisplay, clients, writeConnectors) {
   const primaryClient = clients[0] ?? DEFAULT_SETUP_CLIENTS[0];
   const bundle = commandPath(bundleInput);
   const commands = [
     `enigma status --bundle ${bundle}`,
     `enigma drive health --bundle ${bundle}`,
+    IMPORT_PREVIEW_COMMAND,
     `enigma remember --bundle ${bundle} --text-file ./memory.txt --plain`,
     `enigma search --bundle ${bundle} --query "project context"`,
     `enigma context --bundle ${bundle} --query "project context"`,
@@ -2071,9 +2074,9 @@ function firstRunStatusSummary({ bundlePath, activeCount, tombstoneCount, receip
         command: 'enigma connect <client> --bundle "<bundle-path>" --dry-run',
       }
       : {
-        id: 'import_or_remember_first_memory',
-        label: 'Remember first memory',
-        command: 'enigma remember --bundle "<bundle-path>" --text-file <memories.md> --plain',
+        id: 'preview_first_import',
+        label: 'Preview first memory import',
+        command: IMPORT_PREVIEW_COMMAND,
       },
     lanes: {
       memory_drive: { status: 'ready', label: 'Memory Drive exists' },
@@ -2136,6 +2139,7 @@ function passportStatusReport({ bundlePath, bundleDisplay = publicPathDisplay(bu
     connector_readiness: connectorReadinessSummary(safeBundle),
     first_run_status: firstRunStatusSummary({ bundlePath: safeBundle, activeCount, tombstoneCount, receiptCount }),
     next_recommended_commands: [
+      IMPORT_PREVIEW_COMMAND,
       `enigma remember --bundle ${quotedBundle} --text-file <path>`,
       `enigma search --bundle ${quotedBundle} --query <text>`,
       `enigma context --bundle ${quotedBundle} --query <text>`,
@@ -4642,12 +4646,13 @@ Quick start:
   enigma doctor --bundle "$HOME/.enigma/bundle.json"
   enigma claude-mcpb package --plain
   enigma connect cursor --bundle "$HOME/.enigma/bundle.json" --dry-run
-  echo "Your memory text" > memory.txt
+  enigma import text --file ./memories.md --complete --plain
   enigma remember --bundle "$HOME/.enigma/bundle.json" --text-file memory.txt
   enigma search  --bundle "$HOME/.enigma/bundle.json" --query "your topic"
   enigma context --bundle "$HOME/.enigma/bundle.json" --query "your topic" --out "$HOME/.enigma/context-pack.json"
 
 Windows CMD uses %USERPROFILE% instead of $HOME:
+  enigma import text --file .\\memories.md --complete --plain
   enigma remember --bundle "%USERPROFILE%\\.enigma\\bundle.json" --text-file memory.txt
 
 Common commands:

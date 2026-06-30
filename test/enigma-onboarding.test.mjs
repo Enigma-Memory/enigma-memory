@@ -357,6 +357,7 @@ test('init dry-run prints a public-safe first-run plan without writing artifacts
   assert.ok(summary.next_commands[0].startsWith('enigma init --bundle "<bundle-path>" --out-dir "<out-dir>"'));
   assert.doesNotMatch(summary.next_commands[0], /--overwrite/);
   assert.ok(summary.next_commands.some((command) => command.startsWith('enigma remember ')));
+  assert.ok(summary.next_commands.some((command) => command === 'enigma import text --file ./memories.md --complete --plain'));
   assert.ok(summary.next_commands.some((command) => command.startsWith('enigma verify ')));
   assert.equal(summary.connectors.every((connector) => connector.connect_plan.dry_run === true), true);
   await assert.rejects(() => readFile(bundlePath, 'utf8'), /ENOENT/);
@@ -710,7 +711,8 @@ test('setup plain output summarizes first run without JSON or local paths', asyn
     assert.match(stdout, /Status: Ready/);
     assert.match(stdout, /Memory Drive: <bundle-path>/);
     assert.match(stdout, /Connectors: planned only/);
-    assert.match(stdout, /Next: enigma remember --bundle "<bundle-path>" --text-file \.\/memory\.txt/);
+    assert.match(stdout, /Next: enigma import text --file \.\/memories\.md --complete --plain/);
+    assert.doesNotMatch(stdout, /Next: enigma remember --bundle "<bundle-path>" --text-file \.\/memory\.txt/);
     assert.match(stdout, /Boundary: local Enigma setup only/);
     assert.doesNotMatch(stdout, /^\s*\{/);
     assert.equal(stdout.includes(dir), false);
