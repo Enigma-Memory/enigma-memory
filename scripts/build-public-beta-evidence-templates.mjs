@@ -414,6 +414,17 @@ export async function buildPublicBetaEvidenceTemplates(options = {}, now = new D
       command: registryInstallEvidenceCommand(),
       evidence_template: `${outDir}/${TEMPLATE_FILES.registryInstall}`,
     },
+    desktop_release_guidance: {
+      evidence_template: `${outDir}/${TEMPLATE_FILES.desktopReleaseEvidence}`,
+      required_statuses: [
+        'windows.signature.status=verified with evidence_ref',
+        'macos.signature.status=verified with evidence_ref',
+        'macos.notarization.status=accepted with evidence_ref',
+        'macos.stapling.status=stapled with evidence_ref',
+        'manifest.signature.status=verified',
+        'update_rollback.status=pass with evidence_ref',
+      ],
+    },
     support_dry_run_collection_guidance: SUPPORT_DRY_RUN_COLLECTION_GUIDANCE,
     claim_boundary: templateBoundary(),
   };
@@ -441,6 +452,10 @@ export function renderPublicBetaEvidenceTemplatesPlain(report) {
   if (report.registry_install_guidance) {
     lines.push(`Registry install after npm publish: ${report.registry_install_guidance.command}`);
     lines.push(`Registry install evidence template: ${report.registry_install_guidance.evidence_template}`);
+  }
+  if (report.desktop_release_guidance) {
+    lines.push(`Desktop release evidence template: ${report.desktop_release_guidance.evidence_template}`);
+    lines.push(`Desktop release required statuses: ${report.desktop_release_guidance.required_statuses.join('; ')}`);
   }
   lines.push('Boundary: templates only; no PR approval, merge, npm publish, signing, upload, network action, provider action, hosted service, benchmark, token ROI, or compliance claim.');
   return `${lines.join('\n')}\n`;
