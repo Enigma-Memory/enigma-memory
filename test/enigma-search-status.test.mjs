@@ -263,6 +263,8 @@ test('status reports passport counts and roots without raw memory', async () => 
       assert.match(json.active_set_root, /^sha256:[a-f0-9]{64}$/);
       assert.match(json.receipt_log_root, /^sha256:[a-f0-9]{64}$/);
       assert.equal(json.connector_readiness.ready, true);
+      assert.equal(json.bundle, '<bundle-path>');
+      assert.equal(json.connector_readiness.bundle, '<bundle-path>');
       assert.equal(json.first_run_status.schema, 'enigma.first_run_status.v1');
       assert.equal(json.first_run_status.state, 'ready_for_app_connection');
       assert.equal(json.first_run_status.primary_action.id, 'connect_ai_app');
@@ -270,6 +272,7 @@ test('status reports passport counts and roots without raw memory', async () => 
       assert.equal(json.first_run_status.lanes.import_sandbox.status, 'ready');
       assert.equal(json.first_run_status.claim_boundaries.raw_memory_returned, false);
       assert.equal(JSON.stringify(json.first_run_status).includes(bundlePath), false);
+      assert.equal(JSON.stringify(json).includes(bundlePath), false);
       assert.ok(json.next_recommended_commands.some((command) => command.includes('enigma search')));
       assert.doesNotMatch(stdout, /active status fixture plaintext canary|removed status fixture plaintext canary/);
       assert.equal(active.memory_addr.length > 0, true);

@@ -609,10 +609,15 @@ function searchCandidates(vault, queryTokens, includeUnrelated = false) {
   return { candidates, byAddress };
 }
 
-function connectorReadinessSummary(bundlePath) {
+function safeBundleDisplay(bundleDisplay = '<bundle-path>') {
+  const value = typeof bundleDisplay === 'string' && bundleDisplay.length > 0 ? bundleDisplay : '<bundle-path>';
+  return publicPathDisplay(value, 'bundle-path');
+}
+
+function connectorReadinessSummary(bundleDisplay = '<bundle-path>') {
   return {
     ready: true,
-    bundle: bundlePath,
+    bundle: safeBundleDisplay(bundleDisplay),
     bundle_env: 'ENIGMA_BUNDLE',
     mcp_command: 'enigma-mcp',
     supported_clients: supportedClients,
@@ -2084,15 +2089,17 @@ function firstRunStatusSummary({ bundlePath, activeCount, tombstoneCount, receip
   };
 }
 
-function passportStatusReport({ bundlePath, stored = {}, vault, passport }) {
+function passportStatusReport({ bundlePath, bundleDisplay = publicPathDisplay(bundlePath, 'bundle-path'), stored = {}, vault, passport }) {
   const roots = vault.__computeRoots();
   const activeCount = activeMemoryCount(vault);
   const tombstoneCount = vault.tombstones instanceof Map ? vault.tombstones.size : 0;
   const receiptCount = Array.isArray(vault.receipts) ? vault.receipts.length : 0;
+  const safeBundle = safeBundleDisplay(bundleDisplay);
+  const quotedBundle = commandPath(safeBundle);
   return {
     ok: true,
     schema: 'enigma.passport_status.v1',
-    bundle: bundlePath,
+    bundle: safeBundle,
     passport_ref: `enigma://passport/${passport.passport_id}`,
     owner: {
       subject_id: stored.owner?.subject_id ?? stored.passport?.owner?.subject_id ?? stored.vault?.subject_id ?? passport.owner?.subject_id ?? vault.subject_id,
@@ -2108,23 +2115,25 @@ function passportStatusReport({ bundlePath, stored = {}, vault, passport }) {
     receipt_count: receiptCount,
     active_set_root: roots.active_set_root,
     receipt_log_root: roots.receipt_log_root,
-    connector_readiness: connectorReadinessSummary(bundlePath),
-    first_run_status: firstRunStatusSummary({ bundlePath, activeCount, tombstoneCount, receiptCount }),
+    connector_readiness: connectorReadinessSummary(safeBundle),
+    first_run_status: firstRunStatusSummary({ bundlePath: safeBundle, activeCount, tombstoneCount, receiptCount }),
     next_recommended_commands: [
-      `enigma remember --bundle "${bundlePath}" --text-file <path>`,
-      `enigma search --bundle "${bundlePath}" --query <text>`,
-      `enigma context --bundle "${bundlePath}" --query <text>`,
-      `enigma verify --bundle "${bundlePath}"`,
-      `enigma connect <client> --bundle "${bundlePath}" --dry-run`,
+      `enigma remember --bundle ${quotedBundle} --text-file <path>`,
+      `enigma search --bundle ${quotedBundle} --query <text>`,
+      `enigma context --bundle ${quotedBundle} --query <text>`,
+      `enigma verify --bundle ${quotedBundle}`,
+      `enigma connect <client> --bundle ${quotedBundle} --dry-run`,
     ],
     claim_boundary: 'Status reports local bundle counters, owner display fields, connector readiness hints, and commitment roots only; it does not expose raw memory, certify compliance, prove provider deletion, or prove model forgetting.',
   };
 }
 
 async function statusCommand(flags, io) {
-  const bundlePath = resolve(String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE)));
+  const bundleInput = String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE));
+  const bundlePath = resolve(bundleInput);
+  const bundleDisplay = publicPathDisplay(bundleInput, 'bundle-path');
   const { stored, vault, passport } = await loadState(bundlePath, { passphrase: getFlag(flags, ['passphrase']) });
-  const report = passportStatusReport({ bundlePath, stored, vault, passport });
+  const report = passportStatusReport({ bundlePath, bundleDisplay, stored, vault, passport });
   printStatusSummary(report, flags, io);
   return 0;
 }
@@ -2849,7 +2858,7 @@ async function nextCommand(flags, io) {
     return 0;
   }
   const { stored, vault, passport } = await loadState(bundlePath, { passphrase: getFlag(flags, ['passphrase']) });
-  const report = passportStatusReport({ bundlePath, stored, vault, passport });
+  const report = passportStatusReport({ bundlePath, bundleDisplay, stored, vault, passport });
   const action = {
     ok: true,
     schema: 'enigma.next_action.v1',
@@ -3405,12 +3414,12 @@ export async function supportSummaryCommand(flags, io) {
   if (bundleInitialized.ok === true) {
     try {
       const { stored, vault, passport } = await loadState(resolvedBundlePath, { passphrase: getFlag(flags, ['passphrase']) });
-      firstRunStatus = passportStatusReport({ bundlePath: resolvedBundlePath, stored, vault, passport }).first_run_status;
+      firstRunStatus = passportStatusReport({ bundlePath: resolvedBundlePath, bundleDisplay: publicBundlePath, stored, vault, passport }).first_run_status;
     } catch {
       firstRunStatus = null;
     }
   }
-  const connectorSummary = connectorReadinessSummary(connectorDoctor);
+  const connectorSummary = connectorReadinessSummary(publicBundlePath);
   const issueCodes = [
     ...setupStatus.reasons,
     ...((connectorDoctor.clients ?? []).flatMap((client) => Array.isArray(client.repair_reasons) ? client.repair_reasons.map((reason) => `connector_${reason}`) : [])),

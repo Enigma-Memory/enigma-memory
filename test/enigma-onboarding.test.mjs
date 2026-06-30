@@ -774,6 +774,9 @@ test('status plain output reports counters without JSON or local paths', async (
     assert.equal(await main(['status', '--bundle', bundlePath], jsonIo.io), 0, jsonIo.stderr());
     const status = jsonIo.json();
     assert.ok(status.next_recommended_commands.some((command) => command.startsWith('enigma connect <client> ') && command.endsWith(' --dry-run')));
+    assert.equal(status.bundle, '<bundle-path>');
+    assert.equal(status.connector_readiness.bundle, '<bundle-path>');
+    assert.equal(JSON.stringify(status).includes(dir), false);
     assert.equal(stdout.includes(bundlePath), false);
   } finally {
     await rm(dir, { recursive: true, force: true });
