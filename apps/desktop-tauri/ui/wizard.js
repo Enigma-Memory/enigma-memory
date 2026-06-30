@@ -1184,7 +1184,7 @@ function renderDashboard() {
       : updateStatus === 'blocked_channel'
         ? 'Enigma will not install an update from a different release channel.'
         : updateStatus === 'blocked_incomplete'
-          ? 'Enigma will not install an update without a payload URL and SHA-256 hash.'
+          ? 'Enigma will not install an update without an HTTPS payload URL and SHA-256 hash.'
           : updateStatus === 'blocked_version'
             ? 'Enigma will not install an update with an invalid version.'
             : 'Enigma will not install this update until it passes safety checks.';
@@ -1826,7 +1826,7 @@ async function handleAction(event) {
       health.update_status = update.status;
       busy = false;
       render();
-      setStatus(update.status === 'available' ? 'An update is available.' : update.status === 'blocked_unsigned' ? 'Update blocked until a signed manifest is available.' : update.status === 'blocked_downgrade' ? 'Downgrade update blocked.' : update.status === 'blocked_channel' ? 'Update blocked because it is from a different release channel.' : update.status === 'blocked_incomplete' ? 'Update blocked until payload URL and SHA-256 hash are available.' : update.status === 'blocked_version' ? 'Update blocked because the manifest version is invalid.' : 'App is up to date.');
+      setStatus(update.status === 'available' ? 'An update is available.' : update.status === 'blocked_unsigned' ? 'Update blocked until a signed manifest is available.' : update.status === 'blocked_downgrade' ? 'Downgrade update blocked.' : update.status === 'blocked_channel' ? 'Update blocked because it is from a different release channel.' : update.status === 'blocked_incomplete' ? 'Update blocked until an HTTPS payload URL and SHA-256 hash are available.' : update.status === 'blocked_version' ? 'Update blocked because the manifest version is invalid.' : 'App is up to date.');
       return;
     }
     case 'toggle-crash-reporting': {

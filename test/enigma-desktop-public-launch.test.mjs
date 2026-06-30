@@ -474,7 +474,7 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(wizard, /Wrong channel blocked/);
   assert.match(wizard, /different release channel/);
   assert.match(wizard, /Incomplete update blocked/);
-  assert.match(wizard, /payload URL and SHA-256 hash/);
+  assert.match(wizard, /HTTPS payload URL and SHA-256 hash/);
   assert.match(help, /before any Memory Drive write/);
   assert.doesNotMatch(`${wizard}\n${help}`, /Private vault|private vault|your vault|local vault|vault stores|vault write|vault activity|Checking vault|Creating vault|Check your vault|Private vault created|Create vault/);
   assert.match(wizard, /WIZARD_STORAGE_KEY/);
