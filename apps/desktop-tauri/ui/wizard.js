@@ -66,6 +66,8 @@ let connectionPreview = null;
 let disconnectPreview = null;
 let claudeMcpbHandoff = null;
 let dashboardHydration = { status: 'idle', error: null, last_updated: null };
+let readyGate = { status: 'not_checked', reason: 'Run health check before Ready.', checked_at: null };
+
 
 let busy = false;
 
@@ -81,7 +83,8 @@ function setStatus(text) {
 function safeWizardStep(value) {
   const step = Number(value);
   if (!Number.isInteger(step)) return 0;
-  return Math.min(MAX_WIZARD_STEP, Math.max(0, step));
+  const bounded = Math.min(MAX_WIZARD_STEP, Math.max(0, step));
+  return bounded === 5 ? 4 : bounded;
 }
 
 function safeControllerUi(value = {}) {
@@ -1042,16 +1045,19 @@ function renderHealth() {
 
 function renderReady() {
   const appCopy = clients.some((c) => c.status === 'connected') ? 'Apps connected' : 'Apps can be connected later';
+  const gateCopy = readyGate.checked_at ? `Checked ${readyGate.checked_at}` : 'Checked in this session';
   return renderCard(`
     <p class="eyebrow">Step 6 of 6 · Ready</p>
     <h1>Your Memory Drive is ready</h1>
     <p>Enigma is set up on this computer. Connected apps can now ask for helpful memory when you allow it.</p>
     <ul class="checklist">
       <li>Private vault created</li>
+      <li>Local engine running</li>
       <li>Privacy guardrails checked</li>
       <li>${escapeHtml(appCopy)}</li>
       <li>Dashboard ready</li>
     </ul>
+    <p class="note">Ready is shown only after the current Memory Drive health check and local engine check pass. ${escapeHtml(gateCopy)}.</p>
     <p>Next: try asking a connected app to remember a harmless preference, then check that it appears in your dashboard.</p>
     <div class="button-row">
       ${primaryButton('Open dashboard', 'go-dashboard')}
@@ -1066,6 +1072,27 @@ function normalizeMemoryDriveStatus(status) {
   if (value === 'watch' || value === 'degraded' || value === 'critical') return 'ready';
   if (value === 'missing' || value === 'creating' || value === 'error') return value;
   return 'unknown';
+}
+
+function readyGateFromCurrentState(reason = '') {
+  const memoryDriveStatus = normalizeMemoryDriveStatus(health.memory_drive_status);
+  const healthStatus = String(health.health_status || 'unknown').toLowerCase();
+  const serviceRunning = serviceStatus?.running === true;
+  const offlineReady = serviceRunning && health.offline_ready === true && memoryDriveStatus === 'ready' && healthStatus === 'healthy';
+  return {
+    status: offlineReady ? 'passed' : 'blocked',
+    memory_drive_status: memoryDriveStatus,
+    health_status: healthStatus,
+    service_running: serviceRunning,
+    offline_ready: offlineReady,
+    reason: reason || (offlineReady ? 'Ready gate passed.' : health.offline_ready_explanation || 'Run health check before Ready.'),
+    checked_at: new Date().toISOString(),
+  };
+}
+
+function readyGatePassed() {
+  const current = readyGateFromCurrentState(readyGate.reason);
+  return readyGate.status === 'passed' && current.status === 'passed';
 }
 
 function dashboardNextAction({ memoryDriveStatus, offlineReady, serviceRunning, updateAvailable }) {
@@ -1203,8 +1230,13 @@ function render() {
   else if (currentStep === 2) html = renderFindApps();
   else if (currentStep === 3) html = renderConnectApps();
   else if (currentStep === 4) html = renderHealth();
-  else if (currentStep === 5) html = renderReady();
-  else if (currentStep === 6) html = renderDashboard();
+  else if (currentStep === 5) {
+    if (readyGatePassed()) html = renderReady();
+    else {
+      currentStep = 4;
+      html = renderHealth();
+    }
+  } else if (currentStep === 6) html = renderDashboard();
   app.innerHTML = html;
   wireEvents();
   persistWizardResumeState();
@@ -1255,6 +1287,7 @@ async function hydrateDashboardState() {
   crashReporting.status = settledValue(crashResult, crashReporting.status);
   health.proof_status = proofActivity?.proof_status || health.proof_status;
   health.proof_activity = proofActivity;
+  readyGate = readyGateFromCurrentState('Dashboard refreshed with current local status.');
   dashboardHydration = { status: 'ready', error: null, last_updated: new Date().toISOString() };
 }
 async function runClientCommand({ command, args, pending, success, failure }) {
@@ -1609,12 +1642,11 @@ async function handleAction(event) {
         health.update_status = update.status;
         busy = false;
         if (currentStep === 4) {
-          const finalMemoryDriveStatus = normalizeMemoryDriveStatus(health.memory_drive_status);
-          const offlineReady = serviceStatus?.running === true && health.offline_ready === true;
-          if (finalMemoryDriveStatus === 'ready' && offlineReady) {
+          readyGate = readyGateFromCurrentState('Health check passed for the current Memory Drive and local engine.');
+          if (readyGate.status === 'passed') {
             currentStep = 5;
           } else {
-            setStatus('Memory Drive needs attention before Ready. Open the dashboard for the next safe action.');
+            setStatus(readyGate.reason || 'Memory Drive needs attention before Ready. Open the dashboard for the next safe action.');
           }
         }
       } catch (_) {

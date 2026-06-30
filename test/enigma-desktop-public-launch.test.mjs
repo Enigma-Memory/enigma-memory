@@ -282,6 +282,9 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   const renderClientActionsBlock = wizard.match(/function renderClientActions\(client, status\) \{[\s\S]*?\n\}/)?.[0] || '';
   const renderDashboardBlock = wizard.match(/function renderDashboard\(\) \{[\s\S]*?\n\}/)?.[0] || '';
   const dashboardNextActionBlock = wizard.match(/function dashboardNextAction\(\{[\s\S]*?\n\}/)?.[0] || '';
+  const safeWizardStepBlock = wizard.match(/function safeWizardStep\(value\) \{[\s\S]*?\n\}/)?.[0] || '';
+  const renderReadyBlock = wizard.match(/function renderReady\(\) \{[\s\S]*?\n\}/)?.[0] || '';
+  const renderBlock = wizard.match(/function render\(\) \{[\s\S]*?\n\}/)?.[0] || '';
 
   assert.match(wizard, /Install this app, then select Scan apps/);
   assert.match(wizard, /Connection needs repair/);
@@ -316,6 +319,15 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(wizard, /restoreWizardResumeState/);
   assert.match(wizard, /persistWizardResumeState/);
   assert.match(wizard, /safeWizardStep/);
+  assert.match(wizard, /let readyGate = \{ status: 'not_checked'/);
+  assert.match(safeWizardStepBlock, /return bounded === 5 \? 4 : bounded/);
+  assert.match(renderReadyBlock, /Ready is shown only after the current Memory Drive health check and local engine check pass/);
+  assert.match(wizard, /function readyGateFromCurrentState/);
+  assert.match(wizard, /function readyGatePassed/);
+  assert.match(renderBlock, /currentStep === 5/);
+  assert.match(renderBlock, /readyGatePassed\(\)/);
+  assert.match(renderBlock, /currentStep = 4/);
+  assert.match(runHealthBlock, /readyGate = readyGateFromCurrentState\('Health check passed for the current Memory Drive and local engine\.'\)/);
   assert.doesNotMatch(wizard.match(/function persistWizardResumeState\(\) \{[\s\S]*?\n\}/)?.[0] || '', /pendingText|local absolute|raw memory/i);
   assert.match(wizard, /No raw memory, local paths, provider responses, or outside-Enigma control claims/);
   assert.match(wizard, /Import Sandbox/);
