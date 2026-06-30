@@ -126,6 +126,15 @@ test('public beta evidence templates are public-safe blockers, not fake evidence
     assert.equal(registry.execute, false);
     assert.equal(registry.install.command, 'npm install --prefix <temp-prefix> enigma-memory@0.1.19');
     assert.doesNotMatch(registry.install.command, /npm install enigma-memory@|npm publish|npm token/i);
+    assert.deepEqual(registry.next_actions.map((action) => action.id), [
+      'record_public_npm_publish',
+      'run_temp_prefix_registry_install',
+    ]);
+    assert.equal(registry.next_actions.find((action) => action.id === 'run_temp_prefix_registry_install').command, 'npm install --prefix <temp-prefix> enigma-memory@0.1.19');
+    assert.deepEqual(registry.next_actions.find((action) => action.id === 'run_temp_prefix_registry_install').required_fields, [
+      'install.result',
+      'install.evidence_ref',
+    ]);
 
     const desktop = JSON.parse(await readFile(join(outDir, 'desktop-release-evidence.json'), 'utf8'));
     assert.equal(desktop.schema, 'enigma.desktop_release_evidence.v1');

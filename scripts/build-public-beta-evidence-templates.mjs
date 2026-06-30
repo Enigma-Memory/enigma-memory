@@ -141,6 +141,19 @@ function buildRegistryInstallTemplate(generatedAt) {
       result: 'pending',
       evidence_ref: 'TBD-public-install-result-ref',
     },
+    next_actions: [
+      {
+        id: 'record_public_npm_publish',
+        collect: 'Public registry package ref for the exact required version after trusted publish completes.',
+        required_fields: ['package.registry_ref'],
+      },
+      {
+        id: 'run_temp_prefix_registry_install',
+        collect: 'Run the temp-prefix install command only after public npm publish evidence exists.',
+        command: registryInstallEvidenceCommand(),
+        required_fields: ['install.result', 'install.evidence_ref'],
+      },
+    ],
     claim_boundary: templateBoundary(),
   };
 }
