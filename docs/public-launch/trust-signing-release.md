@@ -32,10 +32,10 @@ First-sprint signing prerequisites are tracked in [release-owner-checklist.md](r
 ### Product deliverables
 
 - A signed desktop shell, preferably Tauri, that bundles the required runtime internally so consumers do not install Node.
-- One-button first run that creates an Enigma-controlled local vault automatically.
+- One-button first run that creates an Enigma-controlled Memory Drive automatically.
 - Client detection for supported local AI clients without requiring terminal use or JSON editing.
-- Fix-it actions for client connection, permissions, vault location, update state, and health issues.
-- Health dashboard showing local vault status, connector status, update status, and bounded proof/evidence status.
+- Fix-it actions for client connection, permissions, Memory Drive location, update state, and health issues.
+- Health dashboard showing Memory Drive status, connector status, update status, and bounded proof/evidence status.
 - Progressive disclosure: default screens show essential setup and health; advanced CLI/proof/debug details stay behind explicit advanced links.
 - CLI remains available as a power-user engine and support path, but consumer onboarding must not depend on it.
 
@@ -62,8 +62,8 @@ Windows public beta acceptance:
 - A clean Windows 11 consumer machine can install, launch, update, and uninstall the app without Node, npm, terminal commands, or JSON editing.
 - The displayed publisher name matches the approved Microsoft/certificate identity.
 - SmartScreen behavior is recorded honestly in the evidence packet, including any warning shown during the beta.
-- The app can create and open an Enigma-controlled local vault without writing raw memory or transcripts into public logs.
-- The health dashboard reports installer, vault, connector, and update status without exposing local absolute paths in public evidence.
+- The app can create and open an Enigma-controlled Memory Drive without writing raw memory or transcripts into public logs.
+- The health dashboard reports installer, Memory Drive, connector, and update status without exposing local absolute paths in public evidence.
 
 Windows GA acceptance:
 
@@ -97,7 +97,7 @@ macOS public beta acceptance:
 - A clean supported macOS machine can download, open, install, launch, update, and uninstall without Node, npm, terminal commands, or JSON editing.
 - Gatekeeper shows the approved developer identity and does not require consumers to bypass security controls.
 - Notarization status and stapling status are recorded in the evidence packet without exposing Apple account IDs, local paths, credentials, or private team metadata beyond the public developer identity.
-- The app creates the local vault and reports health using public-safe logs.
+- The app creates the Memory Drive and reports health using public-safe logs.
 
 macOS GA acceptance:
 
@@ -116,12 +116,12 @@ Requirements:
 - Pin the update public key or trusted signing identity in the app build. Store private update signing material outside the repo.
 - Show consumers plain-language update state: current version, available version, last check time, and whether update verification passed.
 - Keep rollback packages signed and bounded to documented emergency use.
-- Public evidence may include manifest hashes, artifact hashes, version numbers, signature verification result, and signer identity. It must not include signing private keys, tokens, local paths, account IDs, user vault paths, raw memory, prompts, transcripts, or customer identifiers.
+Public evidence may include manifest hashes, artifact hashes, version numbers, signature verification result, and signer identity. It must not include signing private keys, tokens, local paths, account IDs, Memory Drive paths, raw memory, prompts, transcripts, or customer identifiers.
 
 Public beta blockers:
 
 - Auto-update path is unsigned, unverifiable, or silently downgrades.
-- Update failure leaves the local vault inaccessible or corrupt without a recovery path.
+- Update failure leaves the Memory Drive inaccessible or corrupt without a recovery path.
 - Beta and stable channels are not separated.
 
 GA blockers:
@@ -178,9 +178,9 @@ The packet may include screenshots only if they show synthetic data and no priva
 - No signed Windows artifact for the selected Windows distribution path.
 - No signed and notarized macOS artifact for the selected macOS distribution path.
 - Desktop first run requires Node, npm, terminal commands, or manual JSON editing.
-- No automatic local vault creation or recovery-safe vault initialization.
+- No automatic Memory Drive creation or recovery-safe Memory Drive initialization.
 - No client detection or guided fix-it path for the supported consumer MCP clients.
-- No health dashboard for vault, connector, signing/update, and local evidence state.
+- No health dashboard for Memory Drive, connector, signing/update, and local evidence state.
 - Update mechanism is unsigned, unverified, channel-confused, or able to apply unexpected downgrades.
 - Public evidence packet contains raw memory, prompts, transcripts, credentials, tokens, private keys, local absolute paths, account IDs, customer identifiers, or signing secrets.
 - Public copy claims provider deletion, model forgetting, hosted SaaS/BYOC readiness, compliance certification, benchmark superiority, or legal/patent conclusions.
@@ -192,7 +192,7 @@ The packet may include screenshots only if they show synthetic data and no priva
 - Public beta blockers remain open.
 - No observed install, update, rollback, and uninstall path on clean supported Windows and macOS machines.
 - No documented key/certificate renewal, revocation, and rotation ownership.
-- No support process for corrupted local vault state, failed client connection, failed update, or signing/notarization warnings.
+- No support process for corrupted Memory Drive state, failed client connection, failed update, or signing/notarization warnings.
 - No channel policy separating internal, beta, and stable releases.
 - No redacted public-safe evidence packet approved for the GA candidate.
 - No incident process for pulling a release, deprecating an npm version, or revoking an update manifest.
@@ -203,8 +203,8 @@ The packet may include screenshots only if they show synthetic data and no priva
 A release candidate is public-beta ready when all of the following are true:
 
 - Consumers install the signed desktop app on supported Windows and macOS systems without installing Node or editing JSON.
-- First run creates a local vault, detects supported clients, offers one-button setup, and shows fix-it actions for recoverable issues.
-- The health dashboard clearly distinguishes local vault health, connector status, update status, and bounded evidence status.
+- First run creates a Memory Drive, detects supported clients, offers one-button setup, and shows fix-it actions for recoverable issues.
+- The health dashboard clearly distinguishes Memory Drive health, connector status, update status, and bounded evidence status.
 - Windows signing/MSIX or Store status is documented, including any SmartScreen warning observed.
 - macOS Developer ID signing, notarization, and stapling status are documented.
 - Update verification rejects unsigned or wrong-channel updates in the release rehearsal.
@@ -219,7 +219,7 @@ A release candidate is GA-ready when all public beta criteria remain true and:
 - Install, first-run, update, rollback, and uninstall have been rehearsed on each supported OS version and architecture.
 - Signing identities, certificate expiration, key custody, revocation, renewal, and emergency contacts are owned and documented in the private release runbook.
 - Stable update channel is separated from beta/internal channels and has a documented staged rollout policy.
-- Support has approved consumer-facing troubleshooting for install warnings, connector setup, local vault recovery, and update failures.
+- Support has approved consumer-facing troubleshooting for install warnings, connector setup, Memory Drive recovery, and update failures.
 - Public docs make signed desktop install the default consumer path while preserving CLI/npm as the power-user path.
 - The final evidence packet is approved for public sharing and contains only bounded, public-safe claims.
 
@@ -231,9 +231,9 @@ Required beta rehearsal coverage:
 
 - Windows install path for the selected distribution route: Store/MSIX, direct signed installer, or both.
 - macOS install path for the selected artifact type: signed/notarized app bundle, `.dmg`, `.zip`, or `.pkg`.
-- First-run local vault creation with no Node install, terminal command, or JSON editing.
+- First-run Memory Drive creation with no Node install, terminal command, or JSON editing.
 - Client detection and guided fix-it path for each supported consumer client. For Claude Desktop, prefer the lowest-friction supported connector path, including Claude Desktop Extensions or `.mcpb` packaging when available, before falling back to manual MCP configuration.
-- Health dashboard review for local vault status, connector status, update status, and bounded evidence status.
+- Health dashboard review for Memory Drive status, connector status, update status, and bounded evidence status.
 - Update rehearsal from an older beta build to a newer beta build, including signature verification, channel check, and failed-update recovery.
 - Rollback rehearsal using an approved signed rollback package or manifest.
 - Uninstall rehearsal that leaves user-controlled vault data only when explicitly documented and consented.

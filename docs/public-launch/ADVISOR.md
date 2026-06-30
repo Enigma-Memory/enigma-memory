@@ -83,14 +83,14 @@ These rules are applied before every promotion, screenshot, copy review, beta an
 2. **Evidence-before-claim rule:** a claim ships only when an Enigma-controlled artifact proves that exact claim. Otherwise the claim is removed, rewritten, or held.
 3. **Privacy fail-closed rule:** if the scanner, reviewer, or owner cannot prove a public/export/support artifact is safe, sharing/export/publishing is blocked.
 4. **Allowlist-over-redaction rule:** public artifacts and support diagnostics are built from approved fields. Redaction is a safety net, not the data model.
-5. **Consent-before-write rule:** connector config writes, imports into the vault, destructive vault actions, telemetry/crash upload, diagnostic sharing, and proof export require human-readable preview and explicit consent.
+5. **Consent-before-write rule:** connector config writes, imports into the Memory Drive, destructive Memory Drive actions, telemetry/crash upload, diagnostic sharing, and proof export require human-readable preview and explicit consent.
 6. **Rollback-before-write rule:** no connector/update/import/config write may ship without backup, rollback/undo semantics, and unrelated-setting preservation.
 7. **One-primary-action rule:** consumer screens show one main action and at most one secondary escape hatch; advanced details never interrupt first run.
 8. **Narrow-support rule:** claim support only for clients/platforms/channels with fixture evidence plus clean-machine/manual evidence. Unsupported clients go to clearly labeled advanced paths.
-9. **Offline-local rule:** local vault health, dashboard, proof/activity summaries, diagnostics preview, and already-installed app launch must work offline where the feature is local. Network failures defer network actions only.
+9. **Offline-local rule:** Memory Drive health, dashboard, proof/activity summaries, diagnostics preview, and already-installed app launch must work offline where the feature is local. Network failures defer network actions only.
 10. **Channel-integrity rule:** beta, stable, and internal update channels are separate; wrong-channel and downgrade updates are rejected unless an emergency rollback process explicitly authorizes the action.
 11. **Supportability rule:** every blocking state has a stable support code, one fix-it action or safe handoff, public-safe diagnostics, owner escalation, and closure rule.
-12. **Claim-boundary rule:** public materials may claim Enigma-controlled local vault state, connector setup/repair status, local receipt/proof summaries, signed installer/update status, health checks, support codes, and public-safe schema/evidence metadata only.
+12. **Claim-boundary rule:** public materials may claim Enigma-controlled Memory Drive state, connector setup/repair status, local receipt/proof summaries, signed installer/update status, health checks, support codes, and public-safe schema/evidence metadata only.
 13. **Advisor veto rule:** one open privacy leak, unsupported public claim, unsafe update, unrecoverable connector/import write, default-path developer prerequisite, or missing rollback blocks promotion.
 
 ## Friction budget
@@ -135,7 +135,7 @@ Every phase, scenario, public claim, screenshot set, diagnostic/export bundle, i
 | `artifact_refs` | Public-safe references to evidence artifacts, screenshots, release files, hashes, schema IDs, support codes, or verifier summaries. No local absolute paths. |
 | `environment` | OS family/version bucket, architecture bucket, channel, client/app version bucket, and clean/upgraded profile status. No account IDs or machine/user names. |
 | `claim_text` | Exact public claim or UI/support copy under review, if any. |
-| `claim_scope` | What Enigma-controlled fact the claim proves: local vault, connector status, proof summary, signing/update status, diagnostics, support code, or public-safe schema metadata. |
+| `claim_scope` | What Enigma-controlled fact the claim proves: Memory Drive, connector status, proof summary, signing/update status, diagnostics, support code, or public-safe schema metadata. |
 | `claim_boundary_result` | Pass, rewrite required, hold, or blocked; include unsupported-claim reason. |
 | `privacy_scan_result` | Pass, fail, inconclusive, not applicable; include scanner/version/ref and blocked categories. |
 | `export_allowlist_version` | Version/ref of the field allowlist used for screenshots, diagnostics, support bundle, proof export, import receipt, or evidence packet. |
@@ -269,7 +269,7 @@ Purpose: prove the implementation follows the governed contract before evidence 
 - [ ] Proof viewer distinguishes shape/schema inspection from verifier-backed status. **Block** if a green verified state can come from shape checks alone.
 - [ ] Diagnostics/proof/import/release exporters use allowlisted projections and fail closed on forbidden fields. **Block** if exporter reads raw logs/state directly.
 - [ ] Updates verify signed manifest and payload, reject wrong channel/downgrade, preserve vault/connectors, and fail safely. **Block** on unsafe update behavior.
-- [ ] Default uninstall keeps user vault/backups unless explicit destructive removal is separately chosen. **Block** if normal uninstall silently removes user memory.
+- [ ] Default uninstall keeps Memory Drive data/backups unless explicit destructive removal is separately chosen. **Block** if normal uninstall silently removes user memory.
 - [ ] Support codes are stable and emitted for expected blocker classes. **Hold** if support cannot triage expected failures from safe fields.
 
 ### Evidence gate checklist
@@ -346,10 +346,10 @@ Any one item below forces `hold` or `rollback`:
 ### GA can ship only if all are true
 
 - All public beta criteria remain green after beta exit.
-- Install, update, rollback, uninstall, reconnect, offline mode, corrupted-config recovery, partial uninstall, failed update, crash recovery, vault retention, and telemetry controls pass across every supported Windows/macOS version, architecture, and channel claimed for GA.
+- Install, update, rollback, uninstall, reconnect, offline mode, corrupted-config recovery, partial uninstall, failed update, crash recovery, Memory Drive retention, and telemetry controls pass across every supported Windows/macOS version, architecture, and channel claimed for GA.
 - Stable, beta, and internal update channels are separated; emergency update revocation/rollback is rehearsed.
 - Signing key/certificate custody, renewal, revocation, rotation, and release authority are privately documented with owners.
-- Support has approved playbooks for installer warnings, first-run failures, local vault recovery, connector setup/repair, import quarantine, proof/export confusion, update failures, diagnostic bundles, uninstall/reinstall, and privacy boundaries.
+- Support has approved playbooks for installer warnings, first-run failures, Memory Drive recovery, connector setup/repair, import quarantine, proof/export confusion, update failures, diagnostic bundles, uninstall/reinstall, and privacy boundaries.
 - Consumer website, in-app help, release notes, screenshots, demo scripts, support macros, and evidence packets pass claim-boundary and privacy/export allowlist review.
 - Final public-safe GA evidence packet is approved and records Advisor `ship`.
 
@@ -446,8 +446,8 @@ Before public beta and GA, every state-changing path must have a rollback playbo
 | Connector write | Backup created before write; unrelated settings preserved; restore path tested; disconnect removes only Enigma-owned entry/grant. |
 | Claude `.mcpb` | User can disable/remove extension through Claude UI; Enigma can detect stale/missing version where observable; fallback config entries are Enigma-owned and restorable. |
 | Import batch | Batch ID, candidate IDs, explicit commit, duplicates skipped by default, quarantine held back, undo/tombstone of Enigma-created records only. |
-| Update | Valid update succeeds; unsigned/wrong-channel/downgrade rejected; deliberately failed update leaves prior app/vault/connectors usable. |
-| Uninstall/reinstall | Default uninstall keeps vault/backups; reinstall detects kept vault and offers reconnect/repair; full removal is separate destructive choice. |
+| Update | Valid update succeeds; unsigned/wrong-channel/downgrade rejected; deliberately failed update leaves prior app, Memory Drive, and connectors usable. |
+| Uninstall/reinstall | Default uninstall keeps Memory Drive data and backups; reinstall detects the kept Memory Drive and offers reconnect/repair; full removal is separate destructive choice. |
 | Public copy/screenshot | Bad copy/image can be pulled or replaced; support notified; evidence ledger marks unsupported claim or privacy leak. |
 | Release candidate | Candidate can be paused/pulled; update manifest can be revoked or redirected safely; support knows current recommended version/channel. |
 

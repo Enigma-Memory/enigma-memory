@@ -22,22 +22,22 @@ Default and support copy must stay inside these boundaries:
 2. **Plain language first.** Explain outcomes before mechanisms. The first run avoids jargon-first words such as Merkle, schema, MCP, receipt chain, proof-of-non-use, and quarantine root.
 3. **Progressive disclosure.** Consumers see what to do next. Advanced proof and CLI details stay reachable after setup from a clearly labeled technical details area.
 4. **Repair over diagnosis.** When something is wrong, show a fix-it button before logs or explanations.
-5. **Local-first trust.** Reassure users that setup creates a private vault on this computer and does not publish their memory.
+5. **Local-first trust.** Reassure users that setup creates a Memory Drive on this computer and does not publish their memory.
 6. **Deferral of optional work.** Optional proof export, CLI setup, advanced app profiles, and developer settings happen after the dashboard is usable.
 
 ## Consumer language map
 
 | Technical concept | Default consumer phrase | Short explanation copy | Advanced label after setup |
 | --- | --- | --- | --- |
-| Memory Drive | Memory Drive | "Your private place for useful facts your AI apps can reuse." | Memory Drive / local vault |
-| Private memory | Helpful facts | "Facts you chose to keep available for your AI apps, stored in your private vault." | Memory records |
-| Local vault | Private vault | "Stored on this computer and protected by your operating system." | Vault location and key storage |
+| Memory Drive | Memory Drive | "Your private place for useful facts your AI apps can reuse." | Memory Drive |
+| Private memory | Helpful facts | "Facts you chose to keep available for your AI apps, stored in your Memory Drive." | Memory records |
+| Local storage | Private app storage | "Stored on this computer and protected by your operating system." | Memory Drive location and key storage |
 | MCP client | Connected app | "An AI app Enigma can work with." | MCP client connector |
 | Connected apps | Connected apps | "AI apps you allow to ask Enigma for memory." | Client connectors |
 | MCP configuration | App connection | "The setting that lets the app ask Enigma for memory." | Client configuration file |
 | Retrieval/context pack | Shared memory | "The small set of relevant facts Enigma offers to a connected app." | Context pack |
 | Proof details | Activity details | "Technical records that show what Enigma did without revealing your private text." | Proof details / receipts |
-| Health score | Memory health | "A simple check that your vault, app connections, and privacy checks are working." | Health report |
+| Health score | Memory health | "A simple check that your Memory Drive, app connections, and privacy checks are working." | Health report |
 | Quarantine | Needs review | "Enigma held something back because it may be unsafe or incomplete." | Quarantine / review queue |
 | Connector sync | App status | "Whether a connected app can reach Enigma right now." | Connector health |
 | Revocation/deletion marker | Removed from Enigma sharing | "Enigma will no longer offer this item to connected apps." | Revocation record |
@@ -89,7 +89,7 @@ The default download page must detect the operating system where possible and re
 ### Required steps
 
 1. Welcome
-2. Create private vault
+2. Create Memory Drive
 3. Find apps
 4. Connect apps
 5. Health check
@@ -141,19 +141,19 @@ The default download page must detect the operating system where possible and re
 
 **Acceptance:** A non-technical user can understand what the app is for without seeing terminal, package, protocol, or proof language.
 
-### Screen 2: Create private vault
+### Screen 2: Create Memory Drive
 
-**Purpose:** Create or select the local vault with no file-system jargon.
+**Purpose:** Create or select the Memory Drive with no file-system jargon.
 
-**Progress:** `Step 2 of 6 · Private vault`
+**Progress:** `Step 2 of 6 · Memory Drive`
 
-**Title:** `Create your private vault`
+**Title:** `Create your Memory Drive`
 
 **Body copy:**
 
-`This vault stores Enigma Memory data on this computer. You can move it later from Settings.`
+`This Memory Drive stores Enigma Memory data on this computer. You can move it later from Settings.`
 
-**Primary button:** `Create vault`
+**Primary button:** `Create Memory Drive`
 
 **Secondary link:** `Choose a different location`
 
@@ -167,13 +167,13 @@ The default download page must detect the operating system where possible and re
 
 **Progress states:**
 
-- `Creating vault...`
+- `Creating Memory Drive...`
 - `Protecting local files...`
-- `Checking vault access...`
+- `Checking Memory Drive access...`
 
 **Success inline copy:**
 
-`Vault ready.`
+`Memory Drive ready.`
 
 **Error states:**
 
@@ -182,14 +182,14 @@ The default download page must detect the operating system where possible and re
    - Body: `Choose another folder or allow access in your system settings.`
    - Primary: `Choose another folder`
    - Secondary: `Open help`
-2. Existing vault found
+2. Existing Memory Drive found
    - Title: `We found an existing Memory Drive`
    - Body: `You can use it here, or create a separate one for this computer profile.`
    - Primary: `Use this Memory Drive`
    - Secondary: `Create a separate one`
 3. Disk space low
    - Title: `This computer is low on space`
-   - Body: `Enigma needs room for your private vault and search index.`
+   - Body: `Enigma needs room for your Memory Drive and search index.`
    - Primary: `Choose another location`
    - Secondary: `Try again`
 
@@ -270,7 +270,7 @@ The default download page must detect the operating system where possible and re
 
 **Disclosure copy for secondary link:**
 
-`Connected apps can ask Enigma for relevant memory. Enigma still keeps your private vault local. You control which apps are connected, and you only see an app permission when that app asks Enigma to recall memory for a specific purpose.`
+`Connected apps can ask Enigma for relevant memory. Enigma still keeps your Memory Drive local. You control which apps are connected, and you only see an app permission when that app asks Enigma to recall memory for a specific purpose.`
 
 **Claude Desktop extension note, shown only when applicable:**
 
@@ -317,7 +317,7 @@ The default download page must detect the operating system where possible and re
 
 **Body copy:**
 
-`Enigma will check your vault, privacy guardrails, and app connections.`
+`Enigma will check your Memory Drive, privacy guardrails, and app connections.`
 
 **Primary button:** `Run health check`
 
@@ -353,7 +353,7 @@ The default download page must detect the operating system where possible and re
 
 | Technical check | Consumer label | Healthy copy | Warning or error copy |
 | --- | --- | --- | --- |
-| Vault readable/writable | Private vault | `Vault ready` | `Vault needs access` |
+| Memory Drive readable/writable | Memory Drive | `Memory Drive ready` | `Memory Drive needs access` |
 | Privacy denylist scan | Privacy guardrails | `Privacy checks ready` | `Review privacy warning` |
 | Connector config | Connected apps | `Apps connected` | `App connection needs a fix` |
 | Retrieval index | Memory search | `Memory search ready` | `Memory search needs rebuild` |
@@ -379,7 +379,7 @@ The default download page must detect the operating system where possible and re
 
 **Success checklist:**
 
-- `Private vault created`
+- `Memory Drive created`
 - `Privacy guardrails checked`
 - `Apps connected` or `Apps can be connected later`
 - `Dashboard ready`
@@ -488,7 +488,7 @@ Advanced details must be available, but never required to complete first run.
 
 1. **Default summary**
    - Audience: consumer.
-   - Language: local vault, connected apps, health, activity details.
+   - Language: Memory Drive, connected apps, health, activity details.
    - No raw memory or protocol terms.
 2. **Technical summary**
    - Audience: advanced consumer, developer, support.
@@ -594,7 +594,7 @@ A non-technical user can report setup failure without opening a terminal, copyin
 - Signed desktop app shell around the existing Enigma engine, preferably Tauri for small footprint and native OS integration.
 - Bundled runtime so consumers do not install Node.
 - First-run wizard with the six screens above.
-- Local vault creation with recommended default path and optional chooser.
+- Memory Drive creation with recommended default path and optional chooser.
 - Supported app detection and one-click connection.
 - Claude Desktop extension package support where available to reduce manual settings edits.
 - Health dashboard with fix-it actions.
@@ -675,7 +675,7 @@ No automated commands are required for this plan. Product validation should use 
 - Desktop shell not yet packaging the engine with an internal runtime.
 - No consumer-safe app detection and one-click connection layer.
 - No packaged connection path for Claude Desktop where extension packaging is available.
-- No first-run vault creation UI with OS keychain/keyring integration decision finalized.
+- No first-run Memory Drive creation UI with OS keychain/keyring integration decision finalized.
 - No health dashboard UI with fix-it actions.
 - No safe support report preview and redaction review.
 - No consumer privacy copy review against claim boundaries.
@@ -690,7 +690,7 @@ No automated commands are required for this plan. Product validation should use 
 - App detection matrix for supported clients and versions.
 - Safe app connection writer with backup, preview, rollback, and conflict handling.
 - Claude Desktop extension package generation and installation path where supported.
-- Local vault path, key storage, migration, and recovery design.
+- Memory Drive path, key storage, migration, and recovery design.
 - Health check API that returns consumer-safe statuses and fix actions.
 - Support report generator with denylist scanning and preview UI.
 - Documentation screenshots that use synthetic, non-private sample data.

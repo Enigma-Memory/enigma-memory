@@ -13,10 +13,10 @@ A default user should experience Enigma like installing a sync utility:
 1. Download a signed installer from the public website or platform store.
 2. Open the installed Enigma Memory desktop app.
 3. Click **Set up Enigma Memory**.
-4. Confirm the local vault location and client connections in a guided wizard.
+4. Confirm the Memory Drive and client connections in a guided wizard.
 5. See a health dashboard that says what is connected, what is local, and what still needs attention.
 6. Use fix-it buttons for supported clients instead of editing config files.
-7. Keep using the app offline for local vault access, diagnostics, and queued local actions.
+7. Keep using the app offline for Memory Drive access, diagnostics, and queued local actions.
 
 The user must not be asked to install Node.js, run `npm install -g`, paste shell commands, or edit MCP JSON during the default path.
 
@@ -28,7 +28,7 @@ The user must not be asked to install Node.js, run `npm install -g`, paste shell
 - Installer verifies publisher identity through the OS trust surface.
 - Installer places the app in the normal platform application location.
 - Installer does not require Node.js, npm, Git, developer tools, or a terminal.
-- Installer does not create or delete the user vault.
+- Installer does not create or delete the Memory Drive.
 
 ### 2. First launch welcome
 
@@ -42,12 +42,12 @@ Screen copy should be short and consumer-safe:
 
 The welcome screen must not show raw memory contents, prompts, transcripts, local expanded paths, account IDs, tokens, or credentials.
 
-### 3. Local vault setup
+### 3. Memory Drive setup
 
 Default behavior:
 
-- Create an Enigma-controlled local vault under the platform application data directory.
-- Show a friendly location label such as **Enigma Memory local vault**.
+- Create an Enigma-controlled Memory Drive under the platform application data directory.
+- Show a friendly location label such as **Enigma Memory Drive**.
 - Put advanced path details behind **Show technical location**.
 - Never print an expanded personal filesystem path in public logs, screenshots, telemetry, or release evidence.
 
@@ -96,11 +96,11 @@ Claude Desktop-specific goal:
 
 After setup, the app lands on a dashboard with:
 
-- Local vault status: initialized, locked/unlocked, schema version, last successful health check.
+- Memory Drive status: initialized, locked/unlocked, schema version, last successful health check.
 - Local service status: running, stopped, needs update, blocked by permission, port/socket conflict.
 - Client connection status: connected, needs restart, needs permission, unsupported, not installed.
 - Update status: current, update available, update downloaded, update failed with retry.
-- Privacy boundary panel: local vault and connector status only; no provider deletion or model forgetting claims.
+- Privacy boundary panel: Memory Drive and connector status only; no provider deletion or model forgetting claims.
 - Buttons: **Fix**, **Restart local service**, **Open supported client**, **Export diagnostics**, **Advanced CLI handoff**.
 
 The dashboard must not render raw memories, prompts, transcripts, credentials, tokens, private keys, account IDs, or customer identifiers.
@@ -209,7 +209,7 @@ Update rules:
 Offline launch must work for local-first features:
 
 - App opens.
-- Vault status loads.
+- Memory Drive status loads.
 - Local service starts.
 - Health dashboard shows offline update/check state.
 - Supported local diagnostics run.
@@ -470,7 +470,7 @@ Pass criteria:
 Steps:
 
 1. Click **Set up Enigma Memory**.
-2. Accept default local vault.
+2. Accept default Memory Drive.
 3. Let app detect supported clients.
 4. Connect one supported automatic client.
 5. Open dashboard.
@@ -515,7 +515,7 @@ Pass criteria:
 
 - App launches offline.
 - Local service starts offline.
-- Vault status loads offline.
+- Memory Drive status loads offline.
 - Update check fails gracefully or is marked unavailable.
 - No hosted service readiness is implied.
 

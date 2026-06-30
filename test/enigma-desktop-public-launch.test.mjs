@@ -605,7 +605,7 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
 });
 
 test('public website explains consumer install path without unsupported claims', async () => {
-  const [home, download, setup, privacy, proofs, vaultNotReady, websiteStyles, help, launchStatus, installGuide, macosInstall, windowsInstall, connectApps, claudeConnect, cursorConnect, otherClients, troubleshooting, clientNotDetected, removalGuide, faq, developerCli, readme, installAnywhere, clientConnectors, developerEcosystem, publicApiReference, onboardingUx, qaSmokeScenarios, codeSigningSetup, productionReadinessStatus, supportPlaybooks, qaSupportObservability, publicLaunchDocs] = await Promise.all([
+  const [home, download, setup, privacy, proofs, vaultNotReady, websiteStyles, help, launchStatus, installGuide, macosInstall, windowsInstall, connectApps, claudeConnect, cursorConnect, otherClients, troubleshooting, clientNotDetected, removalGuide, faq, developerCli, readme, installAnywhere, clientConnectors, developerEcosystem, publicApiReference, onboardingUx, qaSmokeScenarios, codeSigningSetup, productionReadinessStatus, supportPlaybooks, qaSupportObservability, publicLaunchDocs, advisorDocs, desktopAppPlan, oneClickConnectors, trustSigningRelease, securityAuditRfp] = await Promise.all([
     readWebsiteFile('index.html'),
     readWebsiteFile('download.html'),
     readWebsiteFile('setup.html'),
@@ -639,6 +639,11 @@ test('public website explains consumer install path without unsupported claims',
     readFile(new URL('../docs/public-launch/support-playbooks.md', import.meta.url), 'utf8'),
     readFile(new URL('../docs/public-launch/qa-support-observability.md', import.meta.url), 'utf8'),
     readFile(new URL('../docs/public-launch/public-launch-docs.md', import.meta.url), 'utf8'),
+    readFile(new URL('../docs/public-launch/ADVISOR.md', import.meta.url), 'utf8'),
+    readFile(new URL('../docs/public-launch/desktop-app-plan.md', import.meta.url), 'utf8'),
+    readFile(new URL('../docs/public-launch/one-click-connectors.md', import.meta.url), 'utf8'),
+    readFile(new URL('../docs/public-launch/trust-signing-release.md', import.meta.url), 'utf8'),
+    readFile(new URL('../docs/public-launch/security-audit-rfp.md', import.meta.url), 'utf8'),
   ]);
   const publicProofDocs = (await Promise.all([
     readFile(new URL('../docs/demo-proof-network.md', import.meta.url), 'utf8'),
@@ -682,6 +687,21 @@ test('public website explains consumer install path without unsupported claims',
   assert.match(publicLaunchDocs, /Where is my Memory Drive/);
   assert.match(publicLaunchDocs, /Enigma Memory Drive/);
   assert.doesNotMatch(publicLaunchDocs, /local vault|Create local vault|Where is my vault|canonical memory vault|Enigma-controlled local vault/i);
+  const publicLaunchPlanningDocs = [
+    onboardingUx,
+    qaSmokeScenarios,
+    productionReadinessStatus,
+    supportPlaybooks,
+    qaSupportObservability,
+    publicLaunchDocs,
+    advisorDocs,
+    desktopAppPlan,
+    oneClickConnectors,
+    trustSigningRelease,
+    securityAuditRfp,
+  ].join('\n');
+  assert.match(publicLaunchPlanningDocs, /Memory Drive/);
+  assert.doesNotMatch(publicLaunchPlanningDocs, /local vault|vault bundle|Create local vault|Repair vault|keep-vault|remove-vault|kept vault|vault_root|canonical vault|Enigma-controlled local vault|First-run.*vault|Health dashboard.*vault|local vault recovery|vault status|vault health|vault setup|vault warning|selected vault|current vault|missing vault|vault manager|Private vault|Create private vault|your vault|repair vault|private vault|Vault ready|Vault needs|vault reachable|vault paths|user vault/i);
   assert.match(setup, /Enigma shows what it will change before you approve/);
   assert.match(setup, /Memory Drive dashboard/);
   assert.doesNotMatch(setup, /connection boundary|local client config|Enigma-controlled vault|local app location|manual MCP JSON/i);

@@ -9,7 +9,7 @@
 
 ## 1. Executive summary
 
-Enigma Memory is a local-first AI memory wallet. Users install a signed desktop application, create a private vault, and connect supported AI clients so that memory can be saved, recalled, and anchored on-chain without per-item approvals. The current public-launch scope includes:
+Enigma Memory is a local-first AI memory wallet. Users install a signed desktop application, create a Memory Drive, and connect supported AI clients so that memory can be saved, recalled, and anchored on-chain without per-item approvals. The current public-launch scope includes:
 
 - Six Solana Anchor programs (memory registry, budget escrow, capability registry, royalty router, treasury, and a protocol token).
 - An off-chain memory node (Node.js) exposing an HTTP API and an MCP server for AI client integration.

@@ -11,11 +11,11 @@ Never ask users to send raw memory, prompts, transcripts, credentials, tokens, p
 | Prefix | Area | Examples |
 | --- | --- | --- |
 | `INST` | Installer and launch trust | Trust prompt blocked, insufficient permission, corrupted installer, first launch failed. |
-| `WIZ` | First-run wizard | Vault creation failed, resume failed, client scan failed, health step failed. |
+| `WIZ` | First-run wizard | Memory Drive creation failed, resume failed, client scan failed, health step failed. |
 | `CONN` | Client connectors | Client not detected, config malformed, write denied, backup restore failed. |
 | `PROOF` | Proof/receipt output | Summary failed, verifier failed, forbidden field detected, offline verify unavailable. |
 | `UPD` | Update | Metadata unavailable, signature failed, apply failed, rollback used. |
-| `UNINST` | Uninstall/reinstall | Keep-vault failed, explicit removal failed, reconnect after reinstall failed. |
+| `UNINST` | Uninstall/reinstall | Keep Memory Drive failed, explicit removal failed, reconnect after reinstall failed. |
 | `OFF` | Offline mode | Offline launch failed, deferred action retried without approval, local view unavailable. |
 | `DIAG` | Diagnostics | Bundle created, scrubber rejected, preview failed, user deleted bundle. |
 | `PRIV` | Privacy controls | Opt-in missing, disable/delete/export failed, forbidden field detected. |

@@ -16,12 +16,12 @@
 
 ### Desktop app
 - `apps/desktop-tauri/` Tauri v2 scaffold with consumer onboarding wizard.
-- Six-step wizard: Welcome, Create private vault, Find apps, Connect apps, Health check, Ready; the wizard now resumes from public-safe local UI state after close/reopen without storing import text, raw memory, local paths, logs, or config bodies.
+- Six-step wizard: Welcome, Create Memory Drive, Find apps, Connect apps, Health check, Ready; the wizard now resumes from public-safe local UI state after close/reopen without storing import text, raw memory, local paths, logs, or config bodies.
 - Tauri commands wired to bundled Enigma engine sidecar via `ServiceHandle`: spawns engine process, captures stdout/stderr, bounded restart on crash, clean shutdown.
-- Health dashboard normalizes CLI health into consumer states, avoids duplicate vault creation, and requires service-running plus healthy Memory Drive before showing offline-ready.
+- Health dashboard normalizes CLI health into consumer states, avoids duplicate Memory Drive creation, and requires service-running plus healthy Memory Drive before showing offline-ready.
 - First-run health check now starts the bundled local engine before showing the Ready screen, refreshes health, and the Ready screen is not resumed from stored UI state until the current Memory Drive health plus local engine checks pass.
 - Memory Controller dashboard cards show consent/review/private-bubble states without approving recall on review alone.
-- Import Sandbox supports local text/Markdown paste, preview counts and duplicate groups, explicit approve only when the preview decision is `ready_for_import`, local vault write, batch receipt, and latest-import rollback; raw text and raw report paths are not printed in the UI result.
+- Import Sandbox supports local text/Markdown paste, preview counts and duplicate groups, explicit approve only when the preview decision is `ready_for_import`, Memory Drive write, batch receipt, and latest-import rollback; raw text and raw report paths are not printed in the UI result.
 - Proof Activity summary shows local receipt counts, Memory Drive roots, verifier/evidence status, claim boundaries including provider non-use non-claims, and explicit public-safe export without raw memory, prompts, transcripts, provider responses, or paths.
 - Diagnostics preview/export with forbidden-field rejection and user approval.
 - Support summary surfaces exist through CLI, MCP, and the desktop dashboard with explicit public-safe export and privacy-scan metadata; the support dry-run script can ingest only redacted `enigma.support_summary.v1` / `enigma.diagnostics.v1` artifacts as allowlisted hash snapshots.

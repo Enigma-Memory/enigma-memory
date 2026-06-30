@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Make Enigma Memory feel like a consumer desktop product: install the signed desktop app, open Connectors, choose an AI client, approve the preview, and start using the local vault through MCP without installing Node, opening a terminal, or editing JSON.
+Make Enigma Memory feel like a consumer desktop product: install the signed desktop app, open Connectors, choose an AI client, approve the preview, and start using the Memory Drive through MCP without installing Node, opening a terminal, or editing JSON.
 
 The CLI remains the power-user engine. The public default is a Tauri desktop shell that bundles the Enigma runtime internally and performs connector detection, consent, config updates, backups, rollback, restarts guidance, and health checks through a guided UI.
 
 ## Claim and privacy boundaries
 
-- Enigma writes only Enigma-controlled local vault and client connector state.
+- Enigma writes only Enigma-controlled Memory Drive and client connector state.
 - Enigma does not claim provider deletion, model forgetting, hosted SaaS readiness, BYOC readiness, compliance certification, benchmark superiority, or legal/patent conclusions.
 - Public logs and support bundles must not expose raw memory, prompts, transcripts, credentials, tokens, private keys, account IDs, customer identifiers, or raw local absolute paths.
 - UI diagnostics may show client names, status, redacted config locations, redacted bundle labels, timestamps, error classes, and hashes/fingerprints when needed.
@@ -19,7 +19,7 @@ The CLI remains the power-user engine. The public default is a Tauri desktop she
 ### Default connect flow
 
 1. User installs and opens the signed Enigma Memory desktop app.
-2. First run creates or locates the automatic local vault.
+2. First run creates or locates the automatic Memory Drive.
 3. Connectors screen detects supported MCP clients.
 4. User selects a detected client or chooses Generic MCP.
 5. Enigma shows a plain-language preview:
@@ -27,7 +27,7 @@ The CLI remains the power-user engine. The public default is a Tauri desktop she
    - whether Enigma will add, update, repair, or remove the Enigma MCP server entry;
    - whether a backup will be created;
    - whether restart is required;
-   - redacted config and vault labels, not raw local paths.
+   - redacted config and Memory Drive labels, not raw local paths.
 6. User clicks Connect.
 7. Enigma writes only the Enigma MCP entry, preserving unrelated client settings and other MCP servers.
 8. Enigma records a rollback snapshot before changing an existing config.
@@ -58,7 +58,7 @@ The CLI remains the power-user engine. The public default is a Tauri desktop she
 
 - **Enigma Desktop**: Tauri shell, signed and notarized/stapled where applicable, with bundled runtime. It owns the consumer connector UI.
 - **Connector engine**: shared library or wrapped CLI code path that performs detection, preview, semantic config write, backup, rollback, disconnect, repair, and health verification.
-- **Local vault manager**: creates and tracks the default local vault label and bundle reference without surfacing raw absolute paths in public logs.
+- **Memory Drive manager**: creates and tracks the default Memory Drive label and bundle reference without surfacing raw absolute paths in public logs.
 - **Health service**: read-only checks for client detection, config parseability, Enigma MCP entry presence, bundle availability, command availability, restart state, and last handshake/test result.
 - **Public log redactor**: central path and secret redaction layer used by UI diagnostics, support export, and release telemetry if added later.
 
@@ -96,7 +96,7 @@ The desktop app should expose one primary fix button per failure so users are no
 | Enigma command bridge stale | Repair connector bridge | Update only Enigma command/args/env fields | Restore prior Enigma entry |
 | Existing Enigma entry should be removed | Disconnect Enigma | Remove only Enigma's MCP server entry | Restore prior Enigma entry |
 | Config malformed | Restore last safe config | Restore backup id and affected client label | Restore previous backup when available |
-| Bundle missing | Recreate local vault | Create/select vault label and update connector only if needed | Restore prior connector entry |
+| Bundle missing | Recreate Memory Drive | Create/select Memory Drive label and update connector only if needed | Restore prior connector entry |
 | Permission denied | Retry after permission fix | No write until user retries and approves | No partial write should exist |
 
 If more than one issue exists, show the safest prerequisite first: malformed config before connector edits, missing bundle before command updates, permission denied before any write, and restart needed after successful writes.
@@ -105,12 +105,12 @@ If more than one issue exists, show the safest prerequisite first: malformed con
 
 | Client | Preferred public path | Fallback | Restart guidance | Test target |
 | --- | --- | --- | --- | --- |
-| Claude Desktop | `.mcpb` extension install | Semantic config write | Fully quit and reopen Claude Desktop | Extension/config present, vault ready, MCP handshake when observable |
+| Claude Desktop | `.mcpb` extension install | Semantic config write | Fully quit and reopen Claude Desktop | Extension/config present, Memory Drive ready, MCP handshake when observable |
 | Cursor | Semantic config write | Copy manual snippet | Reload/restart Cursor | Parseable MCP config and Enigma entry |
 | Kimi Code | Semantic config write | Copy manual snippet | Restart Kimi Code | Parseable MCP config and Enigma entry |
-| VS Code/Cline | Cline MCP config write | Install Cline or Generic MCP | Reload VS Code window | Cline config ready and vault reachable |
-| Roo | Roo MCP config write | Copy manual snippet | Reload/restart Roo host | Roo config ready and vault reachable |
-| OpenCode | Semantic config write | Copy manual snippet | Restart or reload MCP servers | OpenCode config ready and vault reachable |
+| VS Code/Cline | Cline MCP config write | Install Cline or Generic MCP | Reload VS Code window | Cline config ready and Memory Drive reachable |
+| Roo | Roo MCP config write | Copy manual snippet | Reload/restart Roo host | Roo config ready and Memory Drive reachable |
+| OpenCode | Semantic config write | Copy manual snippet | Restart or reload MCP servers | OpenCode config ready and Memory Drive reachable |
 | Generic MCP | Copy/export snippet | User-selected config-file write | Restart or reload the chosen MCP client | Selected config ready when Enigma manages it |
 
 ### Per-client flow checklist
@@ -119,13 +119,13 @@ Each client card must implement the same consumer-grade lifecycle. A client is l
 
 | Client | Detect | Preview | One-click connect | One-click disconnect | One-click repair | Backup/rollback | Restart guidance | Health test | Required failure coverage |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Claude Desktop | App plus extension/config capability | Extension install or config delta | Install `.mcpb` or write fallback entry | Remove/disable extension or remove fallback entry | Enable extension, restore config, repair vault, or update bridge | Backup config fallback; extension removal guidance for `.mcpb` | Full quit and reopen | Extension/config, vault, bridge, handshake when observable | Missing Claude, malformed fallback config, missing bundle, restart needed, permission denied |
-| Cursor | App/config markers | Config delta | Write Enigma entry | Remove Enigma entry | Create config, restore config, repair vault, or update bridge | Backup before changed config; rollback button | Reload/restart Cursor | Config parse, Enigma entry, vault, bridge | Missing Cursor, malformed config, missing bundle, restart needed, permission denied |
-| Kimi Code | App/config markers | Config delta | Write Enigma entry | Remove Enigma entry | Create/restore config, repair vault, or update bridge | Backup before changed config; rollback button | Restart Kimi Code | Config parse, Enigma entry, vault, bridge | Missing Kimi Code, malformed config, missing bundle, restart needed, permission denied |
-| VS Code/Cline | VS Code plus Cline extension/config | Cline config delta | Write Cline MCP entry | Remove Enigma entry | Install Cline, create/restore config, repair vault, or update bridge | Backup before changed config; rollback button | Reload VS Code window | Cline config parse, Enigma entry, vault, bridge | Missing VS Code/Cline, malformed config, missing bundle, restart needed, permission denied |
-| Roo | Roo extension/app config markers | Roo config delta | Write Enigma entry | Remove Enigma entry | Create/restore config, repair vault, or update bridge | Backup before changed config; rollback button | Reload/restart Roo host | Roo config parse, Enigma entry, vault, bridge | Missing Roo, malformed config, missing bundle, restart needed, permission denied |
-| OpenCode | App/config markers | Config delta | Write Enigma entry | Remove Enigma entry | Create/restore config, repair vault, or update bridge | Backup before changed config; rollback button | Restart or reload MCP servers | Config parse, Enigma entry, vault, bridge | Missing OpenCode, malformed config, missing bundle, restart needed, permission denied |
-| Generic MCP | User-selected config or copy-only mode | Snippet or selected-file delta | Copy snippet or write selected file | Remove from selected file or show manual removal | Restore selected-file backup, repair vault, or copy fresh snippet | Backup only when Enigma writes selected file; rollback button | Restart/reload chosen MCP client | Selected-file parse when managed, vault, bridge | Unknown client, malformed selected config, missing bundle, restart needed, permission denied |
+| Claude Desktop | App plus extension/config capability | Extension install or config delta | Install `.mcpb` or write fallback entry | Remove/disable extension or remove fallback entry | Enable extension, restore config, repair Memory Drive, or update bridge | Backup config fallback; extension removal guidance for `.mcpb` | Full quit and reopen | Extension/config, Memory Drive, bridge, handshake when observable | Missing Claude, malformed fallback config, missing bundle, restart needed, permission denied |
+| Cursor | App/config markers | Config delta | Write Enigma entry | Remove Enigma entry | Create config, restore config, repair Memory Drive, or update bridge | Backup before changed config; rollback button | Reload/restart Cursor | Config parse, Enigma entry, Memory Drive, bridge | Missing Cursor, malformed config, missing bundle, restart needed, permission denied |
+| Kimi Code | App/config markers | Config delta | Write Enigma entry | Remove Enigma entry | Create/restore config, repair Memory Drive, or update bridge | Backup before changed config; rollback button | Restart Kimi Code | Config parse, Enigma entry, Memory Drive, bridge | Missing Kimi Code, malformed config, missing bundle, restart needed, permission denied |
+| VS Code/Cline | VS Code plus Cline extension/config | Cline config delta | Write Cline MCP entry | Remove Enigma entry | Install Cline, create/restore config, repair Memory Drive, or update bridge | Backup before changed config; rollback button | Reload VS Code window | Cline config parse, Enigma entry, Memory Drive, bridge | Missing VS Code/Cline, malformed config, missing bundle, restart needed, permission denied |
+| Roo | Roo extension/app config markers | Roo config delta | Write Enigma entry | Remove Enigma entry | Create/restore config, repair Memory Drive, or update bridge | Backup before changed config; rollback button | Reload/restart Roo host | Roo config parse, Enigma entry, Memory Drive, bridge | Missing Roo, malformed config, missing bundle, restart needed, permission denied |
+| OpenCode | App/config markers | Config delta | Write Enigma entry | Remove Enigma entry | Create/restore config, repair Memory Drive, or update bridge | Backup before changed config; rollback button | Restart or reload MCP servers | Config parse, Enigma entry, Memory Drive, bridge | Missing OpenCode, malformed config, missing bundle, restart needed, permission denied |
+| Generic MCP | User-selected config or copy-only mode | Snippet or selected-file delta | Copy snippet or write selected file | Remove from selected file or show manual removal | Restore selected-file backup, repair Memory Drive, or copy fresh snippet | Backup only when Enigma writes selected file; rollback button | Restart/reload chosen MCP client | Selected-file parse when managed, Memory Drive, bridge | Unknown client, malformed selected config, missing bundle, restart needed, permission denied |
 
 ## Supported client plans
 
@@ -167,14 +167,14 @@ The Claude-first public helper is `createClaudeDesktopMcpbManifest()`. It emits 
 
 - If extension installed but disabled: show Enable in Claude guidance.
 - If fallback config malformed: offer backup restore or guarded minimal replacement.
-- If bundle missing: offer Recreate local vault or Select existing vault.
+- If bundle missing: offer Recreate Memory Drive or Select existing Memory Drive.
 - If command bridge stale: offer Update connector entry.
 - If restart needed: show Quit and reopen Claude Desktop.
 
 #### Test
 
 - Read-only config/extension detection.
-- Verify the local vault bundle exists through the vault manager.
+- Verify the Memory Drive bundle exists through the Memory Drive manager.
 - Verify Enigma MCP command/bridge is resolvable by the desktop runtime.
 - Ask user to open Claude and use the Enigma tool only after green local checks.
 
@@ -201,7 +201,7 @@ Best consumer path: semantic MCP config write from Enigma Desktop.
 
 - Missing config with installed Cursor: offer Create Cursor MCP config with Enigma entry.
 - Malformed config: offer Restore backup or Open config; do not overwrite silently.
-- Missing bundle: offer Recreate local vault or Select existing vault.
+- Missing bundle: offer Recreate Memory Drive or Select existing Memory Drive.
 - Permission denied: show OS-specific permission guidance and Retry.
 - Restart needed: show Reload window / restart guidance.
 
@@ -233,7 +233,7 @@ Best consumer path: semantic MCP config write from Enigma Desktop.
 #### Repair
 
 - Missing client: show installation guidance and Skip.
-- Missing bundle: offer Recreate local vault or Select existing vault.
+- Missing bundle: offer Recreate Memory Drive or Select existing Memory Drive.
 - Malformed config: offer Restore backup or Open config.
 - Permission denied: explain blocked write and offer Retry after user fixes permissions.
 - Restart needed: show restart prompt until the connector health check refreshes.
@@ -241,7 +241,7 @@ Best consumer path: semantic MCP config write from Enigma Desktop.
 #### Test
 
 - Read config parse state.
-- Verify Enigma entry points to the current local vault label through internal mapping.
+- Verify Enigma entry points to the current Memory Drive label through internal mapping.
 - Verify command bridge availability.
 
 ### VS Code / Cline
@@ -273,7 +273,7 @@ Best consumer path: detect VS Code-compatible installs and write the Cline MCP c
 #### Test
 
 - Verify Cline config parseability and Enigma entry.
-- Verify local vault and command bridge.
+- Verify Memory Drive and command bridge.
 - Surface Cline-specific readiness in health dashboard.
 
 ### Roo
@@ -305,8 +305,8 @@ Best consumer path: detect Roo extension/app configuration and write the MCP ent
 #### Test
 
 - Verify parseable Roo MCP config.
-- Verify Enigma entry and local vault readiness.
-- Verify public health export redacts config and vault paths.
+- Verify Enigma entry and Memory Drive readiness.
+- Verify public health export redacts config and Memory Drive paths.
 
 ### OpenCode
 
@@ -338,7 +338,7 @@ Best consumer path: semantic MCP config write from Enigma Desktop.
 
 - Verify config parseability.
 - Verify Enigma entry and command bridge.
-- Verify vault bundle readiness through local vault manager.
+- Verify Memory Drive bundle readiness through Memory Drive manager.
 
 ### Generic MCP
 
@@ -372,7 +372,7 @@ Best consumer path: copyable or exportable MCP snippet for any client, plus opti
 #### Test
 
 - Verify selected file parseability if Enigma manages it.
-- Verify local vault and command bridge.
+- Verify Memory Drive and command bridge.
 - Provide a generic MCP ping/check instruction without including raw local paths in support logs.
 
 ## Failure modes and UX requirements
@@ -381,7 +381,7 @@ Best consumer path: copyable or exportable MCP snippet for any client, plus opti
 | --- | --- | --- | --- | --- |
 | Missing client | App/config markers absent | "Client not found on this device." | Install guidance, Skip, Generic MCP | Create config for an absent named client |
 | Config malformed | JSON parse fails | "This client config is not valid JSON." | Restore Enigma backup, Open config, guarded replace after consent | Silently overwrite unrelated config |
-| Bundle missing | Vault manager cannot resolve current bundle | "Your local vault is missing or moved." | Recreate vault, Select existing vault, Roll back connector | Claim provider memory was deleted/forgotten |
+| Bundle missing | Memory Drive manager cannot resolve current bundle | "Your Memory Drive is missing or moved." | Recreate Memory Drive, Select existing Memory Drive, Roll back connector | Claim provider memory was deleted/forgotten |
 | Restart needed | Config changed but client has not reloaded | "Restart or reload the client to finish connecting." | Client-specific restart/reload steps, Test again | Report connected as fully healthy before reload evidence |
 | Permission denied | Write/backup fails with access error | "Enigma cannot update this client config yet." | Explain permission fix, Retry, Copy manual snippet | Escalate privileges without explanation or consent |
 | Command bridge missing | Bundled bridge unavailable or stale | "Enigma's local connector bridge needs repair." | Repair desktop install, Update connector entry | Ask consumer to install Node by default |
@@ -395,7 +395,7 @@ Best consumer path: copyable or exportable MCP snippet for any client, plus opti
 - **Not installed**: client not detected.
 - **Ready to connect**: client detected, no Enigma entry.
 - **Connected, restart needed**: config changed, client reload not verified.
-- **Connected**: config/extension, vault, command bridge, and recent handshake/test are healthy.
+- **Connected**: config/extension, Memory Drive, command bridge, and recent handshake/test are healthy.
 - **Needs repair**: fixable local issue detected.
 - **Blocked**: permission denied, malformed config without approved fix, or missing client.
 - **Disconnected**: no Enigma entry for that client.
@@ -406,7 +406,7 @@ Best consumer path: copyable or exportable MCP snippet for any client, plus opti
 - Config parseability.
 - Enigma entry presence and semantic correctness.
 - Backup availability for last write.
-- Local vault bundle existence through internal vault mapping.
+- Memory Drive bundle existence through internal mapping.
 - Command bridge availability inside the desktop bundle.
 - Restart/reload status where observable.
 - Last MCP handshake/test result where observable.
@@ -415,7 +415,7 @@ Best consumer path: copyable or exportable MCP snippet for any client, plus opti
 ## Public log redaction requirements
 
 - Replace local config paths with labels such as `Claude Desktop config`, `Cursor MCP config`, or `Selected MCP config`.
-- Replace vault bundle paths with labels such as `Default local vault` or `Selected local vault`.
+- Replace Memory Drive bundle paths with labels such as `Default Memory Drive` or `Selected Memory Drive`.
 - Include stable non-reversible fingerprints only when needed for support correlation.
 - Never include raw memory records, prompts, transcripts, client conversations, credential material, account IDs, private keys, or customer identifiers.
 - Run redaction before rendering UI diagnostics, saving support bundles, or copying error details to clipboard.
@@ -445,7 +445,7 @@ Best consumer path: copyable or exportable MCP snippet for any client, plus opti
 - Existing config changes create rollback backups before writes.
 - Malformed configs are never silently overwritten.
 - Missing clients are skipped with clear install guidance.
-- Missing bundles route to local vault repair, not to provider-memory claims.
+- Missing bundles route to Memory Drive repair, not to provider-memory claims.
 - Permission failures are explained with retry/manual options.
 - Restart-needed state remains visible until the user restarts/reloads or a health check proves the client has refreshed.
 - Public logs and support exports contain no raw local absolute paths, raw memory, prompts, transcripts, credentials, tokens, private keys, account IDs, or customer identifiers.
@@ -454,20 +454,20 @@ Best consumer path: copyable or exportable MCP snippet for any client, plus opti
 
 Manual and automated product tests should cover these scenarios without requiring public logs to expose raw paths or private content:
 
-1. Fresh desktop install, default vault creation, and connect for each supported client.
+1. Fresh desktop install, default Memory Drive creation, and connect for each supported client.
 2. Missing client detection for each named client.
 3. Existing valid config with unrelated MCP servers preserved after connect and disconnect.
 4. Equivalent existing Enigma entry produces no config change and no unnecessary backup.
 5. Malformed config blocks write and offers backup restore/open-config options.
 6. Existing config write creates rollback backup and rollback restores prior content.
-7. Bundle missing produces vault repair options and blocks healthy status.
+7. Bundle missing produces Memory Drive repair options and blocks healthy status.
 8. Permission denied produces blocked state, retry guidance, and no partial write.
 9. Restart needed appears after write and clears only after reload evidence or successful user-triggered test.
 10. Claude `.mcpb` install path succeeds where supported.
 11. Claude config-writing fallback works where `.mcpb` is unavailable.
 12. Generic MCP copy-only path never claims Enigma edited the unknown client.
 13. Generic MCP selected-file path preserves unrelated settings and supports rollback.
-14. Public diagnostic export redacts config paths, vault paths, memory content, prompts, transcripts, and secrets.
+14. Public diagnostic export redacts config paths, Memory Drive paths, memory content, prompts, transcripts, and secrets.
 
 ## Release blockers
 
@@ -487,7 +487,7 @@ Manual and automated product tests should cover these scenarios without requirin
 - Connector detection map for each supported client and OS.
 - Claude Desktop Extension (`.mcpb`) packaging and validation.
 - Shared semantic JSON config writer with atomic write and backup support.
-- Local vault manager that exposes redacted labels to UI and diagnostics.
+- Memory Drive manager that exposes redacted labels to UI and diagnostics.
 - Health verification service with client-specific restart/reload hints.
 - Redaction library applied to UI diagnostics and support exports.
 - Consumer docs that present desktop setup first and CLI/config editing only as advanced power-user paths.
