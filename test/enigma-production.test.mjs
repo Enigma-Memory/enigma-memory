@@ -3694,7 +3694,7 @@ test('public collateral keeps proof, token, hosted, and raw-memory claim boundar
   const proofBoundaryRequirements = Object.freeze({
     'README.md': [
       /Enigma does not claim that a closed provider deleted internal data/i,
-      /proves facts about Enigma-controlled vault state, receipts, checkpoints, and declared boundary operations/i,
+      /proves facts about Enigma-controlled Memory Drive state, receipts, checkpoints, and declared boundary operations/i,
       /Register host name `com\.enigma\.native_host` by generating a browser-specific manifest/i,
       /Provider-native memory remains cache only; Enigma receipts do not prove provider deletion or model forgetting/i,
     ],

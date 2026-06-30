@@ -677,6 +677,10 @@ test('public website explains consumer install path without unsupported claims',
   assert.match(setup, /private Memory Drive on this computer/);
   assert.match(setup, /whether your Memory Drive and connections are ready/);
   assert.doesNotMatch(publicWebsite, /Where is my vault|Vault not ready|Repair vault|raw vault files|your vault|vault and app connections|vault and connections/i);
+  assert.match(readme, /Enigma creates a local Memory Drive/);
+  assert.match(readme, /canonical Memory Drive on your device/);
+  assert.match(readme, /Memory Drive state, receipts, checkpoints/);
+  assert.doesNotMatch(readme.slice(0, readme.indexOf('## Developer CLI')), /local vault|canonical vault|Enigma-controlled vault/i);
   assert.doesNotMatch(developerCli, /--overwrite/);
   assert.match(developerCli, /enigma claude-mcpb package --plain/);
   assert.match(websiteStyles, /setup-map/);

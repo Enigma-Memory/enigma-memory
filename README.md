@@ -13,7 +13,7 @@ For most people, start with the Enigma Memory desktop app. The public launch tar
 1. Go to the [download page](website/download.html) or the Enigma Memory website.
 2. Check the current platform status. Signed Windows and macOS installers are the consumer target; unsigned development builds are testing-only until signing evidence is complete.
 3. When a signed installer is available for your platform, open it and follow the first-run setup flow.
-4. Enigma creates a local vault, detects installed AI clients, and previews connection changes before applying them.
+4. Enigma creates a local Memory Drive, detects installed AI clients, and previews connection changes before applying them.
 
 The desktop app bundles its runtime. Consumers should not install Node or npm for the default path; command-line setup is advanced developer/troubleshooting material.
 
@@ -24,9 +24,9 @@ For the public launch desktop flow, pair this with the [consumer onboarding UX p
 
 ## Privacy and proof boundaries
 
-Enigma Memory keeps its canonical vault on your device. You choose which AI clients are connected and what context they can use. Connected clients may still have their own logs, retention, and caches outside Enigma control.
+Enigma Memory keeps its canonical Memory Drive on your device. You choose which AI clients are connected and what context they can use. Connected clients may still have their own logs, retention, and caches outside Enigma control.
 
-Enigma proves facts about Enigma-controlled vault state, receipts, checkpoints, and declared boundary operations. Enigma does not claim facts about a provider's own stored copies, hidden personalization, or model state.
+Enigma proves facts about Enigma-controlled Memory Drive state, receipts, checkpoints, and declared boundary operations. Enigma does not claim facts about a provider's own stored copies, hidden personalization, or model state.
 Enigma does not claim that a closed provider deleted internal data; it only proves declared Enigma-controlled lifecycle events.
 
 For details, see:
@@ -185,7 +185,7 @@ npm run install:local -- --execute --init-vault --bundle "$ENIGMA_BUNDLE_FILE"
 enigma doctor --bundle "$ENIGMA_BUNDLE_FILE"
 ```
 
-`install:local` is dry-run unless `--execute` is present. The command above installs the checked-out package globally and creates a local vault bundle.
+`install:local` is dry-run unless `--execute` is present. The command above installs the checked-out package globally and creates a local Memory Drive bundle.
 
 ### Export and verify proof artifacts
 
@@ -194,13 +194,13 @@ enigma export --bundle "$ENIGMA_BUNDLE_FILE" --out ./enigma-export.json
 enigma verify --export ./enigma-export.json
 ```
 
-Exported proof artifacts contain encrypted/committed vault state and receipt metadata; do not paste raw memory plaintext into relay records, witness checkpoints, SIEM events, public proof artifacts, or shell command lines.
+Exported proof artifacts contain encrypted/committed Memory Drive state and receipt metadata; do not paste raw memory plaintext into relay records, witness checkpoints, SIEM events, public proof artifacts, or shell command lines.
 
 ### Claim boundary
 
 Enigma can honestly claim:
 
-- A local Enigma vault contains or no longer serves a committed memory address.
+- A local Enigma Memory Drive contains or no longer serves a committed memory address.
 - A memory create, retrieval, context-pack, update, or tombstone event produced a receipt that verifies offline.
 - A boundary harness classified an observed boundary event as committed, blocked, out-of-scope, or failed.
 - A relay stored an opaque encrypted record or signed a witness checkpoint without raw memory plaintext.
