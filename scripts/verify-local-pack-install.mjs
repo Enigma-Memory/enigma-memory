@@ -12,7 +12,7 @@ const COMMAND_TIMEOUT_MS = 120_000;
 const SCHEMA = 'enigma.local_pack_install_smoke.v1';
 
 function usage() {
-  return `Usage: node scripts/verify-local-pack-install.mjs [--plain|--json]\n\nPacks the local source package into a temporary tarball, installs that tarball into a temporary npm prefix, runs installed package entrypoints directly, then removes the temp directory. No npm publish, npm token, global install, registry install, signing, upload, or network action is performed.\n`;
+  return `Usage: node scripts/verify-local-pack-install.mjs [--plain|--json]\n\nPacks the local source package into a temporary tarball, installs that tarball into a temporary npm prefix, runs installed package entrypoints and npm bin shims, then removes the temp directory. No npm publish, npm token, global install, registry install, signing, upload, or network action is performed.\n`;
 }
 
 function npmInvocation(args) {
@@ -280,7 +280,7 @@ export async function runLocalPackInstallSmoke(now = new Date()) {
         network_required: false,
         signing_required: false,
       },
-      claim_boundary: 'Local packed install smoke only. This proves the source package tarball can install into a temporary npm prefix and run selected entrypoints locally; it does not prove npm publication, global install safety, signed installers, hosted service readiness, provider behavior, benchmark superiority, token ROI, or compliance.',
+      claim_boundary: 'Local packed install smoke only. This proves the source package tarball can install into a temporary npm prefix and run selected entrypoints plus npm bin shims locally; it does not prove npm publication, global install safety, signed installers, hosted service readiness, provider behavior, benchmark superiority, token ROI, or compliance.',
     };
   } finally {
     await rm(tempDir, { recursive: true, force: true });

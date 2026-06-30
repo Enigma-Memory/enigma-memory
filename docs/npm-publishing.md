@@ -70,7 +70,7 @@ The workflow performs these Node 24 steps before publishing:
 4. It runs `npm run check`.
 5. It runs `npm test`.
 6. It runs `npm pack --dry-run`.
-7. It runs `npm run package:install-smoke` to install the local tarball into a temporary npm prefix and run selected entrypoints without publishing, tokens, global install, signing, hosted services, or network claims.
+7. It runs `npm run package:install-smoke` to install the local tarball into a temporary npm prefix and run selected entrypoints plus npm bin shims without publishing, tokens, global install, signing, hosted services, or network claims.
 8. After `preflight` passes, the `publish` job waits on the `npm-publish` environment approval.
 9. The `publish` job checks out the same workflow ref, sets up Node.js 24, re-verifies the version input, reruns `npm run check`, `npm test`, `npm pack --dry-run`, and `npm run package:install-smoke`, then publishes with:
 
@@ -84,7 +84,7 @@ If the input version differs from `package.json`, the workflow fails before the 
 
 - `npm publish --provenance` asks npm to attach registry provenance for the publish event when supported by npm and GitHub Actions OIDC.
 - `npm pack --dry-run` previews package contents; it does not publish and does not attest the tarball.
-- `npm run package:install-smoke` installs the locally packed tarball into a temporary npm prefix and runs selected entrypoints; it does not publish, use npm tokens, install globally, sign desktop artifacts, or prove registry availability.
+- `npm run package:install-smoke` installs the locally packed tarball into a temporary npm prefix and runs selected entrypoints plus npm bin shims; it does not publish, use npm tokens, install globally, sign desktop artifacts, or prove registry availability.
 - `npm run provenance:local` records local checksum/SBOM evidence for package-surface files; it is unsigned local evidence only.
 - CI and publish logs are operational evidence for the commands run in that workflow. They do not prove provider deletion, model forgetting, compliance certification, legal approval, hosted cloud readiness, customer BYOC readiness, support/SLA readiness, or website deployment state.
 
