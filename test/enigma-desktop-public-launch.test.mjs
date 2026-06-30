@@ -536,10 +536,12 @@ test('public website explains consumer install path without unsupported claims',
   assert.doesNotMatch(download, /signed installers are ready|signed-ready|download-ready/i);
   assert.match(setup, /Four screens\. No terminal\. No JSON\./);
   assert.match(setup, /Create Memory Drive/);
+  assert.doesNotMatch(setup, /Create local vault/);
   assert.match(setup, /Preview, then approve/);
   assert.match(setup, /Enigma shows what it will change before you approve/);
   assert.match(setup, /Memory Drive dashboard/);
   assert.doesNotMatch(setup, /connection boundary|local client config|Enigma-controlled vault|local app location|manual MCP JSON/i);
+  assert.doesNotMatch(publicWebsite, /local vault|vault bundle|Create local vault|local app location/i);
   assert.doesNotMatch(developerCli, /--overwrite/);
   assert.match(developerCli, /enigma connect claude-desktop --bundle \.\/\.enigma\/bundle\.json --dry-run/);
   assert.match(websiteStyles, /setup-map/);
@@ -565,6 +567,9 @@ test('public website explains consumer install path without unsupported claims',
   assert.match(faq, /help\/troubleshooting\/vault-not-ready\.html/);
   assert.match(faq, /Restore from backup, Safe reset/);
   assert.doesNotMatch(faq, /<p>Run Repair vault[^<]*<a href="\.\/developers\/cli\.html"/);
+  assert.match(troubleshooting, /Create Memory Drive/);
+  assert.doesNotMatch(troubleshooting, /Create local vault|local vault bundle/);
+  assert.doesNotMatch(faq, /Enigma-controlled local app location/);
   assert.match(vaultNotReady, /repair buttons inside the desktop app/);
   assert.match(vaultNotReady, /Advanced command-line repair/);
   assert.ok(vaultNotReady.indexOf('<strong>Repair vault</strong>') < vaultNotReady.indexOf('Advanced command-line repair'));
@@ -593,7 +598,7 @@ test('public website explains consumer install path without unsupported claims',
   assert.match(clientNotDetected, /advanced manual settings/);
   assert.doesNotMatch(publicWebsite, /MCP settings change|MCP entry|MCP JSON|local MCP server|Manual MCP configuration|client config directory|complete client config files/i);
   assert.match(help, /Remove Enigma safely/);
-  assert.match(removalGuide, /Remove Enigma without losing your local vault by accident/);
+  assert.match(removalGuide, /Remove Enigma without losing your Memory Drive by accident/);
   assert.match(removalGuide, /Disconnecting Enigma from an app affects Enigma-controlled local connector setup only/);
   assert.match(removalGuide, /Full removal is separate and destructive/);
   assert.match(faq, /safe removal guide/);
