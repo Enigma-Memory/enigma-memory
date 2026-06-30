@@ -8,7 +8,7 @@ This package is a dependency-free browser shell that can be wrapped later by Ele
 - `src/app.js` remains the ESM test and wrapper surface. It exports `createDesktopState`, `desktopReducer`, `renderDesktopModel`, `renderMemoryDriveDashboard`, `desktopActions`, and named action creators for MCP, vault, Memory Drive, service, health, proof activity, update, diagnostics, memory, verifier, client, import, and export flows.
 - First-run state defaults to the consumer `home` screen. Public copy says Memory Drive, connected apps, health/fix-it, proof activity, updates, diagnostics, and safe support report before advanced vault/MCP wording.
 - `renderMemoryDriveDashboard` is the public-safe dashboard contract. It exposes one `next_action`, `memory_drive_status`, `connected_app_count`, `proof_status`, `update_status`, `diagnostics_status`, `offline_ready`, `issue_codes`, `memory_controller`, and `import_sandbox`.
-- Dashboard, diagnostics, proof, import receipt, release evidence, and screenshot surfaces must not contain raw memory bodies, prompts, transcripts, provider responses, local absolute paths, credentials, tokens, private keys, account identifiers, customer identifiers, or signing secrets.
+- Dashboard, support report, diagnostics, proof, import receipt, release evidence, and screenshot surfaces must not contain raw memory bodies, prompts, transcripts, provider responses, local absolute paths, credentials, tokens, private keys, account identifiers, customer identifiers, or signing secrets.
 - Reducer state is local operational evidence only. UI state is never presented as cryptographic proof.
 - Receipt verifier output is structural evidence about supplied receipts. Offline receipt verification remains the proof path.
 - Raw memory plaintext is not exported, shown in receipts, deletion evidence, verifier evidence, or import/export bundles. Memory text entered in the shell is reduced to a local fingerprint plus non-sensitive descriptor metadata.
@@ -17,7 +17,7 @@ This package is a dependency-free browser shell that can be wrapped later by Ele
 
 ## Screens
 
-The static shell renders consumer home, Memory Controller, Import Sandbox, setup/fix-it, advanced vault status, MCP server status, connected app buttons, import/export, receipt verifier output, delete-and-prove evidence, mesh status, and enterprise status.
+The static shell renders consumer home, Memory Controller, Import Sandbox, setup/fix-it, safe support report, advanced vault status, MCP server status, connected app buttons, import/export, receipt verifier output, delete-and-prove evidence, mesh status, and enterprise status.
 
 ## Public-launch command contract
 

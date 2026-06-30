@@ -31,6 +31,7 @@
       <nav class="screen-nav" aria-label="Desktop screens">
         <button class="screen-tab is-active" type="button">Memory Drive</button>
         <button class="screen-tab" type="button">Setup</button>
+        <button class="screen-tab" type="button">Support report</button>
         <button class="screen-tab" type="button">Vault</button>
         <button class="screen-tab" type="button">MCP server</button>
         <button class="screen-tab" type="button">Connected apps</button>
@@ -50,6 +51,7 @@ const VERIFIER_EVIDENCE_SCHEMA = 'enigma.desktop.verifier_evidence.v1';
 export const DESKTOP_SCREENS = Object.freeze([
   'home',
   'setup',
+  'support',
   'vault',
   'mcp',
   'clients',
@@ -258,6 +260,7 @@ export function renderDesktopModel(state = createDesktopState()) {
   const connectedClients = state.clients.filter((client) => client.status === 'connected');
   const verifierOk = state.verifier.status === 'checked' && state.verifier.errors.length === 0;
   const dashboard = renderMemoryDriveDashboard(state);
+  const diagnostics = renderSupportReportModel(state.desktopDiagnostics);
 
   return {
     schema: 'enigma.desktop.render_model.v1',
@@ -355,14 +358,8 @@ export function renderDesktopModel(state = createDesktopState()) {
         siem: state.enterprise.siem,
         note: state.enterprise.note
       },
-      diagnostics: {
-        title: 'Safe support report',
-        status: state.desktopDiagnostics.status,
-        checked_at: state.desktopDiagnostics.checked_at,
-        support_report_ready: Boolean(state.desktopDiagnostics.support_report_ready),
-        issue_codes: normalizeIssueCodes(state.desktopDiagnostics.issue_codes),
-        safe_summary: normalizeSafePublicList(state.desktopDiagnostics.safe_summary, 6)
-      }
+      diagnostics,
+      support: diagnostics
     }
   };
 }
@@ -408,6 +405,41 @@ export function renderMemoryDriveDashboard(state = createDesktopState()) {
       connectedAppCount,
       issueCodes
     })
+  };
+}
+
+function renderSupportReportModel(diagnostics = {}) {
+  const status = normalizePublicStatus(diagnostics.status, ['not-run', 'running', 'ready', 'needs-review', 'error'], 'not-run');
+  const checkedAt = cleanString(diagnostics.checked_at ?? diagnostics.checkedAt);
+  const issueCodes = normalizeIssueCodes(diagnostics.issue_codes ?? diagnostics.issueCodes);
+  const safeSummary = normalizeSafePublicList(diagnostics.safe_summary ?? diagnostics.safeSummary ?? diagnostics.summary, 6);
+  const ready = Boolean(diagnostics.support_report_ready ?? diagnostics.supportReportReady) && status === 'ready';
+  const reportSeed = `${status}\u001f${checkedAt}\u001f${issueCodes.join(',')}\u001f${safeSummary.join('\u001f')}`;
+  const reportId = reportSeed.replace(/\u001f/g, '') ? `support_${localFingerprint(reportSeed).slice(0, 16)}` : '';
+  return {
+    schema: 'enigma.desktop.support_report.v1',
+    title: 'Safe support report',
+    status,
+    checked_at: checkedAt,
+    support_report_ready: ready,
+    report_id: reportId,
+    issue_codes: issueCodes,
+    safe_summary: safeSummary,
+    shareable_summary: safeSummary.length
+      ? safeSummary
+      : [status === 'not-run' ? 'Run diagnostics before sharing support status.' : 'No public support summary details were produced.'],
+    privacy_boundaries: {
+      raw_memory_returned: false,
+      prompts_returned: false,
+      transcripts_returned: false,
+      provider_responses_returned: false,
+      local_paths_returned: false,
+      credentials_returned: false,
+      complete_settings_returned: false
+    },
+    primary_action: ready
+      ? { id: 'copy_support_report', label: 'Copy safe support report' }
+      : { id: 'collect_support_report', label: 'Collect support report' }
   };
 }
 
@@ -1412,6 +1444,7 @@ function screenLabel(screen) {
   switch (screen) {
     case 'home': return 'Memory Drive';
     case 'setup': return 'Setup';
+    case 'support': return 'Support report';
     case 'vault': return 'Vault';
     case 'mcp': return 'MCP server';
     case 'clients': return 'Connected apps';
@@ -1510,7 +1543,7 @@ function selectMemoryDriveNextAction(input) {
     return { id: 'install_update', label: 'Install update', screen: 'setup', reason: 'A desktop update is ready.' };
   }
   if (input.diagnosticsStatus === 'needs-review' || input.diagnosticsStatus === 'error') {
-    return { id: 'open_diagnostics', label: 'Open safe support report', screen: 'setup', reason: 'Diagnostics need review before sharing support metadata.' };
+    return { id: 'open_diagnostics', label: 'Open safe support report', screen: 'support', reason: 'Diagnostics need review before sharing support metadata.' };
   }
   if (input.proofStatus === 'error' || input.proofStatus === 'needs-review') {
     return { id: 'review_proof', label: 'Review proof activity', screen: 'verifier', reason: 'Proof activity needs local review.' };
@@ -1602,6 +1635,21 @@ function selectImportSandboxSummary(input) {
   };
 }
 
+function supportReportClipboardText(report = {}) {
+  const lines = [
+    'Enigma safe support report',
+    `Status: ${safePublicString(report.status, 'not-run', 32)}`,
+    `Report ID: ${safePublicString(report.report_id, 'not generated', 64)}`,
+    `Checked: ${safePublicString(report.checked_at, 'not observed', 64)}`,
+    'Privacy: no raw memory, prompts, transcripts, provider responses, credentials, complete settings, or local paths.'
+  ];
+  const issues = normalizeIssueCodes(report.issue_codes);
+  lines.push(`Issue codes: ${issues.length ? issues.join(', ') : 'none'}`);
+  const summary = normalizeSafePublicList(report.shareable_summary ?? report.safe_summary, 6);
+  for (const item of summary) lines.push(`Summary: ${item}`);
+  return lines.join('\n');
+}
+
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
 }
@@ -1672,6 +1720,7 @@ function renderHtml(model, state) {
     <main>
       ${renderHomeScreen(model.screens.home)}
       ${renderSetupScreen(model.screens.setup)}
+      ${renderSupportScreen(model.screens.support)}
       ${renderVaultScreen(model.screens.vault, state)}
       ${renderMcpScreen(model.screens.mcp)}
       ${renderClientsScreen(model.screens.clients)}
@@ -1763,6 +1812,33 @@ function renderSetupScreen(screen) {
         <button type="button" data-action="${escapeHtml(screen.next_action.id)}">${escapeHtml(screen.next_action.label)}</button>
       </div>
     </div>`);
+}
+
+function renderSupportScreen(screen) {
+  const issues = screen.issue_codes.length ? screen.issue_codes.map((code) => `<li>${escapeHtml(code)}</li>`).join('') : '<li>No issue codes in the safe report.</li>';
+  const summary = screen.shareable_summary.map((item) => `<li>${escapeHtml(item)}</li>`).join('');
+  const boundaries = Object.entries(screen.privacy_boundaries).map(([key, value]) => `<li><strong>${escapeHtml(key.replace(/_/g, ' '))}</strong><span>${value === false ? 'never included' : 'review required'}</span></li>`).join('');
+  return renderScreen('support', screen.title, `
+    <div class="two-column">
+      <div class="panel status-panel">
+        <span class="status-pill">${escapeHtml(screen.status)}</span>
+        <h3>${escapeHtml(screen.primary_action.label)}</h3>
+        <p>Share this report with support when asked. It is generated from public-safe status fields only.</p>
+        <button type="button" data-action="${escapeHtml(screen.primary_action.id)}">${escapeHtml(screen.primary_action.label)}</button>
+      </div>
+      <dl class="panel detail-list">
+        ${renderMetric('Report ready', screen.support_report_ready ? 'yes' : 'no')}
+        ${renderMetric('Report ID', screen.report_id || 'not generated')}
+        ${renderMetric('Checked', screen.checked_at || 'not observed')}
+      </dl>
+    </div>
+    <div class="two-column">
+      <div class="panel"><h3>Public summary</h3><ul class="boundary-list">${summary}</ul></div>
+      <div class="panel"><h3>Issue codes</h3><ul class="boundary-list">${issues}</ul></div>
+    </div>
+    <div class="panel"><h3>Privacy boundaries</h3><ul class="boundary-list">${boundaries}</ul></div>
+    <p class="honesty-note">No raw memory, prompts, transcripts, provider responses, credentials, complete settings, or local paths are included.</p>
+    <label class="panel">Copyable safe report<textarea readonly>${escapeHtml(supportReportClipboardText(screen))}</textarea></label>`);
 }
 
 function renderVaultScreen(screen, state) {
@@ -1900,8 +1976,25 @@ function wireDesktopEvents(root, state, dispatch) {
           dispatch(updateDesktopUpdateStatus({ status: 'current', issue_codes: [] }, { now }));
           break;
         case 'open_diagnostics':
-          dispatch(updateDesktopDiagnostics({ status: 'ready', support_report_ready: true, safe_summary: ['Safe support report prepared'] }, { now }));
+          dispatch(selectDesktopScreen('support'));
           break;
+        case 'collect_support_report':
+          dispatch(updateDesktopDiagnostics({
+            status: 'ready',
+            support_report_ready: true,
+            issue_codes: ['SAFE_SUPPORT_REPORT_READY'],
+            safe_summary: ['Memory Drive status checked', 'Connected app status checked', 'Proof and update status checked']
+          }, { now }));
+          dispatch(selectDesktopScreen('support'));
+          break;
+        case 'copy_support_report': {
+          const report = renderSupportReportModel(state.desktopDiagnostics);
+          if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+            navigator.clipboard.writeText(supportReportClipboardText(report)).catch(() => undefined);
+          }
+          dispatch(selectDesktopScreen('support'));
+          break;
+        }
         case 'shutdown_desktop':
           dispatch(shutdownDesktop({ now }));
           break;

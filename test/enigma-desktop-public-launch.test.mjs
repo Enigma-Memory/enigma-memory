@@ -71,6 +71,8 @@ test('desktop first-run defaults to Memory Drive home dashboard', async () => {
   assert.equal(model.activeScreen, 'home');
   assert.equal(model.navigation[0].id, 'home');
   assert.equal(model.navigation[0].label, 'Memory Drive');
+  assert.equal(model.navigation[2].id, 'support');
+  assert.equal(model.navigation[2].label, 'Support report');
   assert.equal(model.screens.home.title, 'Memory Drive dashboard');
   assert.equal(model.dashboard.next_action.id, 'create_memory_drive');
   assert.equal(model.dashboard.next_action.label, 'Create Memory Drive');
@@ -94,24 +96,38 @@ test('desktop first-run defaults to Memory Drive home dashboard', async () => {
   assert.equal(model.dashboard.import_sandbox.primary_action.id, 'create_memory_drive');
   assert.equal(model.dashboard.import_sandbox.receipt_boundaries.raw_memory_returned, false);
   assert.equal(model.dashboard.import_sandbox.receipt_boundaries.provider_deletion_proof, false);
+  assert.equal(model.screens.support.schema, 'enigma.desktop.support_report.v1');
+  assert.equal(model.screens.support.primary_action.id, 'collect_support_report');
+  assert.equal(model.screens.support.privacy_boundaries.raw_memory_returned, false);
+  assert.equal(model.screens.support.privacy_boundaries.local_paths_returned, false);
 });
 
-test('static desktop shell mirrors Memory Controller and Import Sandbox dashboard cards', async () => {
+test('static desktop shell mirrors Memory Controller, Import Sandbox, and Support Report cards', async () => {
   const shell = await readDesktopShellFile('index.html');
   const homeBlock = shell.match(/function renderHomeScreen\(screen\) \{[\s\S]*?\n\}/)?.[0] || '';
   const importSandboxBlock = shell.match(/function renderImportSandboxHtml\(sandbox\) \{[\s\S]*?function renderScreen/s)?.[0] || '';
+  const supportBlock = shell.match(/function renderSupportScreen\(screen\) \{[\s\S]*?function renderVaultScreen/s)?.[0] || '';
 
   assert.match(shell, /function selectMemoryControllerSummary/);
   assert.match(shell, /function selectImportSandboxSummary/);
+  assert.match(shell, /function renderSupportReportModel/);
+  assert.match(shell, /function supportReportClipboardText/);
   assert.match(shell, /memory_controller: memoryController/);
   assert.match(shell, /import_sandbox: importSandbox/);
+  assert.match(shell, /support: diagnostics/);
+  assert.match(shell, /Support report/);
+  assert.match(shell, /renderSupportScreen\(model\.screens\.support\)/);
   assert.match(homeBlock, /Memory Controller/);
   assert.match(homeBlock, /Import Sandbox/);
   assert.match(homeBlock, /renderImportSandboxHtml\(dashboard\.import_sandbox\)/);
   assert.match(importSandboxBlock, /Provider-side proof/);
   assert.match(importSandboxBlock, /Model-state proof/);
+  assert.match(supportBlock, /Copyable safe report/);
+  assert.match(supportBlock, /Privacy boundaries/);
+  assert.match(supportBlock, /No raw memory, prompts, transcripts, provider responses, credentials, complete settings, or local paths/);
   assert.match(shell, /The shell reports local setup only; provider logs and model behavior require provider evidence/);
   assert.doesNotMatch(homeBlock, /provider deletion|model forgetting|provider-native memory control/i);
+  assert.doesNotMatch(supportBlock, /provider deletion|model forgetting|provider-native memory control/i);
 });
 
 test('desktop create Memory Drive action prepares consumer dashboard without raw paths', async () => {
@@ -223,11 +239,17 @@ test('desktop public dashboard omits raw memory, prompts, transcripts, tokens, p
   assertControllerPrimitiveContracts(dashboard.memory_controller);
   assert.equal(model.screens.diagnostics.safe_summary.length, 1);
   assert.deepEqual(model.screens.diagnostics.safe_summary, ['Local service reachable']);
+  assert.equal(model.screens.support.support_report_ready, true);
+  assert.match(model.screens.support.report_id, /^support_/);
+  assert.deepEqual(model.screens.support.shareable_summary, ['Local service reachable']);
+  assert.equal(model.screens.support.primary_action.id, 'copy_support_report');
+  assert.equal(model.screens.support.privacy_boundaries.provider_responses_returned, false);
   assertPublicSafe(model);
   assertPublicSafe(model.dashboard);
   assertPublicSafe(model.screens.home);
   assertPublicSafe(model.screens.setup);
   assertPublicSafe(model.screens.diagnostics);
+  assertPublicSafe(model.screens.support);
 });
 
 test('desktop unknown public-launch action fails closed', async () => {
