@@ -22,6 +22,10 @@ async function importDesktop() {
 async function readDesktopUiFile(name) {
   return readFile(new URL(`../apps/desktop-tauri/ui/${name}`, import.meta.url), 'utf8');
 }
+async function readDesktopShellFile(name) {
+  return readFile(new URL(`../apps/desktop/src/${name}`, import.meta.url), 'utf8');
+}
+
 
 async function readDesktopTauriSource(name) {
   return readFile(new URL(`../apps/desktop-tauri/src/${name}`, import.meta.url), 'utf8');
@@ -90,6 +94,24 @@ test('desktop first-run defaults to Memory Drive home dashboard', async () => {
   assert.equal(model.dashboard.import_sandbox.primary_action.id, 'create_memory_drive');
   assert.equal(model.dashboard.import_sandbox.receipt_boundaries.raw_memory_returned, false);
   assert.equal(model.dashboard.import_sandbox.receipt_boundaries.provider_deletion_proof, false);
+});
+
+test('static desktop shell mirrors Memory Controller and Import Sandbox dashboard cards', async () => {
+  const shell = await readDesktopShellFile('index.html');
+  const homeBlock = shell.match(/function renderHomeScreen\(screen\) \{[\s\S]*?\n\}/)?.[0] || '';
+  const importSandboxBlock = shell.match(/function renderImportSandboxHtml\(sandbox\) \{[\s\S]*?function renderScreen/s)?.[0] || '';
+
+  assert.match(shell, /function selectMemoryControllerSummary/);
+  assert.match(shell, /function selectImportSandboxSummary/);
+  assert.match(shell, /memory_controller: memoryController/);
+  assert.match(shell, /import_sandbox: importSandbox/);
+  assert.match(homeBlock, /Memory Controller/);
+  assert.match(homeBlock, /Import Sandbox/);
+  assert.match(homeBlock, /renderImportSandboxHtml\(dashboard\.import_sandbox\)/);
+  assert.match(importSandboxBlock, /Provider-side proof/);
+  assert.match(importSandboxBlock, /Model-state proof/);
+  assert.match(shell, /The shell reports local setup only; provider logs and model behavior require provider evidence/);
+  assert.doesNotMatch(homeBlock, /provider deletion|model forgetting|provider-native memory control/i);
 });
 
 test('desktop create Memory Drive action prepares consumer dashboard without raw paths', async () => {

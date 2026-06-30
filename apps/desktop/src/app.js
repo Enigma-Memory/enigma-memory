@@ -1670,6 +1670,26 @@ function renderMemoryControllerHtml(controller) {
   ];
   return `<dl class="detail-list">${items.map(([label, item]) => renderMetric(label, `${item.label} · ${item.primary_action.label}`)).join('')}</dl>`;
 }
+function renderImportSandboxHtml(sandbox) {
+  const receiptBoundaries = sandbox.receipt_boundaries || {};
+  const boundaries = [
+    ['Preview receipt', receiptBoundaries.preview_receipt],
+    ['Batch receipt', receiptBoundaries.batch_receipt],
+    ['Rollback receipt', receiptBoundaries.rollback_receipt],
+    ['Raw memory text', receiptBoundaries.raw_memory_returned === false ? 'never returned' : 'review required'],
+    ['Local paths', receiptBoundaries.local_paths_returned === false ? 'never returned' : 'review required'],
+    ['Provider-side proof', receiptBoundaries.provider_deletion_proof === false ? 'not claimed' : 'review required'],
+    ['Model-state proof', receiptBoundaries.model_forgetting_proof === false ? 'not claimed' : 'review required']
+  ];
+  return `
+    <p>${escapeHtml(sandbox.summary)}</p>
+    <dl class="detail-list">
+      ${renderMetric('Status', sandbox.label)}
+      ${renderMetric('Next action', sandbox.primary_action.label)}
+    </dl>
+    <ul class="boundary-list">${boundaries.map(([label, value]) => `<li><strong>${escapeHtml(label)}</strong><span>${escapeHtml(value)}</span></li>`).join('')}</ul>`;
+}
+
 
 function renderScreen(id, title, body) {
   return `<section class="screen-card" id="screen-${escapeHtml(id)}"><div class="screen-heading"><p>${escapeHtml(screenLabel(id))}</p><h2>${escapeHtml(title)}</h2></div>${body}</section>`;
@@ -1694,7 +1714,10 @@ function renderHomeScreen(screen) {
         ${renderMetric('Offline ready', dashboard.offline_ready ? 'yes' : 'no')}
       </dl>
     </div>
-    <div class="panel memory-controller-panel"><h3>Memory Controller</h3>${renderMemoryControllerHtml(dashboard.memory_controller)}</div>
+    <div class="two-column trust-card-grid">
+      <div class="panel memory-controller-panel"><h3>Memory Controller</h3>${renderMemoryControllerHtml(dashboard.memory_controller)}</div>
+      <div class="panel import-sandbox-panel"><h3>Import Sandbox</h3>${renderImportSandboxHtml(dashboard.import_sandbox)}</div>
+    </div>
     <div class="panel"><h3>Issue codes</h3><ul class="boundary-list">${issues}</ul></div>`);
 }
 
