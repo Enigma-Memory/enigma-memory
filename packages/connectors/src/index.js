@@ -650,12 +650,18 @@ function wizardStepsForClient(clientId, platform) {
       },
       {
         order: 5,
-        id: 'test_claude_mcpb',
-        title: 'Restart Claude Desktop and test the Enigma extension before real work.',
+        id: 'select_memory_drive',
+        title: 'When Claude asks, select the local Memory Drive file for Enigma.',
         writes: false,
       },
       {
         order: 6,
+        id: 'test_claude_mcpb',
+        title: 'Ask Claude to run read-only enigma_support_summary or enigma_next_action; success is a public-safe Enigma schema response.',
+        writes: false,
+      },
+      {
+        order: 7,
         id: 'advanced_config_fallback',
         title: 'Only if support asks: preview manual Claude settings.',
         command: previewConnectCommandFor(clientId, platform),
@@ -907,19 +913,19 @@ function claudeDesktopMcpbPrimaryAction(status) {
     mcpb_ready: {
       id: 'restart_claude',
       label: 'Restart Claude Desktop',
-      description: 'Fully quit and reopen Claude Desktop, then test the Enigma connection.',
+      description: 'Fully quit and reopen Claude Desktop, choose the Memory Drive if prompted, then ask Claude to run read-only enigma_support_summary or enigma_next_action.',
       kind: 'user_action',
     },
     restart_required: {
       id: 'restart_claude',
       label: 'Restart Claude Desktop',
-      description: 'Fully quit and reopen Claude Desktop, then test the Enigma connection.',
+      description: 'Fully quit and reopen Claude Desktop, choose the Memory Drive if prompted, then ask Claude to run read-only enigma_support_summary or enigma_next_action.',
       kind: 'user_action',
     },
     testing: {
       id: 'wait_for_connection_test',
       label: 'Wait for connection test',
-      description: 'Keep Claude Desktop open while Enigma verifies the local bridge.',
+      description: 'Keep Claude Desktop open while Enigma waits for a read-only public-safe schema response.',
       kind: 'status',
     },
     ready: {
@@ -931,7 +937,7 @@ function claudeDesktopMcpbPrimaryAction(status) {
     repair_required: {
       id: 'repair_claude_extension',
       label: 'Repair Claude connection',
-      description: 'Use Enigma repair to reinstall the extension handoff or switch to the consented fallback path.',
+      description: 'Enable or reinstall Enigma Memory in Claude Settings → Extensions, reselect the Memory Drive, fully quit and reopen Claude, then use the dry-run fallback only if support asks.',
       kind: 'repair',
     },
     advanced_fallback: {

@@ -194,7 +194,8 @@ Steps:
 1. Open the generated `.mcpb` package in Claude Desktop.
 2. Choose the local Memory Drive when Claude asks.
 3. Restart Claude Desktop.
-4. Return to Enigma and run the Claude connection test.
+4. Ask Claude to run a read-only Enigma tool such as `enigma_support_summary` or `enigma_next_action`.
+5. Treat a public-safe Enigma schema response as the local connection test; if Claude cannot see Enigma, enable or reinstall Enigma Memory in Settings → Extensions, reselect the Memory Drive, fully quit/reopen Claude, then use the dry-run fallback only if support asks.
 
 This extension handoff is the default Claude path. It writes no Claude config, launches no provider, performs no network call, and is not treated as connected until a restart/test gives positive local evidence.
 

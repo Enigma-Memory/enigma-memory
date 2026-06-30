@@ -102,13 +102,23 @@ export function createClaudeMcpbInstallHandoff() {
       instruction: 'Drag the Enigma .mcpb bundle shown as <mcpb-output> into Extensions, or choose Install/Browse and select it.',
     },
     {
+      id: 'select_memory_drive',
+      instruction: 'When Claude asks for configuration, choose the local Memory Drive file for Enigma.',
+    },
+    {
       id: 'restart_claude',
       instruction: 'Restart Claude Desktop so it can load the extension after you approve the install.',
     },
     {
       id: 'test_connection',
-      instruction: 'In Claude Desktop, test the Enigma MCP connection before using it for real work.',
+      instruction: 'Ask Claude to run read-only Enigma tool enigma_support_summary or enigma_next_action; success is a public-safe Enigma schema response.',
     },
+  ];
+  const repairActions = [
+    'Enable or reinstall Enigma Memory in Claude Settings → Extensions.',
+    'Reselect the local Memory Drive file if Claude asks for it again.',
+    'Fully quit and reopen Claude Desktop, then rerun the read-only Enigma tool test.',
+    'Use enigma connect claude-desktop --dry-run only as an advanced fallback when support asks.',
   ];
   const boundaries = {
     install_performed: false,
@@ -120,9 +130,17 @@ export function createClaudeMcpbInstallHandoff() {
     title: 'Claude Desktop MCPB install handoff',
     summary: 'Copy these steps when a human is ready to install the reviewed .mcpb package in Claude Desktop.',
     steps: copyableSteps,
+    repair_handoff: {
+      summary: 'If Claude cannot see Enigma after restart, use these no-write repair steps before any advanced fallback.',
+      actions: repairActions,
+      automatic_config_write: false,
+      advanced_fallback_command: 'enigma connect claude-desktop --dry-run',
+    },
     copyable_text: [
       'Claude Desktop MCPB install handoff',
       ...copyableSteps.map((step, index) => `${index + 1}. [${step.id}] ${step.instruction}`),
+      'Repair if needed:',
+      ...repairActions.map((action, index) => `${index + 1}. ${action}`),
       'Boundaries: install_performed=false; automatic_config_write=false; provider_launched=false; network_performed=false.',
     ].join('\n'),
     boundaries,
@@ -143,6 +161,10 @@ export function renderClaudeMcpbPackagePlain(report, outWritten = false) {
   lines.push('', 'How to install in Claude Desktop:');
   for (const [index, step] of (report.install_handoff?.steps ?? []).entries()) {
     lines.push(`${index + 1}. [${step.id}] ${step.instruction}`);
+  }
+  if (report.install_handoff?.repair_handoff?.actions?.length) {
+    lines.push('', 'If Claude cannot see Enigma after restart:');
+    for (const action of report.install_handoff.repair_handoff.actions) lines.push(`- ${action}`);
   }
   lines.push(
     '',

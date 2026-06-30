@@ -162,6 +162,7 @@ test('Claude Desktop mcpb health fails closed until test evidence exists', () =>
   assert.equal(installed.test_evidence_present, false);
   assert.equal(installed.primary_action.id, 'restart_claude');
   assert.equal(installed.next_action_id, 'restart_claude');
+  assert.match(installed.primary_action.description, /enigma_support_summary|enigma_next_action/);
 
   const restart = createClaudeDesktopMcpbHealth({ mcpbInstalled: true, restartRequired: true });
   assert.equal(restart.status, 'restart_required');
@@ -185,6 +186,7 @@ test('Claude Desktop mcpb health fails closed until test evidence exists', () =>
   assert.equal(failed.test_evidence_present, true);
   assertPublicSafe(failed);
   assert.equal(failed.primary_action.id, 'repair_claude_extension');
+  assert.match(failed.primary_action.description, /reselect the Memory Drive/);
 
   const ready = createClaudeDesktopMcpbHealth({ mcpbInstalled: true, testEvidence: { status: 'passed' } });
   assert.equal(ready.status, 'ready');
@@ -231,6 +233,7 @@ test('Claude Desktop mcpb package builder writes deterministic public-safe artif
   assert.deepEqual(report.install_handoff.steps.map((step) => step.id), [
     'open_mcpb',
     'select_bundle',
+    'select_memory_drive',
     'restart_claude',
     'test_connection',
   ]);
@@ -244,8 +247,14 @@ test('Claude Desktop mcpb package builder writes deterministic public-safe artif
   assert.match(report.install_handoff.copyable_text, /1\. \[open_mcpb\]/);
   assert.match(report.install_handoff.copyable_text, /Settings → Extensions/);
   assert.match(report.install_handoff.copyable_text, /Drag the Enigma \.mcpb bundle/);
+  assert.match(report.install_handoff.copyable_text, /select_memory_drive/);
+  assert.match(report.install_handoff.copyable_text, /enigma_support_summary/);
+  assert.match(report.install_handoff.copyable_text, /enigma_next_action/);
+  assert.match(report.install_handoff.copyable_text, /Repair if needed/);
+  assert.match(report.install_handoff.repair_handoff.actions.join('\\n'), /dry-run only as an advanced fallback/);
   assert.ok(report.install_handoff.copyable_text.indexOf('[open_mcpb]') < report.install_handoff.copyable_text.indexOf('[select_bundle]'));
-  assert.ok(report.install_handoff.copyable_text.indexOf('[select_bundle]') < report.install_handoff.copyable_text.indexOf('[restart_claude]'));
+  assert.ok(report.install_handoff.copyable_text.indexOf('[select_bundle]') < report.install_handoff.copyable_text.indexOf('[select_memory_drive]'));
+  assert.ok(report.install_handoff.copyable_text.indexOf('[select_memory_drive]') < report.install_handoff.copyable_text.indexOf('[restart_claude]'));
   assert.ok(report.install_handoff.copyable_text.indexOf('[restart_claude]') < report.install_handoff.copyable_text.indexOf('[test_connection]'));
   assert.match(report.install_handoff.copyable_text, /automatic_config_write=false/);
   assert.deepEqual(written.install_handoff, report.install_handoff);
@@ -253,6 +262,9 @@ test('Claude Desktop mcpb package builder writes deterministic public-safe artif
   assert.match(directPlain, /How to install in Claude Desktop:/);
   assert.ok(directPlain.indexOf('[open_mcpb]') < directPlain.indexOf('[select_bundle]'));
   assert.ok(directPlain.indexOf('[select_bundle]') < directPlain.indexOf('[restart_claude]'));
+  assert.ok(directPlain.indexOf('[select_memory_drive]') < directPlain.indexOf('[restart_claude]'));
+  assert.match(directPlain, /enigma_support_summary/);
+  assert.match(directPlain, /If Claude cannot see Enigma after restart/);
   assert.ok(directPlain.indexOf('[restart_claude]') < directPlain.indexOf('[test_connection]'));
   assert.match(directPlain, /Automatic config write: no/);
   assert.equal(parseClaudeMcpbPackageArgs(['--plain']).plain, true);
@@ -290,6 +302,7 @@ test('Claude MCPB package is available through the Enigma CLI', async () => {
   assert.deepEqual(report.install_handoff.steps.map((step) => step.id), [
     'open_mcpb',
     'select_bundle',
+    'select_memory_drive',
     'restart_claude',
     'test_connection',
   ]);
@@ -316,11 +329,15 @@ test('Claude MCPB package is available through the Enigma CLI', async () => {
   assert.match(plain, /How to install in Claude Desktop:/);
   assert.match(plain, /\[open_mcpb\]/);
   assert.match(plain, /\[select_bundle\]/);
+  assert.match(plain, /\[select_memory_drive\]/);
   assert.match(plain, /\[restart_claude\]/);
   assert.match(plain, /\[test_connection\]/);
   assert.ok(plain.indexOf('Open Claude Desktop') < plain.indexOf('Drag the Enigma .mcpb bundle'));
   assert.ok(plain.indexOf('Drag the Enigma .mcpb bundle') < plain.indexOf('Restart Claude Desktop'));
-  assert.ok(plain.indexOf('Restart Claude Desktop') < plain.indexOf('test the Enigma MCP connection'));
+  assert.ok(plain.indexOf('choose the local Memory Drive') < plain.indexOf('Restart Claude Desktop'));
+  assert.match(plain, /enigma_support_summary/);
+  assert.match(plain, /If Claude cannot see Enigma after restart/);
+  assert.ok(plain.indexOf('Restart Claude Desktop') < plain.indexOf('Ask Claude to run read-only Enigma tool'));
   assert.match(plain, /Install performed: no/);
   assert.match(plain, /Automatic config write: no/);
   assert.match(plain, /Provider launched: no/);

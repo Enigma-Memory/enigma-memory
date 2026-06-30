@@ -215,9 +215,11 @@ test('connector detection and wizard planner cover all supported clients with pu
         'create_local_bundle',
         'package_claude_mcpb',
         'install_claude_mcpb',
+        'select_memory_drive',
         'test_claude_mcpb',
         'advanced_config_fallback',
       ]);
+      assert.match(client.steps.find((step) => step.id === 'test_claude_mcpb').title, /enigma_support_summary|enigma_next_action/);
       assert.equal(client.connect_command, 'enigma claude-mcpb package --plain');
       assert.match(client.one_command_install_connect, /enigma claude-mcpb package --plain/);
       assert.doesNotMatch(client.one_command_install_connect, /connect claude-desktop/);
