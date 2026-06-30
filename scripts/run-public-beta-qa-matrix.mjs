@@ -223,7 +223,7 @@ const NEXT_ACTION_ORDER = Object.freeze([
       evidence_item_id: 'EV-P10-SUPPORT-DRY-RUN-SUMMARY',
       manifest_field: 'support_dry_run',
       target_file: '.enigma/public-beta/support-dry-run-<scenario>.json',
-      collect: 'scenario id, issue code, triage result, privacy-check status, and support owner ref',
+      collect: 'preset-generated public-safe summary (`--preset diagnostics` or `--preset crash`) with observed triage result, observed privacy-check status, and optional redacted support-artifact snapshot',
     },
   },
 ]);

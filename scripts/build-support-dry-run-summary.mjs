@@ -16,8 +16,46 @@ const SECRET_OR_PRIVATE_TEXT_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]+|ghp_[A-Za-z0-
 const SUPPORT_ARTIFACT_SCHEMAS = new Set(['enigma.support_summary.v1', 'enigma.diagnostics.v1']);
 const PUBLIC_VALUE_RE = /^[A-Za-z0-9][A-Za-z0-9._~:@#?=&%+/-]{0,159}$/u;
 
+export const SUPPORT_DRY_RUN_PRESETS = Object.freeze({
+  diagnostics: Object.freeze({
+    scenario_id: 'BETA-DIAG-001',
+    issue_code: 'DIAG-BUNDLE-PREVIEWED',
+    support_owner_ref: 'ref:role:beta-support',
+  }),
+  crash: Object.freeze({
+    scenario_id: 'BETA-CRASH-001',
+    issue_code: 'CRASH-REPORTING-MANUAL-EVIDENCE',
+    support_owner_ref: 'ref:role:beta-support',
+  }),
+});
+const SUPPORT_DRY_RUN_SCENARIO_PRESETS = Object.freeze({
+  'BETA-DIAG-001': 'diagnostics',
+  'BETA-CRASH-001': 'crash',
+});
+
+function applySupportDryRunPreset(options) {
+  const scenarioPreset = options.scenario_id ? SUPPORT_DRY_RUN_SCENARIO_PRESETS[options.scenario_id] : null;
+  const presetName = options.preset ?? scenarioPreset;
+  if (!presetName) return options;
+  const preset = SUPPORT_DRY_RUN_PRESETS[presetName];
+  if (!preset) throw new Error(`Unsupported support dry-run preset: ${presetName}`);
+  if (scenarioPreset && options.preset && scenarioPreset !== options.preset) throw new Error('--preset does not match --scenario-id');
+  if (options.scenario_id && options.scenario_id !== preset.scenario_id) throw new Error('--preset does not match --scenario-id');
+  return {
+    ...options,
+    preset: presetName,
+    scenario_id: options.scenario_id ?? preset.scenario_id,
+    issue_code: options.issue_code ?? preset.issue_code,
+    support_owner_ref: options.support_owner_ref ?? preset.support_owner_ref,
+  };
+}
+
 function usage() {
-  return `Usage: node scripts/build-support-dry-run-summary.mjs --scenario-id <id> --issue-code <code> --triage-result <result> --bundle-privacy-check-status <status> --support-owner-ref <ref:role:...> [--support-artifact <redacted-json>] [--out <path>] [--json|--plain]\n\nBuilds a public-safe ${SUPPORT_DRY_RUN_SUMMARY_SCHEMA} artifact for the public beta support dry-run evidence item. --out writes JSON evidence; --plain controls stdout only.\n`;
+  return `Usage: node scripts/build-support-dry-run-summary.mjs --preset <diagnostics|crash> --triage-result <result> --bundle-privacy-check-status <status> [--support-artifact <redacted-json>] [--out <path>] [--json|--plain]
+       node scripts/build-support-dry-run-summary.mjs --scenario-id <id> --issue-code <code> --triage-result <result> --bundle-privacy-check-status <status> --support-owner-ref <ref:role:...> [--support-artifact <redacted-json>] [--out <path>] [--json|--plain]
+
+Builds a public-safe ${SUPPORT_DRY_RUN_SUMMARY_SCHEMA} artifact for the public beta support dry-run evidence item. Presets fill only scenario, issue, and support-owner defaults; they never set triage result or bundle privacy status. --out writes JSON evidence; --plain controls stdout only.
+`;
 }
 
 function readArg(argv, index, flag) {
@@ -29,7 +67,10 @@ export function parseSupportDryRunArgs(argv = process.argv.slice(2)) {
   const options = { json: false, plain: false, out: null };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (arg === '--scenario-id' || arg === '--scenarioId') {
+    if (arg === '--preset') {
+      options.preset = readArg(argv, i + 1, arg);
+      i += 1;
+    } else if (arg === '--scenario' || arg === '--scenario-id' || arg === '--scenarioId') {
       options.scenario_id = readArg(argv, i + 1, arg);
       i += 1;
     } else if (arg === '--issue-code' || arg === '--issueCode') {
@@ -65,7 +106,7 @@ export function parseSupportDryRunArgs(argv = process.argv.slice(2)) {
     }
   }
   if (options.json && options.plain) throw new Error('Choose only one output format: --json or --plain.');
-  return options;
+  return applySupportDryRunPreset(options);
 }
 
 function requiredString(options, key) {

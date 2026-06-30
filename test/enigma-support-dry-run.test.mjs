@@ -11,6 +11,7 @@ import {
   parseSupportDryRunArgs,
   renderSupportDryRunPlain,
   readSupportArtifactSnapshot,
+  SUPPORT_DRY_RUN_PRESETS,
   SUPPORT_DRY_RUN_EVIDENCE_ITEM_ID,
   SUPPORT_DRY_RUN_SUMMARY_SCHEMA,
 } from '../scripts/build-support-dry-run-summary.mjs';
@@ -238,4 +239,95 @@ test('support dry-run argument parser recognizes required fields', () => {
   assert.equal(parsed.support_owner_ref, BASE.support_owner_ref);
   assert.equal(parsed.plain, true);
   assert.equal(parsed.support_artifact, 'support-summary.json');
+});
+
+test('support dry-run presets fill public defaults without greenwashing privacy', () => {
+  const parsed = parseSupportDryRunArgs([
+    '--preset', 'diagnostics',
+    '--triage-result', 'needs_user_action',
+    '--bundle-privacy-check-status', 'blocked',
+    '--plain',
+  ]);
+  const summary = buildSupportDryRunSummary({ ...parsed, generated_at: BASE.generated_at });
+
+  assert.equal(parsed.preset, 'diagnostics');
+  assert.equal(parsed.scenario_id, SUPPORT_DRY_RUN_PRESETS.diagnostics.scenario_id);
+  assert.equal(parsed.issue_code, SUPPORT_DRY_RUN_PRESETS.diagnostics.issue_code);
+  assert.equal(parsed.support_owner_ref, SUPPORT_DRY_RUN_PRESETS.diagnostics.support_owner_ref);
+  assert.equal(parsed.triage_result, 'needs_user_action');
+  assert.equal(parsed.bundle_privacy_check_status, 'blocked');
+  assert.equal(summary.bundle_privacy_check_status, 'blocked');
+  assert.equal(summary.privacy_review.status, 'hold');
+});
+
+test('support dry-run scenario alias selects matching preset defaults', () => {
+  const parsed = parseSupportDryRunArgs([
+    '--scenario', 'BETA-CRASH-001',
+    '--triage-result', 'blocked',
+    '--bundle-privacy-check-status', 'not_applicable',
+  ]);
+
+  assert.equal(parsed.preset, 'crash');
+  assert.equal(parsed.scenario_id, SUPPORT_DRY_RUN_PRESETS.crash.scenario_id);
+  assert.equal(parsed.issue_code, SUPPORT_DRY_RUN_PRESETS.crash.issue_code);
+  assert.equal(parsed.support_owner_ref, SUPPORT_DRY_RUN_PRESETS.crash.support_owner_ref);
+  assert.equal(parsed.bundle_privacy_check_status, 'not_applicable');
+});
+
+test('support dry-run presets reject unsafe or incomplete automation', () => {
+  assert.throws(
+    () => parseSupportDryRunArgs([
+      '--preset', 'unknown',
+      '--triage-result', 'blocked',
+      '--bundle-privacy-check-status', 'blocked',
+    ]),
+    /Unsupported support dry-run preset/,
+  );
+  assert.throws(
+    () => parseSupportDryRunArgs([
+      '--preset', 'diagnostics',
+      '--scenario', 'BETA-CRASH-001',
+      '--triage-result', 'blocked',
+      '--bundle-privacy-check-status', 'blocked',
+    ]),
+    /--preset does not match --scenario-id/,
+  );
+  assert.throws(
+    () => buildSupportDryRunSummary(parseSupportDryRunArgs([
+      '--preset', 'diagnostics',
+      '--bundle-privacy-check-status', 'blocked',
+    ])),
+    /Missing required triage_result/,
+  );
+});
+
+test('support dry-run CLI accepts presets while keeping blocked privacy non-green', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-support-dry-run-preset-'));
+  const out = join(dir, 'crash-summary.json');
+  let failure;
+
+  try {
+    await execFileAsync(process.execPath, [
+      SCRIPT,
+      '--preset', 'crash',
+      '--triage-result', 'blocked',
+      '--bundle-privacy-check-status', 'blocked',
+      '--generated-at', BASE.generated_at,
+      '--out', out,
+      '--json',
+    ], { windowsHide: true });
+  } catch (error) {
+    failure = error;
+  }
+
+  assert.equal(failure?.code, 1);
+  assert.equal(failure.stderr.trim(), '');
+  const printed = JSON.parse(failure.stdout);
+  const written = JSON.parse(await readFile(out, 'utf8'));
+  assert.deepEqual(printed, written);
+  assert.equal(printed.scenario_id, 'BETA-CRASH-001');
+  assert.equal(printed.issue_code, 'CRASH-REPORTING-MANUAL-EVIDENCE');
+  assert.equal(printed.bundle_privacy_check_status, 'blocked');
+  assert.equal(printed.privacy_review.status, 'hold');
+  assert.equal(JSON.stringify(printed).includes(dir), false);
 });

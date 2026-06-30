@@ -102,7 +102,7 @@ function buildEvidenceCollection({ cleanMachineSmoke, supportDryRun, registryIns
       evidence_item_id: 'EV-P10-SUPPORT-DRY-RUN-SUMMARY',
       manifest_field: 'support_dry_run',
       target_file: supportDryRun,
-      collect: 'support dry-run summaries with scenario id, issue code, triage result, privacy-check status, and support owner ref',
+      collect: 'support dry-run summaries from `--preset diagnostics` and `--preset crash` with observed triage result, observed privacy-check status, and support owner ref',
     },
     {
       evidence_item_id: 'EV-P10-REGISTRY-INSTALL',
