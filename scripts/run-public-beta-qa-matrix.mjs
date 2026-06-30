@@ -271,6 +271,17 @@ function cleanMachineCollectCommand(targetFile) {
   return safeTarget ? `npm run production:clean-machine-smoke -- --plain --out ${safeTarget}` : null;
 }
 
+function cleanMachinePlanCommand(targetFile) {
+  const safeTarget = publicRelativeEvidenceTarget(targetFile);
+  return safeTarget ? `npm run production:clean-machine-smoke -- --dry-run --plain --out ${safeTarget}` : null;
+}
+
+function preflightCommandsForCollectNext(collectNext, evidenceTargets = {}) {
+  if (collectNext?.manifest_field !== 'clean_machine_smoke') return [];
+  return [cleanMachinePlanCommand(evidenceTargets.clean_machine_smoke_plan)].filter(Boolean);
+}
+
+
 function appendSupportDryRunCommandGuidance(lines) {
   lines.push(`Allowed observed-result: ${SUPPORT_DRY_RUN_COLLECTION_GUIDANCE.triage_result_values.join(', ')}`);
   lines.push(`Allowed observed-status: ${SUPPORT_DRY_RUN_COLLECTION_GUIDANCE.bundle_privacy_check_status_values.join(', ')}`);
@@ -306,10 +317,12 @@ function resolveCollectNext(collectNext, evidenceTargets = {}) {
   if (!collectNext) return null;
   const targetFiles = collectTargetsForField(collectNext, evidenceTargets);
   const collectCommands = collectCommandsForTargets(collectNext, targetFiles);
+  const preflightCommands = preflightCommandsForCollectNext(collectNext, evidenceTargets);
   return {
     ...collectNext,
     target_file: targetFiles[0] ?? null,
     ...(targetFiles.length > 1 ? { target_files: targetFiles } : {}),
+    ...(preflightCommands.length > 0 ? { preflight_commands: preflightCommands } : {}),
     ...(collectCommands.some(Boolean) ? { collect_commands: collectCommands } : {}),
   };
 }
@@ -319,6 +332,8 @@ function appendCollectNextLines(lines, prefix, action) {
   const targetFiles = Array.isArray(action.collect_next.target_files) && action.collect_next.target_files.length > 0
     ? action.collect_next.target_files
     : [action.collect_next.target_file].filter(Boolean);
+  const preflightCommands = Array.isArray(action.collect_next.preflight_commands) ? action.collect_next.preflight_commands : [];
+  for (const command of preflightCommands) lines.push(`Plan first: ${command}`);
   const collectCommands = Array.isArray(action.collect_next.collect_commands) ? action.collect_next.collect_commands : [];
   for (const [index, targetFile] of targetFiles.entries()) {
     lines.push(`${prefix}: ${action.action_id} — ${action.collect_next.evidence_item_id} into ${targetFile}: ${action.collect_next.collect}`);
@@ -373,7 +388,7 @@ function buildTopConsumerFriction(nextActions) {
 }
 
 function usage() {
-  return `Usage: node scripts/run-public-beta-qa-matrix.mjs [--json|--plain] [--out <path>] [--evidence-manifest <path>] [--clean-machine-smoke <path>] [--support-dry-run <path>] [--registry-install <path>] [--desktop-release-evidence <path>] [--production-handoff-packet <path>]\n\nGenerates a public-safe ${PUBLIC_BETA_QA_MATRIX_SCHEMA} report from repository files plus optional public-safe QA evidence artifacts, including ranked next_actions for release owners.\n`;
+  return `Usage: node scripts/run-public-beta-qa-matrix.mjs [--json|--plain] [--out <path>] [--evidence-manifest <path>] [--clean-machine-smoke <path>] [--clean-machine-smoke-plan <path>] [--support-dry-run <path>] [--registry-install <path>] [--desktop-release-evidence <path>] [--production-handoff-packet <path>]\n\nGenerates a public-safe ${PUBLIC_BETA_QA_MATRIX_SCHEMA} report from repository files plus optional public-safe QA evidence artifacts, including ranked next_actions for release owners.\n`;
 }
 
 function readArg(argv, index, flag) {
@@ -382,7 +397,7 @@ function readArg(argv, index, flag) {
 }
 
 export function parseArgs(argv = process.argv.slice(2)) {
-  const options = { json: false, plain: false, out: null, evidenceManifest: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: null, desktopReleaseEvidence: null, productionHandoffPacket: null };
+  const options = { json: false, plain: false, out: null, evidenceManifest: null, cleanMachineSmoke: null, cleanMachineSmokePlan: null, supportDryRun: [], registryInstall: null, desktopReleaseEvidence: null, productionHandoffPacket: null };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--json') {
@@ -398,6 +413,9 @@ export function parseArgs(argv = process.argv.slice(2)) {
       i += 1;
     } else if (arg === '--clean-machine-smoke') {
       options.cleanMachineSmoke = readArg(argv, i + 1, '--clean-machine-smoke');
+      i += 1;
+    } else if (arg === '--clean-machine-smoke-plan') {
+      options.cleanMachineSmokePlan = readArg(argv, i + 1, '--clean-machine-smoke-plan');
       i += 1;
     } else if (arg === '--support-dry-run') {
       options.supportDryRun.push(readArg(argv, i + 1, '--support-dry-run'));
@@ -463,6 +481,7 @@ async function readPublicEvidenceJsonList(paths, expectedSchema) {
 export function normalizeEvidenceManifest(manifest = null) {
   const empty = {
     cleanMachineSmoke: null,
+    cleanMachineSmokePlan: null,
     supportDryRun: [],
     registryInstall: null,
     desktopReleaseEvidence: null,
@@ -475,6 +494,7 @@ export function normalizeEvidenceManifest(manifest = null) {
   const supportDryRun = manifest.support_dry_run ?? manifest.supportDryRun ?? [];
   return {
     cleanMachineSmoke: manifest.clean_machine_smoke ?? manifest.cleanMachineSmoke ?? null,
+    cleanMachineSmokePlan: manifest.clean_machine_smoke_plan ?? manifest.cleanMachineSmokePlan ?? null,
     supportDryRun: Array.isArray(supportDryRun) ? supportDryRun : [supportDryRun].filter(Boolean),
     registryInstall: manifest.registry_install ?? manifest.registryInstall ?? null,
     desktopReleaseEvidence: manifest.desktop_release_evidence ?? manifest.desktopReleaseEvidence ?? null,
@@ -487,6 +507,7 @@ export function mergeEvidenceOptions(options = {}, manifest = null) {
   return {
     ...options,
     cleanMachineSmoke: options.cleanMachineSmoke ?? normalized.cleanMachineSmoke,
+    cleanMachineSmokePlan: options.cleanMachineSmokePlan ?? normalized.cleanMachineSmokePlan,
     supportDryRun: [...normalized.supportDryRun, ...(Array.isArray(options.supportDryRun) ? options.supportDryRun : [])],
     registryInstall: options.registryInstall ?? normalized.registryInstall,
     desktopReleaseEvidence: options.desktopReleaseEvidence ?? normalized.desktopReleaseEvidence,
@@ -687,6 +708,7 @@ export async function inspectPublicBetaQaInputs(options = {}) {
     productionHandoffPacket,
     evidenceTargets: {
       clean_machine_smoke: evidenceOptions.cleanMachineSmoke,
+      clean_machine_smoke_plan: evidenceOptions.cleanMachineSmokePlan,
       support_dry_run: evidenceOptions.supportDryRun,
       registry_install: evidenceOptions.registryInstall,
       desktop_release_evidence: evidenceOptions.desktopReleaseEvidence,

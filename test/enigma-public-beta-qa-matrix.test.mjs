@@ -153,14 +153,15 @@ test('public beta QA npm scripts expose JSON and Advisor runners', async () => {
 });
 
 test('public beta QA runner accepts explicit plain output mode', () => {
-  assert.deepEqual(parseArgs(['--plain']), { json: false, plain: true, out: null, evidenceManifest: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: null, desktopReleaseEvidence: null, productionHandoffPacket: null });
-  assert.deepEqual(parseArgs(['--format', 'text']), { json: false, plain: true, out: null, evidenceManifest: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: null, desktopReleaseEvidence: null, productionHandoffPacket: null });
-  assert.deepEqual(parseArgs(['--evidence-manifest', 'evidence.json']), { json: false, plain: false, out: null, evidenceManifest: 'evidence.json', cleanMachineSmoke: null, supportDryRun: [], registryInstall: null, desktopReleaseEvidence: null, productionHandoffPacket: null });
-  assert.deepEqual(parseArgs(['--clean-machine-smoke', 'smoke.json']), { json: false, plain: false, out: null, evidenceManifest: null, cleanMachineSmoke: 'smoke.json', supportDryRun: [], registryInstall: null, desktopReleaseEvidence: null, productionHandoffPacket: null });
-  assert.deepEqual(parseArgs(['--support-dry-run', 'diag.json', '--support-dry-run', 'crash.json']), { json: false, plain: false, out: null, evidenceManifest: null, cleanMachineSmoke: null, supportDryRun: ['diag.json', 'crash.json'], registryInstall: null, desktopReleaseEvidence: null, productionHandoffPacket: null });
-  assert.deepEqual(parseArgs(['--registry-install', 'registry.json']), { json: false, plain: false, out: null, evidenceManifest: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: 'registry.json', desktopReleaseEvidence: null, productionHandoffPacket: null });
-  assert.deepEqual(parseArgs(['--desktop-release-evidence', 'desktop.json']), { json: false, plain: false, out: null, evidenceManifest: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: null, desktopReleaseEvidence: 'desktop.json', productionHandoffPacket: null });
-  assert.deepEqual(parseArgs(['--production-handoff-packet', 'handoff.json']), { json: false, plain: false, out: null, evidenceManifest: null, cleanMachineSmoke: null, supportDryRun: [], registryInstall: null, desktopReleaseEvidence: null, productionHandoffPacket: 'handoff.json' });
+  assert.deepEqual(parseArgs(['--plain']), { json: false, plain: true, out: null, evidenceManifest: null, cleanMachineSmoke: null, cleanMachineSmokePlan: null, supportDryRun: [], registryInstall: null, desktopReleaseEvidence: null, productionHandoffPacket: null });
+  assert.deepEqual(parseArgs(['--format', 'text']), { json: false, plain: true, out: null, evidenceManifest: null, cleanMachineSmoke: null, cleanMachineSmokePlan: null, supportDryRun: [], registryInstall: null, desktopReleaseEvidence: null, productionHandoffPacket: null });
+  assert.deepEqual(parseArgs(['--evidence-manifest', 'evidence.json']), { json: false, plain: false, out: null, evidenceManifest: 'evidence.json', cleanMachineSmoke: null, cleanMachineSmokePlan: null, supportDryRun: [], registryInstall: null, desktopReleaseEvidence: null, productionHandoffPacket: null });
+  assert.deepEqual(parseArgs(['--clean-machine-smoke', 'smoke.json']), { json: false, plain: false, out: null, evidenceManifest: null, cleanMachineSmoke: 'smoke.json', cleanMachineSmokePlan: null, supportDryRun: [], registryInstall: null, desktopReleaseEvidence: null, productionHandoffPacket: null });
+  assert.deepEqual(parseArgs(['--clean-machine-smoke-plan', 'plan.json']), { json: false, plain: false, out: null, evidenceManifest: null, cleanMachineSmoke: null, cleanMachineSmokePlan: 'plan.json', supportDryRun: [], registryInstall: null, desktopReleaseEvidence: null, productionHandoffPacket: null });
+  assert.deepEqual(parseArgs(['--support-dry-run', 'diag.json', '--support-dry-run', 'crash.json']), { json: false, plain: false, out: null, evidenceManifest: null, cleanMachineSmoke: null, cleanMachineSmokePlan: null, supportDryRun: ['diag.json', 'crash.json'], registryInstall: null, desktopReleaseEvidence: null, productionHandoffPacket: null });
+  assert.deepEqual(parseArgs(['--registry-install', 'registry.json']), { json: false, plain: false, out: null, evidenceManifest: null, cleanMachineSmoke: null, cleanMachineSmokePlan: null, supportDryRun: [], registryInstall: 'registry.json', desktopReleaseEvidence: null, productionHandoffPacket: null });
+  assert.deepEqual(parseArgs(['--desktop-release-evidence', 'desktop.json']), { json: false, plain: false, out: null, evidenceManifest: null, cleanMachineSmoke: null, cleanMachineSmokePlan: null, supportDryRun: [], registryInstall: null, desktopReleaseEvidence: 'desktop.json', productionHandoffPacket: null });
+  assert.deepEqual(parseArgs(['--production-handoff-packet', 'handoff.json']), { json: false, plain: false, out: null, evidenceManifest: null, cleanMachineSmoke: null, cleanMachineSmokePlan: null, supportDryRun: [], registryInstall: null, desktopReleaseEvidence: null, productionHandoffPacket: 'handoff.json' });
   assert.throws(() => parseArgs(['--json', '--plain']), /Choose only one output format/);
 });
 
@@ -168,6 +169,7 @@ test('public beta evidence manifest normalizes one-file release-owner inputs', (
   const manifest = {
     schema: 'enigma.public_beta_evidence_manifest.v1',
     clean_machine_smoke: 'smoke.json',
+    clean_machine_smoke_plan: 'plan.json',
     support_dry_run: ['diag.json'],
     registry_install: 'registry.json',
     desktop_release_evidence: 'desktop.json',
@@ -176,6 +178,7 @@ test('public beta evidence manifest normalizes one-file release-owner inputs', (
   assert.deepEqual(normalizeEvidenceManifest(manifest), {
     cleanMachineSmoke: 'smoke.json',
     supportDryRun: ['diag.json'],
+    cleanMachineSmokePlan: 'plan.json',
     registryInstall: 'registry.json',
     desktopReleaseEvidence: 'desktop.json',
     productionHandoffPacket: 'handoff.json',
@@ -185,6 +188,7 @@ test('public beta evidence manifest normalizes one-file release-owner inputs', (
     registryInstall: 'override-registry.json',
     cleanMachineSmoke: 'smoke.json',
     desktopReleaseEvidence: 'desktop.json',
+    cleanMachineSmokePlan: 'plan.json',
     productionHandoffPacket: 'handoff.json',
   });
   assert.throws(() => normalizeEvidenceManifest({ schema: 'wrong' }), /Evidence manifest schema mismatch/);
@@ -221,6 +225,7 @@ test('public beta advisor collect-next paths follow relative evidence manifest t
       schema: 'enigma.public_beta_evidence_manifest.v1',
       clean_machine_smoke: `${dir}/clean-machine-smoke.json`,
       support_dry_run: [`${dir}/support-dry-run-diagnostics.json`, `${dir}/support-dry-run-crash.json`],
+      clean_machine_smoke_plan: `${dir}/clean-machine-smoke-plan.json`,
       registry_install: `${dir}/registry-install.json`,
       desktop_release_evidence: `${dir}/desktop-release-evidence.json`,
       production_handoff_packet: `${dir}/production-handoff-packet.json`,
@@ -237,6 +242,9 @@ test('public beta advisor collect-next paths follow relative evidence manifest t
     assert.deepEqual(matrix.consumer_next_action.collect_next.collect_commands, [
       `npm run production:clean-machine-smoke -- --plain --out ${dir}/clean-machine-smoke.json`,
     ]);
+    assert.deepEqual(matrix.consumer_next_action.collect_next.preflight_commands, [
+      `npm run production:clean-machine-smoke -- --dry-run --plain --out ${dir}/clean-machine-smoke-plan.json`,
+    ]);
     assert.deepEqual(matrix.next_actions.find((action) => action.action_id === 'record_support_dry_run').collect_next.target_files, [`${dir}/support-dry-run-diagnostics.json`, `${dir}/support-dry-run-crash.json`]);
     assert.deepEqual(matrix.next_actions.find((action) => action.action_id === 'record_support_dry_run').collect_next.collect_commands, [
       `npm run production:support-dry-run -- --preset diagnostics --triage-result <observed-result> --bundle-privacy-check-status <observed-status> --out ${dir}/support-dry-run-diagnostics.json`,
@@ -247,6 +255,7 @@ test('public beta advisor collect-next paths follow relative evidence manifest t
     assert.match(plain, new RegExp(`Collect: npm run public-beta:evidence-manifest -- --out ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/evidence-manifest\\.json --plain`));
     assert.match(plain, new RegExp(`Collect internal: run_clean_machine_qa .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/clean-machine-smoke\\.json`));
     assert.match(plain, new RegExp(`Collect consumer: run_clean_machine_qa .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/clean-machine-smoke\\.json`));
+    assert.ok(plain.includes(`Plan first: npm run production:clean-machine-smoke -- --dry-run --plain --out ${dir}/clean-machine-smoke-plan.json`));
     assert.ok(plain.includes(`Run: npm run production:clean-machine-smoke -- --plain --out ${dir}/clean-machine-smoke.json`));
     assert.match(plain, new RegExp(`Collect internal: record_support_dry_run .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/support-dry-run-diagnostics\\.json`));
     assert.match(plain, new RegExp(`Collect internal: record_support_dry_run .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/support-dry-run-crash\\.json`));
