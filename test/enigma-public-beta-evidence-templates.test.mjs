@@ -86,6 +86,20 @@ test('public beta evidence templates are public-safe blockers, not fake evidence
     assert.equal(manifest.desktop_release_evidence, `${outDir}/desktop-release-evidence.json`);
     assert.equal(manifest.production_handoff_packet, `${outDir}/production-handoff-packet.json`);
 
+    const cleanMachineSmoke = JSON.parse(await readFile(join(outDir, 'clean-machine-smoke.json'), 'utf8'));
+    assert.equal(cleanMachineSmoke.schema, 'enigma.clean_machine_smoke.v1');
+    assert.deepEqual(cleanMachineSmoke.next_actions.map((action) => action.id), [
+      'run_clean_machine_smoke_plan',
+      'record_clean_machine_smoke_evidence',
+    ]);
+    assert.equal(cleanMachineSmoke.next_actions.find((action) => action.id === 'run_clean_machine_smoke_plan').command, 'npm run production:clean-machine-smoke -- --dry-run --plain --out <clean-machine-smoke-plan-out>');
+    assert.deepEqual(cleanMachineSmoke.next_actions.find((action) => action.id === 'record_clean_machine_smoke_evidence').required_fields, [
+      'summary.healthy',
+      'summary.status',
+      'safety.local_paths_included',
+      'safety.memory_text_included',
+    ]);
+
     const cleanMachinePlan = JSON.parse(await readFile(join(outDir, 'clean-machine-smoke-plan.json'), 'utf8'));
     assert.equal(cleanMachinePlan.schema, 'enigma.clean_machine_smoke_plan.v1');
     assert.equal(cleanMachinePlan.safety.system_inspection_performed, false);

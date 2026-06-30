@@ -279,6 +279,20 @@ function buildCleanMachineSmokeTemplate(generatedAt) {
       local_paths_included: false,
       memory_text_included: false,
     },
+    next_actions: [
+      {
+        id: 'run_clean_machine_smoke_plan',
+        collect: 'Run the dry-run plan command first to review public-safe manual QA steps.',
+        command: cleanMachineSmokePlanCommand('<clean-machine-smoke-plan-out>'),
+        required_fields: ['summary.pending_checks'],
+      },
+      {
+        id: 'record_clean_machine_smoke_evidence',
+        collect: 'Run the real clean-machine smoke command on a fresh Windows/macOS profile and record pass/fail notes only.',
+        command: cleanMachineSmokeEvidenceCommand('<clean-machine-smoke-out>'),
+        required_fields: ['summary.healthy', 'summary.status', 'safety.local_paths_included', 'safety.memory_text_included'],
+      },
+    ],
     claim_boundary: templateBoundary(),
   };
 }
