@@ -238,24 +238,28 @@ function publicRelativeEvidenceTarget(value) {
   return normalized;
 }
 
-function collectTargetForField(collectNext, evidenceTargets = {}) {
-  if (!collectNext?.manifest_field) return collectNext?.target_file ?? null;
+function collectTargetsForField(collectNext, evidenceTargets = {}) {
+  if (!collectNext?.manifest_field) return collectNext?.target_file ? [collectNext.target_file] : [];
   const value = evidenceTargets[collectNext.manifest_field];
   if (Array.isArray(value)) {
-    for (const item of value) {
-      const target = publicRelativeEvidenceTarget(item);
-      if (target) return target;
-    }
-    return collectNext.target_file;
+    const targets = value.map((item) => publicRelativeEvidenceTarget(item)).filter(Boolean);
+    return targets.length > 0 ? targets : [collectNext.target_file].filter(Boolean);
   }
-  return publicRelativeEvidenceTarget(value) ?? collectNext.target_file;
+  const target = publicRelativeEvidenceTarget(value) ?? collectNext.target_file;
+  return target ? [target] : [];
+}
+
+function collectTargetForField(collectNext, evidenceTargets = {}) {
+  return collectTargetsForField(collectNext, evidenceTargets)[0] ?? null;
 }
 
 function resolveCollectNext(collectNext, evidenceTargets = {}) {
   if (!collectNext) return null;
+  const targetFiles = collectTargetsForField(collectNext, evidenceTargets);
   return {
     ...collectNext,
-    target_file: collectTargetForField(collectNext, evidenceTargets),
+    target_file: targetFiles[0] ?? null,
+    ...(targetFiles.length > 1 ? { target_files: targetFiles } : {}),
   };
 }
 
@@ -998,8 +1002,11 @@ export function renderPublicBetaQaPlain(report) {
   const actions = Array.isArray(report.next_actions) ? report.next_actions.slice(0, 5) : [];
   for (const action of actions) {
     lines.push(`Next: ${action.action_id} — ${action.summary}`);
-    if (action.collect_next?.target_file && action.collect_next?.collect) {
-      lines.push(`Collect next: ${action.action_id} — ${action.collect_next.evidence_item_id} into ${action.collect_next.target_file}: ${action.collect_next.collect}`);
+    if (action.collect_next?.collect) {
+      const targetFiles = Array.isArray(action.collect_next.target_files) && action.collect_next.target_files.length > 0
+        ? action.collect_next.target_files
+        : [action.collect_next.target_file].filter(Boolean);
+      for (const targetFile of targetFiles) lines.push(`Collect next: ${action.action_id} — ${action.collect_next.evidence_item_id} into ${targetFile}: ${action.collect_next.collect}`);
     }
   }
   const internalEvidenceActions = (Array.isArray(report.next_actions) ? report.next_actions : [])
@@ -1008,8 +1015,11 @@ export function renderPublicBetaQaPlain(report) {
     lines.push('Internal QA/support evidence to collect now:');
     for (const action of internalEvidenceActions) {
       lines.push(`Internal: ${action.action_id} — ${action.summary}`);
-      if (action.collect_next?.target_file && action.collect_next?.collect) {
-        lines.push(`Collect internal: ${action.action_id} — ${action.collect_next.evidence_item_id} into ${action.collect_next.target_file}: ${action.collect_next.collect}`);
+      if (action.collect_next?.collect) {
+        const targetFiles = Array.isArray(action.collect_next.target_files) && action.collect_next.target_files.length > 0
+          ? action.collect_next.target_files
+          : [action.collect_next.target_file].filter(Boolean);
+        for (const targetFile of targetFiles) lines.push(`Collect internal: ${action.action_id} — ${action.collect_next.evidence_item_id} into ${targetFile}: ${action.collect_next.collect}`);
       }
     }
   }

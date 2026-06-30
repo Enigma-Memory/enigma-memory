@@ -101,13 +101,21 @@ function generatedSupportDryRunPaths(outDir) {
 }
 
 async function writeGeneratedSupportDryRunSummaries(paths) {
+  const counts = { written: 0, preserved: 0 };
   for (let index = 0; index < GENERATED_SUPPORT_DRY_RUNS.length; index += 1) {
     const spec = GENERATED_SUPPORT_DRY_RUNS[index];
     const out = paths[index];
     const summary = buildSupportDryRunSummary(spec);
     await mkdir(dirname(resolve(out)), { recursive: true });
-    await writeFile(resolve(out), `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
+    try {
+      await writeFile(resolve(out), `${JSON.stringify(summary, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
+      counts.written += 1;
+    } catch (error) {
+      if (error?.code !== 'EEXIST') throw error;
+      counts.preserved += 1;
+    }
   }
+  return counts;
 }
 
 export async function existingEvidenceOptionsFromManifest(manifest) {
@@ -132,6 +140,7 @@ export function renderPublicBetaReviewPlain(result) {
     `QA matrix: written to ${result.paths.matrix}`,
     `Evidence files used: ${result.evidence_files_used}`,
     `Generated support dry-runs: ${result.generated_evidence_files ?? 0}`,
+    ...(result.preserved_evidence_files ? [`Preserved existing support evidence files: ${result.preserved_evidence_files}`] : []),
     `Generated clean-machine plan: ${result.generated_plan_files ?? 0}`,
     `Templates: ${result.template_command ?? 'npm run public-beta:evidence-templates -- --out-dir .enigma/public-beta --plain'}`,
     '',
@@ -161,7 +170,7 @@ export async function runPublicBetaReview(options = {}) {
 
   await mkdir(resolve(outDir), { recursive: true });
   await mkdir(dirname(resolve(manifestPath)), { recursive: true });
-  await writeGeneratedSupportDryRunSummaries(supportDryRunPaths);
+  const supportDryRunWrites = await writeGeneratedSupportDryRunSummaries(supportDryRunPaths);
   await writeFile(resolve(cleanMachineSmokePlanPath), `${JSON.stringify(buildCleanMachineSmokePlan(), null, 2)}\n`, 'utf8');
   await writeFile(resolve(manifestPath), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
 
@@ -190,7 +199,8 @@ export async function runPublicBetaReview(options = {}) {
       matrix: '<public-beta-qa-matrix>',
     },
     evidence_files_used: evidenceFilesUsed,
-    generated_evidence_files: supportDryRunPaths.length,
+    generated_evidence_files: supportDryRunWrites.written,
+    preserved_evidence_files: supportDryRunWrites.preserved,
     generated_plan_files: 1,
     generated_evidence_items: ['EV-P10-SUPPORT-DRY-RUN-SUMMARY'],
     template_command: `npm run public-beta:evidence-templates -- --out-dir ${repositoryRelativeOutDir ? normalizedOutDir : DEFAULT_OUT_DIR} --plain`,

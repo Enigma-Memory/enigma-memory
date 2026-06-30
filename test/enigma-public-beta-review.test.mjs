@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -26,6 +26,7 @@ test('public beta review writes generated support dry-run blockers and keeps ext
     assert.equal(result.public_safe, true);
     assert.equal(result.evidence_files_used, 2);
     assert.equal(result.generated_evidence_files, 2);
+    assert.equal(result.preserved_evidence_files, 0);
     assert.equal(result.generated_plan_files, 1);
     assert.deepEqual(result.generated_evidence_items, ['EV-P10-SUPPORT-DRY-RUN-SUMMARY']);
     assert.equal(result.matrix.advisor_decision, 'hold');
@@ -104,6 +105,44 @@ test('public beta review plain output is bounded and path-redacted', async () =>
     assert.match(stdout, /Boundary: one-command local review only/);
     assert.doesNotMatch(stdout, /^\s*\{/);
     assert.equal(stdout.includes(dir), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('public beta review preserves existing support dry-run evidence files', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-public-beta-review-preserve-'));
+  try {
+    const diagnosticPath = join(dir, 'support-dry-run-diagnostics.json');
+    const existingSummary = {
+      schema: 'enigma.support_dry_run_summary.v1',
+      evidence_item_id: 'EV-P10-SUPPORT-DRY-RUN-SUMMARY',
+      generated_at: '2026-06-28T12:00:00.000Z',
+      scenario_id: 'BETA-DIAG-001',
+      issue_code: 'DIAG-BUNDLE-PREVIEWED',
+      triage_result: 'needs_user_action',
+      bundle_privacy_check_status: 'pass',
+      support_owner_ref: 'ref:role:beta-support',
+      privacy_review: { status: 'pass' },
+      preserved_marker: 'ref:preserved-support-summary',
+    };
+    const before = `${JSON.stringify(existingSummary, null, 2)}\n`;
+    await writeFile(diagnosticPath, before, 'utf8');
+
+    const result = await runPublicBetaReview({ outDir: dir });
+    const after = await readFile(diagnosticPath, 'utf8');
+    const crashSupport = JSON.parse(await readFile(join(dir, 'support-dry-run-crash.json'), 'utf8'));
+    const plain = renderPublicBetaReviewPlain(result);
+
+    assert.equal(after, before);
+    assert.equal(result.generated_evidence_files, 1);
+    assert.equal(result.preserved_evidence_files, 1);
+    assert.equal(crashSupport.scenario_id, 'BETA-CRASH-001');
+    assert.equal(crashSupport.triage_result, 'blocked');
+    assert.equal(result.matrix.advisor_decision, 'hold');
+    assert.equal(result.matrix.summary.ready_for_public_beta, false);
+    assert.match(plain, /Preserved existing support evidence files: 1/);
+    assert.equal(plain.includes(dir), false);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
