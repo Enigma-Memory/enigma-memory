@@ -12,7 +12,7 @@ const SCRIPT = resolve('scripts/run-clean-machine-smoke.mjs');
 
 test('clean-machine public path labels do not expose local absolute paths', () => {
   assert.equal(publicSafePath('C:\\Users\\Alice\\AppData\\Local\\Enigma Memory\\app.exe', '<app-binary-path>'), '<app-binary-path>');
-  assert.equal(publicSafePath('/home/alice/.config/enigma-desktop', '<vault-dir>'), '<vault-dir>');
+  assert.equal(publicSafePath('/home/alice/.config/enigma-desktop', '<memory-drive-data-path>'), '<memory-drive-data-path>');
   assert.equal(publicSafePath('/Applications/Enigma Memory.app', '<app-binary-path>'), '<app-binary-path>');
   assert.equal(publicSafePath('relative/report.json', '<local-path>'), 'relative/report.json');
 });
@@ -32,6 +32,8 @@ test('clean-machine smoke report is public-safe even when local checks fail', as
     assert.doesNotMatch(serialized, /C:\\Users\\|\/home\/|\/tmp\/|AppData\\Local/i);
     assert.doesNotMatch(serialized, /raw memory|prompt:|transcript:|provider_response|api[_-]?key|password/i);
     assert.ok(report.scenarios.every((scenario) => ['pass', 'fail', 'skip'].includes(scenario.status)));
+    assert.ok(report.scenarios.some((scenario) => scenario.scenario_id === 'SMOKE-MEMORY-DRIVE-001' && scenario.name === 'Memory Drive data directory exists'));
+    assert.equal(serialized.includes('Local vault'), false);
   } finally {
     if (previousManifestUrl === undefined) {
       delete process.env.UPDATER_MANIFEST_URL;
@@ -53,6 +55,8 @@ test('clean-machine smoke plain output is readable and path-redacted', async () 
     assert.match(plain, /Scenarios: 6/);
     assert.match(plain, /Scenario: SMOKE-INSTALL-001/);
     assert.match(plain, /Boundary: local clean-machine smoke evidence only/);
+    assert.match(plain, /Scenario: SMOKE-MEMORY-DRIVE-001/);
+    assert.doesNotMatch(plain, /SMOKE-VAULT|Local vault/i);
     assert.doesNotMatch(plain, /^\s*\{/);
     assert.doesNotMatch(plain, /C:\\Users\\|\/home\/|\/tmp\/|AppData\\Local/i);
     assert.doesNotMatch(plain, /raw_memory|prompt:|transcript:|provider_response|api[_-]?key|password/i);
@@ -118,6 +122,8 @@ test('clean-machine smoke dry-run plan is public-safe and non-inspecting', () =>
     'run_health_check',
     'export_public_safe_report',
   ]);
+  assert.match(plan.steps.find((step) => step.step_id === 'create_memory_drive')?.expected_evidence ?? '', /Memory Drive data check/);
+  assert.doesNotMatch(serialized, /local vault/i);
   assert.match(plain, /^Enigma clean-machine smoke plan\n/);
   assert.match(plain, /Step: install_desktop_app/);
   assert.match(plain, /Boundary: plan only/);

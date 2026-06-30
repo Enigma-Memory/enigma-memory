@@ -80,32 +80,32 @@ async function checkInstalledApp() {
   });
 }
 
-async function checkVaultExists() {
+async function checkMemoryDriveDataExists() {
   const platform = os.platform();
-  let vaultDir = null;
+  let memoryDriveDir = null;
   if (platform === 'win32') {
-    vaultDir = path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'enigma-desktop');
+    memoryDriveDir = path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'enigma-desktop');
   } else if (platform === 'darwin') {
-    vaultDir = path.join(os.homedir(), 'Library', 'Application Support', 'enigma-desktop');
+    memoryDriveDir = path.join(os.homedir(), 'Library', 'Application Support', 'enigma-desktop');
   } else {
-    vaultDir = path.join(os.homedir(), '.config', 'enigma-desktop');
+    memoryDriveDir = path.join(os.homedir(), '.config', 'enigma-desktop');
   }
 
-  const exists = await fileExists(vaultDir);
+  const exists = await fileExists(memoryDriveDir);
   if (!exists) {
-    return scenario('SMOKE-VAULT-001', 'Local vault directory exists', 'fail', { expected: publicSafePath(vaultDir, '<vault-dir>') });
+    return scenario('SMOKE-MEMORY-DRIVE-001', 'Memory Drive data directory exists', 'fail', { expected: publicSafePath(memoryDriveDir, '<memory-drive-data-path>') });
   }
 
   let entryCount = 0;
   try {
-    const entries = await readdir(vaultDir);
+    const entries = await readdir(memoryDriveDir);
     entryCount = entries.filter((entry) => typeof entry === 'string' && entry.length > 0).length;
   } catch {
     // ignore
   }
 
-  return scenario('SMOKE-VAULT-001', 'Local vault directory exists', 'pass', {
-    path_label: publicSafePath(vaultDir, '<vault-dir>'),
+  return scenario('SMOKE-MEMORY-DRIVE-001', 'Memory Drive data directory exists', 'pass', {
+    path_label: publicSafePath(memoryDriveDir, '<memory-drive-data-path>'),
     entry_count: entryCount,
     entries_redacted: true,
   });
@@ -211,7 +211,7 @@ async function checkDiagnosticsBundle() {
 export async function runSmoke() {
   const scenarios = await Promise.all([
     checkInstalledApp(),
-    checkVaultExists(),
+    checkMemoryDriveDataExists(),
     checkConnectorConfig(),
     checkEngineService(),
     checkUpdateManifest(),
@@ -256,7 +256,7 @@ export function buildCleanMachineSmokePlan(now = new Date()) {
         step_id: 'create_memory_drive',
         title: 'Create the Memory Drive',
         action: 'Click Create Memory Drive and keep the recommended local storage location.',
-        expected_evidence: 'The smoke report records a local vault check without exposing file names or memory contents.',
+        expected_evidence: 'The smoke report records a Memory Drive data check without exposing file names or memory contents.',
       },
       {
         step_id: 'connect_or_skip_client',

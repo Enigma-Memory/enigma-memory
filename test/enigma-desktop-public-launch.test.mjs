@@ -665,6 +665,10 @@ test('public website explains consumer install path without unsupported claims',
   assert.match(setup, /Create Memory Drive/);
   assert.doesNotMatch(setup, /Create local vault/);
   assert.match(setup, /Preview, then approve/);
+  assert.match(qaSmokeScenarios, /Wizard creates\/detects the Memory Drive/);
+  assert.match(qaSmokeScenarios, /Memory Drive behavior/);
+  assert.match(qaSmokeScenarios, /preserving Memory Drive and connector settings/);
+  assert.doesNotMatch(qaSmokeScenarios, /local vault|kept vault|preserving vault/i);
   assert.match(setup, /Enigma shows what it will change before you approve/);
   assert.match(setup, /Memory Drive dashboard/);
   assert.doesNotMatch(setup, /connection boundary|local client config|Enigma-controlled vault|local app location|manual MCP JSON/i);

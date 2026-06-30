@@ -4,7 +4,7 @@ This document is the runnable scenario catalog for Enigma Memory public beta and
 
 ## Claim boundary
 
-These scenarios prove Enigma-controlled local setup, local vault behavior, local connector configuration, local proof/receipt output, and public-safe support workflows only. They do not prove provider deletion, model forgetting, hosted SaaS readiness, BYOC readiness, compliance certification, legal conclusions, or benchmark superiority.
+These scenarios prove Enigma-controlled local setup, Memory Drive behavior, local connector configuration, local proof/receipt output, and public-safe support workflows only. They do not prove provider deletion, model forgetting, hosted SaaS readiness, BYOC readiness, compliance certification, legal conclusions, or benchmark superiority.
 
 ## How to use this checklist
 
@@ -23,8 +23,8 @@ These scenarios prove Enigma-controlled local setup, local vault behavior, local
 
 ### `BETA-FIRST-001` Fresh first run
 
-- [ ] Windows beta: Wizard creates/detects the local vault, detects clients, offers connect, then shows health.
-- [ ] macOS beta: Wizard creates/detects the local vault, detects clients, offers connect, then shows health.
+- [ ] Windows beta: Wizard creates/detects the Memory Drive, detects clients, offers connect, then shows health.
+- [ ] macOS beta: Wizard creates/detects the Memory Drive, detects clients, offers connect, then shows health.
 - [ ] GA: Resume works after app restart, OS restart, and update interruption.
 
 
@@ -60,8 +60,8 @@ These scenarios prove Enigma-controlled local setup, local vault behavior, local
 
 ### `BETA-OFFLINE-001` Offline launch
 
-- [ ] Windows beta: App launches, shows local health, and defers network-dependent actions.
-- [ ] macOS beta: App launches, shows local health, and defers network-dependent actions.
+- [ ] Windows beta: App launches, shows Memory Drive health, and defers network-dependent actions.
+- [ ] macOS beta: App launches, shows Memory Drive health, and defers network-dependent actions.
 - [ ] GA: Returning online retries only user-approved actions.
 
 ### `BETA-CONFIG-001` Corrupted Enigma app config
@@ -102,8 +102,8 @@ These scenarios prove Enigma-controlled local setup, local vault behavior, local
 
 ### `BETA-UPDATE-001` Beta update and rollback evidence
 
-- [ ] Windows beta: Update verification rejects unsigned, wrong-channel, and downgrade payloads while preserving vault and connector settings.
-- [ ] macOS beta: Update verification rejects unsigned, wrong-channel, and downgrade payloads while preserving vault and connector settings.
+- [ ] Windows beta: Update verification rejects unsigned, wrong-channel, and downgrade payloads while preserving Memory Drive and connector settings.
+- [ ] macOS beta: Update verification rejects unsigned, wrong-channel, and downgrade payloads while preserving Memory Drive and connector settings.
 - [ ] GA: Signature verification, failed-update rollback, and metadata kill switch are proven.
 
 ### `BETA-NPM-001` npm package availability evidence
@@ -122,7 +122,7 @@ These scenarios prove Enigma-controlled local setup, local vault behavior, local
 
 - [ ] Windows GA: App binaries are removed; user data is kept by default.
 - [ ] macOS GA: App binaries are removed; user data is kept by default.
-- [ ] GA: Reinstall detects kept vault and offers reconnect.
+- [ ] GA: Reinstall detects kept Memory Drive and offers reconnect.
 
 ### `GA-UNINSTALL-002` Explicit full removal
 
