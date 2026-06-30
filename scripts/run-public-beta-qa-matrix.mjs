@@ -919,11 +919,13 @@ export async function buildPublicBetaQaMatrix(options = {}) {
   const nextActions = buildRankedNextActions(blockers, inputs.evidenceTargets);
   const readyForPublicBeta = scenarios.every((row) => row.status === 'pass');
   const ledgerSummary = summarizePublicLaunchEvidence(scenarios.map((row) => ledgerEntry(row, generatedAt)));
+  const evidenceManifestRef = publicRelativeEvidenceTarget(options.evidenceManifest) ?? '.enigma/public-beta/evidence-manifest.json';
   const report = {
     schema: PUBLIC_BETA_QA_MATRIX_SCHEMA,
     generated_at: generatedAt,
     version: inputs.packageVersion ?? 'unknown',
     required_public_beta_version: REQUIRED_PUBLIC_BETA_VERSION,
+    evidence_manifest: evidenceManifestRef,
     advisor_decision: readyForPublicBeta ? 'ship' : 'hold',
     summary: {
       total_scenarios: scenarios.length,
@@ -974,8 +976,9 @@ export function renderPublicBetaQaPlain(report) {
     }
   }
   if (!report.summary?.ready_for_public_beta) {
-    lines.push('Collect: npm run public-beta:evidence-manifest -- --out .enigma/public-beta/evidence-manifest.json --plain');
-    lines.push('Review: npm run public-beta:advisor -- --evidence-manifest .enigma/public-beta/evidence-manifest.json');
+    const evidenceManifest = publicRelativeEvidenceTarget(report.evidence_manifest) ?? '.enigma/public-beta/evidence-manifest.json';
+    lines.push(`Collect: npm run public-beta:evidence-manifest -- --out ${evidenceManifest} --plain`);
+    lines.push(`Review: npm run public-beta:advisor -- --evidence-manifest ${evidenceManifest}`);
   }
   lines.push('Boundary: local repository and supplied public-safe evidence matrix only; no PR approval, merge, npm publication, signed installer, hosted service, provider deletion, model behavior, benchmark superiority, token ROI, or compliance claims.');
   return `${lines.join('\n')}\n`;
