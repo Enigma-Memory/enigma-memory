@@ -345,9 +345,11 @@ function renderValueList(values) {
 
 export function renderSupportDryRunPlain(summary) {
   const artifactHash = summary.support_artifact?.artifact_hash;
+  const privateFindingCount = summary.privacy_scan?.detected_private_field_count ?? 0;
+  const evidenceReady = summary.bundle_privacy_check_status === 'pass' && privateFindingCount === 0;
   const lines = [
     'Enigma support dry-run',
-    `Status: ${summary.bundle_privacy_check_status === 'pass' ? 'Ready' : 'Needs attention'}`,
+    `Evidence status: ${evidenceReady ? 'Ready' : 'Needs privacy review'}`,
     `Evidence item: ${summary.evidence_item_id ?? SUPPORT_DRY_RUN_EVIDENCE_ITEM_ID}`,
     `Scenario: ${summary.scenario_id ?? '<scenario-id>'}`,
     `Issue: ${summary.issue_code ?? '<issue-code>'}`,
@@ -358,7 +360,7 @@ export function renderSupportDryRunPlain(summary) {
     `Collection steps: ${renderValueList(summary.collection_guidance?.collection_steps)}`,
     `Support owner: ${summary.support_owner_ref ?? '<support-owner-ref>'}`,
     `Support artifact: ${artifactHash ? 'attached by hash' : 'none'} (${summary.collection_guidance?.support_artifact_input ?? 'redacted_snapshot_only'})`,
-    `Privacy scan: ${summary.privacy_scan?.status ?? '<status>'} (${summary.privacy_scan?.detected_private_field_count ?? 0} finding(s), ${Array.isArray(summary.privacy_scan?.checked_categories) ? summary.privacy_scan.checked_categories.length : 0} categories checked)`,
+    `Privacy scan: ${summary.privacy_scan?.status ?? '<status>'} (${privateFindingCount} finding(s), ${Array.isArray(summary.privacy_scan?.checked_categories) ? summary.privacy_scan.checked_categories.length : 0} categories checked)`,
   ];
   if (artifactHash) lines.push(`Support artifact hash: ${artifactHash}`);
   lines.push('Boundary: public-safe support dry-run evidence only; no raw logs, screenshots, transcripts, credentials, account identifiers, owner names, local paths, raw support artifacts, hosted service, provider deletion, model behavior, beta-ready, production-ready, compliance, benchmark superiority, or token ROI claims.');

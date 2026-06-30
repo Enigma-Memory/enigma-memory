@@ -177,12 +177,13 @@ test('support dry-run plain output is readable and writes JSON evidence separate
 
   assert.equal(stderr.trim(), '');
   assert.match(stdout, /^Enigma support dry-run\n/);
-  assert.match(stdout, /Status: Ready/);
+  assert.match(stdout, /Evidence status: Ready/);
   assert.match(stdout, /Evidence item: EV-P10-SUPPORT-DRY-RUN-SUMMARY/);
   assert.match(stdout, /Scenario: BETA-DIAG-001/);
   assert.match(stdout, /Bundle privacy check: pass/);
   assert.match(stdout, /Boundary: public-safe support dry-run evidence only/);
   assert.match(stdout, /Privacy scan: pass \(0 finding\(s\), 8 categories checked\)/);
+  assert.doesNotMatch(stdout, /^Status: Ready/m);
   assert.match(stdout, /Allowed triage values: resolved, needs_user_action, escalated, release_blocker, blocked/);
   assert.match(stdout, /Allowed privacy statuses: pass, fail, blocked, not_applicable/);
   assert.match(stdout, /Collection steps: run_selected_preset_with_observed_triage_result, record_bundle_privacy_check_status_from_redaction_review, attach_redacted_allowlisted_support_artifact_only_when_available, keep_private_material_out_of_public_artifact/);
@@ -192,6 +193,20 @@ test('support dry-run plain output is readable and writes JSON evidence separate
   assert.equal(stdout.includes(out), false);
   const written = JSON.parse(await readFile(out, 'utf8'));
   assert.equal(written.schema, SUPPORT_DRY_RUN_SUMMARY_SCHEMA);
+});
+
+test('support dry-run plain status stays evidence-scoped on privacy hold', () => {
+  const summary = buildSupportDryRunSummary({
+    ...BASE,
+    triage_result: 'release_blocker',
+    bundle_privacy_check_status: 'blocked',
+  });
+  const plain = renderSupportDryRunPlain(summary);
+
+  assert.match(plain, /Evidence status: Needs privacy review/);
+  assert.match(plain, /Triage: release_blocker/);
+  assert.match(plain, /Bundle privacy check: blocked/);
+  assert.doesNotMatch(plain, /^Status: Ready/m);
 });
 
 test('support dry-run plain renderer summarizes attached artifact by hash only', () => {
