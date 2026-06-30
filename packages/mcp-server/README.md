@@ -4,18 +4,18 @@
 
 ## Install and preview before connecting
 
-Create the local bundle, then preview the client you use:
+Create the local bundle, then use the lowest-friction connector path for the client you use:
 
 ```sh
 npm install -g enigma-memory
 enigma quickstart --bundle ./.enigma/bundle.json
-enigma connect claude-desktop --bundle ./.enigma/bundle.json --dry-run
+enigma claude-mcpb package --mcpb ./.enigma/claude/enigma-memory.mcpb --out ./.enigma/claude/enigma-memory-mcpb.json --plain
 enigma connect cursor --bundle ./.enigma/bundle.json --dry-run
 enigma connect kimi-code --bundle ./.enigma/bundle.json --dry-run
 enigma connect vscode-cline --bundle ./.enigma/bundle.json --dry-run
 ```
 
-When the dry-run names the intended client and bundle, repeat that single `enigma connect <client> --bundle ./.enigma/bundle.json` command without `--dry-run`.
+For Claude Desktop, open the generated `.mcpb` package in Claude and test the connection after restart. For other clients, when the dry-run names the intended client and bundle, repeat that single `enigma connect <client> --bundle ./.enigma/bundle.json` command without `--dry-run`.
 
 The generated server entry uses command `enigma-mcp`, no args, and `ENIGMA_BUNDLE` pointing at the local bundle. Existing sibling MCP servers are preserved.
 

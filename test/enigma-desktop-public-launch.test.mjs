@@ -553,7 +553,7 @@ test('public website explains consumer install path without unsupported claims',
   assert.match(installAnywhere, /enigma connect claude-desktop --bundle \.\/\.enigma\/bundle\.json --dry-run/);
   assert.doesNotMatch(clientConnectors, /setup --client auto --connect-installed --overwrite/);
   assert.match(clientConnectors, /Preview one intended client first/);
-  assert.match(clientConnectors, /enigma connect claude-desktop --dry-run/);
+  assert.match(clientConnectors, /enigma claude-mcpb package/);
   assert.doesNotMatch(developerEcosystem, /setup --client auto --connect-installed --overwrite/);
   assert.doesNotMatch(developerEcosystem, /npx enigma setup --overwrite/);
   assert.match(developerEcosystem, /enigma quickstart --bundle \.\/\.enigma\/bundle\.json/);

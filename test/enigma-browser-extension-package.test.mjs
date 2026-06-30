@@ -139,10 +139,11 @@ test('browser and native-host docs show dry-run MCP setup before manual JSON fal
   for (const doc of docs) {
     assert.match(doc, /npm install -g enigma-memory/);
     assert.match(doc, /enigma quickstart --bundle \.\/\.enigma\/bundle\.json/);
-    assert.match(doc, /enigma connect claude-desktop --bundle \.\/\.enigma\/bundle\.json --dry-run/);
+    assert.match(doc, /enigma claude-mcpb package --mcpb \.\/\.enigma\/claude\/enigma-memory\.mcpb/);
     assert.match(doc, /enigma connect cursor --bundle \.\/\.enigma\/bundle\.json --dry-run/);
     assert.match(doc, /enigma connect kimi-code --bundle \.\/\.enigma\/bundle\.json --dry-run/);
     assert.match(doc, /enigma connect vscode-cline --bundle \.\/\.enigma\/bundle\.json --dry-run/);
+    assert.doesNotMatch(doc, /enigma connect claude-desktop/);
     assert.doesNotMatch(doc, /setup --client .*--overwrite/);
     assert.doesNotMatch(doc, /connect-installed --overwrite/);
   }

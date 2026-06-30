@@ -138,18 +138,18 @@ node scripts/package-browser-extension.mjs --zip ./dist/enigma-browser-extension
 
 The packager validates the unpacked extension, denies source maps/private files/credential-shaped content/local user paths, and emits public-safe JSON or plain text with file checksums. It does not submit to any browser store.
 
-1. Install the npm package, create the local bundle, and preview the MCP client you use most often:
+1. Install the npm package, create the local bundle, and use the lowest-friction connector path for the app you use most often:
 
    ```sh
    npm install -g enigma-memory
    enigma quickstart --bundle ./.enigma/bundle.json
-   enigma connect claude-desktop --bundle ./.enigma/bundle.json --dry-run
+   enigma claude-mcpb package --mcpb ./.enigma/claude/enigma-memory.mcpb --out ./.enigma/claude/enigma-memory-mcpb.json --plain
    enigma connect cursor --bundle ./.enigma/bundle.json --dry-run
    enigma connect kimi-code --bundle ./.enigma/bundle.json --dry-run
    enigma connect vscode-cline --bundle ./.enigma/bundle.json --dry-run
    ```
 
-   When the dry-run names the intended client and bundle, repeat that single `enigma connect <client> --bundle ./.enigma/bundle.json` command without `--dry-run`.
+   For Claude Desktop, open the generated `.mcpb` package in Claude and test the connection after restart; Enigma does not write Claude settings for that extension handoff. For other clients, when the dry-run names the intended client and bundle, repeat that single `enigma connect <client> --bundle ./.enigma/bundle.json` command without `--dry-run`.
 2. Keep the same local bundle available to the browser-launched native host through `ENIGMA_BUNDLE` or a local wrapper.
 3. Load `enigma/apps/browser-extension` as an unpacked extension in Chrome or Edge, or load `manifest.json` as a temporary add-on in Firefox.
 4. Copy the local extension ID from the browser developer page.
