@@ -695,6 +695,10 @@ test('public website explains consumer install path without unsupported claims',
   assert.match(supportPlaybooks, /cancel the SmartScreen prompt and check the Enigma launch-status page/);
   assert.match(supportPlaybooks, /stop at the Gatekeeper prompt and check the Enigma launch-status page/);
   assert.doesNotMatch(supportPlaybooks, /right-click it and choose|More info.*Run anyway|click \*\*More info\*\*/i);
+  assert.match(supportPlaybooks, /Memory Drive creation failed/);
+  assert.match(supportPlaybooks, /Create Memory Drive/);
+  assert.match(supportPlaybooks, /Repair Memory Drive/);
+  assert.doesNotMatch(supportPlaybooks, /local vault|Create local vault|Repair vault|existing vault|your vault|keep your vault/i);
   assert.match(installAnywhere, /enigma quickstart --bundle \.\/\.enigma\/bundle\.json/);
   assert.match(installAnywhere, /enigma claude-mcpb package --plain/);
   assert.doesNotMatch(clientConnectors, /setup --client auto --connect-installed --overwrite/);

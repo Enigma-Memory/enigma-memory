@@ -83,27 +83,27 @@ Escalate as a release blocker if a signed beta/GA build is blocked on a supporte
 
 ---
 
-## Vault creation failed
+## Memory Drive creation failed
 
 ### Issue codes
 
-- `WIZ-VAULT-CREATE-FAILED` — Wizard could not create the local vault.
-- `WIZ-VAULT-PATH-DENIED` — Selected vault location is not writable.
-- `WIZ-VAULT-ALREADY-EXISTS` — Vault exists but wizard cannot resume.
-- `WIZ-VAULT-REPAIR-FAILED` — In-app repair could not recover the vault.
+- `WIZ-VAULT-CREATE-FAILED` — Wizard could not create the Memory Drive.
+- `WIZ-VAULT-PATH-DENIED` — Selected Memory Drive location is not writable.
+- `WIZ-VAULT-ALREADY-EXISTS` — Memory Drive exists but wizard cannot resume.
+- `WIZ-VAULT-REPAIR-FAILED` — In-app repair could not recover the Memory Drive.
 
 ### Triage tree
 
 ```
-User cannot create or open the local vault
+User cannot create or open the Memory Drive
 ├── Did first run complete?
 │   ├── No → WIZ-VAULT-CREATE-FAILED or WIZ-VAULT-PATH-DENIED
-│   └── Yes → vault exists but unreadable
+│   └── Yes → Memory Drive exists but is unreadable
 │       ├── In-app repair succeeds → resolved
 │       └── In-app repair fails → WIZ-VAULT-REPAIR-FAILED
-├── Did user choose a custom vault location?
+├── Did user choose a custom Memory Drive location?
 │   └── Yes → WIZ-VAULT-PATH-DENIED
-└── Does a vault already exist from a previous install?
+└── Does a Memory Drive already exist from a previous install?
     └── Yes → WIZ-VAULT-ALREADY-EXISTS
 ```
 
@@ -111,19 +111,19 @@ User cannot create or open the local vault
 
 **WIZ-VAULT-CREATE-FAILED**
 
-> Thanks for reaching out. Let's get your local vault created. Please open Enigma Memory and click **Create local vault** in the setup wizard. If it fails, note the exact support code that appears and I will guide you through recovery.
+> Thanks for reaching out. Let's get your Memory Drive created. Please open Enigma Memory and click **Create Memory Drive** in the setup wizard. If it fails, note the exact support code that appears and I will guide you through recovery.
 
 **WIZ-VAULT-PATH-DENIED**
 
-> Thanks for reaching out. Enigma could not write to the selected vault location. Please go back and use the default location, or pick a folder inside your user home directory that you have permission to write to. Avoid network drives or folders managed by another app.
+> Thanks for reaching out. Enigma could not write to the selected Memory Drive location. Please go back and use the default location, or pick a folder inside your user home directory that you have permission to write to. Avoid network drives or folders managed by another app.
 
 **WIZ-VAULT-ALREADY-EXISTS**
 
-> Thanks for reaching out. Enigma found an existing vault on this device. In the setup wizard, choose **Use existing vault** if it appears. If the app instead asks to repair, click **Repair vault** and let me know the support code.
+> Thanks for reaching out. Enigma found an existing Memory Drive on this device. In the setup wizard, choose **Use existing Memory Drive** if it appears. If the app instead asks to repair, click **Repair Memory Drive** and let me know the support code.
 
 **WIZ-VAULT-REPAIR-FAILED**
 
-> Thanks for reaching out. The in-app repair did not recover the vault. If you have a backup, choose **Restore from backup**. If not, choose **Safe reset** — this recreates the vault and preserves your connected app settings. Note the support code before you confirm.
+> Thanks for reaching out. The in-app repair did not recover the Memory Drive. If you have a backup, choose **Restore from backup**. If not, choose **Safe reset** — this recreates the Memory Drive and preserves your connected app settings. Note the support code before you confirm.
 
 ### Escalation
 
@@ -248,7 +248,7 @@ Enigma cannot reach its local helper
 
 **WIZ-HELPER-NOT-FOUND**
 
-> Thanks for reaching out. Enigma cannot find its local helper. Please restart Enigma Memory. If the error persists, reinstall the app using the default keep-user-data option so your vault is preserved.
+> Thanks for reaching out. Enigma cannot find its local helper. Please restart Enigma Memory. If the error persists, reinstall the app using the default keep-user-data option so your Memory Drive is preserved.
 
 **WIZ-HELPER-LAUNCH-FAILED**
 
@@ -307,7 +307,7 @@ User reports a failed update
 
 **UPD-ROLLBACK-USED**
 
-> Thanks for reaching out. Enigma rolled back to the previous version to keep your vault and connections safe. You can continue using the app. Please let us know the support code so we can investigate the failed update.
+> Thanks for reaching out. Enigma rolled back to the previous version to keep your Memory Drive and connections safe. You can continue using the app. Please let us know the support code so we can investigate the failed update.
 
 ### Escalation
 
@@ -346,7 +346,7 @@ User cannot export or share a proof
 
 **PROOF-SUMMARY-FAILED**
 
-> Thanks for reaching out. The proof summary could not be generated. Please check that your local vault is healthy on the dashboard, then try again. If it still fails, note the support code and I will investigate.
+> Thanks for reaching out. The proof summary could not be generated. Please check that your Memory Drive is healthy on the dashboard, then try again. If it still fails, note the support code and I will investigate.
 
 **PROOF-VERIFY-FAILED**
 
