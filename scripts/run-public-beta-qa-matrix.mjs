@@ -12,6 +12,7 @@ import {
   summarizePublicLaunchEvidence,
   verifyPublicSafeArtifact,
 } from '../packages/core/src/index.js';
+import { SUPPORT_DRY_RUN_COLLECTION_GUIDANCE } from './build-support-dry-run-summary.mjs';
 
 export const PUBLIC_BETA_QA_MATRIX_SCHEMA = 'enigma.public_beta_qa_matrix.v1';
 export const REQUIRED_PUBLIC_BETA_VERSION = '0.1.19';
@@ -265,6 +266,11 @@ function supportDryRunCollectCommand(targetFile) {
     ? `npm run production:support-dry-run -- --preset ${preset} --triage-result <observed-result> --bundle-privacy-check-status <observed-status> --out ${safeTarget}`
     : null;
 }
+function appendSupportDryRunCommandGuidance(lines) {
+  lines.push(`Allowed observed-result: ${SUPPORT_DRY_RUN_COLLECTION_GUIDANCE.triage_result_values.join(', ')}`);
+  lines.push(`Allowed observed-status: ${SUPPORT_DRY_RUN_COLLECTION_GUIDANCE.bundle_privacy_check_status_values.join(', ')}`);
+}
+
 
 function collectCommandsForTargets(collectNext, targetFiles) {
   if (collectNext?.manifest_field !== 'support_dry_run') return [];
@@ -310,7 +316,10 @@ function appendCollectNextLines(lines, prefix, action) {
   const collectCommands = Array.isArray(action.collect_next.collect_commands) ? action.collect_next.collect_commands : [];
   for (const [index, targetFile] of targetFiles.entries()) {
     lines.push(`${prefix}: ${action.action_id} — ${action.collect_next.evidence_item_id} into ${targetFile}: ${action.collect_next.collect}`);
-    if (collectCommands[index]) lines.push(`Run: ${collectCommands[index]}`);
+    if (collectCommands[index]) {
+      lines.push(`Run: ${collectCommands[index]}`);
+      if (action.collect_next.manifest_field === 'support_dry_run') appendSupportDryRunCommandGuidance(lines);
+    }
   }
 }
 

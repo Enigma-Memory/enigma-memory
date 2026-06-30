@@ -248,6 +248,8 @@ test('public beta advisor collect-next paths follow relative evidence manifest t
     assert.match(plain, new RegExp(`Collect internal: record_support_dry_run .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/support-dry-run-crash\\.json`));
     assert.ok(plain.includes(`Run: npm run production:support-dry-run -- --preset diagnostics --triage-result <observed-result> --bundle-privacy-check-status <observed-status> --out ${dir}/support-dry-run-diagnostics.json`));
     assert.ok(plain.includes(`Run: npm run production:support-dry-run -- --preset crash --triage-result <observed-result> --bundle-privacy-check-status <observed-status> --out ${dir}/support-dry-run-crash.json`));
+    assert.match(plain, /Allowed observed-result: resolved, needs_user_action, escalated, release_blocker, blocked/);
+    assert.match(plain, /Allowed observed-status: pass, fail, blocked, not_applicable/);
     assert.match(plain, new RegExp(`Review: npm run public-beta:advisor -- --evidence-manifest ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/evidence-manifest\\.json`));
   } finally {
     await rm(dir, { recursive: true, force: true });
