@@ -76,6 +76,8 @@ test('desktop first-run defaults to Memory Drive home dashboard', async () => {
   assert.equal(model.navigation[0].label, 'Memory Drive');
   assert.equal(model.navigation[2].id, 'support');
   assert.equal(model.navigation[2].label, 'Support report');
+  assert.equal(model.navigation[3].label, 'Memory Drive details');
+  assert.equal(model.navigation[4].label, 'Local connector service');
   assert.equal(model.screens.home.title, 'Memory Drive dashboard');
   assert.equal(model.dashboard.next_action.id, 'create_memory_drive');
   assert.equal(model.dashboard.next_action.label, 'Create Memory Drive');
@@ -116,6 +118,8 @@ test('desktop first-run defaults to Memory Drive home dashboard', async () => {
   assert.equal(model.screens.support.privacy_scan.schema, 'enigma.support_privacy_scan.v1');
   assert.equal(model.screens.support.privacy_scan.status, 'not_run');
   assert.ok(model.screens.support.privacy_scan.checked_categories.includes('raw_logs'));
+  assert.equal(model.screens.vault.title, 'Memory Drive details');
+  assert.equal(model.screens.mcp.title, 'Local connector service');
 });
 
 test('static desktop shell mirrors Memory Controller, Import Sandbox, and Support Report cards', async () => {

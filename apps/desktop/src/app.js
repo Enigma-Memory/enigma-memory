@@ -248,7 +248,7 @@ export function renderDesktopModel(state = createDesktopState()) {
         issue_codes: dashboard.issue_codes.slice()
       },
       vault: {
-        title: 'Vault status',
+        title: 'Memory Drive details',
         status: state.vault.status,
         vault_id: safePublicString(state.vault.vault_id, '', 96),
         active_set_root: safePublicString(state.vault.active_set_root, '', 96),
@@ -261,13 +261,13 @@ export function renderDesktopModel(state = createDesktopState()) {
         memories: state.memories.map(renderMemoryRow)
       },
       mcp: {
-        title: 'MCP server status',
+        title: 'Local connector service',
         status: state.mcp.status,
         endpoint: safePublicString(state.mcp.endpoint, 'local endpoint', 96),
         transport: safePublicString(state.mcp.transport, 'local transport', 32),
         port: state.mcp.port,
         client_count: connectedClients.length,
-        honest_status: state.mcp.status === 'running' ? 'local server claimed running' : 'local server stopped'
+        honest_status: state.mcp.status === 'running' ? 'local connector service claimed running' : 'local connector service stopped'
       },
       clients: {
         title: 'Connected apps',
@@ -1458,8 +1458,8 @@ function screenLabel(screen) {
     case 'home': return 'Memory Drive';
     case 'setup': return 'Setup';
     case 'support': return 'Support report';
-    case 'vault': return 'Vault';
-    case 'mcp': return 'MCP server';
+    case 'vault': return 'Memory Drive details';
+    case 'mcp': return 'Local connector service';
     case 'clients': return 'Connected apps';
     case 'import-export': return 'Import / export';
     case 'verifier': return 'Inspect receipt shape';

@@ -17,7 +17,7 @@ This package is a dependency-free browser shell that can be wrapped later by Ele
 
 ## Screens
 
-The static shell renders consumer home, Memory Controller, Import Sandbox, setup/fix-it, safe support report, support-code copy action, advanced vault status, MCP server status, connected app buttons, import/export, receipt verifier output, delete-and-prove evidence, mesh status, and enterprise status.
+The static shell renders consumer home, Memory Controller, Import Sandbox, setup/fix-it, safe support report, support-code copy action, Memory Drive details, local connector service status, connected app buttons, import/export, receipt verifier output, delete-and-prove evidence, mesh status, and enterprise status.
 
 ## Public-launch command contract
 
