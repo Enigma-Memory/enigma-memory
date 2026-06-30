@@ -1,12 +1,12 @@
 # Public-launch documentation plan
 
-This plan defines the documentation and information architecture required to make Enigma Memory understandable and usable by general consumers. The default path must feel like installing Dropbox: download a signed desktop app, click setup once, get a local vault, connect supported AI clients automatically, and see health/fix-it guidance without using a terminal, installing Node, or editing JSON.
+This plan defines the documentation and information architecture required to make Enigma Memory understandable and usable by general consumers. The default path must feel like installing Dropbox: download a signed desktop app, click setup once, get a Memory Drive, connect supported AI clients automatically, and see health/fix-it guidance without using a terminal, installing Node, or editing JSON.
 
 ## Claim and privacy boundary
 
 Public launch copy must stay inside Enigma's evidence boundary:
 
-- Enigma controls the local vault, local retrieval/context packaging, Enigma-generated receipts, public-safe proof artifacts, local diagnostics, and local client connection helpers.
+- Enigma controls the Memory Drive, local retrieval/context packaging, Enigma-generated receipts, public-safe proof artifacts, local diagnostics, and local client connection helpers.
 - Enigma does not claim provider deletion, model-weight forgetting, provider-native memory removal, hosted SaaS/BYOC readiness, compliance certification, benchmark superiority, chain submission, legal effect, or patent conclusions unless separate approved evidence exists.
 - Public docs, screenshots, examples, proof snippets, and support templates must not expose raw memory, prompts, transcripts, completions, embeddings, local absolute paths, credentials, tokens, private keys, account IDs, tenant names, customer identifiers, provider response bodies, or realistic private policies.
 
@@ -14,7 +14,7 @@ Public launch copy must stay inside Enigma's evidence boundary:
 
 | Audience | Default entry | What they should see first | What must be hidden until advanced |
 | --- | --- | --- | --- |
-| General consumer | Public website and desktop app | Download, install, one-button setup, connected apps, vault health, privacy basics | npm, Node, shell commands, JSON config, source checkout, MCP stdio details |
+| General consumer | Public website and desktop app | Download, install, one-button setup, connected apps, Memory Drive health, privacy basics | npm, Node, shell commands, JSON config, source checkout, MCP stdio details |
 | Curious consumer | Help center and FAQ | Plain-language explanations, screenshots, fix-it actions, proof/privacy boundaries | Raw proof schemas, CLI flags, package manager instructions |
 | Developer/power user | Developer CLI appendix | CLI install, MCP server details, source checkout, exported artifacts | Consumer marketing walkthroughs |
 | Release/support operator | Internal launch checklist, not public default | Claim-safe copy checks, screenshot redaction, support macros | Private support data, customer examples |
@@ -74,13 +74,13 @@ All app copy must use progressive disclosure: one primary action per screen, sho
 ### `/` consumer landing page
 
 1. Eyebrow: `Local-first memory for the AI apps you already use`
-2. H1: `Your AI memory, kept in your own local vault.`
+2. H1: `Your AI memory, kept in your own Memory Drive.`
 3. Subhead: `Install Enigma Memory once, connect supported assistants, and choose what context they can use without managing Node, terminals, or JSON files.`
 4. Primary CTA: `Download Enigma Memory`
 5. Secondary CTA: `See how privacy works`
 6. Trust note: `Enigma creates and verifies Enigma-controlled local receipts. It does not claim that AI providers delete their own logs, backups, or model memories.`
 7. Three cards:
-   - `One local vault` — `Keep AI context in an Enigma-controlled local vault on your device.`
+   - `One Memory Drive` — `Keep AI context in an Enigma-controlled Memory Drive on your device.`
    - `Connect your assistants` — `Detect supported clients and apply reviewed MCP settings with one click.`
    - `Health and proof` — `See what is connected, what needs attention, and which local proof artifacts are safe to share.`
 
@@ -88,7 +88,7 @@ All app copy must use progressive disclosure: one primary action per screen, sho
 
 1. Eyebrow: `Download`
 2. H1: `Install the desktop app. No terminal required.`
-3. Subhead: `Choose your platform, open the signed installer, and Enigma will create a local vault during first run.`
+3. Subhead: `Choose your platform, open the signed installer, and Enigma will create a Memory Drive during first run.`
 4. Primary CTA: `Download for this device`
 5. Secondary links: `macOS`, `Windows`, `Linux`, `Developer CLI`
 6. Signing note:
@@ -100,10 +100,10 @@ All app copy must use progressive disclosure: one primary action per screen, sho
 
 1. Eyebrow: `First run`
 2. H1: `Set up your Memory Drive in one guided flow.`
-3. Subhead: `Enigma creates a local vault, checks supported AI clients, and shows any fix-it steps before you start using memory.`
+3. Subhead: `Enigma creates a Memory Drive, checks supported AI clients, and shows any fix-it steps before you start using memory.`
 4. Primary CTA: `Open setup guide`
 5. Step cards:
-   - `1. Create local vault`
+   - `1. Create Memory Drive`
    - `2. Connect supported apps`
    - `3. Review health`
    - `4. Start using memory`
@@ -113,7 +113,7 @@ All app copy must use progressive disclosure: one primary action per screen, sho
 
 1. Eyebrow: `Install guide`
 2. H1: `Install Enigma Memory like a desktop app.`
-3. Subhead: `Download, open, and approve the signed installer. Enigma handles the local runtime and vault setup.`
+3. Subhead: `Download, open, and approve the signed installer. Enigma handles the local runtime and Memory Drive setup.`
 4. Primary section: platform-specific desktop steps with screenshots.
 5. Secondary section: `If your system blocks the installer` with SmartScreen/Gatekeeper-safe guidance.
 6. Advanced section: collapsed `Install from npm or source` linking to `/developers/cli` and `/developers/source`.
@@ -135,7 +135,7 @@ All app copy must use progressive disclosure: one primary action per screen, sho
 3. Subhead: `Enigma explains what is wrong, what it can fix automatically, and what you need to approve.`
 4. Primary categories:
    - `Installer blocked`
-   - `Vault needs setup`
+   - `Memory Drive needs setup`
    - `Client not detected`
    - `Client config needs review`
    - `App cannot reach Enigma`
@@ -147,7 +147,7 @@ All app copy must use progressive disclosure: one primary action per screen, sho
 
 1. Eyebrow: `Privacy`
 2. H1: `Your memory starts local.`
-3. Subhead: `Enigma keeps its canonical vault on your device and only shares context with an AI client when you choose to connect and use it.`
+3. Subhead: `Enigma keeps its canonical Memory Drive on your device and only shares context with an AI client when you choose to connect and use it.`
 4. Primary CTA: `Open privacy settings`
 5. Sections:
    - `What stays local`
@@ -177,9 +177,9 @@ All app copy must use progressive disclosure: one primary action per screen, sho
 3. Subhead: `Short answers for privacy, setup, AI app connections, proofs, and developer options.`
 4. First questions:
    - `Do I need Node or npm?` — `No for the consumer desktop app. Node/npm belong to the Developer CLI appendix.`
-   - `Does Enigma delete memory from AI providers?` — `No. Enigma controls its local vault and context selection; provider deletion requires provider evidence.`
+   - `Does Enigma delete memory from AI providers?` — `No. Enigma controls its Memory Drive and context selection; provider deletion requires provider evidence.`
    - `Can I use it without the command line?` — `Yes, that is the default public-launch path.`
-   - `Where is my vault?` — `In an Enigma-controlled local app location shown inside the desktop app; public docs should not print local absolute paths.`
+   - `Where is my Memory Drive?` — `In an Enigma-controlled local app area shown inside the desktop app; public docs should not print local absolute paths.`
    - `What can I safely share with support?` — `Health status, app version, sanitized error codes, and public-safe proof refs only.`
 
 ### `/developers/cli`
@@ -202,10 +202,10 @@ All app copy must use progressive disclosure: one primary action per screen, sho
 
 1. H1: `Enigma Memory`
 2. One-line value prop: `A local-first Memory Drive for the AI apps you already use.`
-3. Consumer lead: `For most people, start with the signed Enigma Memory desktop app. It creates your local vault, connects supported assistants, and shows health/fix-it guidance without requiring Node, npm, terminal commands, or JSON editing.`
+3. Consumer lead: `For most people, start with the signed Enigma Memory desktop app. It creates your Memory Drive, connects supported assistants, and shows health/fix-it guidance without requiring Node, npm, terminal commands, or JSON editing.`
 4. Primary CTA link: `Download the desktop app`
 5. Secondary CTA link: `Read privacy and proof boundaries`
-6. Boundary note: `Enigma proves Enigma-controlled local vault and receipt events. It does not prove provider deletion, provider-native memory removal, model forgetting, hosted SaaS readiness, compliance certification, or benchmark superiority.`
+6. Boundary note: `Enigma proves Enigma-controlled Memory Drive and receipt events. It does not prove provider deletion, provider-native memory removal, model forgetting, hosted SaaS readiness, compliance certification, or benchmark superiority.`
 7. Developer escape hatch: `Developers and power users can use the CLI appendix for npm, MCP stdio, source checkout, and manual JSON examples.`
 
 The README top third must not show an install command. The first command block may appear only after a `Developer CLI` heading and a sentence that says it is not the default consumer setup.
@@ -213,32 +213,32 @@ The README top third must not show an install command. The first command block m
 ### Desktop welcome first screen
 
 1. Eyebrow: `Welcome to Enigma Memory`
-2. H1: `Set up your private AI memory vault.`
-3. Subhead: `Enigma keeps its canonical memory vault on this device, helps connect supported AI clients, and shows what needs attention before you use it.`
-4. Primary CTA: `Create local vault`
+2. H1: `Set up your private AI Memory Drive.`
+3. Subhead: `Enigma keeps its canonical Memory Drive on this device, helps connect supported AI clients, and shows what needs attention before you use it.`
+4. Primary CTA: `Create Memory Drive`
 5. Secondary CTA: `Learn how privacy works`
-6. Trust note: `You stay in control of Enigma's local vault. Connected AI apps may still have their own logs, settings, and retention policies.`
+6. Trust note: `You stay in control of Enigma's Memory Drive. Connected AI apps may still have their own logs, settings, and retention policies.`
 7. Footer link: `Advanced: use the CLI instead`
 
 ### Desktop setup wizard screens
 
 | Screen | First-screen copy | Primary action | Secondary action | Success state |
 | --- | --- | --- | --- | --- |
-| Vault | `Create a local vault for Enigma-controlled memory.` | `Create vault` | `Choose storage location` | `Local vault ready` |
+| Memory Drive | `Create a Memory Drive for Enigma-controlled memory.` | `Create Memory Drive` | `Choose storage location` | `Memory Drive ready` |
 | Connections | `Connect Enigma to the AI clients installed on this device.` | `Review connections` | `Skip for now` | `Connection preview ready` |
 | Approvals | `Approve the settings Enigma will change.` | `Apply selected connections` | `Back` | `Selected apps connected` |
-| Health | `Check that your vault and app connections are ready.` | `Fix issues` or `Finish setup` | `Show details` | `Ready to use` |
+| Health | `Check that your Memory Drive and app connections are ready.` | `Fix issues` or `Finish setup` | `Show details` | `Ready to use` |
 | Privacy | `Understand what Enigma controls before you share context.` | `Open privacy settings` | `Finish` | `Privacy settings saved` |
 
 ### Health dashboard first screen
 
 1. Eyebrow: `Health`
 2. H1: `Your Memory Drive status`
-3. Subhead: `See whether your local vault, connected apps, and proof checks are ready.`
+3. Subhead: `See whether your Memory Drive, connected apps, and proof checks are ready.`
 4. Primary action when healthy: `Open Enigma`
 5. Primary action when unhealthy: `Fix highest-priority issue`
 6. Status groups:
-   - `Vault`
+   - `Memory Drive`
    - `Connected apps`
    - `Proof safety`
    - `Updates`
@@ -272,7 +272,7 @@ Create these help articles before public launch:
 | `/help/connect-apps/kimi-code` | `Connect Kimi Code` | App detection, preview, apply, restart guidance | Manual JSON only in advanced |
 | `/help/connect-apps/generic-mcp` | `Connect a generic MCP client` | Explain this is advanced if no app-specific connector exists | Manual JSON allowed here only |
 | `/help/troubleshooting/installer-blocked` | `Installer blocked by the operating system` | Signing-safe user guidance, no bypass-first framing | Signing technical details collapsed |
-| `/help/troubleshooting/vault-not-ready` | `Vault not ready` | Use in-app repair first | CLI repair only in advanced |
+| `/help/troubleshooting/vault-not-ready` | `Memory Drive not ready` | Use in-app repair first | CLI repair only in advanced |
 | `/help/troubleshooting/client-not-detected` | `AI app not detected` | Install/open supported client, refresh detection | Manual config only in advanced |
 | `/help/troubleshooting/proof-export-rejected` | `Proof export rejected as unsafe` | Explain private-field rejection | Schema details collapsed |
 | `/help/troubleshooting/support-diagnostics` | `Send safe diagnostics to support` | Sanitized export only | Raw logs never requested |
@@ -282,10 +282,10 @@ Create these help articles before public launch:
 Group FAQ entries in this order:
 
 1. `Before you install` — desktop app, supported platforms, no Node/npm for consumers, signed installer expectations.
-2. `Privacy and control` — local vault, connected AI app boundaries, provider deletion limits, what users can remove from Enigma context.
+2. `Privacy and control` — Memory Drive, connected AI app boundaries, provider deletion limits, what users can remove from Enigma context.
 3. `Connecting AI apps` — supported clients, `.mcpb` where available, previews/approvals, restart guidance.
 4. `Proofs` — what proofs show, what they never show, why opaque refs are safe to share, Solana-ready boundary.
-5. `Troubleshooting` — blocked installer, app not detected, vault warning, health dashboard states.
+5. `Troubleshooting` — blocked installer, app not detected, Memory Drive warning, health dashboard states.
 6. `Developers` — CLI, npm, MCP JSON, source checkout, local proof artifacts.
 
 Each FAQ answer must start with a short direct answer, then one short explanation, then a link to the relevant help article. Do not place command blocks in FAQ answers except in the `Developers` group.
@@ -314,7 +314,7 @@ Advanced proof details may include schemas, validators, signatures, roots, nulli
 
 The privacy explainer must separate four concepts:
 
-1. `Enigma local vault` — Enigma-controlled canonical memory state on the user's device.
+1. `Enigma Memory Drive` — Enigma-controlled canonical memory state on the user's device.
 2. `Context shared with connected AI apps` — selected context may be sent to the user's chosen client during use.
 3. `Provider systems` — providers may have separate logs, retention, account settings, caches, or native memory outside Enigma control.
 4. `Public-safe proofs` — hashes, roots, refs, counts, timestamps, signatures, and validation results that should not reveal raw memory.
@@ -338,7 +338,7 @@ Do not use `delete everywhere`, `make the model forget`, `erase provider memory`
 
 - Download signed app.
 - Open app.
-- Create local vault.
+- Create Memory Drive.
 - Detect installed clients.
 - Preview connection changes.
 - Apply connection with approval.
@@ -371,11 +371,11 @@ Each help article should use this structure:
 
 Example article titles:
 
-- `Create your local vault`.
+- `Create your Memory Drive`.
 - `Connect Claude Desktop`.
 - `Connect Cursor`.
 - `Reconnect an app after it updates`.
-- `Repair a missing vault`.
+- `Repair a missing Memory Drive`.
 - `Understand a proof export warning`.
 - `Remove Enigma from an app`.
 - `Use the CLI instead of the desktop app`.
@@ -394,7 +394,7 @@ Example article titles:
 ### Product/app deliverables
 
 - Desktop welcome and setup wizard copy.
-- Local vault health dashboard labels and status descriptions.
+- Memory Drive health dashboard labels and status descriptions.
 - Client detection state taxonomy: `Detected`, `Ready to connect`, `Needs permission`, `Already connected`, `Needs repair`, `Unsupported`, `Not installed`.
 - Fix-it action copy for each recoverable state.
 - Privacy and proof in-app explainers.
@@ -416,7 +416,7 @@ Public consumer docs should not launch until these are true or explicitly labele
 - Windows signing/MSIX/Store plan complete enough to avoid presenting unsigned `.exe` as the consumer default.
 - macOS Developer ID signing, notarization, and stapling plan complete enough to avoid Gatekeeper confusion.
 - Desktop app bundles the required runtime internally; no consumer Node/npm prerequisite.
-- First-run wizard can create or initialize the local vault without terminal commands.
+- First-run wizard can create or initialize the Memory Drive without terminal commands.
 - Client detection and connection preview exist for supported clients.
 - Health dashboard has user-readable statuses and fix-it actions.
 - Claude Desktop `.mcpb` path is evaluated and documented when available; manual JSON is not the first Claude path.
@@ -442,12 +442,12 @@ Create or update only the public documentation artifacts below when implementati
 | --- | --- | --- | --- |
 | Public homepage `/` | Update | Desktop-first product story, download CTA, privacy/proof trust note | Footer link to developers |
 | Public download page `/download` | Create/update | Signed desktop app download, platform selector, installer trust explanation | `Developer CLI` link only after desktop options |
-| Public setup page `/setup` | Create/update | Visual wizard walkthrough, local vault, app detection, health dashboard | Collapsed CLI alternative |
+| Public setup page `/setup` | Create/update | Visual wizard walkthrough, Memory Drive, app detection, health dashboard | Collapsed CLI alternative |
 | Public help hub `/help` | Create/update | Install, connect, troubleshooting, privacy, proofs cards | Developer card visually last |
 | Install guide `/help/install` | Create/update | Signed app install by OS, blocked-installer guidance | npm/source install at bottom |
 | Troubleshooting `/help/troubleshooting` | Create/update | Health states and fix-it actions | Manual CLI recovery only in advanced panels |
 | Proof explainer `/proofs` | Create/update | Plain-language safe proof concepts | Schemas/roots/signatures/nullifiers after basics |
-| Privacy explainer `/privacy` | Create/update | Local vault and connected-app boundaries | Provider and proof boundary details after basics |
+| Privacy explainer `/privacy` | Create/update | Memory Drive and connected-app boundaries | Provider and proof boundary details after basics |
 | FAQ `/faq` | Create/update | Consumer questions first | Developer questions last |
 | Developer CLI appendix `/developers/cli` | Create/update | Warning that this is not default setup | npm, Node, CLI flags, MCP JSON, stdio |
 | Source appendix `/developers/source` | Create/update | None above the fold except warning | Git/source checkout/build notes |
