@@ -59,13 +59,13 @@ User cannot install or open Enigma Memory
 
 **INST-TRUST-BLOCKED (Windows)**
 
-> Thanks for reaching out. The Windows SmartScreen warning is expected for some downloaded apps. If your installer came from our official download page, click **More info** on the SmartScreen prompt, then **Run anyway**. If the installer came from anywhere else, please download it again from [download page] and do not bypass the warning.
+> Thanks for reaching out. For default public installs, cancel the SmartScreen prompt and check the Enigma launch-status page before trying again. If the installer came from anywhere except the official download page, delete it and download it again from [download page]. Use testing-only bypass steps only when a release owner has explicitly confirmed you are validating an official pre-launch build.
 >
 > Do not send me the installer file or any screenshots that show your downloads folder path.
 
 **INST-TRUST-BLOCKED (macOS)**
 
-> Thanks for reaching out. macOS Gatekeeper may warn about apps downloaded from the web. If your installer came from our official download page, right-click it and choose **Open**, then confirm. If the installer came from anywhere else, please download it again from [download page] and do not bypass the warning.
+> Thanks for reaching out. For default public installs, stop at the Gatekeeper prompt and check the Enigma launch-status page before trying again. If the installer came from anywhere except the official download page, delete it and download it again from [download page]. Use testing-only bypass steps only when a release owner has explicitly confirmed you are validating an official pre-launch build.
 >
 > Do not send me the installer file or any screenshots that show your Applications folder path.
 

@@ -605,7 +605,7 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
 });
 
 test('public website explains consumer install path without unsupported claims', async () => {
-  const [home, download, setup, privacy, proofs, vaultNotReady, websiteStyles, help, launchStatus, installGuide, macosInstall, windowsInstall, connectApps, claudeConnect, cursorConnect, otherClients, troubleshooting, clientNotDetected, removalGuide, faq, developerCli, readme, installAnywhere, clientConnectors, developerEcosystem, publicApiReference, onboardingUx, qaSmokeScenarios, codeSigningSetup, productionReadinessStatus] = await Promise.all([
+  const [home, download, setup, privacy, proofs, vaultNotReady, websiteStyles, help, launchStatus, installGuide, macosInstall, windowsInstall, connectApps, claudeConnect, cursorConnect, otherClients, troubleshooting, clientNotDetected, removalGuide, faq, developerCli, readme, installAnywhere, clientConnectors, developerEcosystem, publicApiReference, onboardingUx, qaSmokeScenarios, codeSigningSetup, productionReadinessStatus, supportPlaybooks] = await Promise.all([
     readWebsiteFile('index.html'),
     readWebsiteFile('download.html'),
     readWebsiteFile('setup.html'),
@@ -636,6 +636,7 @@ test('public website explains consumer install path without unsupported claims',
     readFile(new URL('../docs/public-launch/qa-smoke-scenarios.md', import.meta.url), 'utf8'),
     readFile(new URL('../docs/public-launch/code-signing-setup.md', import.meta.url), 'utf8'),
     readFile(new URL('../docs/public-launch/production-readiness-status.md', import.meta.url), 'utf8'),
+    readFile(new URL('../docs/public-launch/support-playbooks.md', import.meta.url), 'utf8'),
   ]);
   const publicProofDocs = (await Promise.all([
     readFile(new URL('../docs/demo-proof-network.md', import.meta.url), 'utf8'),
@@ -679,6 +680,9 @@ test('public website explains consumer install path without unsupported claims',
   assert.match(installAnywhereDefault, /If Gatekeeper appears, stop and check launch status again/);
   assert.match(installAnywhereDefault, /If SmartScreen appears, cancel the prompt and check launch status again/);
   assert.doesNotMatch(installAnywhereDefault, /right-click and choose Open|More info, then Run anyway|click More info/i);
+  assert.match(supportPlaybooks, /cancel the SmartScreen prompt and check the Enigma launch-status page/);
+  assert.match(supportPlaybooks, /stop at the Gatekeeper prompt and check the Enigma launch-status page/);
+  assert.doesNotMatch(supportPlaybooks, /right-click it and choose|More info.*Run anyway|click \*\*More info\*\*/i);
   assert.match(installAnywhere, /enigma quickstart --bundle \.\/\.enigma\/bundle\.json/);
   assert.match(installAnywhere, /enigma claude-mcpb package --plain/);
   assert.doesNotMatch(clientConnectors, /setup --client auto --connect-installed --overwrite/);
