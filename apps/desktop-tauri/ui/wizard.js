@@ -232,7 +232,7 @@ async function demoInvoke(cmd, args = {}) {
           },
           disconnect_boundaries: {
             mcpb_path: 'Guide the user to remove or disable the Enigma Memory extension in Claude Desktop.',
-            fallback_path: 'Remove only the Enigma MCP server entry after advanced-user consent.',
+            fallback_path: 'Remove only the Enigma local connector entry after advanced-user consent.',
             automatic_config_write: false,
           },
         },
@@ -718,7 +718,7 @@ function renderClientActions(client, status) {
   if (client.id === 'claude-desktop') {
     return `
       <button type="button" class="client-primary" data-action="claude-mcpb-handoff" data-id="${id}">Connect with Claude extension</button>
-      <button type="button" class="link" data-action="connect" data-id="${id}">Advanced setup preview</button>
+      <button type="button" class="link" data-action="connect" data-id="${id}">Advanced manual setup preview</button>
     `;
   }
   const actionLabel = status === 'skipped' ? 'Connect later' : 'Preview connection';
@@ -792,7 +792,7 @@ function renderClaudeMcpbHandoff(client) {
       </ol>
       <p class="note">Status: ${escapeHtml(health.status || 'not_installed')}. Next: ${escapeHtml(nextAction.label || 'Install Claude extension')}. ${escapeHtml(nextAction.description || 'Open the Enigma Claude extension package in Claude Desktop, then test the connection.')}</p>
       <p class="note">Remove or disable later: ${escapeHtml(disconnect.mcpb_path || 'Remove or disable the Enigma Memory extension in Claude Desktop.')}</p>
-      <p class="note">If the extension path is unavailable, use Advanced setup preview. It stays review-first and does not write until you approve.</p>
+      <p class="note">If the extension path is unavailable, use Advanced manual setup preview. It stays review-first and does not write until you approve.</p>
       <div class="button-row">
         <button type="button" class="secondary" data-action="copy-claude-steps" data-id="${escapeHtml(client.id)}">Copy Claude install steps</button>
       </div>

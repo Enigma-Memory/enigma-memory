@@ -556,11 +556,12 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(wizard, /Enigma did not write Claude settings/);
   assert.match(wizard, /enigma\.desktop_claude_mcpb_handoff\.v1/);
   assert.match(wizard, /Connect with Claude extension/);
-  assert.match(wizard, /Advanced setup preview/);
-  assert.ok(renderClientActionsBlock.indexOf('claude-mcpb-handoff') < renderClientActionsBlock.indexOf('Advanced setup preview'));
+  assert.match(wizard, /Advanced manual setup preview/);
+  assert.ok(renderClientActionsBlock.indexOf('claude-mcpb-handoff') < renderClientActionsBlock.indexOf('Advanced manual setup preview'));
   assert.match(wizard, /Remove or disable later/);
   assert.match(wizard, /Return here and run Test connection/);
-  assert.match(wizard, /If the extension path is unavailable, use Advanced setup preview/);
+  assert.match(wizard, /If the extension path is unavailable, use Advanced manual setup preview/);
+  assert.doesNotMatch(wizard, /Enigma MCP server entry/);
   assert.match(wizard, /Open the Enigma Claude extension package in Claude Desktop, then test the connection/);
   assert.match(wizard, /Enigma does not write Claude settings for this extension handoff/);
   assert.match(wizard, /claudeMcpbClipboardText/);
