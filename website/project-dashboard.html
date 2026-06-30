@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Enigma Memory project dashboard showing live public surfaces, built PR work, blockers, idea lanes, and next release actions.">
+  <title>Project Dashboard — Enigma Memory</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="site-logo" href="./index.html">Enigma Memory</a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="./download.html">Download</a>
+        <a href="./launch-status.html">Launch status</a>
+        <a href="./project-dashboard.html">Project dashboard</a>
+        <a href="./setup.html">How it works</a>
+        <a href="./privacy.html">Privacy</a>
+        <a href="./help/index.html">Help</a>
+        <a href="./faq.html">FAQ</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero hero--split dashboard-hero">
+      <div>
+        <span class="eyebrow">Release command center</span>
+        <h1>What is live, what is built, and what still blocks public use.</h1>
+        <p>This dashboard is a public-safe snapshot of Enigma Memory status. It separates live public surfaces from PR-ready work, release blockers, and the product ideas still queued behind evidence.</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="#blockers">See blockers</a>
+          <a class="btn btn-secondary" href="https://github.com/Enigma-Memory/enigma-memory/pull/60">Open PR #60</a>
+        </div>
+        <p class="trust-note">Snapshot: PR head <code>c54f1f8</code>; public beta decision <strong>HOLD</strong>; npm latest observed as <code>0.1.18</code>.</p>
+      </div>
+      <aside class="dashboard-scorecard" aria-label="Current release scorecard">
+        <div>
+          <span>Public beta</span>
+          <strong>HOLD</strong>
+        </div>
+        <div>
+          <span>PR #60</span>
+          <strong>Open</strong>
+        </div>
+        <div>
+          <span>Review</span>
+          <strong>Required</strong>
+        </div>
+        <div>
+          <span>Merge state</span>
+          <strong>Blocked</strong>
+        </div>
+        <div>
+          <span>QA scenarios</span>
+          <strong>0 pass / 20 blocked / 1 pending</strong>
+        </div>
+        <div>
+          <span>GitHub checks</span>
+          <strong>Passing</strong>
+        </div>
+      </aside>
+    </section>
+
+    <section class="content-section" aria-labelledby="now-heading">
+      <div class="section-kicker">Current public surface</div>
+      <h2 id="now-heading">Live now versus built but not released.</h2>
+      <div class="dashboard-lanes">
+        <article class="dashboard-lane dashboard-lane--live">
+          <span class="status-label status-label--testing">Live now</span>
+          <h3>Public website and status pages</h3>
+          <p>The public website is live and explains the consumer path, launch status, privacy boundary, setup model, and support pages. It does not present signed installers as ready.</p>
+          <ul>
+            <li>Website and docs are public-facing.</li>
+            <li>Launch-status page says signed installers are not ready.</li>
+            <li>npm registry latest is <code>enigma-memory@0.1.18</code>.</li>
+          </ul>
+        </article>
+        <article class="dashboard-lane dashboard-lane--built">
+          <span class="status-label status-label--testing">Built in PR #60</span>
+          <h3>Consumer product foundation</h3>
+          <p>The PR contains the Memory Boundary Transaction System, desktop/Tauri shell, Memory Drive dashboard model, Claude extension handoff, support surfaces, and public beta evidence tooling.</p>
+          <ul>
+            <li>PR head <code>c54f1f8</code> is pushed.</li>
+            <li>GitHub checks are passing.</li>
+            <li>Review and merge are still required.</li>
+          </ul>
+        </article>
+        <article class="dashboard-lane dashboard-lane--blocked">
+          <span class="status-label status-label--pending">Not public-ready</span>
+          <h3>General consumer release</h3>
+          <p>Public beta remains on HOLD until external release evidence exists. The current code can be reviewable and CI-green without proving signed desktop distribution or clean-machine public use.</p>
+          <ul>
+            <li>No signed Windows installer evidence yet.</li>
+            <li>No macOS notarization and stapling evidence yet.</li>
+            <li>No public-safe release packet approval yet.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="content-section" id="blockers" aria-labelledby="blockers-heading">
+      <div class="section-kicker">Blockers</div>
+      <h2 id="blockers-heading">The seven gates before general public use.</h2>
+      <div class="blocker-list">
+        <article>
+          <span>1</span>
+          <div>
+            <h3>PR #60 review and merge</h3>
+            <p>Status: open, review required, merge blocked. This is the required path to main.</p>
+          </div>
+        </article>
+        <article>
+          <span>2</span>
+          <div>
+            <h3>Publish <code>enigma-memory@0.1.19</code></h3>
+            <p>Observed npm latest remains <code>0.1.18</code>. Publish must happen after merge through the trusted release path.</p>
+          </div>
+        </article>
+        <article>
+          <span>3</span>
+          <div>
+            <h3>Windows signed installer evidence</h3>
+            <p>Need verified signature status, public checksum, artifact name, signature evidence ref, and download ref.</p>
+          </div>
+        </article>
+        <article>
+          <span>4</span>
+          <div>
+            <h3>macOS signed, notarized, stapled evidence</h3>
+            <p>Need Developer ID signature, notarization acceptance, stapling status, public checksum, and download ref.</p>
+          </div>
+        </article>
+        <article>
+          <span>5</span>
+          <div>
+            <h3>Signed update rollback rehearsal</h3>
+            <p>Need update manifest signature evidence and rollback rehearsal status marked pass with a public-safe evidence ref.</p>
+          </div>
+        </article>
+        <article>
+          <span>6</span>
+          <div>
+            <h3>Clean-machine Windows/macOS QA</h3>
+            <p>Top consumer blocker. Run the dry-run plan first, then collect real install, first-run, connector, proof, offline, diagnostics, update, and uninstall evidence.</p>
+          </div>
+        </article>
+        <article>
+          <span>7</span>
+          <div>
+            <h3>Public-safe release packet approval</h3>
+            <p>Need release packet ref, claim-boundary reviewer ref, approval ref, approved status, and approval date.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="content-section" aria-labelledby="ideas-heading">
+      <div class="section-kicker">Product ideas and lanes</div>
+      <h2 id="ideas-heading">The direction board.</h2>
+      <div class="idea-board">
+        <article>
+          <span class="idea-state idea-state--active">Strongest direction</span>
+          <h3>Consumer desktop app</h3>
+          <p>Install like Dropbox, open app, click Start, connect Claude or Cursor, done. Tauri shell and dashboard model are built in PR; signed installers and clean-machine evidence still block public use.</p>
+        </article>
+        <article>
+          <span class="idea-state idea-state--active">Near-term wedge</span>
+          <h3>Claude-first extension</h3>
+          <p>Claude Desktop Extension handoff is the cleanest first AI-app path. `.mcpb` contract and no-write repair boundaries are built; public distribution still waits on release gates.</p>
+        </article>
+        <article>
+          <span class="idea-state idea-state--live">Live surface</span>
+          <h3>Public website funnel</h3>
+          <p>Website explains what Enigma does, launch status, setup, privacy, proofs, and support. Download stays status-first until signed installers exist.</p>
+        </article>
+        <article>
+          <span class="idea-state idea-state--built">Built foundation</span>
+          <h3>Memory Drive dashboard</h3>
+          <p>Dashboard model, status surfaces, support report, import sandbox, local connector service copy, and proof-oriented messaging are built in the desktop shell.</p>
+        </article>
+        <article>
+          <span class="idea-state idea-state--built">First-value path</span>
+          <h3>Import wizard</h3>
+          <p>Preview-first import and quarantine language are part of onboarding. Public polish continues after the core desktop release gate clears.</p>
+        </article>
+        <article>
+          <span class="idea-state idea-state--blocked">Release infrastructure</span>
+          <h3>Public beta evidence system</h3>
+          <p>Advisor, evidence manifest, templates, support dry-runs, clean-machine plans, and status command are built. Real external evidence is still missing.</p>
+        </article>
+        <article>
+          <span class="idea-state idea-state--built">Novelty surface</span>
+          <h3>Proof viewer and verifier</h3>
+          <p>Proof primitives, receipt verifier output, context proof APIs, and non-use boundaries are in the system. Public-facing viewer polish remains downstream of release readiness.</p>
+        </article>
+        <article>
+          <span class="idea-state idea-state--moonshot">Category narrative</span>
+          <h3>Memory Controller</h3>
+          <p>The product category is Enigma as the control panel for AI memory across assistants. The proof and connector layers make this credible; public packaging still has to land first.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="content-section" aria-labelledby="commands-heading">
+      <div class="section-kicker">Release-owner commands</div>
+      <h2 id="commands-heading">Copy these when checking status.</h2>
+      <div class="command-stack">
+        <pre><code>npm run public-beta:status</code></pre>
+        <pre><code>npm run public-beta:evidence-templates -- --out-dir .enigma/public-beta --plain</code></pre>
+        <pre><code>npm run production:clean-machine-smoke -- --dry-run --plain --out .enigma/public-beta/clean-machine-smoke-plan.json</code></pre>
+        <pre><code>npm run production:clean-machine-smoke -- --plain --out .enigma/public-beta/clean-machine-smoke.json</code></pre>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer__inner">
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="./download.html">Download</a></li>
+          <li><a href="./setup.html">How it works</a></li>
+          <li><a href="./privacy.html">Privacy</a></li>
+          <li><a href="./launch-status.html">Launch status</a></li>
+          <li><a href="./project-dashboard.html">Project dashboard</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Support</h4>
+        <ul>
+          <li><a href="./help/index.html">Help hub</a></li>
+          <li><a href="./help/install.html">Install guide</a></li>
+          <li><a href="./help/troubleshooting.html">Troubleshooting</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Developers</h4>
+        <ul>
+          <li><a href="./developers/cli.html">CLI appendix</a></li>
+          <li><a href="https://github.com/Enigma-Memory/enigma-memory/pull/60">PR #60</a></li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

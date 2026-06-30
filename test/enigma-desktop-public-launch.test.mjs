@@ -695,7 +695,7 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
 });
 
 test('public website explains consumer install path without unsupported claims', async () => {
-  const [home, download, setup, privacy, proofs, vaultNotReady, websiteStyles, help, launchStatus, installGuide, macosInstall, windowsInstall, connectApps, claudeConnect, cursorConnect, otherClients, troubleshooting, clientNotDetected, removalGuide, faq, developerCli, readme, installAnywhere, clientConnectors, developerEcosystem, publicApiReference, onboardingUx, qaSmokeScenarios, codeSigningSetup, productionReadinessStatus, supportPlaybooks, qaSupportObservability, publicLaunchDocs, advisorDocs, desktopAppPlan, oneClickConnectors, trustSigningRelease, securityAuditRfp] = await Promise.all([
+  const [home, download, setup, privacy, proofs, vaultNotReady, websiteStyles, help, launchStatus, projectDashboard, installGuide, macosInstall, windowsInstall, connectApps, claudeConnect, cursorConnect, otherClients, troubleshooting, clientNotDetected, removalGuide, faq, developerCli, readme, installAnywhere, clientConnectors, developerEcosystem, publicApiReference, onboardingUx, qaSmokeScenarios, codeSigningSetup, productionReadinessStatus, supportPlaybooks, qaSupportObservability, publicLaunchDocs, advisorDocs, desktopAppPlan, oneClickConnectors, trustSigningRelease, securityAuditRfp] = await Promise.all([
     readWebsiteFile('index.html'),
     readWebsiteFile('download.html'),
     readWebsiteFile('setup.html'),
@@ -705,6 +705,7 @@ test('public website explains consumer install path without unsupported claims',
     readWebsiteFile('styles.css'),
     readWebsiteFile('help/index.html'),
     readWebsiteFile('launch-status.html'),
+    readWebsiteFile('project-dashboard.html'),
     readWebsiteFile('help/install.html'),
     readWebsiteFile('help/install/macos.html'),
     readWebsiteFile('help/install/windows.html'),
@@ -741,7 +742,7 @@ test('public website explains consumer install path without unsupported claims',
     readFile(new URL('../docs/proof-network-demo-video-script.md', import.meta.url), 'utf8'),
     readFile(new URL('../docs/proof-network-launch-plan.md', import.meta.url), 'utf8'),
   ])).join('\n');
-  const publicWebsite = `${home}\n${download}\n${setup}\n${privacy}\n${proofs}\n${vaultNotReady}\n${help}\n${launchStatus}\n${installGuide}\n${macosInstall}\n${windowsInstall}\n${connectApps}\n${claudeConnect}\n${cursorConnect}\n${otherClients}\n${troubleshooting}\n${clientNotDetected}\n${removalGuide}\n${faq}`;
+  const publicWebsite = `${home}\n${download}\n${setup}\n${privacy}\n${proofs}\n${vaultNotReady}\n${help}\n${launchStatus}\n${projectDashboard}\n${installGuide}\n${macosInstall}\n${windowsInstall}\n${connectApps}\n${claudeConnect}\n${cursorConnect}\n${otherClients}\n${troubleshooting}\n${clientNotDetected}\n${removalGuide}\n${faq}`;
   const funnelSpec = `${publicWebsite}\n${onboardingUx}`;
   const vaultBeforeAdvanced = vaultNotReady.slice(0, vaultNotReady.indexOf('Advanced command-line repair'));
   const installAnywhereDefault = installAnywhere.slice(0, installAnywhere.indexOf('## Advanced path: install with npm'));
@@ -867,6 +868,17 @@ test('public website explains consumer install path without unsupported claims',
   assert.match(launchStatus, /Windows trusted installer/);
   assert.match(launchStatus, /General consumer download/);
   assert.doesNotMatch(launchStatus, /Azure|Artifact Signing|free\/trial\/sponsored|eligible paid subscription|Public Trust|repository custody path/i);
+  assert.match(launchStatus, /project-dashboard\.html/);
+  assert.match(projectDashboard, /What is live, what is built, and what still blocks public use/);
+  assert.match(projectDashboard, /public beta decision <strong>HOLD<\/strong>/);
+  assert.match(projectDashboard, /npm latest observed as <code>0\.1\.18<\/code>/);
+  assert.match(projectDashboard, /PR head <code>c54f1f8<\/code>/);
+  assert.match(projectDashboard, /Consumer desktop app/);
+  assert.match(projectDashboard, /Claude-first extension/);
+  assert.match(projectDashboard, /Public beta evidence system/);
+  assert.match(projectDashboard, /npm run public-beta:status/);
+  assert.match(projectDashboard, /clean-machine-smoke/);
+  assert.doesNotMatch(projectDashboard, /signed installers are ready|ready for general consumers|Azure Artifact Signing|Public Trust|local vault|provider deletion|model forgetting/i);
   for (const scenarioId of ['BETA-CLIENT-CLAUDE-001', 'BETA-SIGNING-WINDOWS-001', 'BETA-SIGNING-MACOS-001', 'BETA-UPDATE-001', 'BETA-NPM-001', 'BETA-MERGE-001']) {
     assert.match(qaSmokeScenarios, new RegExp(scenarioId));
   }
