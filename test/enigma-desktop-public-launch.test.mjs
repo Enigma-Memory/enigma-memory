@@ -25,6 +25,9 @@ async function readDesktopUiFile(name) {
 async function readDesktopShellFile(name) {
   return readFile(new URL(`../apps/desktop/src/${name}`, import.meta.url), 'utf8');
 }
+async function readDesktopContract() {
+  return readFile(new URL('../apps/desktop/DESKTOP_CONTRACT.md', import.meta.url), 'utf8');
+}
 
 
 async function readDesktopTauriSource(name) {
@@ -109,6 +112,7 @@ test('desktop first-run defaults to Memory Drive home dashboard', async () => {
 
 test('static desktop shell mirrors Memory Controller, Import Sandbox, and Support Report cards', async () => {
   const shell = await readDesktopShellFile('index.html');
+  const contract = await readDesktopContract();
   const homeBlock = shell.match(/function renderHomeScreen\(screen\) \{[\s\S]*?\n\}/)?.[0] || '';
   const importSandboxBlock = shell.match(/function renderImportSandboxHtml\(sandbox\) \{[\s\S]*?function renderScreen/s)?.[0] || '';
   const supportBlock = shell.match(/function renderSupportScreen\(screen\) \{[\s\S]*?function renderVaultScreen/s)?.[0] || '';
@@ -128,6 +132,8 @@ test('static desktop shell mirrors Memory Controller, Import Sandbox, and Suppor
   assert.match(homeBlock, /Import Sandbox/);
   assert.match(homeBlock, /renderImportSandboxHtml\(dashboard\.import_sandbox\)/);
   assert.match(importSandboxBlock, /Provider-side proof/);
+  assert.match(contract, /support_report_ready/);
+  assert.match(contract, /support_report_status/);
   assert.match(importSandboxBlock, /Model-state proof/);
   assert.match(supportBlock, /Copyable safe report/);
   assert.match(supportBlock, /Privacy boundaries/);
