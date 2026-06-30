@@ -9,7 +9,7 @@ import { renderHelpButton } from './help.js';
 
 const SCREENS = [
   { id: 'welcome', label: 'Welcome' },
-  { id: 'vault', label: 'Private vault' },
+  { id: 'vault', label: 'Memory Drive' },
   { id: 'find-apps', label: 'Find apps' },
   { id: 'connect-apps', label: 'Connect apps' },
   { id: 'health', label: 'Health check' },
@@ -326,7 +326,7 @@ async function mockInvoke(cmd, args = {}) {
         candidate_count: candidateCount,
         import_decision: candidateCount > 0 ? 'ready_for_import' : 'empty',
         primary_action: candidateCount > 0
-          ? { id: 'approve_import', label: 'Import selected memories', description: 'Approve this local import batch before Enigma writes candidates into the vault.', writes_vault: true, requires_explicit_approval: true, public_safe: true }
+          ? { id: 'approve_import', label: 'Import selected memories', description: 'Approve this local import batch before Enigma writes candidates into the Memory Drive.', writes_vault: true, requires_explicit_approval: true, public_safe: true }
           : { id: 'choose_import_file', label: 'Choose memory file', description: 'Pick a local memory export or curated memory list to preview.', writes_vault: false, requires_explicit_approval: true, public_safe: true },
         counts: { dedupe: { duplicate_group_count: 0 } },
         preview_receipt: {
@@ -868,7 +868,7 @@ function renderImportSandboxSection() {
       ${result ? `<p class="note">Import written locally: ${escapeHtml(String(resultCount))} candidates. Batch receipt returned without raw memory text. Rollback is available from the latest local import report.</p>` : ''}
       ${rollback ? `<p class="note">Rollback complete: ${escapeHtml(String(rollbackCount))} local memories tombstoned. Rollback receipt returned without raw memory text.</p>` : ''}
       ${importSandbox.error ? `<p class="note">Import needs attention: ${escapeHtml(importSandbox.error)}</p>` : ''}
-      <p class="note">Import and rollback receipts prove Enigma-local vault activity only. They do not prove changes outside Enigma or model behavior changes.</p>
+      <p class="note">Import and rollback receipts prove Enigma-local Memory Drive activity only. They do not prove changes outside Enigma or model behavior changes.</p>
     </section>
   `;
 }
@@ -1005,15 +1005,15 @@ function renderSupportSummarySection() {
 
 function renderVault() {
   return renderCard(`
-    <p class="eyebrow">Step 2 of 6 · Private vault</p>
-    <h1>Create your private vault</h1>
-    <p>This vault stores Enigma Memory data on this computer. You can move it later from Settings.</p>
+    <p class="eyebrow">Step 2 of 6 · Memory Drive</p>
+    <h1>Create your Memory Drive</h1>
+    <p>This Memory Drive stores Enigma Memory data on this computer. You can move it later from Settings.</p>
     <div class="disclosure">
       <strong>Recommended location selected</strong><br>
       Enigma Memory will use your operating system's application data folder.
     </div>
     <div class="button-row">
-      ${primaryButton('Create vault', 'create-vault-action')}
+      ${primaryButton('Create Memory Drive', 'create-vault-action')}
     </div>
   `, 'vault');
 }
@@ -1058,7 +1058,7 @@ function renderHealth() {
   return renderCard(`
     <p class="eyebrow">Step 5 of 6 · Health check</p>
     <h1>Check your Memory Drive</h1>
-    <p>Enigma will check your vault, privacy guardrails, and app connections.</p>
+    <p>Enigma will check your Memory Drive, privacy guardrails, and app connections.</p>
     <div class="button-row">
       ${primaryButton('Run health check', 'run-health')}
       ${secondaryButton('Open dashboard anyway', 'go-dashboard')}
@@ -1074,7 +1074,7 @@ function renderReady() {
     <h1>Your Memory Drive is ready</h1>
     <p>Enigma is set up on this computer. Connected apps can now ask for helpful memory when you allow it.</p>
     <ul class="checklist">
-      <li>Private vault created</li>
+      <li>Memory Drive created</li>
       <li>Local engine running</li>
       <li>Privacy guardrails checked</li>
       <li>${escapeHtml(appCopy)}</li>
@@ -1126,7 +1126,7 @@ function dashboardNextAction({ memoryDriveStatus, offlineReady, serviceRunning, 
     return { label: 'Start engine', action: 'start-service', reason: 'Start the bundled local service so connected apps can talk to Enigma.' };
   }
   if (!offlineReady) {
-    return { label: 'Run health check', action: 'run-health', reason: 'Check local vault, privacy guardrails, and app connection readiness.' };
+    return { label: 'Run health check', action: 'run-health', reason: 'Check Memory Drive, privacy guardrails, and app connection readiness.' };
   }
   if (Number(health.connected_app_count ?? 0) === 0) {
     return { label: 'Connect apps', action: 'detect-clients', reason: 'Find Claude, Cursor, or another supported app and connect it without editing setup files.' };
@@ -1171,7 +1171,7 @@ function renderDashboard() {
   return renderCard(`
     <p class="eyebrow">Memory health</p>
     <h1>Health dashboard</h1>
-    <p>A simple check that your vault, app connections, and privacy checks are working.</p>
+    <p>A simple check that your Memory Drive, app connections, and privacy checks are working.</p>
     <div class="dashboard-grid">
       <div class="metric"><dt>Memory Drive</dt><dd>${escapeHtml(memoryDriveStatus)}</dd></div>
       <div class="metric"><dt>Health</dt><dd>${escapeHtml(health.health_status || 'unknown')}</dd></div>
@@ -1343,15 +1343,15 @@ async function handleAction(event) {
     case 'create-vault': {
       currentStep = 1;
       render();
-      setStatus('Choose where Enigma keeps your private vault.');
+      setStatus('Choose where Enigma keeps your Memory Drive.');
       return;
     }
     case 'create-vault-action': {
       busy = true;
-      setStatus('Creating vault...');
+      setStatus('Creating Memory Drive...');
       const btn = event.currentTarget;
       btn.disabled = true;
-      btn.textContent = 'Creating vault...';
+      btn.textContent = 'Creating Memory Drive...';
       health = await call('create_vault');
       busy = false;
       currentStep = 2;
@@ -1648,7 +1648,7 @@ async function handleAction(event) {
       return;
     case 'run-health': {
       busy = true;
-      setStatus('Checking vault...');
+      setStatus('Checking Memory Drive...');
       try {
         health = await call('get_health');
         serviceStatus = await call('get_service_status');

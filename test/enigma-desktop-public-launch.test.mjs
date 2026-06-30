@@ -397,6 +397,13 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(wizard, /dashboardNextAction\(\{ memoryDriveStatus, offlineReady, serviceRunning, updateAvailable \}\)/);
   assert.doesNotMatch(wizard.match(/case 'create-vault': \{[\s\S]*?return;\n    \}/)?.[0] || '', /call\('create_vault'\)/);
   assert.doesNotMatch(wizard, /choose-location|Choose a different location|Location chooser would open here/);
+  assert.match(wizard, /Step 2 of 6 · Memory Drive/);
+  assert.match(wizard, /Create your Memory Drive/);
+  assert.match(wizard, /Creating Memory Drive/);
+  assert.match(wizard, /Checking Memory Drive/);
+  assert.match(help, /Your Memory Drive/);
+  assert.match(help, /before any Memory Drive write/);
+  assert.doesNotMatch(`${wizard}\n${help}`, /Private vault|private vault|your vault|local vault|vault stores|vault write|vault activity|Checking vault|Creating vault|Check your vault|Private vault created|Create vault/);
   assert.match(wizard, /WIZARD_STORAGE_KEY/);
   assert.match(wizard, /restoreWizardResumeState/);
   assert.match(wizard, /persistWizardResumeState/);
