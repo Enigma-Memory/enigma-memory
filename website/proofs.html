@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Enigma Memory proofs show local vault events without publishing your memory.">
+  <meta name="description" content="Enigma Memory proofs show Memory Drive events without publishing your memory.">
   <title>Proofs — Enigma Memory</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -36,7 +36,7 @@
       <h2 id="show-heading">What a proof can show</h2>
       <ul>
         <li>A memory create, retrieval, context-pack, update, or tombstone event produced a receipt.</li>
-        <li>The receipt verifies offline against Enigma-controlled vault state.</li>
+        <li>The receipt verifies offline against Enigma-controlled Memory Drive state.</li>
         <li>Exported artifacts contain commitments and metadata, not raw memory plaintext.</li>
       </ul>
     </section>
@@ -57,9 +57,9 @@
 
     <section class="content-section" aria-labelledby="not-prove-heading">
       <h2 id="not-prove-heading">What local proof is not</h2>
-      <p>Local proof is not proof about provider-side erasure or model state changes. It shows what Enigma did in its own vault. Solana-ready means prepared for review, not submitted to a chain unless separate transaction evidence exists.</p>
+      <p>Local proof is not proof about provider-side erasure or model state changes. It shows what Enigma did in its own Memory Drive. Solana-ready means prepared for review, not submitted to a chain unless separate transaction evidence exists.</p>
       <div class="boundary-callout">
-        <strong>Boundary note:</strong> Enigma proves Enigma-controlled local vault and receipt events. It does not prove that a closed provider removed hidden copies or that a model changed training, fine-tuning, cache, or personalization state.
+        <strong>Boundary note:</strong> Enigma proves Memory Drive and receipt events. It does not prove that a closed provider removed hidden copies or that a model changed training, fine-tuning, cache, or personalization state.
       </div>
     </section>
 

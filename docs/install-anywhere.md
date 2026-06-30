@@ -13,7 +13,7 @@ Hosted cloud and BYOC operation are waitlist/operator-deploy only; they require 
    - **macOS:** Open the signed, notarized disk image or package. If Gatekeeper appears, right-click and choose Open.
    - **Windows:** Run the signed installer. If SmartScreen appears, click More info, then Run anyway.
    - **Linux:** Mark the AppImage executable or install the distribution package.
-3. Open Enigma Memory. The first-run setup creates your local vault.
+3. Open Enigma Memory. The first-run setup creates your Memory Drive.
 4. Review detected AI clients, preview the connection change, and approve the clients you want to connect.
 5. Check the health dashboard and follow any fix-it guidance.
 
@@ -25,7 +25,7 @@ The desktop app bundles its runtime. Consumers should not install Node or npm.
 - Windows 10 or later for the signed installer or Store/MSIX path.
 - A recent Linux distribution for the AppImage or package.
 
-A local filesystem path for the Enigma vault bundle is created during first run. No database, provider credential, cloud credential, npm publishing token, package registry account, or hosted Enigma account is required for the default desktop path.
+A local filesystem path for Memory Drive storage is created during first run. No database, provider credential, cloud credential, npm publishing token, package registry account, or hosted Enigma account is required for the default desktop path.
 
 ## Advanced path: install with npm
 

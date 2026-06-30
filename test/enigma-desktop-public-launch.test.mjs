@@ -519,10 +519,12 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
 });
 
 test('public website explains consumer install path without unsupported claims', async () => {
-  const [home, download, setup, vaultNotReady, websiteStyles, help, launchStatus, installGuide, macosInstall, windowsInstall, connectApps, claudeConnect, cursorConnect, otherClients, troubleshooting, clientNotDetected, removalGuide, faq, developerCli, readme, installAnywhere, clientConnectors, developerEcosystem, publicApiReference, onboardingUx, qaSmokeScenarios, codeSigningSetup, productionReadinessStatus] = await Promise.all([
+  const [home, download, setup, privacy, proofs, vaultNotReady, websiteStyles, help, launchStatus, installGuide, macosInstall, windowsInstall, connectApps, claudeConnect, cursorConnect, otherClients, troubleshooting, clientNotDetected, removalGuide, faq, developerCli, readme, installAnywhere, clientConnectors, developerEcosystem, publicApiReference, onboardingUx, qaSmokeScenarios, codeSigningSetup, productionReadinessStatus] = await Promise.all([
     readWebsiteFile('index.html'),
     readWebsiteFile('download.html'),
     readWebsiteFile('setup.html'),
+    readWebsiteFile('privacy.html'),
+    readWebsiteFile('proofs.html'),
     readWebsiteFile('help/troubleshooting/vault-not-ready.html'),
     readWebsiteFile('styles.css'),
     readWebsiteFile('help/index.html'),
@@ -555,9 +557,10 @@ test('public website explains consumer install path without unsupported claims',
     readFile(new URL('../docs/proof-network-demo-video-script.md', import.meta.url), 'utf8'),
     readFile(new URL('../docs/proof-network-launch-plan.md', import.meta.url), 'utf8'),
   ])).join('\n');
-  const publicWebsite = `${home}\n${download}\n${setup}\n${vaultNotReady}\n${help}\n${launchStatus}\n${installGuide}\n${macosInstall}\n${windowsInstall}\n${connectApps}\n${claudeConnect}\n${cursorConnect}\n${otherClients}\n${troubleshooting}\n${clientNotDetected}\n${removalGuide}\n${faq}`;
+  const publicWebsite = `${home}\n${download}\n${setup}\n${privacy}\n${proofs}\n${vaultNotReady}\n${help}\n${launchStatus}\n${installGuide}\n${macosInstall}\n${windowsInstall}\n${connectApps}\n${claudeConnect}\n${cursorConnect}\n${otherClients}\n${troubleshooting}\n${clientNotDetected}\n${removalGuide}\n${faq}`;
   const funnelSpec = `${publicWebsite}\n${onboardingUx}`;
   const vaultBeforeAdvanced = vaultNotReady.slice(0, vaultNotReady.indexOf('Advanced command-line repair'));
+  const installAnywhereDefault = installAnywhere.slice(0, installAnywhere.indexOf('## Advanced path: install with npm'));
 
   assert.match(home, /Check installer status/);
   assert.doesNotMatch(home, /Download the desktop app/);
@@ -586,6 +589,7 @@ test('public website explains consumer install path without unsupported claims',
   assert.match(readme, /enigma quickstart --bundle "\$ENIGMA_BUNDLE_FILE"/);
   assert.match(readme, /enigma claude-mcpb package --plain/);
   assert.doesNotMatch(installAnywhere, /setup --client auto --connect-installed --overwrite/);
+  assert.doesNotMatch(installAnywhereDefault, /canonical vault|local vault|vault bundle|Enigma-controlled local app location/i);
   assert.match(installAnywhere, /enigma quickstart --bundle \.\/\.enigma\/bundle\.json/);
   assert.match(installAnywhere, /enigma claude-mcpb package --plain/);
   assert.doesNotMatch(clientConnectors, /setup --client auto --connect-installed --overwrite/);
