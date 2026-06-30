@@ -326,7 +326,7 @@ export function renderMemoryDriveDashboard(state = createDesktopState()) {
   const serviceStatus = normalizePublicStatus(state.desktopService?.status, ['stopped', 'starting', 'running', 'repair-needed', 'error'], 'stopped');
   const healthStatus = normalizePublicStatus(state.desktopHealth?.status, ['needs-setup', 'checking', 'healthy', 'fix-needed', 'error'], 'needs-setup');
   const proofStatus = normalizePublicStatus(state.proofActivity?.status || state.verifier?.status, ['idle', 'checking', 'checked', 'error', 'needs-review'], 'idle');
-  const updateStatus = normalizePublicStatus(state.desktopUpdate?.status, ['unknown', 'checking', 'current', 'available', 'installing', 'ready', 'error'], 'unknown');
+  const updateStatus = normalizePublicStatus(state.desktopUpdate?.status, ['unknown', 'checking', 'current', 'available', 'blocked_unsigned', 'installing', 'ready', 'error'], 'unknown');
   const diagnosticsStatus = normalizePublicStatus(state.desktopDiagnostics?.status, ['not-run', 'running', 'ready', 'needs-review', 'error'], 'not-run');
   const supportReport = renderSupportReportModel(state.desktopDiagnostics);
   const supportReportReady = supportReport.support_report_ready;
@@ -1013,7 +1013,7 @@ function updateDesktopUpdateStatusState(state, action) {
     activeScreen: 'home',
     desktopUpdate: {
       ...state.desktopUpdate,
-      status: normalizePublicStatus(update.status, ['unknown', 'checking', 'current', 'available', 'installing', 'ready', 'error'], state.desktopUpdate.status),
+      status: normalizePublicStatus(update.status, ['unknown', 'checking', 'current', 'available', 'blocked_unsigned', 'installing', 'ready', 'error'], state.desktopUpdate.status),
       version: safePublicString(update.version, state.desktopUpdate.version, 32),
       checked_at: now,
       issue_codes: normalizeIssueCodes(update.issue_codes ?? update.issueCodes)

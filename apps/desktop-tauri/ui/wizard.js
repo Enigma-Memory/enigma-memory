@@ -1164,7 +1164,8 @@ function renderDashboard() {
   const serviceRunning = serviceStatus?.running;
   const localEngineStatus = serviceRunning ? 'Ready' : 'Needs start';
   const updateStatus = update?.status || 'unknown';
-  const updateAvailable = update?.available_version && update.available_version !== update.current_version;
+  const updateAvailable = updateStatus === 'available';
+  const updateBlockedUnsigned = updateStatus === 'blocked_unsigned';
   const crashEnabled = crashReporting.status?.enabled ?? false;
   const crashPending = crashReporting.status?.pending_count ?? 0;
   const memoryDriveStatus = normalizeMemoryDriveStatus(health.memory_drive_status);
@@ -1227,7 +1228,8 @@ function renderDashboard() {
       <h2>Update check</h2>
       <p>Current version: ${escapeHtml(update?.current_version || '0.1.19')}</p>
       <p>Available version: ${escapeHtml(update?.available_version || 'unknown')}
-        ${updateAvailable ? ` <span class="status-pill warning">Update available</span>` : ''}</p>
+        ${updateAvailable ? ` <span class="status-pill warning">Update available</span>` : ''}${updateBlockedUnsigned ? ` <span class="status-pill warning">Unsigned update blocked</span>` : ''}</p>
+      ${updateBlockedUnsigned ? '<p class="note">Enigma will not install this update until a signed manifest is available.</p>' : ''}
       <div class="button-row">
         ${primaryButton('Check for updates', 'check-update')}
       </div>
@@ -1802,7 +1804,7 @@ async function handleAction(event) {
       health.update_status = update.status;
       busy = false;
       render();
-      setStatus(update.status === 'available' ? 'An update is available.' : 'App is up to date.');
+      setStatus(update.status === 'available' ? 'An update is available.' : update.status === 'blocked_unsigned' ? 'Update blocked until a signed manifest is available.' : 'App is up to date.');
       return;
     }
     case 'toggle-crash-reporting': {

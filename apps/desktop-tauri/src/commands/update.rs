@@ -41,11 +41,8 @@ pub async fn check_update(state: tauri::State<'_, AppState>) -> Result<Value, St
         .to_string();
 
     let signature_present = manifest.get("signature").is_some();
-    let status = if available_version == *current_version {
-        "current"
-    } else {
-        "available"
-    };
+    let status = update_status(current_version, &available_version, signature_present);
+    let requires_signed_manifest = available_version != *current_version && !signature_present;
 
     Ok(json!({
         "status": status,
@@ -53,24 +50,29 @@ pub async fn check_update(state: tauri::State<'_, AppState>) -> Result<Value, St
         "available_version": available_version,
         "manifest_url": manifest_url,
         "signature_present": signature_present,
+        "requires_signed_manifest": requires_signed_manifest,
         "notes": manifest.get("notes").and_then(|v| v.as_str()).unwrap_or("")
     }))
 }
 
+fn update_status(current: &str, available: &str, signature_present: bool) -> &'static str {
+    if available == current {
+        "current"
+    } else if signature_present {
+        "available"
+    } else {
+        "blocked_unsigned"
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use super::update_status;
 
     #[test]
-    fn current_version_comparison() {
-        assert_eq!("current", compare_versions("0.1.18", "0.1.18"));
-        assert_eq!("available", compare_versions("0.1.18", "0.1.19"));
-    }
-
-    fn compare_versions(current: &str, available: &str) -> &'static str {
-        if available == current {
-            "current"
-        } else {
-            "available"
-        }
+    fn update_status_requires_signed_newer_manifest() {
+        assert_eq!("current", update_status("0.1.18", "0.1.18", false));
+        assert_eq!("available", update_status("0.1.18", "0.1.19", true));
+        assert_eq!("blocked_unsigned", update_status("0.1.18", "0.1.19", false));
     }
 }
