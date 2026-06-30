@@ -210,7 +210,7 @@ test('CLI import plain output summarizes preview without raw content or paths', 
   assert.match(stdout, /^Enigma import\n/);
   assert.match(stdout, /Decision: ready_for_import/);
   assert.match(stdout, /Candidates: 1/);
-  assert.match(stdout, /Vault write: not performed/);
+  assert.match(stdout, /Memory Drive write: not performed/);
   assert.match(stdout, /Boundary: local import preview\/write only/);
   assert.doesNotMatch(stdout, /^\s*\{/);
   assert.equal(stdout.includes(note), false);
@@ -285,7 +285,7 @@ test('CLI text import with write-vault returns sanitized batch receipt', async (
   assert.match(rollbackPlain.stdout(), /Requested writes: 1/);
   assert.match(rollbackPlain.stdout(), /Skipped: 1/);
   assert.match(rollbackPlain.stdout(), /Source report: <import-report-file>/);
-  assert.match(rollbackPlain.stdout(), /Boundary: local Enigma vault tombstones only/);
+  assert.match(rollbackPlain.stdout(), /Boundary: local Memory Drive tombstones only/);
   assert.doesNotMatch(rollbackPlain.stdout(), /^\s*\{/);
   assert.equal(rollbackPlain.stdout().includes(note), false);
   assert.equal(rollbackPlain.stdout().includes(dir), false);

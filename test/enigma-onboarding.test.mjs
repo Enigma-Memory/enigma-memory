@@ -128,6 +128,10 @@ test('root help starts with non-overwrite setup, Claude extension package, and d
   assert.match(installCommands, /enigma claude-mcpb package --plain/);
   assert.match(installCommands, /enigma connect cursor --bundle \.\/\.enigma\/bundle\.json --dry-run/);
   assert.doesNotMatch(installCommands, /connect claude-desktop/);
+  assert.match(JSON.stringify(usage.connector_options), /Memory Drive bundle/);
+  assert.match(JSON.stringify(usage.memory_drive_health.options), /Memory Drive bundle to inspect/);
+  assert.match(JSON.stringify(usage.import_options), /selected Memory Drive bundle/);
+  assert.doesNotMatch(JSON.stringify(usage), /vault bundle|Local Enigma vault|Vault write|Vault writes/);
 });
 
 test('setup fails closed when an artifact already exists', async () => {

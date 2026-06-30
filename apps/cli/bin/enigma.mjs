@@ -2437,7 +2437,7 @@ function renderCapsuleImportPlain(result) {
   const lines = [
     'Enigma capsule import',
     `Status: ${result.ok ? 'Ready' : 'Needs attention'}`,
-    `Vault writes: ${Array.isArray(result.vault_writes) ? result.vault_writes.length : result.vault_write_count ?? 0}`,
+    `Memory Drive writes: ${Array.isArray(result.vault_writes) ? result.vault_writes.length : result.vault_write_count ?? 0}`,
     `Limitations: ${Array.isArray(result.limitations) && result.limitations.length ? result.limitations.join(', ') : 'none'}`,
   ];
   if (result.bundle_written) lines.push('Memory Drive: updated');
@@ -2649,7 +2649,7 @@ function renderImportPlain(preview) {
     `Decision: ${preview.import_decision ?? 'unknown'}`,
     `Candidates: ${preview.candidate_count ?? 0}`,
     `Duplicates: ${preview.counts?.dedupe?.duplicate_group_count ?? preview.preview_receipt?.duplicate_group_count ?? 0}`,
-    `Vault write: ${preview.vault_write_performed ? 'performed' : 'not performed'}`,
+    `Memory Drive write: ${preview.vault_write_performed ? 'performed' : 'not performed'}`,
   ];
   if (preview.raw_report_written) lines.push('Report: written to <out>');
   if (preview.import_batch_receipt?.schema) lines.push(`Batch receipt: ${preview.import_batch_receipt.write_count ?? 0} write(s)`);
@@ -2672,7 +2672,7 @@ function renderImportRollbackPlain(receipt) {
     `Skipped: ${receipt.skipped_count ?? 0}`,
     'Source report: <import-report-file>',
   ];
-  lines.push('Boundary: local Enigma vault tombstones only; no raw memory, local paths, provider deletion, model behavior, or hosted service claims.');
+  lines.push('Boundary: local Memory Drive tombstones only; no raw memory, local paths, provider deletion, model behavior, or hosted service claims.');
   return `${lines.join('\n')}\n`;
 }
 
@@ -4779,7 +4779,7 @@ function usage() {
       'drive health',
     ],
     connector_options: {
-      '--bundle <path>': 'Absolute local Enigma vault bundle path rendered as ENIGMA_BUNDLE.',
+      '--bundle <path>': 'Absolute local Enigma Memory Drive bundle path rendered as ENIGMA_BUNDLE.',
       '--config <path>': 'Client MCP JSON config path to read/write.',
       '--server-name <name>': 'MCP server key; defaults to enigma.',
       '--mcp-command <command>': 'Command rendered in MCP config; defaults to enigma-mcp. Alias: --command.',
@@ -4983,7 +4983,7 @@ function usage() {
       schema: 'enigma.memory_drive_health_report.v1',
       output_shape: 'SMART-style report: overall_status/overall_score, ten metrics (freshness, duplicate_rate, tombstone_risk, stale_derived_artifacts, retrieval_hit_rate, token_reduction, leakage_scan, receipt_coverage, connector_health, sync_fork_risk), each with status/score/observed/thresholds/evidence_refs/recommended_actions, plus roots, privacy_boundaries, claim_boundaries, and a conservative proof_network_ready block.',
       options: {
-        '--bundle <path>': 'Local Enigma vault bundle to inspect. Defaults to .enigma/bundle.json.',
+        '--bundle <path>': 'Local Enigma Memory Drive bundle to inspect. Defaults to .enigma/bundle.json.',
         '--now <iso>': 'ISO-8601 timestamp used for age calculations. Defaults to a deterministic timestamp.',
         '--benchmark-summary <path>': 'Optional JSON file with public-safe retrieval probes (probe_count, top_k, hit_at_k, exact_coverage, abstention_correctness). Omit to default gracefully.',
         '--connector-summary <path>': 'Optional JSON file with public-safe connector health (connector_count, healthy_connector_count, lagging_connector_count, error_rate_24h, cursor_gap_count). Omit to default gracefully.',
@@ -5000,8 +5000,8 @@ function usage() {
       '--out <path>': 'Write the raw local import report for capsule export or review. CLI stdout remains a public-safe preview.',
       'enigma capsule export --file <raw-import-report.json> --out <capsule.json> --plain': 'Export a path-redacted, claim-bounded capsule summary while writing the local capsule file.',
       'enigma capsule import --file <capsule.json> --plain': 'Verify an import capsule and print a path-redacted summary without writing to the Memory Drive unless --write-vault is present.',
-      '--write-vault': 'Explicitly write accepted importer candidates into the selected local bundle.',
-      '--bundle <path>': 'Bundle JSON to write when --write-vault is present. Defaults to .enigma/bundle.json.',
+      '--write-vault': 'Explicitly write accepted importer candidates into the selected Memory Drive bundle.',
+      '--bundle <path>': 'Memory Drive bundle JSON to write when --write-vault is present. Defaults to .enigma/bundle.json.',
       '--plain': 'Print a human-readable import or rollback summary instead of JSON. Alias: --text or --format text.',
     },
     relay_gateway_options: {
@@ -5011,7 +5011,7 @@ function usage() {
       '--once': 'Start, report the listening address, persist state when configured, then close.',
     },
     connector_options: {
-      'enigma connect <client> --bundle <path>': 'Plan or write local MCP client config for the selected app.',
+      'enigma connect <client> --bundle <path>': 'Plan or write local MCP client config for the selected app using the selected Memory Drive bundle.',
       'enigma disconnect <client>': 'Plan or write local removal of the Enigma MCP entry from the selected app config.',
       '--dry-run': 'Preview config changes without writing files.',
       '--mcp-command <command>': 'MCP server command to write. Defaults to enigma-mcp; GUI apps may need an absolute path.',
