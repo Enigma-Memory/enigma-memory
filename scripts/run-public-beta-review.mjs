@@ -133,7 +133,7 @@ export function renderPublicBetaReviewPlain(result) {
     `Evidence files used: ${result.evidence_files_used}`,
     `Generated support dry-runs: ${result.generated_evidence_files ?? 0}`,
     `Generated clean-machine plan: ${result.generated_plan_files ?? 0}`,
-    'Templates: npm run public-beta:evidence-templates -- --out-dir .enigma/public-beta --plain',
+    `Templates: ${result.template_command ?? 'npm run public-beta:evidence-templates -- --out-dir .enigma/public-beta --plain'}`,
     '',
     renderPublicBetaQaPlain(result.matrix).trim(),
     'Boundary: one-command local review only; no PR approval, merge, npm publication, signed installer, hosted service, provider deletion, model behavior, benchmark superiority, token ROI, compliance, upload, or network claims.',
@@ -147,10 +147,16 @@ export async function runPublicBetaReview(options = {}) {
   const manifestPath = `${normalizedOutDir}/evidence-manifest.json`;
   const matrixPath = `${normalizedOutDir}/qa-matrix.json`;
   const supportDryRunPaths = generatedSupportDryRunPaths(normalizedOutDir);
+  const repositoryRelativeOutDir = isRepositoryRelativePath(normalizedOutDir);
   const cleanMachineSmokePlanPath = joinPathLabel(normalizedOutDir, 'clean-machine-smoke-plan.json');
   const manifest = buildPublicBetaEvidenceManifest({
     out: manifestPath,
-    supportDryRun: isRepositoryRelativePath(normalizedOutDir) ? supportDryRunPaths : undefined,
+    cleanMachineSmoke: repositoryRelativeOutDir ? joinPathLabel(normalizedOutDir, 'clean-machine-smoke.json') : undefined,
+    cleanMachineSmokePlan: repositoryRelativeOutDir ? cleanMachineSmokePlanPath : undefined,
+    supportDryRun: repositoryRelativeOutDir ? supportDryRunPaths : undefined,
+    registryInstall: repositoryRelativeOutDir ? joinPathLabel(normalizedOutDir, 'registry-install.json') : undefined,
+    desktopReleaseEvidence: repositoryRelativeOutDir ? joinPathLabel(normalizedOutDir, 'desktop-release-evidence.json') : undefined,
+    productionHandoffPacket: repositoryRelativeOutDir ? joinPathLabel(normalizedOutDir, 'production-handoff-packet.json') : undefined,
   });
 
   await mkdir(resolve(outDir), { recursive: true });
@@ -159,12 +165,15 @@ export async function runPublicBetaReview(options = {}) {
   await writeFile(resolve(cleanMachineSmokePlanPath), `${JSON.stringify(buildCleanMachineSmokePlan(), null, 2)}\n`, 'utf8');
   await writeFile(resolve(manifestPath), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
 
-  const manifestEvidenceOptions = isRepositoryRelativePath(normalizedOutDir) ? await existingEvidenceOptionsFromManifest(manifest) : { supportDryRun: [] };
+  const manifestEvidenceOptions = repositoryRelativeOutDir ? await existingEvidenceOptionsFromManifest(manifest) : { supportDryRun: [] };
   const evidenceOptions = {
     ...manifestEvidenceOptions,
     supportDryRun: uniqueList([...(manifestEvidenceOptions.supportDryRun || []), ...supportDryRunPaths]),
   };
-  const matrix = await buildPublicBetaQaMatrix(evidenceOptions);
+  const matrixOptions = repositoryRelativeOutDir
+    ? { evidenceManifest: manifestPath }
+    : evidenceOptions;
+  const matrix = await buildPublicBetaQaMatrix(matrixOptions);
   const evidenceFilesUsed = [
     evidenceOptions.cleanMachineSmoke,
     evidenceOptions.registryInstall,
@@ -184,6 +193,7 @@ export async function runPublicBetaReview(options = {}) {
     generated_evidence_files: supportDryRunPaths.length,
     generated_plan_files: 1,
     generated_evidence_items: ['EV-P10-SUPPORT-DRY-RUN-SUMMARY'],
+    template_command: `npm run public-beta:evidence-templates -- --out-dir ${repositoryRelativeOutDir ? normalizedOutDir : DEFAULT_OUT_DIR} --plain`,
     matrix,
     safety: {
       release_action_performed: false,

@@ -59,6 +59,25 @@ test('public beta review writes generated support dry-run evidence and keeps ext
   }
 });
 
+test('public beta review aligns template and advisor commands with relative out-dir', async () => {
+  const dir = `.enigma/public-beta-review-relative-${process.pid}-${Date.now()}`;
+  try {
+    const result = await runPublicBetaReview({ outDir: dir });
+    const plain = renderPublicBetaReviewPlain(result);
+    assert.equal(result.template_command, `npm run public-beta:evidence-templates -- --out-dir ${dir} --plain`);
+    assert.equal(result.matrix.evidence_manifest, `${dir}/evidence-manifest.json`);
+    assert.equal(result.matrix.next_actions.find((action) => action.action_id === 'approve_merge_release_pr').collect_next.target_file, `${dir}/production-handoff-packet.json`);
+    assert.equal(result.matrix.next_actions.find((action) => action.action_id === 'publish_npm_0_1_19').collect_next.target_file, `${dir}/registry-install.json`);
+    assert.match(plain, new RegExp(`Templates: npm run public-beta:evidence-templates -- --out-dir ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} --plain`));
+    assert.match(plain, new RegExp(`Collect: npm run public-beta:evidence-manifest -- --out ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/evidence-manifest\\.json --plain`));
+    assert.match(plain, new RegExp(`Review: npm run public-beta:advisor -- --evidence-manifest ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/evidence-manifest\\.json`));
+    assert.match(plain, new RegExp(`Collect next: approve_merge_release_pr .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/production-handoff-packet\\.json`));
+    assert.match(plain, new RegExp(`Collect next: publish_npm_0_1_19 .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/registry-install\\.json`));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('public beta review plain output is bounded and path-redacted', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'enigma-public-beta-review-'));
   try {
