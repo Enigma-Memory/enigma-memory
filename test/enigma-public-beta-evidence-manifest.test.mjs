@@ -39,6 +39,16 @@ test('public beta evidence manifest defaults to relative public-safe artifact la
   assert.equal(manifest.evidence_collection[4].target_file, '.enigma/public-beta/production-handoff-packet.json');
   assert.match(manifest.evidence_collection[3].collect, /signature\.status verified/);
   assert.match(manifest.evidence_collection[3].collect, /update_rollback pass/);
+  assert.deepEqual(manifest.next_actions.map((action) => action.id), [
+    'review_clean_machine_plan',
+    'record_clean_machine_smoke',
+    'record_support_dry_runs',
+    'record_registry_install_after_publish',
+    'record_desktop_release_evidence',
+    'record_production_handoff_approval',
+  ]);
+  assert.equal(manifest.next_actions.find((action) => action.id === 'record_support_dry_runs').target_file.length, 2);
+  assert.equal(manifest.next_actions.find((action) => action.id === 'record_production_handoff_approval').target_file, '.enigma/public-beta/production-handoff-packet.json');
   assert.equal(manifest.safety.embeds_artifact_contents, false);
   assert.equal(manifest.safety.performs_release_action, false);
   assert.match(manifest.claim_boundary, /does not prove artifacts exist/);
@@ -80,6 +90,8 @@ test('public beta evidence manifest CLI writes JSON and plain output without loc
     assert.match(stdout, /Status: Path manifest ready; evidence still must be collected/);
     assert.match(stdout, /Collect next: EV-P10-CLEAN-MACHINE-SMOKE into \.enigma\/public-beta\/clean-machine-smoke\.json: clean-machine smoke JSON after fresh install, first-run, connector, proof, offline, diagnostics, and uninstall checks/);
     assert.match(stdout, /Collect next: EV-P10-PRODUCTION-HANDOFF-PACKET into \.enigma\/public-beta\/production-handoff-packet\.json: release PR ref or URL, reviewer approval ref, merge ref, public-safe release packet approval ref, approval date, and handoff status/);
+    assert.match(stdout, /Next action: review_clean_machine_plan into \.enigma\/public-beta\/clean-machine-smoke-plan\.json: Review the dry-run clean-machine plan before touching the test machine\./);
+    assert.match(stdout, /Next action: record_support_dry_runs into \.enigma\/public-beta\/support-dry-run-diagnostics\.json, \.enigma\/public-beta\/support-dry-run-crash\.json: Replace support dry-run templates with observed diagnostics\/crash triage and privacy-review results\./);
     assert.match(stdout, /Boundary: path-only manifest/);
     assert.doesNotMatch(stdout, /^\s*\{/);
     assert.equal(stdout.includes(dir), false);
