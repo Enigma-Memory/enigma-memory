@@ -10,9 +10,33 @@ const execFile = promisify(execFileCallback);
 const PROJECT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const COMMAND_TIMEOUT_MS = 120_000;
 const SCHEMA = 'enigma.local_pack_install_smoke.v1';
+const PUBLIC_EXPORT_SPECIFIERS = Object.freeze([
+  'enigma-memory',
+  'enigma-memory/adapters',
+  'enigma-memory/boundary',
+  'enigma-memory/connectors',
+  'enigma-memory/controller',
+  'enigma-memory/core',
+  'enigma-memory/desktop',
+  'enigma-memory/desktop/tray',
+  'enigma-memory/enterprise',
+  'enigma-memory/gateway',
+  'enigma-memory/hosted-cloud',
+  'enigma-memory/importers',
+  'enigma-memory/mcp-server',
+  'enigma-memory/mesh',
+  'enigma-memory/metering',
+  'enigma-memory/optimizer',
+  'enigma-memory/passport',
+  'enigma-memory/proof-network',
+  'enigma-memory/relay',
+  'enigma-memory/settlement',
+  'enigma-memory/storage',
+  'enigma-memory/vault',
+]);
 
 function usage() {
-  return `Usage: node scripts/verify-local-pack-install.mjs [--plain|--json]\n\nPacks the local source package into a temporary tarball, installs that tarball into a temporary npm prefix, runs installed package entrypoints and npm bin shims, then removes the temp directory. No npm publish, npm token, global install, registry install, signing, upload, or network action is performed.\n`;
+  return `Usage: node scripts/verify-local-pack-install.mjs [--plain|--json]\n\nPacks the local source package into a temporary tarball, installs that tarball into a temporary npm prefix with scripts ignored, optional dependencies omitted, and npm offline mode enabled, then runs installed package entrypoints, npm bin shims, and public package exports before removing the temp directory. No npm publish, npm token, global install, registry install, signing, upload, or network action is performed.\n`;
 }
 
 function npmInvocation(args) {
@@ -217,6 +241,39 @@ async function installedMcpStdioSmoke(prefix, tempDir) {
   };
 }
 
+async function installedPackageExports(prefix) {
+  const specifiersJson = JSON.stringify(PUBLIC_EXPORT_SPECIFIERS);
+  const source = `
+    const specifiers = ${specifiersJson};
+    const checks = [];
+    for (const specifier of specifiers) {
+      const module = await import(specifier);
+      const exportedNames = Object.keys(module).sort();
+      checks.push({
+        specifier,
+        export_count: exportedNames.length,
+        sample_exports: exportedNames.slice(0, 8),
+      });
+    }
+    console.log(JSON.stringify({
+      schema: 'enigma.local_pack_exports_smoke.v1',
+      ok: true,
+      specifier_count: specifiers.length,
+      checks,
+      optional_dependencies_required: false,
+    }));
+  `;
+  const result = await run(process.execPath, ['--input-type=module', '--eval', source], { cwd: prefix });
+  assertNoSecretOutput(`${result.stdout}\n${result.stderr}`, 'installed package exports');
+  if (!result.ok) throw new Error(`installed package export smoke failed with status ${result.status}: ${redactLocalPath(result.stderr || result.stdout)}`);
+  const evidence = parseJsonPayload(result.stdout);
+  return {
+    kind: 'package_exports',
+    specifier_count: evidence.specifier_count,
+    evidence,
+  };
+}
+
 export async function runLocalPackInstallSmoke(now = new Date()) {
   const tempDir = await mkdtemp(join(tmpdir(), 'enigma-local-pack-install-'));
   try {
@@ -232,7 +289,7 @@ export async function runLocalPackInstallSmoke(now = new Date()) {
     await access(tarballPath);
 
     const prefix = join(tempDir, 'prefix');
-    const install = npmInvocation(['install', '--prefix', prefix, '--ignore-scripts', tarballPath]);
+    const install = npmInvocation(['install', '--prefix', prefix, '--ignore-scripts', '--omit=optional', '--offline', tarballPath]);
     const installResult = await run(install.command, install.args, { cwd: tempDir });
     assertNoSecretOutput(`${installResult.stdout}\n${installResult.stderr}`, 'npm install local tarball');
     if (!installResult.ok) throw new Error(`npm install local tarball failed with status ${installResult.status}: ${redactLocalPath(installResult.stderr || installResult.stdout)}`);
@@ -254,6 +311,8 @@ export async function runLocalPackInstallSmoke(now = new Date()) {
     binShimChecks.push(await installedBinShim(prefix, 'enigma-gateway', ['--help'], (stdout) => summarizeCommandHelp(stdout, 'enigma-gateway [demo|serve] [options]', ['demo', 'serve'])));
     binShimChecks.push(await installedBinShim(prefix, 'enigma-native-host', ['--help'], (stdout) => summarizeHelp(stdout, 'enigma-native-host')));
 
+    const exportChecks = await installedPackageExports(prefix);
+
     return {
       schema: SCHEMA,
       generated_at: now.toISOString(),
@@ -264,15 +323,18 @@ export async function runLocalPackInstallSmoke(now = new Date()) {
         tarball: basename(filename),
       },
       install: {
-        command: 'npm install --prefix <temp-prefix> --ignore-scripts <local-tarball>',
+        command: 'npm install --prefix <temp-prefix> --ignore-scripts --omit=optional --offline <local-tarball>',
         global_install: false,
         registry_install: false,
         npm_publish: false,
         npm_token_required: false,
         scripts_ignored: true,
+        optional_dependencies_omitted: true,
+        offline_mode: true,
       },
       checks,
       bin_shim_checks: binShimChecks,
+      export_checks: exportChecks,
       safety: {
         temp_dir_removed: true,
         local_paths_included: false,
@@ -295,6 +357,7 @@ export function renderLocalPackInstallSmokePlain(report) {
     `Install: ${report.install?.command ?? '<unknown>'}`,
     `Checks: ${Array.isArray(report.checks) ? report.checks.length : 0}`,
     `Bin shims: ${Array.isArray(report.bin_shim_checks) ? report.bin_shim_checks.length : 0}`,
+    `Package exports: ${report.export_checks?.specifier_count ?? 0}`,
   ];
   for (const check of Array.isArray(report.checks) ? report.checks : []) {
     lines.push(`Check: ${check.entrypoint}`);
@@ -302,6 +365,7 @@ export function renderLocalPackInstallSmokePlain(report) {
   for (const check of Array.isArray(report.bin_shim_checks) ? report.bin_shim_checks : []) {
     lines.push(`Bin shim: ${check.bin}`);
   }
+  if (report.export_checks?.specifier_count) lines.push(`Export specifiers: ${report.export_checks.specifier_count}`);
   lines.push('Boundary: local temp-prefix install smoke only; no npm publish, token, global install, signing, hosted service, provider behavior, benchmark, token ROI, or compliance claim.');
   return `${lines.join('\n')}\n`;
 }

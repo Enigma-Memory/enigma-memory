@@ -18,7 +18,9 @@ test('local packed install smoke installs tarball into temp prefix only', async 
   assert.equal(report.install.registry_install, false);
   assert.equal(report.install.npm_publish, false);
   assert.equal(report.install.npm_token_required, false);
-  assert.equal(report.install.command, 'npm install --prefix <temp-prefix> --ignore-scripts <local-tarball>');
+  assert.equal(report.install.command, 'npm install --prefix <temp-prefix> --ignore-scripts --omit=optional --offline <local-tarball>');
+  assert.equal(report.install.optional_dependencies_omitted, true);
+  assert.equal(report.install.offline_mode, true);
   assert.deepEqual(report.checks.map((check) => check.entrypoint), [
     'apps/cli/bin/enigma.mjs',
     'apps/cli/bin/enigma.mjs',
@@ -45,8 +47,15 @@ test('local packed install smoke installs tarball into temp prefix only', async 
   ]);
   assert.equal(report.bin_shim_checks[1].evidence.schema, 'enigma.test_drive.v1');
   assert.equal(report.bin_shim_checks[1].evidence.writes_performed, false);
+  assert.equal(report.export_checks.kind, 'package_exports');
+  assert.equal(report.export_checks.evidence.schema, 'enigma.local_pack_exports_smoke.v1');
+  assert.equal(report.export_checks.evidence.optional_dependencies_required, false);
+  assert.equal(report.export_checks.specifier_count, 22);
+  assert.equal(report.export_checks.evidence.checks.some((check) => check.specifier === 'enigma-memory/connectors' && check.export_count > 0), true);
   assert.match(plain, /Bin shims: 6/);
   assert.match(plain, /Bin shim: enigma-native-host/);
+  assert.match(plain, /Package exports: 22/);
+  assert.match(plain, /Export specifiers: 22/);
   assert.equal(report.checks[1].evidence.writes_performed, false);
   assert.match(plain, /local temp-prefix install smoke only/);
   assert.doesNotMatch(serialized, /C:\\Users|[A-Za-z]:\\\\|AppData\\\\Local|file:\/\/\/|\/tmp\/enigma|\/home\/[^"',]+|npm_[A-Za-z0-9]{8,}|ghp_|sk-[A-Za-z0-9]{8,}/i);
