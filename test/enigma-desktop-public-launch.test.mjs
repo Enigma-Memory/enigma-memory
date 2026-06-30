@@ -870,9 +870,11 @@ test('public website explains consumer install path without unsupported claims',
   assert.doesNotMatch(launchStatus, /Azure|Artifact Signing|free\/trial\/sponsored|eligible paid subscription|Public Trust|repository custody path/i);
   assert.match(launchStatus, /project-dashboard\.html/);
   assert.match(projectDashboard, /What is live, what is built, and what still blocks public use/);
-  assert.match(projectDashboard, /public beta decision <strong>HOLD<\/strong>/);
+  assert.match(projectDashboard, /Public beta decision <strong>HOLD<\/strong>/);
   assert.match(projectDashboard, /npm latest observed as <code>0\.1\.18<\/code>/);
-  assert.match(projectDashboard, /PR head <code>c54f1f8<\/code>/);
+  assert.doesNotMatch(projectDashboard, /PR head <code>[0-9a-f]{7}<\/code>/);
+  assert.match(projectDashboard, /The PR branch is pushed to GitHub/);
+  assert.match(projectDashboard, /re-read on the current head before claiming pass/);
   assert.match(projectDashboard, /Consumer desktop app/);
   assert.match(projectDashboard, /Claude-first extension/);
   assert.match(projectDashboard, /Public beta evidence system/);
