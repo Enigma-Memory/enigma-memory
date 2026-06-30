@@ -100,11 +100,16 @@ fn signed_manifest_signature_present(manifest: &Value) -> bool {
 }
 
 fn payload_url_present(manifest: &Value) -> bool {
-    manifest_string(manifest, "url", "download_url").is_some_and(|url| !url.trim().is_empty())
+    manifest_string(manifest, "url", "download_url").is_some_and(is_https_url)
 }
 
 fn payload_hash_present(manifest: &Value) -> bool {
     manifest_string(manifest, "sha256", "payload_sha256").is_some_and(is_sha256_hex)
+}
+
+fn is_https_url(value: &str) -> bool {
+    let trimmed = value.trim();
+    trimmed.len() > "https://".len() && trimmed.starts_with("https://")
 }
 
 fn manifest_string<'a>(manifest: &'a Value, primary: &str, fallback: &str) -> Option<&'a str> {
@@ -199,6 +204,16 @@ mod tests {
         });
         assert!(payload_url_present(&fallback));
         assert!(payload_hash_present(&fallback));
+
+        let insecure = serde_json::json!({
+            "url": "http://downloads.enigmamemory.com/enigma.msi"
+        });
+        assert!(!payload_url_present(&insecure));
+
+        let local_file = serde_json::json!({
+            "download_url": "file:///tmp/enigma.msi"
+        });
+        assert!(!payload_url_present(&local_file));
 
         let malformed = serde_json::json!({
             "signature": "",
