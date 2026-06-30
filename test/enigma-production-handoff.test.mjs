@@ -125,6 +125,8 @@ test('production handoff packet summarizes current blockers without secrets', as
   assert.equal(packet.operator_acceptance.blocker_breakdown.manifest, 2);
   assert.equal(packet.operator_acceptance.blocker_breakdown.release_audit, 2);
   assert.equal(packet.hosted_probe_worker.schema, 'enigma.hosted_probe_worker_bundle.v1');
+  assert.equal(packet.public_safe_release_packet_approval.status, 'pending');
+  assert.equal(packet.public_safe_release_packet_approval.release_packet_ref, null);
   assert.equal(packet.hosted_probe_worker.ok, true);
   assert.deepEqual(packet.hosted_probe_worker.default_routes, ['/livez', '/readyz']);
   assert.equal(packet.hosted_probe_worker.mutates_cloudflare, false);
@@ -167,6 +169,7 @@ test('production handoff plain output is readable and claim-bounded', async () =
   assert.match(plain, /Blockers: /);
   assert.match(plain, /Next: /);
   assert.match(plain, /Boundary: public-safe production handoff summary only/);
+  assert.match(plain, /Public-safe packet approval: pending/);
   assert.doesNotMatch(plain, /^\s*\{/);
   assert.doesNotMatch(plain, /cf-token-present|Bearer|PRIVATE KEY|sk-|raw_memory|C:\\Users\\|\/home\/|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/i);
 });
@@ -278,6 +281,13 @@ test('production handoff can mark go-live ready only with release audit evidence
     infrastructureReadiness: readyInfrastructure(),
     operatorAcceptancePacket,
     releaseAudit: readyReleaseAudit(),
+    publicSafeReleasePacketApproval: {
+      status: 'approved',
+      release_packet_ref: 'ref:evidence:public-safe-release-packet',
+      claim_boundary_reviewer_ref: 'ref:review:claim-boundary',
+      approval_ref: 'ref:approval:public-beta-release',
+      approved_at: '2026-06-30',
+    },
   }, {
     env: {
       CLOUDFLARE_API_TOKEN: 'cf-token-present-but-never-printed',
@@ -291,6 +301,8 @@ test('production handoff can mark go-live ready only with release audit evidence
   assert.equal(packet.infrastructure.hosted_live_ready, true);
   assert.equal(packet.release_audit.ok, true);
   assert.equal(packet.release_audit.required_failed_count, 0);
+  assert.equal(packet.public_safe_release_packet_approval.status, 'approved');
+  assert.equal(packet.public_safe_release_packet_approval.approval_ref, 'ref:approval:public-beta-release');
   assert.ok(packet.release_audit.gate_names.includes('whitepaper-claims-validator'));
   const actionIds = packet.next_actions.map((item) => item.id).join('\n');
   assert.doesNotMatch(actionIds, /provision-hosted-backend|generate-operator-evidence-starter|complete-operator-acceptance|final-release-audit/);
