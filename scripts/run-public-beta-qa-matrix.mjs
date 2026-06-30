@@ -224,7 +224,11 @@ const NEXT_ACTION_ORDER = Object.freeze([
     collect_next: {
       evidence_item_id: 'EV-P10-SUPPORT-DRY-RUN-SUMMARY',
       manifest_field: 'support_dry_run',
-      target_file: '.enigma/public-beta/support-dry-run-<scenario>.json',
+      target_file: '.enigma/public-beta/support-dry-run-diagnostics.json',
+      default_target_files: [
+        '.enigma/public-beta/support-dry-run-diagnostics.json',
+        '.enigma/public-beta/support-dry-run-crash.json',
+      ],
       collect: 'preset-generated public-safe summary (`--preset diagnostics` or `--preset crash`) with observed triage result, observed privacy-check status, privacy_scan.status=pass, zero private findings, and optional redacted support-artifact snapshot',
     },
   },
@@ -239,15 +243,39 @@ function publicRelativeEvidenceTarget(value) {
   return normalized;
 }
 
+function supportDryRunPresetForTarget(targetFile) {
+  const normalized = String(targetFile ?? '').toLowerCase();
+  if (normalized.includes('crash')) return 'crash';
+  if (normalized.includes('diagnostic') || normalized.includes('diag')) return 'diagnostics';
+  return null;
+}
+
+function supportDryRunCollectCommand(targetFile) {
+  const safeTarget = publicRelativeEvidenceTarget(targetFile);
+  const preset = supportDryRunPresetForTarget(safeTarget);
+  return preset
+    ? `npm run production:support-dry-run -- --preset ${preset} --triage-result <observed-result> --bundle-privacy-check-status <observed-status> --out ${safeTarget}`
+    : null;
+}
+
+function collectCommandsForTargets(collectNext, targetFiles) {
+  if (collectNext?.manifest_field !== 'support_dry_run') return [];
+  return targetFiles.map((targetFile) => supportDryRunCollectCommand(targetFile));
+}
+
+
 function collectTargetsForField(collectNext, evidenceTargets = {}) {
   if (!collectNext?.manifest_field) return collectNext?.target_file ? [collectNext.target_file] : [];
+  const fallbackTargets = Array.isArray(collectNext.default_target_files) && collectNext.default_target_files.length > 0
+    ? collectNext.default_target_files
+    : [collectNext.target_file].filter(Boolean);
   const value = evidenceTargets[collectNext.manifest_field];
   if (Array.isArray(value)) {
     const targets = value.map((item) => publicRelativeEvidenceTarget(item)).filter(Boolean);
-    return targets.length > 0 ? targets : [collectNext.target_file].filter(Boolean);
+    return targets.length > 0 ? targets : fallbackTargets;
   }
-  const target = publicRelativeEvidenceTarget(value) ?? collectNext.target_file;
-  return target ? [target] : [];
+  const target = publicRelativeEvidenceTarget(value);
+  return target ? [target] : fallbackTargets;
 }
 
 function collectTargetForField(collectNext, evidenceTargets = {}) {
@@ -257,11 +285,25 @@ function collectTargetForField(collectNext, evidenceTargets = {}) {
 function resolveCollectNext(collectNext, evidenceTargets = {}) {
   if (!collectNext) return null;
   const targetFiles = collectTargetsForField(collectNext, evidenceTargets);
+  const collectCommands = collectCommandsForTargets(collectNext, targetFiles);
   return {
     ...collectNext,
     target_file: targetFiles[0] ?? null,
     ...(targetFiles.length > 1 ? { target_files: targetFiles } : {}),
+    ...(collectCommands.some(Boolean) ? { collect_commands: collectCommands } : {}),
   };
+}
+
+function appendCollectNextLines(lines, prefix, action) {
+  if (!action.collect_next?.collect) return;
+  const targetFiles = Array.isArray(action.collect_next.target_files) && action.collect_next.target_files.length > 0
+    ? action.collect_next.target_files
+    : [action.collect_next.target_file].filter(Boolean);
+  const collectCommands = Array.isArray(action.collect_next.collect_commands) ? action.collect_next.collect_commands : [];
+  for (const [index, targetFile] of targetFiles.entries()) {
+    lines.push(`${prefix}: ${action.action_id} — ${action.collect_next.evidence_item_id} into ${targetFile}: ${action.collect_next.collect}`);
+    if (collectCommands[index]) lines.push(`Run: ${collectCommands[index]}`);
+  }
 }
 
 
@@ -1005,12 +1047,7 @@ export function renderPublicBetaQaPlain(report) {
   const actions = Array.isArray(report.next_actions) ? report.next_actions.slice(0, 5) : [];
   for (const action of actions) {
     lines.push(`Next: ${action.action_id} — ${action.summary}`);
-    if (action.collect_next?.collect) {
-      const targetFiles = Array.isArray(action.collect_next.target_files) && action.collect_next.target_files.length > 0
-        ? action.collect_next.target_files
-        : [action.collect_next.target_file].filter(Boolean);
-      for (const targetFile of targetFiles) lines.push(`Collect next: ${action.action_id} — ${action.collect_next.evidence_item_id} into ${targetFile}: ${action.collect_next.collect}`);
-    }
+    appendCollectNextLines(lines, 'Collect next', action);
   }
   const internalEvidenceActions = (Array.isArray(report.next_actions) ? report.next_actions : [])
     .filter((action) => action.owner_ref === 'ref:role:qa-owner' || action.owner_ref === 'ref:role:beta-support');
@@ -1018,12 +1055,7 @@ export function renderPublicBetaQaPlain(report) {
     lines.push('Internal QA/support evidence to collect now:');
     for (const action of internalEvidenceActions) {
       lines.push(`Internal: ${action.action_id} — ${action.summary}`);
-      if (action.collect_next?.collect) {
-        const targetFiles = Array.isArray(action.collect_next.target_files) && action.collect_next.target_files.length > 0
-          ? action.collect_next.target_files
-          : [action.collect_next.target_file].filter(Boolean);
-        for (const targetFile of targetFiles) lines.push(`Collect internal: ${action.action_id} — ${action.collect_next.evidence_item_id} into ${targetFile}: ${action.collect_next.collect}`);
-      }
+      appendCollectNextLines(lines, 'Collect internal', action);
     }
   }
   const patchableEvidence = (Array.isArray(report.next_actions) ? report.next_actions : [])

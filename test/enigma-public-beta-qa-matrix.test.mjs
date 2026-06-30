@@ -234,12 +234,18 @@ test('public beta advisor collect-next paths follow relative evidence manifest t
     assert.equal(matrix.next_actions.find((action) => action.action_id === 'complete_signing_identities').collect_next.target_file, `${dir}/desktop-release-evidence.json`);
     assert.equal(matrix.next_actions.find((action) => action.action_id === 'record_support_dry_run').collect_next.target_file, `${dir}/support-dry-run-diagnostics.json`);
     assert.deepEqual(matrix.next_actions.find((action) => action.action_id === 'record_support_dry_run').collect_next.target_files, [`${dir}/support-dry-run-diagnostics.json`, `${dir}/support-dry-run-crash.json`]);
+    assert.deepEqual(matrix.next_actions.find((action) => action.action_id === 'record_support_dry_run').collect_next.collect_commands, [
+      `npm run production:support-dry-run -- --preset diagnostics --triage-result <observed-result> --bundle-privacy-check-status <observed-status> --out ${dir}/support-dry-run-diagnostics.json`,
+      `npm run production:support-dry-run -- --preset crash --triage-result <observed-result> --bundle-privacy-check-status <observed-status> --out ${dir}/support-dry-run-crash.json`,
+    ]);
     assert.match(plain, new RegExp(`Collect next: approve_merge_release_pr .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/production-handoff-packet\\.json`));
     assert.match(plain, new RegExp(`Collect next: publish_npm_0_1_19 .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/registry-install\\.json`));
     assert.match(plain, new RegExp(`Collect: npm run public-beta:evidence-manifest -- --out ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/evidence-manifest\\.json --plain`));
     assert.match(plain, new RegExp(`Collect internal: run_clean_machine_qa .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/clean-machine-smoke\\.json`));
     assert.match(plain, new RegExp(`Collect internal: record_support_dry_run .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/support-dry-run-diagnostics\\.json`));
     assert.match(plain, new RegExp(`Collect internal: record_support_dry_run .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/support-dry-run-crash\\.json`));
+    assert.ok(plain.includes(`Run: npm run production:support-dry-run -- --preset diagnostics --triage-result <observed-result> --bundle-privacy-check-status <observed-status> --out ${dir}/support-dry-run-diagnostics.json`));
+    assert.ok(plain.includes(`Run: npm run production:support-dry-run -- --preset crash --triage-result <observed-result> --bundle-privacy-check-status <observed-status> --out ${dir}/support-dry-run-crash.json`));
     assert.match(plain, new RegExp(`Review: npm run public-beta:advisor -- --evidence-manifest ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/evidence-manifest\\.json`));
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -264,6 +270,7 @@ test('public beta QA plain output is readable, bounded, and non-JSON', async () 
   assert.match(plain, /Collect internal: run_clean_machine_qa — EV-P10-CLEAN-MACHINE-SMOKE into \.enigma\/public-beta\/clean-machine-smoke\.json/);
   assert.match(plain, /Internal: record_support_dry_run/);
   assert.match(plain, /Collect internal: record_support_dry_run — EV-P10-SUPPORT-DRY-RUN-SUMMARY into \.enigma\/public-beta\/support-dry-run/);
+  assert.match(plain, /Run: npm run production:support-dry-run -- --preset diagnostics --triage-result <observed-result> --bundle-privacy-check-status <observed-status> --out \.enigma\/public-beta\/support-dry-run-diagnostics\.json/);
   assert.match(plain, /privacy_scan\.status=pass, zero private findings/);
   assert.match(plain, /Patchable evidence:/);
   assert.match(plain, /Evidence: record_support_dry_run — EV-P10-SUPPORT-DRY-RUN-SUMMARY/);
@@ -638,7 +645,11 @@ test('public beta next actions are ranked and public-safe', async () => {
   assert.equal(matrix.next_actions.some((action) => action.action_id === 'record_support_dry_run'), true);
   const supportAction = matrix.next_actions.find((action) => action.action_id === 'record_support_dry_run');
   assert.equal(supportAction.missing_evidence_items[0].evidence_item_id, 'EV-P10-SUPPORT-DRY-RUN-SUMMARY');
-  assert.equal(Array.isArray(supportAction.collect_next.target_files), false);
+  assert.deepEqual(supportAction.collect_next.target_files, ['.enigma/public-beta/support-dry-run-diagnostics.json', '.enigma/public-beta/support-dry-run-crash.json']);
+  assert.deepEqual(supportAction.collect_next.collect_commands, [
+    'npm run production:support-dry-run -- --preset diagnostics --triage-result <observed-result> --bundle-privacy-check-status <observed-status> --out .enigma/public-beta/support-dry-run-diagnostics.json',
+    'npm run production:support-dry-run -- --preset crash --triage-result <observed-result> --bundle-privacy-check-status <observed-status> --out .enigma/public-beta/support-dry-run-crash.json',
+  ]);
   const internalOwners = matrix.next_actions
     .filter((action) => action.owner_ref === 'ref:role:qa-owner' || action.owner_ref === 'ref:role:beta-support')
     .map((action) => action.action_id);
