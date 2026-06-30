@@ -41,7 +41,7 @@ The Advisor can block phase promotion on any missing or failed item below:
 - missing clean-machine or scenario evidence;
 - privacy leak in screenshots, public copy, support diagnostics, proof/export artifacts, examples, or evidence packets;
 - default path requiring terminal, npm, Node, source checkout, provider key, cloud account, manual MCP JSON, or raw file-path navigation;
-- unsafe update, unsigned/unverified artifact, wrong-channel/downgrade acceptance, or update failure that can corrupt app/vault/connector state;
+- unsafe update, unsigned/unverified artifact, wrong-channel/downgrade acceptance, or update failure that can corrupt app, Memory Drive, or connector state;
 - unsupported claim, especially provider deletion, provider-native memory removal, model forgetting, hosted SaaS/BYOC readiness, compliance certification, benchmark superiority, legal/patent conclusion, Solana/on-chain submission, or tamper-proof/private-forever language without exact evidence;
 - absent rollback, backup, uninstall, support owner, release owner, or signing custody owner.
 
@@ -64,7 +64,7 @@ The Advisor owns governance, not implementation.
 
 The eight launch directions are one public path, not eight competing launches:
 
-1. **Consumer desktop app** — signed Windows/macOS desktop app with bundled runtime, local Memory Drive creation, typed app actions, local health, signed update, and vault-preserving uninstall.
+1. **Consumer desktop app** — signed Windows/macOS desktop app with bundled runtime, local Memory Drive creation, typed app actions, local health, signed update, and Memory-Drive-preserving uninstall.
 2. **Claude-first `.mcpb`** — Claude Desktop is the first low-friction connector path when validated; manual MCP JSON remains advanced/fallback only.
 3. **Website/download funnel** — public website leads with signed desktop download, setup guide, privacy/proof explainers, help center, and developer appendix only as secondary navigation.
 4. **Memory Drive dashboard** — default home answers whether the local Memory Drive is ready, which apps are connected, what needs review, and the one next fix-it action.
@@ -110,7 +110,7 @@ The Advisor budgets friction by the default user journey, not by internal ease o
 | Import | Optional after setup; paste/drop curated memory list; preview, quarantine, dedupe, explicit import. | Import is mandatory during first run or auto-writes provider transcript-derived candidates. |
 | Proof | Proof Activity explains local Enigma evidence and limitations; export gated by privacy scan. | Green “verified” state comes from shape/schema checks alone, or proof copy implies provider-side effects. |
 | Support | User can preview/delete/export safe diagnostics; support asks only for safe fields. | Support macro asks for raw logs, memory text, screenshots with private data, absolute paths, complete configs, or provider responses. |
-| Update/rollback | Signed update, channel separation, failed-update recovery, vault preservation. | Update can corrupt app/vault/config, accepts wrong channel, or has no rollback rehearsal. |
+| Update/rollback | Signed update, channel separation, failed-update recovery, Memory Drive preservation. | Update can corrupt app/Memory Drive/config, accepts wrong channel, or has no rollback rehearsal. |
 
 ### Friction budget labels
 
@@ -184,7 +184,7 @@ The Advisor owns this allowlist and must version changes before use:
 - app name, app version, release channel, build hash/ref, artifact hash, artifact size, release date;
 - OS family/version bucket and architecture bucket;
 - installer/update signing status, signer display name, notarization/staple status, update manifest hash, update signature verification result;
-- Memory Drive friendly label, vault lifecycle state, schema/version, storage status bucket, lock/service state;
+- Memory Drive friendly label, Memory Drive lifecycle state, schema/version, storage status bucket, lock/service state;
 - connector app label, connector status, permission/grant status, restart-needed flag, backup/rollback status, support code;
 - dashboard status domain, severity, issue code, one primary action ID, last-checked time bucket;
 - import source type, file type bucket, candidate counts, duplicate counts, quarantine counts, batch ID/ref, receipt hashes/refs, source limitations;
@@ -249,7 +249,7 @@ Purpose: prove the proposed user experience can be safe, understandable, and rec
 - [ ] One primary action per default screen, with advanced details behind disclosure. **Block** if the default screen leads with logs, schemas, hashes, raw paths, command lines, MCP JSON, or protocol terms.
 - [ ] Failure states are designed before happy-path approval: missing app, unsupported client, permission denied, corrupted config, offline, update failed, export blocked, import quarantined, verifier inconclusive. **Block** if failure states are absent.
 - [ ] Every blocking state has one fix-it action or safe support handoff with support code. **Block** if the user must guess or contact support with private data.
-- [ ] Consent preview exists before connector writes, imports, destructive vault actions, diagnostics sharing, telemetry/crash upload, proof export, or update install. **Block** if consent is implicit.
+- [ ] Consent preview exists before connector writes, imports, destructive Memory Drive actions, diagnostics sharing, telemetry/crash upload, proof export, or update install. **Block** if consent is implicit.
 - [ ] Backup/rollback/undo is visible where user state can change. **Block** if write/update/import actions have no user-understandable recovery.
 - [ ] Public/export view model uses the Advisor allowlist. **Block** if design depends on raw logs, raw memory, raw provider data, complete configs, or local absolute paths.
 - [ ] Copy has “what this proves / does not prove” for proof, import, Memory Controller, and privacy surfaces. **Block** if users can reasonably infer provider-side deletion/forgetting or legal/compliance effect.
@@ -268,7 +268,7 @@ Purpose: prove the implementation follows the governed contract before evidence 
 - [ ] Import parser uses local-only file/paste intake, extension/type/size limits, ZIP/path traversal protections where applicable, preview before write, quarantine, dedupe, and batch undo. **Block** if provider transcript-derived candidates auto-write.
 - [ ] Proof viewer distinguishes shape/schema inspection from verifier-backed status. **Block** if a green verified state can come from shape checks alone.
 - [ ] Diagnostics/proof/import/release exporters use allowlisted projections and fail closed on forbidden fields. **Block** if exporter reads raw logs/state directly.
-- [ ] Updates verify signed manifest and payload, reject wrong channel/downgrade, preserve vault/connectors, and fail safely. **Block** on unsafe update behavior.
+- [ ] Updates verify signed manifest and payload, reject wrong channel/downgrade, preserve Memory Drive/connectors, and fail safely. **Block** on unsafe update behavior.
 - [ ] Default uninstall keeps Memory Drive data/backups unless explicit destructive removal is separately chosen. **Block** if normal uninstall silently removes user memory.
 - [ ] Support codes are stable and emitted for expected blocker classes. **Hold** if support cannot triage expected failures from safe fields.
 
@@ -281,7 +281,7 @@ Purpose: prove the feature/release works in the environments and scenarios claim
 - [ ] Public-safe evidence packet includes artifact refs/hashes, version/channel, OS bucket, signer/notarization/update verification where relevant, support owner, known limitations, and decision. **Block** if required fields are absent.
 - [ ] Privacy scan passes on screenshots, diagnostic bundles, proof exports, import receipts, support macros, and evidence packets. **Block** on fail or inconclusive scan for shared artifacts.
 - [ ] Required beta scenarios pass before public beta: `BETA-INSTALL-001`, `BETA-FIRST-001`, `BETA-CLIENT-001`, `BETA-CLIENT-002`, `BETA-CLIENT-003`, `BETA-PROOF-001`, `BETA-OFFLINE-001`, `BETA-CONFIG-001`, `BETA-CONFIG-002`, `BETA-DIAG-001`, `BETA-CRASH-001`. **Block** if any selected-platform beta scenario fails.
-- [ ] Required GA scenarios pass before GA: beta scenarios plus update, uninstall, rollback, reconnect, offline, corrupted-config recovery, partial uninstall, failed update, crash recovery, vault retention, and telemetry controls across every supported OS/version/channel. **Block** if any claimed GA platform lacks evidence.
+- [ ] Required GA scenarios pass before GA: beta scenarios plus update, uninstall, rollback, reconnect, offline, corrupted-config recovery, partial uninstall, failed update, crash recovery, Memory Drive retention, and telemetry controls across every supported OS/version/channel. **Block** if any claimed GA platform lacks evidence.
 - [ ] Rollback/undo rehearsal evidence exists for connector writes, imports, updates, uninstall/reinstall, and release pull/pause. **Block** if rollback is untested.
 - [ ] Support dry run proves expected issue classes can be triaged without private data. **Block** if support needs raw logs, memory, screenshots, configs, provider responses, account IDs, or paths.
 - [ ] Known limitations are public-safe and reflected in copy. **Hold** if limitations are hidden or contradicted by marketing copy.
@@ -307,8 +307,8 @@ Purpose: decide whether a candidate can reach public beta, GA, or must roll back
 - [ ] Windows distribution path is selected and evidence matches the claim: Store/MSIX, signed direct installer, or bounded beta fallback with honest SmartScreen observations. **Block** if Windows artifact trust is missing or overstated.
 - [ ] macOS artifact is Developer ID signed, hardened runtime where applicable, notarized, and stapled for the claimed channel. **Block** if Gatekeeper bypass is required for the default GA path.
 - [ ] Every surfaced binary/helper/runtime/updater is signed as required by the platform. **Block** on unsigned bundled runtime/helper in public candidate.
-- [ ] Update manifest/payload verification, channel separation, downgrade/wrong-channel rejection, and failed-update rollback are proven. **Block** if update can strand users or corrupt vault/connectors.
-- [ ] Vault retention across update, uninstall, reinstall, and rollback is proven. **Block** if normal uninstall or failed update can silently lose user memory.
+- [ ] Update manifest/payload verification, channel separation, downgrade/wrong-channel rejection, and failed-update rollback are proven. **Block** if update can strand users or corrupt Memory Drive/connectors.
+- [ ] Memory Drive retention across update, uninstall, reinstall, and rollback is proven. **Block** if normal uninstall or failed update can silently lose user memory.
 - [ ] Public-safe evidence packet is complete and approved. **Block** if evidence packet leaks forbidden fields or lacks ship/hold/rollback decision.
 - [ ] Release, support, signing custody, and emergency rollback owners are named. **Block** if any owner is absent.
 - [ ] Support playbooks cover installer warnings, first-run stuck, connector failure, proof/export confusion, import quarantine, update failure, uninstall/reinstall, and privacy concern. **Block** if support cannot handle expected classes safely.
@@ -334,7 +334,7 @@ Any one item below forces `hold` or `rollback`:
 
 - SmartScreen/Gatekeeper/install trust friction is unbounded or requires bypass-first instructions for the target beta audience.
 - Any screenshot, diagnostic bundle, proof export, import receipt, support macro, public evidence packet, or release artifact leaks forbidden fields.
-- Update path is unsigned, unverified, channel-confused, downgrade-accepting, or can corrupt app/vault/connectors on failure.
+- Update path is unsigned, unverified, channel-confused, downgrade-accepting, or can corrupt app/Memory Drive/connectors on failure.
 - Connector writes can overwrite unrelated settings, lack backup/rollback, or report connected before observable user confirmation/health evidence.
 - Default path requires terminal, npm, Node, source checkout, manual MCP JSON, provider keys, cloud account, or raw filesystem navigation.
 - Public copy claims provider deletion, provider-native memory removal, model forgetting, hosted SaaS/BYOC readiness, compliance certification, benchmark superiority, legal/patent conclusion, chain submission, or tamper-proof/private-forever status without exact evidence.
@@ -428,7 +428,7 @@ Support diagnostics and intake are approved only when:
 
 | Direction | Advisor must verify | Automatic hold/rollback trigger |
 | --- | --- | --- |
-| Desktop app | Signed installer, bundled runtime, typed app commands, current-user local service, vault retention, offline local views, safe uninstall. | User needs Node/npm/terminal; sidecar/helper unsigned; vault lost on normal uninstall; UI builds shell strings from input. |
+| Desktop app | Signed installer, bundled runtime, typed app commands, current-user local service, Memory Drive retention, offline local views, safe uninstall. | User needs Node/npm/terminal; sidecar/helper unsigned; Memory Drive lost on normal uninstall; UI builds shell strings from input. |
 | Claude `.mcpb` | MCPB/extension path removes JSON and dependency setup; version/health state is precise; fallback config path is advanced and reversible. | “Opened bundle” is claimed as installed/connected; unverified runtime compatibility; fallback JSON writes lack backup/rollback. |
 | Website/download | One primary desktop download CTA; artifact status honest; developer paths secondary; proof/privacy boundaries clear. | Unsigned/unavailable artifact presented as ready; homepage leads with npm/CLI/proof-network; bypass-first install guidance. |
 | Dashboard | User can see readiness and one next fix; safe activity only; no health score overclaim; support summary safe. | Dashboard exposes logs/raw paths/private data or forces technical triage. |

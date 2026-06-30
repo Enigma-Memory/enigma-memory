@@ -35,7 +35,7 @@ The user must not be asked to install Node.js, run `npm install -g`, paste shell
 Screen copy should be short and consumer-safe:
 
 - **Welcome to Enigma Memory**
-- **Your memory vault is stored on this computer.**
+- **Your Memory Drive is stored on this computer.**
 - **Connect supported AI apps when you are ready.**
 - Primary button: **Set up Enigma Memory**
 - Secondary link: **Advanced CLI options**
@@ -51,18 +51,18 @@ Default behavior:
 - Put advanced path details behind **Show technical location**.
 - Never print an expanded personal filesystem path in public logs, screenshots, telemetry, or release evidence.
 
-Planned vault roots:
+Planned Memory Drive roots:
 
-- Windows: app data directory resolved by the OS/Tauri path API, with vault data under `Enigma Memory/vault`.
-- macOS: Application Support directory resolved by the OS/Tauri path API, with vault data under `Enigma Memory/vault`.
-- Linux later: XDG data directory resolved by the OS/Tauri path API, with vault data under `enigma-memory/vault`.
+- Windows: app data directory resolved by the OS/Tauri path API, with Memory Drive data under `Enigma Memory/memory-drive`.
+- macOS: Application Support directory resolved by the OS/Tauri path API, with Memory Drive data under `Enigma Memory/memory-drive`.
+- Linux later: XDG data directory resolved by the OS/Tauri path API, with Memory Drive data under `enigma-memory/memory-drive`.
 
-Vault rules:
+Memory Drive rules:
 
 - The app owns schema initialization, migrations, lock files, and health metadata.
-- Uninstall must not delete the vault by default.
-- A destructive vault removal action must be separate, explicit, and require typed confirmation.
-- Vault location changes are advanced settings, not first-run requirements.
+- Uninstall must not delete the Memory Drive by default.
+- A destructive Memory Drive removal action must be separate, explicit, and require typed confirmation.
+- Memory Drive location changes are advanced settings, not first-run requirements.
 
 ### 4. Client detection
 
@@ -114,7 +114,7 @@ Use Tauri as the public desktop shell because it keeps the UI native-feeling and
 Deliverables:
 
 - `apps/desktop-tauri` or equivalent desktop app package.
-- Tauri command bridge for setup, health, update, vault, and client connection operations.
+- Tauri command bridge for setup, health, update, Memory Drive, and client connection operations.
 - Minimal UI with welcome, setup wizard, dashboard, settings, update, diagnostics, and CLI handoff screens.
 - Deep links or safe app intents for support actions where useful.
 - OS permission prompts routed through the app, not through terminal scripts.
@@ -133,12 +133,12 @@ Preferred implementation:
 
 - Package the existing Enigma engine as an internal sidecar/runtime artifact.
 - Bundle the required runtime with the app.
-- Expose a stable local control API to the Tauri shell for setup, health, vault lifecycle, MCP connection, diagnostics, and shutdown.
+- Expose a stable local control API to the Tauri shell for setup, health, Memory Drive lifecycle, MCP connection, diagnostics, and shutdown.
 - Keep the public CLI available as a power-user binary inside the app bundle or install image, but do not require it for setup.
 
 Runtime acceptance:
 
-- Fresh consumer machine with no Node.js installed can install, launch, initialize vault, connect a supported client, run health checks, and update.
+- Fresh consumer machine with no Node.js installed can install, launch, initialize Memory Drive, connect a supported client, run health checks, and update.
 - The UI never instructs the default user to run `npm install -g enigma-memory`.
 - The UI never requires JSON editing for supported automatic client paths.
 
@@ -149,7 +149,7 @@ Use a supervised local process model:
 - Tauri app is the user-facing controller.
 - Enigma local service is a child sidecar process or OS-managed helper started by the app.
 - Service exposes a localhost or OS IPC control channel restricted to the current user.
-- Service owns vault access, client connector operations, and health checks.
+- Service owns Memory Drive access, client connector operations, and health checks.
 - Tauri shell owns user prompts, permissions, update UX, and support-safe diagnostics.
 
 Required service behavior:
@@ -167,11 +167,11 @@ Background behavior:
 - Optional later setting: launch at login / tray mode after explicit opt-in.
 - No hidden always-on daemon by default.
 
-### Filesystem and vault layout
+### Filesystem and Memory Drive layout
 
 Planned local layout under the OS-resolved app data directory:
 
-- `vault/` — durable local memory vault, retained on uninstall.
+- `memory-drive/` — durable local Memory Drive, retained on uninstall.
 - `state/` — app state, onboarding completion, health summaries.
 - `logs/` — local logs with redaction and rotation.
 - `backups/client-config/` — local backups of client config files before app-managed edits.
@@ -180,8 +180,8 @@ Planned local layout under the OS-resolved app data directory:
 
 Rules:
 
-- Vault data is non-destructive across app updates and normal uninstall.
-- App state can be reset without deleting the vault.
+- Memory Drive data is non-destructive across app updates and normal uninstall.
+- App state can be reset without deleting the Memory Drive.
 - Diagnostic bundles must omit raw memory, prompts, transcripts, credentials, tokens, private keys, expanded personal paths, account IDs, and customer identifiers.
 - Client config backups are local-only and are not published in support artifacts unless explicitly redacted.
 
@@ -194,13 +194,13 @@ Deliverables:
 - Update manifest hosted on the public release channel.
 - Signed update artifacts for Windows and macOS.
 - UI states for checking, available, downloading, ready to restart, failed, and current.
-- Rollback-safe install flow that preserves vault data.
+- Rollback-safe install flow that preserves Memory Drive data.
 - Update notes that describe product changes without exposing private local data.
 
 Update rules:
 
 - Updates must verify artifact signature before install.
-- Failed update must leave the existing working app and vault intact.
+- Failed update must leave the existing working app and Memory Drive intact.
 - Update checks can fail offline without blocking local launch.
 - Mandatory security update policy can be designed later, but public launch should not brick offline local use.
 
@@ -252,7 +252,7 @@ Required for launch:
 - SmartScreen friction reduced through trusted signing and reputation-building release process.
 - App installs without Node.js, npm, Git, or developer tools.
 - App launches from Start Menu and desktop search.
-- Uninstall leaves the vault by default and explains retention.
+- Uninstall leaves the Memory Drive by default and explains retention.
 
 Acceptance:
 

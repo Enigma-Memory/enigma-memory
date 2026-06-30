@@ -10,7 +10,7 @@ CLI commands remain available for power users, but they are not part of the defa
 
 Default and support copy must stay inside these boundaries:
 
-- Enigma creates and manages a local private memory vault and local evidence about Enigma-controlled memory actions.
+- Enigma creates and manages a local Memory Drive and local evidence about Enigma-controlled memory actions.
 - Enigma does not claim that an AI provider deleted data, changed model weights, removed provider logs, or forgot information.
 - Enigma does not claim hosted SaaS, BYOC, compliance certification, benchmark leadership, legal conclusions, or patent conclusions.
 - Public-facing screenshots, docs, telemetry, support bundles, and proof examples must not include raw memory text, prompts, transcripts, completions, embeddings, local absolute paths, credentials, tokens, private keys, account IDs, customer identifiers, or provider response bodies.
@@ -100,7 +100,7 @@ The default download page must detect the operating system where possible and re
 - Import existing memory files.
 - Turn on advanced proof exports.
 - Open CLI setup notes.
-- Change vault location.
+- Change Memory Drive location.
 - Review technical connection details.
 
 ### Global wizard chrome
@@ -108,7 +108,7 @@ The default download page must detect the operating system where possible and re
 - Top-left: Enigma Memory app icon and name.
 - Top-right: "Need help?" link.
 - Progress text: "Step X of 6" and a plain-language label.
-- Footer secondary link: "Set up later" only on app connection screens, never on vault creation.
+- Footer secondary link: "Set up later" only on app connection screens, never on Memory Drive creation.
 - Primary button is always visually dominant and uses a verb.
 - Back button is text-only and disabled while a fix or write operation is running.
 
@@ -323,7 +323,7 @@ The default download page must detect the operating system where possible and re
 
 **Progress states:**
 
-- `Checking vault...`
+- `Checking Memory Drive...`
 - `Checking privacy guardrails...`
 - `Checking connected apps...`
 - `Checking memory search...`
@@ -395,7 +395,7 @@ The default download page must detect the operating system where possible and re
 ### Default dashboard sections
 
 1. **Memory Drive status**
-   - Copy: `Your private memory vault on this computer.`
+   - Copy: `Your Memory Drive on this computer.`
    - Primary action: `View health`
 2. **Connected apps**
    - Copy: `Apps that can ask Enigma for memory.`
@@ -694,7 +694,7 @@ No automated commands are required for this plan. Product validation should use 
 - Health check API that returns consumer-safe statuses and fix actions.
 - Support report generator with denylist scanning and preview UI.
 - Documentation screenshots that use synthetic, non-private sample data.
-- Support playbooks for permission failures, app conflicts, update issues, and vault recovery.
+- Support playbooks for permission failures, app conflicts, update issues, and Memory Drive recovery.
 
 ## Launch readiness checklist
 

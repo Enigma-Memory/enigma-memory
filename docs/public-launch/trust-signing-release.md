@@ -236,7 +236,7 @@ Required beta rehearsal coverage:
 - Health dashboard review for Memory Drive status, connector status, update status, and bounded evidence status.
 - Update rehearsal from an older beta build to a newer beta build, including signature verification, channel check, and failed-update recovery.
 - Rollback rehearsal using an approved signed rollback package or manifest.
-- Uninstall rehearsal that leaves user-controlled vault data only when explicitly documented and consented.
+- Uninstall rehearsal that leaves user-controlled Memory Drive data only when explicitly documented and consented.
 - Public evidence review confirming no raw memory, prompts, transcripts, credentials, tokens, private keys, account IDs, customer identifiers, or local absolute paths appear in logs, screenshots, manifests, or release notes.
 
 Required GA rehearsal coverage:
@@ -245,7 +245,7 @@ Required GA rehearsal coverage:
 - Verify stable-channel update behavior separately from beta and internal channels.
 - Verify certificate/key renewal calendar, revocation procedure, emergency signer access, and signing audit log ownership.
 
-- Verify support can reproduce and resolve install warning, connector setup failure, vault recovery, update failure, and uninstall issues using public-safe artifacts.
+- Verify support can reproduce and resolve install warning, connector setup failure, Memory Drive recovery, update failure, and uninstall issues using public-safe artifacts.
 - Verify npm package publication, if included in the release train, remains a separate trusted-publishing flow and does not require or store a long-lived npm publish token.
 
 ## Dependencies and owners

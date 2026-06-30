@@ -56,7 +56,7 @@
 | # | Item | Definition of ready | Evidence / artifact |
 | --- | --- | --- | --- |
 | 4.1 | **Command surface inventory** | All Tauri commands are listed with allowed inputs and returned data. | Command table. |
-| 4.2 | **Path sandboxing** | The app cannot read or write outside its designated vault and config directories. | Permission audit + tests. |
+| 4.2 | **Path sandboxing** | The app cannot read or write outside its designated Memory Drive and config directories. | Permission audit + tests. |
 | 4.3 | **Signed updates** | The updater verifies the signature of every downloaded manifest and payload before installation. | Update test + signature verification log. |
 | 4.4 | **Crash-report redaction** | Opt-in crash reports exclude memory, wallet data, local paths, and credentials. | Sample crash report review. |
 | 4.5 | **Connector safety** | Client connector backup/repair writes preserve JSON structure and cannot target arbitrary files. | Connector tests. |
@@ -72,7 +72,7 @@
 | 5.2 | **AES-256-GCM correctness** | IVs are 96-bit random/non-repeating, tags are verified on decrypt, and keys are 256-bit. | Code review + test vectors. |
 | 5.3 | **Key separation** | Encryption keys, signing keys, and API credentials are never reused across different purposes. | Key-usage matrix. |
 | 5.4 | **No fixed test keys in production** | Production builds cannot use the fixed test master entropy or all-zero salts. | Build-time assertion or env check. |
-| 5.5 | **Recovery documented** | Users can recover access to their vault through wallet recovery or passphrase if applicable, with clear limitations. | User-facing recovery doc. |
+| 5.5 | **Recovery documented** | Users can recover access to their Memory Drive through wallet recovery or passphrase if applicable, with clear limitations. | User-facing recovery doc. |
 | 5.6 | **Future migration path** | A plan exists to migrate from the current SQLite-backed keys to TEE/HSM/KMS storage without data loss. | Migration design note. |
 
 ---

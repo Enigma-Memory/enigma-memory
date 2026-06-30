@@ -67,7 +67,7 @@ The CLI remains the power-user engine. The public default is a Tauri desktop she
 | Operation | Write? | Consent required? | Public log rule |
 | --- | --- | --- | --- |
 | Detect installed clients | No | No | Client name/status only |
-| Preview connect/repair/disconnect | No | No | Redacted config and vault labels only |
+| Preview connect/repair/disconnect | No | No | Redacted config and Memory Drive labels only |
 | Connect | Yes | Yes | Change class and backup id only |
 | Disconnect | Yes | Yes | Change class and backup id only |
 | Repair | Usually yes | Yes when writing | Error class and fix class only |
@@ -92,7 +92,7 @@ The desktop app should expose one primary fix button per failure so users are no
 | Detected issue | Primary one-click fix | Preview before write | Rollback |
 | --- | --- | --- | --- |
 | Enigma entry missing for installed client | Connect Enigma | Add `mcpServers.enigma` or equivalent extension install | Restore prior config or remove extension |
-| Enigma entry points at stale vault | Update vault link | Update only Enigma's vault reference, shown as a redacted vault label | Restore prior Enigma entry |
+| Enigma entry points at stale Memory Drive | Update Memory Drive link | Update only Enigma's Memory Drive reference, shown as a redacted Memory Drive label | Restore prior Enigma entry |
 | Enigma command bridge stale | Repair connector bridge | Update only Enigma command/args/env fields | Restore prior Enigma entry |
 | Existing Enigma entry should be removed | Disconnect Enigma | Remove only Enigma's MCP server entry | Restore prior Enigma entry |
 | Config malformed | Restore last safe config | Restore backup id and affected client label | Restore previous backup when available |
@@ -268,7 +268,7 @@ Best consumer path: detect VS Code-compatible installs and write the Cline MCP c
 - Config malformed: restore backup or open file; no silent overwrite.
 - Permission denied: show workspace/profile permission guidance.
 - Restart needed: Reload Window guidance.
-- Bundle missing: vault repair flow.
+- Bundle missing: Memory Drive repair flow.
 
 #### Test
 
@@ -298,7 +298,7 @@ Best consumer path: detect Roo extension/app configuration and write the MCP ent
 
 - Missing config with Roo installed: offer Create Roo MCP config.
 - Malformed config: offer Restore backup or Open config.
-- Bundle missing: offer vault repair.
+- Bundle missing: offer Memory Drive repair.
 - Permission denied: show permission remediation.
 - Restart needed: show reload/restart action.
 
@@ -330,7 +330,7 @@ Best consumer path: semantic MCP config write from Enigma Desktop.
 
 - Missing client: show install guidance and Skip.
 - Config malformed: offer Restore backup or Open config.
-- Bundle missing: vault repair flow.
+- Bundle missing: Memory Drive repair flow.
 - Permission denied: explain write failure and Retry.
 - Restart needed: show restart/reload guidance.
 
@@ -348,7 +348,7 @@ Best consumer path: copyable or exportable MCP snippet for any client, plus opti
 
 1. User chooses Generic MCP.
 2. Enigma explains that this path is for MCP clients not detected by name.
-3. Show a redacted, copyable MCP server snippet with the Enigma command bridge and vault label.
+3. Show a redacted, copyable MCP server snippet with the Enigma command bridge and Memory Drive label.
 4. Offer two actions:
    - Copy instructions;
    - Choose a config file to update.
@@ -366,7 +366,7 @@ Best consumer path: copyable or exportable MCP snippet for any client, plus opti
 - Unknown config shape: explain unsupported shape and provide copyable snippet.
 - Malformed config: offer Restore Enigma backup if available or Open config.
 - Permission denied: show permission guidance.
-- Bundle missing: vault repair flow.
+- Bundle missing: Memory Drive repair flow.
 - Restart needed: generic restart guidance.
 
 #### Test

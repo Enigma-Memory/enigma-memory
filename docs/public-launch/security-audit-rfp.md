@@ -67,7 +67,7 @@ Before mainnet deployment and consumer launch, Enigma Memory seeks an external s
 
 **Specific checks required:**
 
-- Sidecar/command isolation: verify the Tauri command surface cannot be abused to execute arbitrary code or read outside the vault.
+- Sidecar/command isolation: verify the Tauri command surface cannot be abused to execute arbitrary code or read outside the Memory Drive.
 - Updater security and signature verification of signed manifests.
 - Local storage permissions and path sandboxing.
 - Crash-report redaction: confirm no memory, wallet, local paths, or credentials are included in opt-in reports.
