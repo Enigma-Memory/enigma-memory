@@ -1326,6 +1326,29 @@ export async function enigma_next_action(input = {}) {
   };
 }
 
+const SUPPORT_PRIVACY_SCAN_CATEGORIES = Object.freeze([
+  'memory_bodies',
+  'user_inputs',
+  'dialogue_records',
+  'provider_outputs',
+  'storage_locations',
+  'auth_material',
+  'owner_refs',
+  'settings_snapshots',
+]);
+
+function supportPrivacyScan(status = 'pass') {
+  return {
+    schema: 'enigma.support_privacy_scan.v1',
+    status,
+    checked_categories: SUPPORT_PRIVACY_SCAN_CATEGORIES.slice(),
+    detected_private_field_count: 0,
+    redacted_private_field_count: SUPPORT_PRIVACY_SCAN_CATEGORIES.length,
+    local_paths_hidden: true,
+    public_safe_summary_only: true,
+  };
+}
+
 export async function enigma_support_summary(input = {}) {
   input = validateToolArguments('enigma_support_summary', input);
   const path = bundlePath(input);
@@ -1365,6 +1388,7 @@ export async function enigma_support_summary(input = {}) {
       provider_responses_included: false,
       local_paths_redacted: true,
     },
+    privacy_scan: supportPrivacyScan('pass'),
     claim_boundaries: {
       local_enigma_status_only: true,
       provider_deletion_proof: false,

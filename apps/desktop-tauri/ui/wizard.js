@@ -414,6 +414,15 @@ async function mockInvoke(cmd, args = {}) {
           export_allowed: true,
           local_paths_denied: true,
           credentials_denied: true,
+          checked_categories: ['memory_bodies', 'user_inputs', 'dialogue_records', 'provider_outputs', 'storage_locations', 'auth_material', 'owner_refs', 'settings_snapshots', 'raw_logs'],
+          detected_private_field_count: 0,
+          redacted_private_field_count: 9,
+          tokens_denied: true,
+          private_keys_denied: true,
+          account_identifiers_denied: true,
+          customer_identifiers_denied: true,
+          raw_logs_denied: true,
+          complete_settings_denied: true,
         },
         export_allowed: true,
       };
@@ -429,6 +438,15 @@ async function mockInvoke(cmd, args = {}) {
           schema: 'enigma.desktop_public_export_privacy_scan.v1',
           status: 'pass',
           export_allowed: true,
+          checked_categories: ['memory_bodies', 'user_inputs', 'dialogue_records', 'provider_outputs', 'storage_locations', 'auth_material', 'owner_refs', 'settings_snapshots', 'raw_logs'],
+          detected_private_field_count: 0,
+          redacted_private_field_count: 9,
+          tokens_denied: true,
+          private_keys_denied: true,
+          account_identifiers_denied: true,
+          customer_identifiers_denied: true,
+          raw_logs_denied: true,
+          complete_settings_denied: true,
         },
         export_allowed: true,
       };
@@ -861,6 +879,8 @@ function publicExportScanStatus(surface = {}) {
   return {
     status,
     exportAllowed: scan.export_allowed === true || surface.export_allowed === true,
+    detectedCount: Number.isInteger(scan.detected_private_field_count) ? scan.detected_private_field_count : 0,
+    categoryCount: Array.isArray(scan.checked_categories) ? scan.checked_categories.length : 0,
   };
 }
 
@@ -883,6 +903,7 @@ function publicSupportClipboardText(summary = {}) {
   const setupState = summary.setup_status?.state || 'not_collected';
   const issueCodes = Array.isArray(summary.issue_codes) ? summary.issue_codes : [];
   const next = summary.next_action && typeof summary.next_action === 'object' ? summary.next_action : {};
+  const scan = publicExportScanStatus(summary);
   return [
     'Enigma support summary',
     `Support code: ${summary.support_code || '<not-collected>'}`,
@@ -890,7 +911,8 @@ function publicSupportClipboardText(summary = {}) {
     `Issue codes: ${issueCodes.length > 0 ? issueCodes.join(', ') : 'none'}`,
     `Next action: ${next.label || 'Collect support summary'}`,
     `Next command: ${next.command || '<none>'}`,
-    'Redaction: public-safe summary only; no raw memory, prompts, transcripts, credentials, provider responses, complete app settings, or local paths.',
+    `Privacy scan: ${scan.status} (${scan.detectedCount} finding(s), ${scan.categoryCount} categories checked)`,
+    'Redaction: public-safe summary only; no raw memory, prompts, transcripts, credentials, tokens, private keys, account identifiers, customer identifiers, raw logs, provider responses, complete app settings, or local paths.',
     'Boundary: local Enigma status only; no outside-provider changes, model behavior changes, hosted service readiness, benchmark, token ROI, or compliance claims.',
   ].join('\n');
 }
@@ -960,12 +982,13 @@ function renderSupportSummarySection() {
     <section class="dashboard-section support-summary" aria-labelledby="support-summary-title">
       <p class="eyebrow">Support summary</p>
       <h2 id="support-summary-title">Shareable status without private memory</h2>
-      <p>Collect a public-safe support summary with setup state, issue count, next action, and redaction flags. It never includes raw memory, prompts, transcripts, credentials, provider responses, or local paths.</p>
+      <p>Collect a public-safe support summary with setup state, issue count, next action, redaction flags, and privacy-scan status. It never includes raw memory, prompts, transcripts, credentials, tokens, private keys, account identifiers, customer identifiers, raw logs, provider responses, or local paths.</p>
       <div class="dashboard-grid">
         <div class="metric"><dt>Setup state</dt><dd>${escapeHtml(setupState)}</dd></div>
         <div class="metric"><dt>Issue codes</dt><dd>${escapeHtml(String(issueCount))}</dd></div>
         <div class="metric"><dt>Next action</dt><dd>${escapeHtml(nextLabel)}</dd></div>
         <div class="metric"><dt>Support code</dt><dd>${escapeHtml(supportCode)}</dd></div>
+        <div class="metric"><dt>Privacy scan</dt><dd>${escapeHtml(`${scan.status} · ${scan.detectedCount} finding(s)`)}</dd></div>
       </div>
       <p class="note">Local Enigma status only. Privacy scan: ${escapeHtml(scan.status)}. Summary sharing is explicit; Enigma does not claim outside-provider changes, model behavior changes, or hosted service readiness.</p>
       ${exported ? `<p class="note">Support summary export ready. File location is hidden in this view.</p>` : ''}

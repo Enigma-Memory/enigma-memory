@@ -549,6 +549,8 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
   assert.equal(supportMissing.result.schema, 'enigma.support_summary.v1');
   assert.equal(supportMissing.result.setup_state, 'setup_needed');
   assert.equal(supportMissing.result.redaction.raw_memory_included, false);
+  assert.equal(supportMissing.result.privacy_scan.schema, 'enigma.support_privacy_scan.v1');
+  assert.equal(supportMissing.result.privacy_scan.detected_private_field_count, 0);
   assert.doesNotMatch(JSON.stringify(supportMissing.response), new RegExp(dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.equal(emptyApproval.result.schema, 'enigma.import_approval_blocked.v1');
   assert.equal(emptyApproval.result.reason_code, 'empty_import');
@@ -643,6 +645,8 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
     assert.equal(supportSummary.result.setup_state, 'ready_for_app_connection');
     assert.equal(supportSummary.result.counts.active_memory_addresses, 2);
     assert.equal(supportSummary.result.redaction.provider_responses_included, false);
+    assert.equal(supportSummary.result.privacy_scan.status, 'pass');
+    assert.ok(supportSummary.result.privacy_scan.checked_categories.includes('provider_outputs'));
     assert.doesNotMatch(JSON.stringify(supportSummary.response), /network plaintext sentinel|approved mcp import private note/);
     assert.ok(context.result.memories.length >= 1);
     assert.ok(Array.isArray(context.result.retrieval_receipts ?? context.result.receipts));

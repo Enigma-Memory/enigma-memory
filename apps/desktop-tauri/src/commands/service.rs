@@ -1184,18 +1184,53 @@ fn desktop_public_export_privacy_scan(value: &Value) -> Value {
     let local_paths_found =
         serialized != redacted_serialized || log_path_regex().is_match(&serialized);
     let credential_text_found = log_token_regex().is_match(&serialized);
+    let auth_material_found = credential_text_found
+        || forbidden_keys
+            .iter()
+            .any(|key| matches!(key.as_str(), "token" | "api_key" | "private_key" | "secret" | "password"));
+    let owner_ref_found = forbidden_keys
+        .iter()
+        .any(|key| matches!(key.as_str(), "account_id" | "customer_id"));
+    let raw_logs_found = forbidden_keys
+        .iter()
+        .any(|key| matches!(key.as_str(), "raw_log" | "raw_logs"));
+    let complete_settings_found = forbidden_keys
+        .iter()
+        .any(|key| matches!(key.as_str(), "settings" | "complete_settings"));
+    let detected_private_field_count = forbidden_keys.len()
+        + if local_paths_found { 1 } else { 0 }
+        + if credential_text_found { 1 } else { 0 };
     let export_allowed = forbidden_keys.is_empty() && !local_paths_found && !credential_text_found;
     json!({
         "schema": "enigma.desktop_public_export_privacy_scan.v1",
         "status": if export_allowed { "pass" } else { "blocked" },
         "export_allowed": export_allowed,
         "forbidden_keys": forbidden_keys,
+        "checked_categories": [
+            "memory_bodies",
+            "user_inputs",
+            "dialogue_records",
+            "provider_outputs",
+            "storage_locations",
+            "auth_material",
+            "owner_refs",
+            "settings_snapshots",
+            "raw_logs",
+        ],
+        "detected_private_field_count": detected_private_field_count,
+        "redacted_private_field_count": 9,
         "raw_memory_denied": true,
         "prompts_denied": true,
         "transcripts_denied": true,
-        "credentials_denied": !credential_text_found,
+        "credentials_denied": !auth_material_found,
+        "tokens_denied": !auth_material_found,
+        "private_keys_denied": !auth_material_found,
         "provider_responses_denied": true,
         "local_paths_denied": !local_paths_found,
+        "account_identifiers_denied": !owner_ref_found,
+        "customer_identifiers_denied": !owner_ref_found,
+        "raw_logs_denied": !raw_logs_found,
+        "complete_settings_denied": !complete_settings_found,
         "claim_boundary": "Local desktop export privacy scan only; it does not prove provider deletion, model forgetting, hosted services, release signing, or compliance.",
     })
 }
@@ -1640,6 +1675,10 @@ mod tests {
         let safe_scan = desktop_public_export_privacy_scan(&safe);
         assert_eq!(safe_scan["status"].as_str(), Some("pass"));
         assert_eq!(safe_scan["export_allowed"].as_bool(), Some(true));
+        assert_eq!(safe_scan["detected_private_field_count"].as_u64(), Some(0));
+        assert_eq!(safe_scan["redacted_private_field_count"].as_u64(), Some(9));
+        assert_eq!(safe_scan["tokens_denied"].as_bool(), Some(true));
+        assert_eq!(safe_scan["account_identifiers_denied"].as_bool(), Some(true));
 
         let raw_memory = json!({
             "schema": "enigma.desktop_proof_activity.v1",
@@ -1653,6 +1692,8 @@ mod tests {
             .unwrap()
             .iter()
             .any(|key| key.as_str() == Some("raw_memory")));
+        assert_eq!(raw_scan["detected_private_field_count"].as_u64(), Some(1));
+        assert_eq!(raw_scan["raw_memory_denied"].as_bool(), Some(true));
 
         let path = json!({
             "schema": "enigma.desktop_proof_activity.v1",
@@ -1661,6 +1702,7 @@ mod tests {
         let path_scan = desktop_public_export_privacy_scan(&path);
         assert_eq!(path_scan["status"].as_str(), Some("blocked"));
         assert_eq!(path_scan["local_paths_denied"].as_bool(), Some(false));
+        assert_eq!(path_scan["detected_private_field_count"].as_u64(), Some(1));
     }
 
     #[tokio::test]

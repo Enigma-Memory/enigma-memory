@@ -42,6 +42,10 @@ test('support dry-run summary is public-safe and claim-bounded', () => {
   assert.equal(summary.privacy_review.raw_logs_included, false);
   assert.equal(summary.privacy_review.transcripts_included, false);
   assert.equal(summary.privacy_review.local_absolute_paths_included, false);
+  assert.equal(summary.privacy_scan.schema, 'enigma.support_privacy_scan.v1');
+  assert.equal(summary.privacy_scan.status, 'pass');
+  assert.equal(summary.privacy_scan.detected_private_field_count, 0);
+  assert.ok(summary.privacy_scan.checked_categories.includes('memory_bodies'));
   assert.equal(summary.claim_boundaries.public_beta_ready, false);
   assert.equal(summary.claim_boundaries.production_ready, false);
   assert.equal(summary.claim_boundaries.provider_deletion_proof, false);
@@ -63,6 +67,15 @@ test('support dry-run summary ingests redacted support artifacts only by hash an
       provider_responses_included: false,
       local_paths_redacted: true,
     },
+    privacy_scan: {
+      schema: 'enigma.support_privacy_scan.v1',
+      status: 'pass',
+      checked_categories: ['memory_bodies', 'user_inputs', 'dialogue_records'],
+      detected_private_field_count: 0,
+      redacted_private_field_count: 3,
+      local_paths_hidden: true,
+      public_safe_summary_only: true,
+    },
     claim_boundaries: {
       provider_deletion_proof: false,
       model_forgetting_proof: false,
@@ -80,6 +93,9 @@ test('support dry-run summary ingests redacted support artifacts only by hash an
   assert.equal(summary.support_artifact.setup_state, 'setup_needed');
   assert.equal(summary.support_artifact.redaction.credentials_included, false);
   assert.equal(summary.support_artifact.claim_boundaries.provider_deletion_proof, false);
+  assert.equal(snapshot.privacy_scan.status, 'pass');
+  assert.equal(summary.support_artifact.privacy_scan.redacted_private_field_count, 3);
+  assert.equal(summary.privacy_scan.support_artifact_attached, true);
   assert.equal(JSON.stringify(summary).includes('setup_status'), false);
 });
 
@@ -161,6 +177,7 @@ test('support dry-run plain output is readable and writes JSON evidence separate
   assert.match(stdout, /Scenario: BETA-DIAG-001/);
   assert.match(stdout, /Bundle privacy check: pass/);
   assert.match(stdout, /Boundary: public-safe support dry-run evidence only/);
+  assert.match(stdout, /Privacy scan: pass \(0 finding\(s\), 8 categories checked\)/);
   assert.doesNotMatch(stdout, /^\s*\{/);
   assert.equal(stdout.includes(dir), false);
   assert.equal(stdout.includes(out), false);

@@ -545,6 +545,10 @@ test('support summary is public-safe on fresh install and initialized bundles', 
     assert.equal(fresh.bundle, '<bundle-path>');
     assert.equal(fresh.redaction.raw_memory_included, false);
     assert.equal(fresh.redaction.local_paths_redacted, true);
+    assert.equal(fresh.privacy_scan.schema, 'enigma.support_privacy_scan.v1');
+    assert.equal(fresh.privacy_scan.status, 'pass');
+    assert.equal(fresh.privacy_scan.detected_private_field_count, 0);
+    assert.ok(fresh.privacy_scan.checked_categories.includes('storage_locations'));
     assert.equal(fresh.claim_boundaries.provider_deletion_proof, false);
     assert.equal(freshStdout.includes(dir), false);
 
@@ -562,6 +566,8 @@ test('support summary is public-safe on fresh install and initialized bundles', 
     assert.equal(ready.first_run_status.schema, 'enigma.first_run_status.v1');
     assert.equal(ready.first_run_status.claim_boundaries.raw_memory_returned, false);
     assert.equal(ready.diagnostics.bundle_initialized_ok, true);
+    assert.equal(ready.privacy_scan.schema, 'enigma.support_privacy_scan.v1');
+    assert.equal(ready.privacy_scan.public_safe_summary_only, true);
     assert.equal(JSON.stringify(ready).includes('Enigma quickstart demo memory'), false);
     assert.equal(readyStdout.includes(dir), false);
     assert.equal(JSON.stringify(ready).includes(dir), false);
@@ -572,6 +578,7 @@ test('support summary is public-safe on fresh install and initialized bundles', 
     assert.match(plainIo.stdout(), /Status: Ready/);
     assert.match(plainIo.stdout(), /Support code: ref:support-summary:/);
     assert.match(plainIo.stdout(), /Redacted: raw memory, prompts, transcripts, credentials, provider responses, local paths/);
+    assert.match(plainIo.stdout(), /Privacy scan: pass \(0 finding\(s\), 8 categories checked\)/);
     assert.match(plainIo.stdout(), /Safe to share: support code, setup state, issue count, and next action only/);
     assert.match(plainIo.stdout(), /Boundary: local Enigma support state only/);
     assert.doesNotMatch(plainIo.stdout(), /^\s*\{/);

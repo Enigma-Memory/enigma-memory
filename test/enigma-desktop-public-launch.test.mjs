@@ -100,6 +100,9 @@ test('desktop first-run defaults to Memory Drive home dashboard', async () => {
   assert.equal(model.screens.support.primary_action.id, 'collect_support_report');
   assert.equal(model.screens.support.privacy_boundaries.raw_memory_returned, false);
   assert.equal(model.screens.support.privacy_boundaries.local_paths_returned, false);
+  assert.equal(model.screens.support.privacy_scan.schema, 'enigma.support_privacy_scan.v1');
+  assert.equal(model.screens.support.privacy_scan.status, 'not_run');
+  assert.ok(model.screens.support.privacy_scan.checked_categories.includes('raw_logs'));
 });
 
 test('static desktop shell mirrors Memory Controller, Import Sandbox, and Support Report cards', async () => {
@@ -124,7 +127,7 @@ test('static desktop shell mirrors Memory Controller, Import Sandbox, and Suppor
   assert.match(importSandboxBlock, /Model-state proof/);
   assert.match(supportBlock, /Copyable safe report/);
   assert.match(supportBlock, /Privacy boundaries/);
-  assert.match(supportBlock, /No raw memory, prompts, transcripts, provider responses, credentials, complete settings, or local paths/);
+  assert.match(supportBlock, /No raw memory, prompts, transcripts, provider responses, credentials, tokens, private keys, account identifiers, customer identifiers, raw logs, complete settings, or local paths/);
   assert.match(shell, /The shell reports local setup only; provider logs and model behavior require provider evidence/);
   assert.doesNotMatch(homeBlock, /provider deletion|model forgetting|provider-native memory control/i);
   assert.doesNotMatch(supportBlock, /provider deletion|model forgetting|provider-native memory control/i);
@@ -244,6 +247,12 @@ test('desktop public dashboard omits raw memory, prompts, transcripts, tokens, p
   assert.deepEqual(model.screens.support.shareable_summary, ['Local service reachable']);
   assert.equal(model.screens.support.primary_action.id, 'copy_support_report');
   assert.equal(model.screens.support.privacy_boundaries.provider_responses_returned, false);
+  assert.equal(model.screens.support.privacy_scan.status, 'pass');
+  assert.equal(model.screens.support.privacy_scan.detected_private_field_count, 0);
+  assert.ok(model.screens.support.privacy_scan.checked_categories.includes('auth_material'));
+  assert.equal(model.screens.support.privacy_boundaries.tokens_returned, false);
+  assert.equal(model.screens.support.privacy_boundaries.private_keys_returned, false);
+  assert.equal(model.screens.support.privacy_boundaries.raw_logs_returned, false);
   assertPublicSafe(model);
   assertPublicSafe(model.dashboard);
   assertPublicSafe(model.screens.home);
@@ -484,6 +493,10 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(tauriService, /desktop_public_export_privacy_scan/);
   assert.match(tauriService, /ensure_desktop_public_export_allowed/);
   assert.match(tauriService, /enigma\.desktop_public_export_privacy_scan\.v1/);
+  assert.match(tauriService, /detected_private_field_count/);
+  assert.match(tauriService, /tokens_denied/);
+  assert.match(tauriService, /account_identifiers_denied/);
+  assert.match(tauriService, /raw_logs_denied/);
   assert.match(tauriService, /Desktop export privacy scan blocked/);
   assert.match(wizard, /Support summary/);
   assert.match(wizard, /Shareable status without private memory/);
@@ -494,7 +507,7 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(wizard, /Copy support summary/);
   assert.match(wizard, /publicSupportClipboardText/);
   assert.match(wizard, /Support summary copied without raw memory, app settings, or local paths/);
-  assert.match(wizard.match(/function publicSupportClipboardText\(summary = \{\}\) \{[\s\S]*?\n\}/)?.[0] || '', /no raw memory, prompts, transcripts, credentials, provider responses, complete app settings, or local paths/);
+  assert.match(wizard.match(/function publicSupportClipboardText\(summary = \{\}\) \{[\s\S]*?\n\}/)?.[0] || '', /no raw memory, prompts, transcripts, credentials, tokens, private keys, account identifiers, customer identifiers, raw logs, provider responses, complete app settings, or local paths/);
   assert.match(wizard, /navigator\.clipboard\.writeText/);
   assert.match(wizard, /Support code copied/);
   assert.match(wizard, /Clipboard copy is unavailable/);

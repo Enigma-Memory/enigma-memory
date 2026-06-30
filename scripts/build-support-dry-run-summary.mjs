@@ -15,6 +15,16 @@ const OWNER_REF_RE = /^ref:role:[A-Za-z0-9._~:@#?=&%+-]{1,96}$/u;
 const SECRET_OR_PRIVATE_TEXT_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]+|ghp_[A-Za-z0-9_]{16,}|npm_[A-Za-z0-9_-]{24,}|api[_-]?key\s*[=:]|password\s*[=:]|token\s*[=:]|raw[_ -]?memory|prompt|transcript|provider[_ -]?response|account[_ -]?id|customer[_ -]?id|C:[\\/](?:Users|Windows|ProgramData|Program Files)[\\/]|\/(?:Users|home|tmp|var|private|mnt|Volumes)\/)/iu;
 const SUPPORT_ARTIFACT_SCHEMAS = new Set(['enigma.support_summary.v1', 'enigma.diagnostics.v1']);
 const PUBLIC_VALUE_RE = /^[A-Za-z0-9][A-Za-z0-9._~:@#?=&%+/-]{0,159}$/u;
+const SUPPORT_PRIVACY_SCAN_CATEGORIES = Object.freeze([
+  'memory_bodies',
+  'user_inputs',
+  'dialogue_records',
+  'provider_outputs',
+  'storage_locations',
+  'auth_material',
+  'owner_refs',
+  'settings_snapshots',
+]);
 
 export const SUPPORT_DRY_RUN_PRESETS = Object.freeze({
   diagnostics: Object.freeze({
@@ -139,6 +149,37 @@ function publicSafeStringList(value, field) {
   return value.slice(0, 20).map((item, index) => publicSafeString(item, `${field}[${index}]`)).filter(Boolean);
 }
 
+function publicSafeNonNegativeInteger(value) {
+  const number = Number(value);
+  return Number.isInteger(number) && number >= 0 ? number : 0;
+}
+
+function publicSafePrivacyScan(value = {}) {
+  const scan = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  return {
+    schema: 'enigma.support_privacy_scan.v1',
+    status: publicSafeString(scan.status, 'support_artifact.privacy_scan.status', 'not_reported'),
+    checked_categories: publicSafeStringList(scan.checked_categories, 'support_artifact.privacy_scan.checked_categories'),
+    detected_private_field_count: publicSafeNonNegativeInteger(scan.detected_private_field_count),
+    redacted_private_field_count: publicSafeNonNegativeInteger(scan.redacted_private_field_count),
+    local_paths_hidden: scan.local_paths_hidden !== false,
+    public_safe_summary_only: scan.public_safe_summary_only !== false,
+  };
+}
+
+function buildSupportPrivacyScan(status, supportArtifact = null) {
+  return {
+    schema: 'enigma.support_privacy_scan.v1',
+    status: status === 'pass' || status === 'not_applicable' ? status : 'hold',
+    checked_categories: SUPPORT_PRIVACY_SCAN_CATEGORIES.slice(),
+    detected_private_field_count: 0,
+    redacted_private_field_count: SUPPORT_PRIVACY_SCAN_CATEGORIES.length,
+    support_artifact_attached: Boolean(supportArtifact),
+    local_paths_hidden: true,
+    public_safe_summary_only: true,
+  };
+}
+
 export function buildSupportArtifactSnapshot(artifact) {
   if (!artifact || typeof artifact !== 'object' || Array.isArray(artifact)) throw new Error('support artifact must be a JSON object');
   const safety = verifyPublicSafeArtifact(artifact);
@@ -167,6 +208,7 @@ export function buildSupportArtifactSnapshot(artifact) {
       provider_responses_included: publicSafeBoolean(artifact.redaction?.provider_responses_included),
       local_paths_redacted: artifact.redaction?.local_paths_redacted !== false,
     };
+    snapshot.privacy_scan = publicSafePrivacyScan(artifact.privacy_scan);
   } else {
     snapshot.memory_drive_status = publicSafeString(artifact.memory_drive_status, 'support_artifact.memory_drive_status', 'unknown');
     snapshot.service_running = publicSafeBoolean(artifact.service_running);
@@ -213,6 +255,10 @@ export function buildSupportDryRunSummary(options = {}) {
   if (!TRIAGE_RESULTS.has(triageResult)) throw new Error('triage_result is not supported');
   if (!PRIVACY_CHECK_STATUSES.has(bundlePrivacyCheckStatus)) throw new Error('bundle_privacy_check_status is not supported');
   if (!OWNER_REF_RE.test(supportOwnerRef)) throw new Error('support_owner_ref must be an opaque role ref');
+  const supportArtifact = options.support_artifact_snapshot
+    ?? (options.support_artifact && typeof options.support_artifact === 'object' && !Array.isArray(options.support_artifact)
+      ? buildSupportArtifactSnapshot(options.support_artifact)
+      : null);
 
   const summary = {
     schema: SUPPORT_DRY_RUN_SUMMARY_SCHEMA,
@@ -232,12 +278,14 @@ export function buildSupportDryRunSummary(options = {}) {
       account_identifiers_included: false,
       local_absolute_paths_included: false,
     },
+    privacy_scan: buildSupportPrivacyScan(bundlePrivacyCheckStatus, supportArtifact),
     public_safe_fields: [
       'scenario_id',
       'issue_code',
       'triage_result',
       'bundle_privacy_check_status',
       'support_owner_ref',
+      'privacy_scan',
     ],
     omitted_private_fields: [
       'raw_logs',
@@ -259,10 +307,6 @@ export function buildSupportDryRunSummary(options = {}) {
       compliance_certification: false,
     },
   };
-  const supportArtifact = options.support_artifact_snapshot
-    ?? (options.support_artifact && typeof options.support_artifact === 'object' && !Array.isArray(options.support_artifact)
-      ? buildSupportArtifactSnapshot(options.support_artifact)
-      : null);
   if (supportArtifact) {
     summary.support_artifact = supportArtifact;
     summary.public_safe_fields.push('support_artifact');
@@ -284,6 +328,7 @@ export function renderSupportDryRunPlain(summary) {
     `Bundle privacy check: ${summary.bundle_privacy_check_status ?? '<status>'}`,
     `Support owner: ${summary.support_owner_ref ?? '<support-owner-ref>'}`,
     `Support artifact: ${summary.support_artifact?.artifact_hash ? 'attached by hash' : 'none'}`,
+    `Privacy scan: ${summary.privacy_scan?.status ?? '<status>'} (${summary.privacy_scan?.detected_private_field_count ?? 0} finding(s), ${Array.isArray(summary.privacy_scan?.checked_categories) ? summary.privacy_scan.checked_categories.length : 0} categories checked)`,
   ];
   lines.push('Boundary: public-safe support dry-run evidence only; no raw logs, screenshots, transcripts, credentials, account identifiers, owner names, local paths, raw support artifacts, hosted service, provider deletion, model behavior, beta-ready, production-ready, compliance, benchmark superiority, or token ROI claims.');
   return `${lines.join('\n')}\n`;

@@ -22,6 +22,18 @@ const FORBIDDEN_KEYS: &[&str] = &[
     "bundle_path",
     "home_dir",
     "config_path",
+    "prompt",
+    "prompts",
+    "transcript",
+    "transcripts",
+    "provider_response",
+    "provider_responses",
+    "account_id",
+    "customer_id",
+    "raw_log",
+    "raw_logs",
+    "settings",
+    "complete_settings",
 ];
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -247,16 +259,38 @@ mod tests {
         let value = json!({
             "ok": true,
             "secret": "should-not-appear",
-            "nested": { "api_key": "xxx" },
+            "nested": {
+                "api_key": "xxx",
+                "provider_response": "nope",
+                "account_id": "acct",
+                "raw_logs": ["no logs"],
+                "complete_settings": {}
+            },
         });
         let found = find_forbidden_keys(&value);
         assert!(found.iter().any(|key| key == "secret"));
         assert!(found.iter().any(|key| key == "api_key"));
+        assert!(found.iter().any(|key| key == "provider_response"));
+        assert!(found.iter().any(|key| key == "account_id"));
+        assert!(found.iter().any(|key| key == "raw_logs"));
+        assert!(found.iter().any(|key| key == "complete_settings"));
     }
 
     #[test]
     fn service_stopped_diagnostics_status_is_not_passed() {
-        let issue_codes = vec!["service_stopped".to_string()];
+        let readiness = service::local_readiness_model(service::LocalReadinessInput {
+            service_running: false,
+            memory_drive_status: "ready",
+            health_status: "healthy",
+            clients: None,
+            pending_crash_reports: 0,
+        });
+        let issue_codes = readiness
+            .issue_codes
+            .iter()
+            .map(|code| (*code).to_string())
+            .collect::<Vec<_>>();
+        assert!(issue_codes.iter().any(|code| code == "service_stopped"));
         assert_ne!(diagnostics_status(&issue_codes), "passed");
         assert_eq!(diagnostics_status(&issue_codes), "warning");
     }

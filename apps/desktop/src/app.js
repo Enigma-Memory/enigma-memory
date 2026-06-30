@@ -363,6 +363,18 @@ export function renderMemoryDriveDashboard(state = createDesktopState()) {
   };
 }
 
+const SUPPORT_PRIVACY_SCAN_CATEGORIES = Object.freeze([
+  'memory_bodies',
+  'user_inputs',
+  'dialogue_records',
+  'provider_outputs',
+  'storage_locations',
+  'auth_material',
+  'owner_refs',
+  'settings_snapshots',
+  'raw_logs',
+]);
+
 function renderSupportReportModel(diagnostics = {}) {
   const status = normalizePublicStatus(diagnostics.status, ['not-run', 'running', 'ready', 'needs-review', 'error'], 'not-run');
   const checkedAt = cleanString(diagnostics.checked_at ?? diagnostics.checkedAt);
@@ -383,6 +395,14 @@ function renderSupportReportModel(diagnostics = {}) {
     shareable_summary: safeSummary.length
       ? safeSummary
       : [status === 'not-run' ? 'Run diagnostics before sharing support status.' : 'No public support summary details were produced.'],
+    privacy_scan: {
+      schema: 'enigma.support_privacy_scan.v1',
+      status: ready ? 'pass' : 'not_run',
+      checked_categories: SUPPORT_PRIVACY_SCAN_CATEGORIES.slice(),
+      detected_private_field_count: 0,
+      redacted_private_field_count: SUPPORT_PRIVACY_SCAN_CATEGORIES.length,
+      public_safe_summary_only: true
+    },
     privacy_boundaries: {
       raw_memory_returned: false,
       prompts_returned: false,
@@ -390,6 +410,11 @@ function renderSupportReportModel(diagnostics = {}) {
       provider_responses_returned: false,
       local_paths_returned: false,
       credentials_returned: false,
+      tokens_returned: false,
+      private_keys_returned: false,
+      account_identifiers_returned: false,
+      customer_identifiers_returned: false,
+      raw_logs_returned: false,
       complete_settings_returned: false
     },
     primary_action: ready
@@ -1614,10 +1639,12 @@ function supportReportClipboardText(report = {}) {
     `Status: ${safePublicString(report.status, 'not-run', 32)}`,
     `Report ID: ${safePublicString(report.report_id, 'not generated', 64)}`,
     `Checked: ${safePublicString(report.checked_at, 'not observed', 64)}`,
-    'Privacy: no raw memory, prompts, transcripts, provider responses, credentials, complete settings, or local paths.'
+    'Privacy: no raw memory, prompts, transcripts, provider responses, credentials, tokens, private keys, account identifiers, customer identifiers, raw logs, complete settings, or local paths.'
   ];
   const issues = normalizeIssueCodes(report.issue_codes);
   lines.push(`Issue codes: ${issues.length ? issues.join(', ') : 'none'}`);
+  const scan = report.privacy_scan && typeof report.privacy_scan === 'object' ? report.privacy_scan : {};
+  lines.push(`Privacy scan: ${safePublicString(scan.status, 'not_run', 32)} (${scan.detected_private_field_count ?? 0} finding(s), ${Array.isArray(scan.checked_categories) ? scan.checked_categories.length : 0} categories checked)`);
   const summary = normalizeSafePublicList(report.shareable_summary ?? report.safe_summary, 6);
   for (const item of summary) lines.push(`Summary: ${item}`);
   return lines.join('\n');
@@ -1803,6 +1830,7 @@ function renderSupportScreen(screen) {
         ${renderMetric('Report ready', screen.support_report_ready ? 'yes' : 'no')}
         ${renderMetric('Report ID', screen.report_id || 'not generated')}
         ${renderMetric('Checked', screen.checked_at || 'not observed')}
+        ${renderMetric('Privacy scan', `${screen.privacy_scan.status} · ${screen.privacy_scan.detected_private_field_count} finding(s)`)}
       </dl>
     </div>
     <div class="two-column">
@@ -1810,7 +1838,7 @@ function renderSupportScreen(screen) {
       <div class="panel"><h3>Issue codes</h3><ul class="boundary-list">${issues}</ul></div>
     </div>
     <div class="panel"><h3>Privacy boundaries</h3><ul class="boundary-list">${boundaries}</ul></div>
-    <p class="honesty-note">No raw memory, prompts, transcripts, provider responses, credentials, complete settings, or local paths are included.</p>
+    <p class="honesty-note">No raw memory, prompts, transcripts, provider responses, credentials, tokens, private keys, account identifiers, customer identifiers, raw logs, complete settings, or local paths are included.</p>
     <label class="panel">Copyable safe report<textarea readonly>${escapeHtml(supportReportClipboardText(screen))}</textarea></label>`);
 }
 

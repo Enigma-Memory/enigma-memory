@@ -71,6 +71,7 @@ const BLOCKERS = Object.freeze({
           'triage_result',
           'bundle_privacy_check_status',
           'support_owner_ref',
+          'privacy_scan',
         ],
         notes: 'Record support triage outcomes only; omit raw logs, screenshots, transcripts, credentials, account identifiers, owner names, and local absolute paths.',
       },
@@ -706,6 +707,8 @@ export function buildScenarioRows(inputs) {
       && SUPPORT_OWNER_REF_RE.test(summary?.support_owner_ref ?? '')
       && summary?.bundle_privacy_check_status === 'pass'
       && summary?.privacy_review?.status === 'pass'
+      && summary?.privacy_scan?.status === 'pass'
+      && summary?.privacy_scan?.detected_private_field_count === 0
       && !['blocked', 'release_blocker'].includes(summary?.triage_result));
   const withSupportEvidence = (scenarioId, refs) => (supportEvidenceReadyFor(scenarioId)
     ? [...refs, `ref:evidence:support-dry-run:${scenarioId}`]

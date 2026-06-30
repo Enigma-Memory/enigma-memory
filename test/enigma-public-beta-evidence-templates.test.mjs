@@ -62,6 +62,8 @@ test('public beta evidence templates are public-safe blockers, not fake evidence
     assert.equal(diagnosticSupport.scenario_id, 'BETA-DIAG-001');
     assert.equal(diagnosticSupport.triage_result, 'blocked');
     assert.equal(diagnosticSupport.privacy_review.status, 'blocked');
+    assert.equal(diagnosticSupport.privacy_scan.status, 'hold');
+    assert.equal(diagnosticSupport.privacy_scan.detected_private_field_count, 0);
     assert.match(diagnosticSupport.replacement_command, /--preset diagnostics/);
     assert.match(diagnosticSupport.replacement_command, /--triage-result <observed-result>/);
     assert.match(diagnosticSupport.replacement_command, /--bundle-privacy-check-status <observed-status>/);

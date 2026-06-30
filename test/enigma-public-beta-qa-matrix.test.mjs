@@ -267,7 +267,7 @@ test('public beta QA plain output is readable, bounded, and non-JSON', async () 
   assert.match(plain, /Patchable evidence:/);
   assert.match(plain, /Evidence: record_support_dry_run — EV-P10-SUPPORT-DRY-RUN-SUMMARY/);
   assert.match(plain, /public-safe support dry-run summary/);
-  assert.match(plain, /Fields: scenario_id, issue_code, triage_result, bundle_privacy_check_status, support_owner_ref/);
+  assert.match(plain, /Fields: scenario_id, issue_code, triage_result, bundle_privacy_check_status, support_owner_ref, privacy_scan/);
   assert.match(plain, /Boundary: local repository and supplied public-safe evidence matrix only/);
   assert.doesNotMatch(plain, /^\s*\{/);
   assertPublicSafe(plain);
@@ -346,6 +346,7 @@ test('support dry-run blocker names the concrete public-safe evidence summary st
         'triage_result',
         'bundle_privacy_check_status',
         'support_owner_ref',
+        'privacy_scan',
       ],
       notes: 'Record support triage outcomes only; omit raw logs, screenshots, transcripts, credentials, account identifiers, owner names, and local absolute paths.',
     },
@@ -524,6 +525,7 @@ test('public beta QA matrix can consume support dry-run evidence per scenario', 
         scenario_id: 'BETA-DIAG-001',
         bundle_privacy_check_status: 'pass',
         privacy_review: { status: 'pass' },
+        privacy_scan: { status: 'pass', detected_private_field_count: 0 },
         triage_result: 'resolved',
         support_owner_ref: 'ref:role:beta-support',
       },
@@ -533,6 +535,7 @@ test('public beta QA matrix can consume support dry-run evidence per scenario', 
         scenario_id: 'BETA-CRASH-001',
         bundle_privacy_check_status: 'pass',
         privacy_review: { status: 'pass' },
+        privacy_scan: { status: 'pass', detected_private_field_count: 0 },
         triage_result: 'needs_user_action',
         support_owner_ref: 'ref:role:beta-support',
       },

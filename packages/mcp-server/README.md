@@ -25,7 +25,7 @@ The generated server entry uses command `enigma-mcp`, no args, and `ENIGMA_BUNDL
 
 ## Support summary
 
-`enigma_support_summary` returns a redacted `enigma.support_summary.v1` for connected clients: setup state, next action, safe counts, tool availability, and redaction flags only. It excludes raw memory, prompts, transcripts, credentials, provider responses, and local paths.
+`enigma_support_summary` returns a redacted `enigma.support_summary.v1` for connected clients: setup state, next action, safe counts, tool availability, redaction flags, and privacy-scan metadata only. It excludes raw memory, prompts, transcripts, credentials, provider responses, and local paths.
 
 ## Import preview
 
