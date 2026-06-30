@@ -387,6 +387,38 @@ test('public beta QA matrix can consume clean-machine smoke evidence without cle
   assert.equal(install.blocker_refs.includes('BLOCKER-MACOS-NOTARIZED-ARTIFACT'), true);
 });
 
+test('public beta QA matrix does not treat present installers as signed evidence', () => {
+  const scenarios = buildScenarioRows({
+    tauriConfig: { bundle: { active: true, targets: ['msi', 'nsis', 'dmg', 'app'] } },
+    desktopReleaseWorkflow: 'Sign update manifest',
+    updateSignerScript: 'present',
+    updateCommands: '"offline"',
+    cleanMachineSmoke: {
+      schema: 'enigma.clean_machine_smoke.v1',
+      app_version: '0.1.19',
+      summary: { healthy: true },
+    },
+    desktopReleaseEvidence: {
+      schema: 'enigma.desktop_release_evidence.v1',
+      release_version: '0.1.19',
+      blockers: [],
+      manifest: { signature: { status: 'verified' } },
+      installers: [
+        { platform: 'windows', present: true, signature: { status: 'file_present_unverified' } },
+        { platform: 'macos', present: true, signature: { status: 'file_present_unverified' } },
+      ],
+    },
+  });
+
+  const windows = scenarioById(scenarios, 'BETA-SIGNING-WINDOWS-001');
+  const macos = scenarioById(scenarios, 'BETA-SIGNING-MACOS-001');
+  const update = scenarioById(scenarios, 'BETA-UPDATE-001');
+  assert.equal(windows.status, 'blocked');
+  assert.equal(macos.status, 'blocked');
+  assert.notEqual(update.status, 'pass');
+  assert.doesNotMatch(JSON.stringify(windows.evidence_refs), /ref:evidence:desktop-release/);
+});
+
 test('public beta QA matrix can consume signed desktop release evidence without clearing review gates', () => {
   const scenarios = buildScenarioRows({
     tauriConfig: { bundle: { active: true, targets: ['msi', 'nsis', 'dmg', 'app'] } },
@@ -405,9 +437,10 @@ test('public beta QA matrix can consume signed desktop release evidence without 
       manifest: {
         signature: { status: 'verified' },
       },
+      update_rollback: { status: 'pass' },
       installers: [
-        { platform: 'windows', present: true },
-        { platform: 'macos', present: true },
+        { platform: 'windows', present: true, signature: { status: 'verified' } },
+        { platform: 'macos', present: true, signature: { status: 'verified' }, notarization: { status: 'accepted' }, stapling: { status: 'stapled' } },
       ],
     },
   });

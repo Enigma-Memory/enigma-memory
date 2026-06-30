@@ -711,13 +711,25 @@ export function buildScenarioRows(inputs) {
     && inputs.registryInstall?.skip_network === false
     && inputs.registryInstall?.package?.name === (inputs.packageJson?.name ?? 'enigma-memory')
     && inputs.registryInstall?.package?.version === REQUIRED_PUBLIC_BETA_VERSION;
+  const desktopInstallers = Array.isArray(inputs.desktopReleaseEvidence?.installers)
+    ? inputs.desktopReleaseEvidence.installers
+    : [];
+  const windowsInstallerReady = desktopInstallers.some((installer) => installer?.platform === 'windows'
+    && installer?.present === true
+    && installer?.signature?.status === 'verified');
+  const macosInstallerReady = desktopInstallers.some((installer) => installer?.platform === 'macos'
+    && installer?.present === true
+    && installer?.signature?.status === 'verified'
+    && installer?.notarization?.status === 'accepted'
+    && installer?.stapling?.status === 'stapled');
+  const updateRollbackReady = inputs.desktopReleaseEvidence?.update_rollback?.status === 'pass';
   const desktopReleaseEvidenceReady = inputs.desktopReleaseEvidence?.schema === 'enigma.desktop_release_evidence.v1'
     && inputs.desktopReleaseEvidence?.release_version === REQUIRED_PUBLIC_BETA_VERSION
     && Array.isArray(inputs.desktopReleaseEvidence?.blockers)
     && inputs.desktopReleaseEvidence.blockers.length === 0
-    && Array.isArray(inputs.desktopReleaseEvidence?.installers)
-    && inputs.desktopReleaseEvidence.installers.some((installer) => installer?.platform === 'windows' && installer?.present === true)
-    && inputs.desktopReleaseEvidence.installers.some((installer) => installer?.platform === 'macos' && installer?.present === true)
+    && windowsInstallerReady
+    && macosInstallerReady
+    && updateRollbackReady
     && inputs.desktopReleaseEvidence?.manifest?.signature?.status === 'verified';
   const desktopReleaseEvidenceRefs = desktopReleaseEvidenceReady ? ['ref:evidence:desktop-release'] : [];
   const desktopReleaseBlockers = (...rest) => (desktopReleaseEvidenceReady ? rest : [windowsSignedArtifact, macosNotarizedArtifact, ...rest]);
