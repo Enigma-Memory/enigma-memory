@@ -306,6 +306,8 @@ export function renderSmokePlanPlain(plan) {
   ];
   for (const step of Array.isArray(plan.steps) ? plan.steps : []) {
     lines.push(`Step: ${step.step_id} — ${step.title}`);
+    lines.push(`Action: ${step.action}`);
+    lines.push(`Evidence: ${step.expected_evidence}`);
   }
   lines.push('Boundary: plan only; no system inspection, network action, release action, raw memory, local paths, provider responses, credentials, screenshots, account identifiers, provider deletion, model behavior, signing, notarization, benchmark superiority, token ROI, or compliance claims.');
   return `${lines.join('\n')}\n`;

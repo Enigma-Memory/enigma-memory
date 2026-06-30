@@ -130,6 +130,8 @@ test('clean-machine smoke dry-run plan is public-safe and non-inspecting', () =>
   assert.match(plain, /^Enigma clean-machine smoke plan\n/);
   assert.match(plain, /Step: install_desktop_app/);
   assert.match(plain, /Step: first_run_default_setup/);
+  assert.match(plain, /Action: .*default local setup path/);
+  assert.match(plain, /Evidence: .*pass\/fail notes only/);
   assert.match(plain, /Boundary: plan only/);
   assert.doesNotMatch(plain, /^\s*\{/);
   assert.doesNotMatch(serialized, /C:\\Users\\|\/home\/|\/tmp\/|AppData\\Local/i);
