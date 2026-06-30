@@ -327,18 +327,24 @@ function summarizeLocalPackInstall(stdout) {
   requireJsonField(json, ['install', 'global_install'], (value) => value === false, 'Local pack install smoke must not use global install.');
   requireJsonField(json, ['install', 'registry_install'], (value) => value === false, 'Local pack install smoke must not use registry install.');
   requireJsonField(json, ['install', 'npm_publish'], (value) => value === false, 'Local pack install smoke must not publish.');
+  requireJsonField(json, ['install', 'optional_dependencies_omitted'], (value) => value === true, 'Local pack install smoke must omit optional dependencies.');
+  requireJsonField(json, ['install', 'offline_mode'], (value) => value === true, 'Local pack install smoke must enable npm offline mode.');
   const checks = requireJsonField(json, ['checks'], Array.isArray, 'Local pack install smoke omitted checks.');
   if (checks.length < 3) throw new Error('Local pack install smoke did not run enough entrypoint checks.');
   const binShimChecks = requireJsonField(json, ['bin_shim_checks'], Array.isArray, 'Local pack install smoke omitted bin shim checks.');
   if (binShimChecks.length < 5) throw new Error('Local pack install smoke did not run enough installed bin shim checks.');
+  const exportChecks = requireJsonField(json, ['export_checks'], (value) => value && typeof value === 'object' && !Array.isArray(value), 'Local pack install smoke omitted package export checks.');
+  requireJsonField(exportChecks, ['evidence', 'schema'], (value) => value === 'enigma.local_pack_exports_smoke.v1', 'Local pack install smoke used an unexpected package export schema.');
+  requireJsonField(exportChecks, ['evidence', 'optional_dependencies_required'], (value) => value === false, 'Local pack export smoke must not require optional dependencies.');
   return {
     schema: json.schema,
     tarball: json.package?.tarball ?? null,
-    temp_prefix_install: json.install?.command === 'npm install --prefix <temp-prefix> --ignore-scripts <local-tarball>',
+    temp_prefix_install: json.install?.command === 'npm install --prefix <temp-prefix> --ignore-scripts --omit=optional --offline <local-tarball>',
     check_count: checks.length,
     checked_entrypoints: checks.map((check) => check.entrypoint),
     bin_shim_count: binShimChecks.length,
     checked_bin_shims: binShimChecks.map((check) => check.bin),
+    export_specifier_count: exportChecks.specifier_count ?? null,
   };
 }
 

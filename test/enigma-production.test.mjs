@@ -1578,6 +1578,9 @@ test('preflight release audit wiring is local-only and documented', async () => 
   assert.match(auditSource, /local-pack-install-smoke/, 'release audit must include local packed install smoke coverage');
   assert.match(auditSource, /verify-local-pack-install\.mjs/, 'release audit must execute the local packed install verifier');
   assert.match(auditSource, /summarizeLocalPackInstall/, 'release audit must validate local packed install output');
+  assert.match(auditSource, /optional_dependencies_omitted/, 'release audit must verify optional dependencies are omitted in local packed install smoke');
+  assert.match(auditSource, /offline_mode/, 'release audit must verify npm offline mode in local packed install smoke');
+  assert.match(auditSource, /export_specifier_count/, 'release audit must summarize installed package export coverage');
   assert.match(auditSource, /runNativeHostInstallPlanGate/, 'release audit must include native install-plan coverage');
   assert.match(auditSource, /native-host['"],\s*['"]install-plan/, 'release audit must execute the native install-plan command shape');
   assert.match(auditSource, /writes_performed/, 'release audit must validate that install-plan does not write browser or OS registration state');
