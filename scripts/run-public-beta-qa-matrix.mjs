@@ -73,7 +73,7 @@ const BLOCKERS = Object.freeze({
           'support_owner_ref',
           'privacy_scan',
         ],
-        notes: 'Record support triage outcomes only; omit raw logs, screenshots, transcripts, credentials, account identifiers, owner names, and local absolute paths.',
+        notes: 'Record support triage outcomes and privacy_scan.status=pass with zero private findings only; omit raw logs, screenshots, transcripts, credentials, account identifiers, owner names, and local absolute paths.',
       },
     ],
   },
@@ -225,7 +225,7 @@ const NEXT_ACTION_ORDER = Object.freeze([
       evidence_item_id: 'EV-P10-SUPPORT-DRY-RUN-SUMMARY',
       manifest_field: 'support_dry_run',
       target_file: '.enigma/public-beta/support-dry-run-<scenario>.json',
-      collect: 'preset-generated public-safe summary (`--preset diagnostics` or `--preset crash`) with observed triage result, observed privacy-check status, and optional redacted support-artifact snapshot',
+      collect: 'preset-generated public-safe summary (`--preset diagnostics` or `--preset crash`) with observed triage result, observed privacy-check status, privacy_scan.status=pass, zero private findings, and optional redacted support-artifact snapshot',
     },
   },
 ]);

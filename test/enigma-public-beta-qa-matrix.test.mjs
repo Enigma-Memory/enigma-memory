@@ -264,6 +264,7 @@ test('public beta QA plain output is readable, bounded, and non-JSON', async () 
   assert.match(plain, /Collect internal: run_clean_machine_qa — EV-P10-CLEAN-MACHINE-SMOKE into \.enigma\/public-beta\/clean-machine-smoke\.json/);
   assert.match(plain, /Internal: record_support_dry_run/);
   assert.match(plain, /Collect internal: record_support_dry_run — EV-P10-SUPPORT-DRY-RUN-SUMMARY into \.enigma\/public-beta\/support-dry-run/);
+  assert.match(plain, /privacy_scan\.status=pass, zero private findings/);
   assert.match(plain, /Patchable evidence:/);
   assert.match(plain, /Evidence: record_support_dry_run — EV-P10-SUPPORT-DRY-RUN-SUMMARY/);
   assert.match(plain, /public-safe support dry-run summary/);
@@ -348,7 +349,7 @@ test('support dry-run blocker names the concrete public-safe evidence summary st
         'support_owner_ref',
         'privacy_scan',
       ],
-      notes: 'Record support triage outcomes only; omit raw logs, screenshots, transcripts, credentials, account identifiers, owner names, and local absolute paths.',
+      notes: 'Record support triage outcomes and privacy_scan.status=pass with zero private findings only; omit raw logs, screenshots, transcripts, credentials, account identifiers, owner names, and local absolute paths.',
     },
   ]);
   assert.equal(matrix.advisor_decision, 'hold');
