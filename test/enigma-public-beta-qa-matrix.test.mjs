@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { buildPublicBetaQaMatrix, buildRankedNextActions, buildScenarioRows, mergeEvidenceOptions, normalizeEvidenceManifest, parseArgs, renderPublicBetaQaPlain } from '../scripts/run-public-beta-qa-matrix.mjs';
@@ -202,6 +202,34 @@ test('public beta QA manifest treats missing optional evidence paths as blockers
     assert.equal(matrix.advisor_decision, 'hold');
     assert.equal(matrix.summary.ready_for_public_beta, false);
     assert.equal(matrix.next_actions.some((action) => action.action_id === 'record_support_dry_run'), true);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('public beta advisor collect-next paths follow relative evidence manifest targets', async () => {
+  const dir = `.enigma/public-beta-target-test-${process.pid}-${Date.now()}`;
+  try {
+    await mkdir(dir, { recursive: true });
+    const manifestPath = `${dir}/evidence-manifest.json`;
+    await writeFile(manifestPath, `${JSON.stringify({
+      schema: 'enigma.public_beta_evidence_manifest.v1',
+      clean_machine_smoke: `${dir}/clean-machine-smoke.json`,
+      support_dry_run: [`${dir}/support-dry-run-diagnostics.json`],
+      registry_install: `${dir}/registry-install.json`,
+      desktop_release_evidence: `${dir}/desktop-release-evidence.json`,
+      production_handoff_packet: `${dir}/production-handoff-packet.json`,
+    }, null, 2)}\n`, 'utf8');
+
+    const matrix = await buildPublicBetaQaMatrix({ evidenceManifest: manifestPath });
+    const plain = renderPublicBetaQaPlain(matrix);
+    assertPublicSafe(matrix.next_actions);
+    assert.equal(matrix.next_actions.find((action) => action.action_id === 'approve_merge_release_pr').collect_next.target_file, `${dir}/production-handoff-packet.json`);
+    assert.equal(matrix.next_actions.find((action) => action.action_id === 'publish_npm_0_1_19').collect_next.target_file, `${dir}/registry-install.json`);
+    assert.equal(matrix.next_actions.find((action) => action.action_id === 'complete_signing_identities').collect_next.target_file, `${dir}/desktop-release-evidence.json`);
+    assert.equal(matrix.next_actions.find((action) => action.action_id === 'record_support_dry_run').collect_next.target_file, `${dir}/support-dry-run-diagnostics.json`);
+    assert.match(plain, new RegExp(`Collect next: approve_merge_release_pr .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/production-handoff-packet\\.json`));
+    assert.match(plain, new RegExp(`Collect next: publish_npm_0_1_19 .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/registry-install\\.json`));
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

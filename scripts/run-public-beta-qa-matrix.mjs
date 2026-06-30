@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { dirname, isAbsolute, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -228,7 +228,38 @@ const NEXT_ACTION_ORDER = Object.freeze([
   },
 ]);
 
-export function buildRankedNextActions(blockers) {
+function publicRelativeEvidenceTarget(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw || isAbsolute(raw) || /^[A-Za-z]:[\\/]/u.test(raw)) return null;
+  const normalized = normalize(raw).replace(/\\/g, '/');
+  if (normalized === '..' || normalized.startsWith('../') || normalized.includes('/../')) return null;
+  if (/\0|\r|\n/u.test(normalized)) return null;
+  return normalized;
+}
+
+function collectTargetForField(collectNext, evidenceTargets = {}) {
+  if (!collectNext?.manifest_field) return collectNext?.target_file ?? null;
+  const value = evidenceTargets[collectNext.manifest_field];
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const target = publicRelativeEvidenceTarget(item);
+      if (target) return target;
+    }
+    return collectNext.target_file;
+  }
+  return publicRelativeEvidenceTarget(value) ?? collectNext.target_file;
+}
+
+function resolveCollectNext(collectNext, evidenceTargets = {}) {
+  if (!collectNext) return null;
+  return {
+    ...collectNext,
+    target_file: collectTargetForField(collectNext, evidenceTargets),
+  };
+}
+
+
+export function buildRankedNextActions(blockers, evidenceTargets = {}) {
   const byId = new Map(blockers.map((blocker) => [blocker.blocker_id, blocker]));
   return NEXT_ACTION_ORDER
     .map((action, index) => {
@@ -244,7 +275,7 @@ export function buildRankedNextActions(blockers) {
         scenario_ids: blocker.scenario_ids,
         evidence_refs: blocker.evidence_refs,
         missing_evidence_items: blocker.missing_evidence_items ?? [],
-        collect_next: action.collect_next,
+        collect_next: resolveCollectNext(action.collect_next, evidenceTargets),
       };
     })
     .filter(Boolean);
@@ -563,6 +594,13 @@ export async function inspectPublicBetaQaInputs(options = {}) {
     registryInstall,
     desktopReleaseEvidence,
     productionHandoffPacket,
+    evidenceTargets: {
+      clean_machine_smoke: evidenceOptions.cleanMachineSmoke,
+      support_dry_run: evidenceOptions.supportDryRun,
+      registry_install: evidenceOptions.registryInstall,
+      desktop_release_evidence: evidenceOptions.desktopReleaseEvidence,
+      production_handoff_packet: evidenceOptions.productionHandoffPacket,
+    },
     mcpbConnectionPlan,
     mcpbHealth,
   };
@@ -878,7 +916,7 @@ export async function buildPublicBetaQaMatrix(options = {}) {
   const scenarios = buildScenarioRows(inputs);
   const counts = statusCounts(scenarios);
   const blockers = collectBlockers(scenarios);
-  const nextActions = buildRankedNextActions(blockers);
+  const nextActions = buildRankedNextActions(blockers, inputs.evidenceTargets);
   const readyForPublicBeta = scenarios.every((row) => row.status === 'pass');
   const ledgerSummary = summarizePublicLaunchEvidence(scenarios.map((row) => ledgerEntry(row, generatedAt)));
   const report = {
