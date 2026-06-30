@@ -298,6 +298,13 @@ test('desktop public dashboard omits raw memory, prompts, transcripts, tokens, p
   }, { now: '2026-06-28T00:10:00.000Z' })));
   assert.equal(downgradeUpdate.update_status, 'blocked_downgrade');
   assert.ok(downgradeUpdate.issue_codes.includes('DOWNGRADE_UPDATE_BLOCKED'));
+  const channelUpdate = renderMemoryDriveDashboard(desktopReducer(state, updateDesktopUpdateStatus({
+    status: 'blocked_channel',
+    version: '1.0.1-beta',
+    issue_codes: ['WRONG_CHANNEL_UPDATE_BLOCKED'],
+  }, { now: '2026-06-28T00:11:00.000Z' })));
+  assert.equal(channelUpdate.update_status, 'blocked_channel');
+  assert.ok(channelUpdate.issue_codes.includes('WRONG_CHANNEL_UPDATE_BLOCKED'));
   assert.equal(model.dashboard.schema, 'enigma.desktop.memory_drive_dashboard.v1');
   assert.equal(dashboard.offline_ready, true);
   assert.equal(dashboard.support_report_ready, true);
@@ -428,6 +435,8 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(wizard, /signed manifest is available/);
   assert.match(wizard, /Downgrade blocked/);
   assert.match(wizard, /would downgrade this app/);
+  assert.match(wizard, /Wrong channel blocked/);
+  assert.match(wizard, /different release channel/);
   assert.match(help, /before any Memory Drive write/);
   assert.doesNotMatch(`${wizard}\n${help}`, /Private vault|private vault|your vault|local vault|vault stores|vault write|vault activity|Checking vault|Creating vault|Check your vault|Private vault created|Create vault/);
   assert.match(wizard, /WIZARD_STORAGE_KEY/);

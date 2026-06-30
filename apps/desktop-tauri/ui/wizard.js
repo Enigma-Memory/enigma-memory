@@ -1170,16 +1170,20 @@ function renderDashboard() {
     ? 'Unsigned update blocked'
     : updateStatus === 'blocked_downgrade'
       ? 'Downgrade blocked'
-      : updateStatus === 'blocked_version'
-        ? 'Invalid update blocked'
-        : 'Update blocked';
+      : updateStatus === 'blocked_channel'
+        ? 'Wrong channel blocked'
+        : updateStatus === 'blocked_version'
+          ? 'Invalid update blocked'
+          : 'Update blocked';
   const updateBlockedNote = updateStatus === 'blocked_unsigned'
     ? 'Enigma will not install this update until a signed manifest is available.'
     : updateStatus === 'blocked_downgrade'
       ? 'Enigma will not install a manifest that would downgrade this app.'
-      : updateStatus === 'blocked_version'
-        ? 'Enigma will not install an update with an invalid version.'
-        : 'Enigma will not install this update until it passes safety checks.';
+      : updateStatus === 'blocked_channel'
+        ? 'Enigma will not install an update from a different release channel.'
+        : updateStatus === 'blocked_version'
+          ? 'Enigma will not install an update with an invalid version.'
+          : 'Enigma will not install this update until it passes safety checks.';
   const crashEnabled = crashReporting.status?.enabled ?? false;
   const crashPending = crashReporting.status?.pending_count ?? 0;
   const memoryDriveStatus = normalizeMemoryDriveStatus(health.memory_drive_status);
@@ -1818,7 +1822,7 @@ async function handleAction(event) {
       health.update_status = update.status;
       busy = false;
       render();
-      setStatus(update.status === 'available' ? 'An update is available.' : update.status === 'blocked_unsigned' ? 'Update blocked until a signed manifest is available.' : update.status === 'blocked_downgrade' ? 'Downgrade update blocked.' : update.status === 'blocked_version' ? 'Update blocked because the manifest version is invalid.' : 'App is up to date.');
+      setStatus(update.status === 'available' ? 'An update is available.' : update.status === 'blocked_unsigned' ? 'Update blocked until a signed manifest is available.' : update.status === 'blocked_downgrade' ? 'Downgrade update blocked.' : update.status === 'blocked_channel' ? 'Update blocked because it is from a different release channel.' : update.status === 'blocked_version' ? 'Update blocked because the manifest version is invalid.' : 'App is up to date.');
       return;
     }
     case 'toggle-crash-reporting': {

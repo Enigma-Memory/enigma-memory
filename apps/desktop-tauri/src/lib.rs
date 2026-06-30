@@ -15,6 +15,7 @@ pub struct DesktopConfig {
     pub cli_path: PathBuf,
     pub node_path: PathBuf,
     pub update_manifest_url: String,
+    pub release_channel: String,
 }
 
 pub struct AppState {
@@ -47,12 +48,16 @@ fn build_config() -> DesktopConfig {
         .or_else(|_| std::env::var("ENIGMA_UPDATE_URL"))
         .unwrap_or_else(|_| "https://enigmamemory.com/releases/desktop/manifest.json".to_string());
 
+    let release_channel =
+        std::env::var("ENIGMA_UPDATE_CHANNEL").unwrap_or_else(|_| "stable".to_string());
+
     DesktopConfig {
         version,
         bundle_path,
         cli_path,
         node_path,
         update_manifest_url,
+        release_channel,
     }
 }
 

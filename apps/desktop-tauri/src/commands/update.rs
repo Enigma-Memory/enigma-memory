@@ -40,9 +40,16 @@ pub async fn check_update(state: tauri::State<'_, AppState>) -> Result<Value, St
         .and_then(|v| v.as_str())
         .unwrap_or(current_version)
         .to_string();
+    let manifest_channel = manifest.get("channel").and_then(|v| v.as_str());
 
     let signature_present = manifest.get("signature").is_some();
-    let status = update_status(current_version, &available_version, signature_present);
+    let status = update_status(
+        current_version,
+        &available_version,
+        signature_present,
+        manifest_channel,
+        &state.config.release_channel,
+    );
     let requires_signed_manifest = status == "blocked_unsigned";
 
     Ok(json!({
@@ -52,11 +59,22 @@ pub async fn check_update(state: tauri::State<'_, AppState>) -> Result<Value, St
         "manifest_url": manifest_url,
         "signature_present": signature_present,
         "requires_signed_manifest": requires_signed_manifest,
+        "manifest_channel": manifest_channel.unwrap_or("unspecified"),
+        "expected_channel": state.config.release_channel,
         "notes": manifest.get("notes").and_then(|v| v.as_str()).unwrap_or("")
     }))
 }
 
-fn update_status(current: &str, available: &str, signature_present: bool) -> &'static str {
+fn update_status(
+    current: &str,
+    available: &str,
+    signature_present: bool,
+    manifest_channel: Option<&str>,
+    expected_channel: &str,
+) -> &'static str {
+    if manifest_channel.is_some_and(|channel| channel != expected_channel) {
+        return "blocked_channel";
+    }
     match compare_versions(current, available) {
         Some(Ordering::Equal) => "current",
         Some(Ordering::Greater) => "blocked_downgrade",
@@ -97,13 +115,29 @@ mod tests {
 
     #[test]
     fn update_status_requires_safe_manifest_progression() {
-        assert_eq!("current", update_status("0.1.18", "0.1.18", false));
-        assert_eq!("available", update_status("0.1.18", "0.1.19", true));
-        assert_eq!("blocked_unsigned", update_status("0.1.18", "0.1.19", false));
-        assert_eq!("blocked_downgrade", update_status("0.1.19", "0.1.18", true));
+        assert_eq!(
+            "current",
+            update_status("0.1.18", "0.1.18", false, None, "stable")
+        );
+        assert_eq!(
+            "available",
+            update_status("0.1.18", "0.1.19", true, Some("stable"), "stable")
+        );
+        assert_eq!(
+            "blocked_unsigned",
+            update_status("0.1.18", "0.1.19", false, None, "stable")
+        );
+        assert_eq!(
+            "blocked_downgrade",
+            update_status("0.1.19", "0.1.18", true, None, "stable")
+        );
+        assert_eq!(
+            "blocked_channel",
+            update_status("0.1.19", "0.1.20", true, Some("beta"), "stable")
+        );
         assert_eq!(
             "blocked_version",
-            update_status("0.1.19", "not-a-version", true)
+            update_status("0.1.19", "not-a-version", true, None, "stable")
         );
     }
 }
