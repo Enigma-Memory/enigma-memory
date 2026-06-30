@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { buildProductionStorageMigrationArtifact } from '../scripts/build-production-storage-migration.mjs';
+import { buildProductionStorageMigrationArtifact, renderProductionStorageMigrationPlain } from '../scripts/build-production-storage-migration.mjs';
 import {
   POSTGRES_MIGRATION_SCHEMA,
   PRODUCTION_STORAGE_OPERATION_SCHEMA,
@@ -207,6 +207,17 @@ test('production storage migration script writes JSON and SQL artifacts', async 
   assert.equal(artifact.migration.migration_id, '001_ops');
   assert.equal(artifact.contract.tables.length, PRODUCTION_STORAGE_TABLES.length);
   assertProductionStorageSqlSafe(artifact.migration.sql);
+  const plain = renderProductionStorageMigrationPlain(artifact);
+  assert.match(plain, /^Enigma production storage migration\n/);
+  assert.match(plain, /Status: Ready/);
+  assert.match(plain, /Database schema: enigma_ops/);
+  assert.match(plain, /Migration: 001_ops/);
+  assert.match(plain, /Tables: /);
+  assert.match(plain, /Output written: no/);
+  assert.match(plain, /Boundary: public-safe local storage migration artifact only/);
+  assert.doesNotMatch(plain, /^\s*\{/);
+  assert.doesNotMatch(plain, /Bearer|Basic|PRIVATE KEY|password|raw_memory|C:\\Users\\|\/home\/|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/i);
+
 
   const dir = await mkdtemp(join(tmpdir(), 'enigma-storage-migration-'));
   const jsonOut = join(dir, 'migration.json');
@@ -224,6 +235,27 @@ test('production storage migration script writes JSON and SQL artifacts', async 
   assert.match(jsonRun.stdout, /\"ok\": true/);
   const jsonArtifact = JSON.parse(await readFile(jsonOut, 'utf8'));
   assert.equal(jsonArtifact.migration.migration_id, '001_ops');
+
+  const plainOut = join(dir, 'migration-plain.json');
+  const plainRun = await execFileAsync(process.execPath, [
+    'scripts/build-production-storage-migration.mjs',
+    '--schema',
+    'enigma_ops',
+    '--migration-id',
+    '001_ops',
+    '--out',
+    plainOut,
+    '--plain',
+  ], { cwd: process.cwd(), timeout: 10000, windowsHide: true });
+  assert.equal(plainRun.stderr, '');
+  assert.match(plainRun.stdout, /^Enigma production storage migration\n/);
+  assert.match(plainRun.stdout, /Output written: yes/);
+  assert.match(plainRun.stdout, /Boundary: public-safe local storage migration artifact only/);
+  assert.doesNotMatch(plainRun.stdout, /^\s*\{/);
+  assert.equal(plainRun.stdout.includes(dir), false);
+  assert.equal(plainRun.stdout.includes(plainOut), false);
+  const plainArtifact = JSON.parse(await readFile(plainOut, 'utf8'));
+  assert.equal(plainArtifact.migration.migration_id, '001_ops');
 
   const sqlRun = await execFileAsync(process.execPath, [
     'scripts/build-production-storage-migration.mjs',

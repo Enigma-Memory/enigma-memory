@@ -8,25 +8,27 @@ For most developers, start with the installed CLI before reading the SDK interna
 
 ```sh
 npm install -g enigma-memory
-enigma init
-enigma setup --client auto --connect-installed --overwrite
-enigma drive health
-enigma status
-enigma remember --text-file ./memory.txt
-enigma search --query "project context"
-enigma context --query "project context" --optimize
+enigma quickstart --bundle ./.enigma/bundle.json
+enigma doctor --bundle ./.enigma/bundle.json
+enigma drive health --bundle ./.enigma/bundle.json
+enigma claude-mcpb package --plain
+enigma status --bundle ./.enigma/bundle.json
+enigma remember --bundle ./.enigma/bundle.json --text-file ./memory.txt
+enigma search --bundle ./.enigma/bundle.json --query "project context"
+enigma context --bundle ./.enigma/bundle.json --query "project context" --optimize
+enigma export --bundle ./.enigma/bundle.json --out ./.enigma/export.json
 enigma verify --export ./.enigma/export.json
 ```
 
-`enigma init` creates the local `.enigma` workspace, bundle, and proof artifacts with no provider or cloud credentials. `enigma setup --client auto --connect-installed --overwrite` configures the drive and writes the `mcpServers.enigma` entry into every installed/config-present client it detects, skipping clients that are not installed; preview with `--dry-run` first. `enigma drive health` reports a SMART-style memory-drive health packet (freshness, duplicate rate, tombstone backlog, stale derived artifacts, receipt coverage, connector health) from local metadata only; it is part of the Memory Drive surface in this release, and `enigma status` plus `enigma doctor` cover local passport counts, roots, and connector readiness in every build. Neither setup command prints raw memory plaintext. Treat provider-native memory as non-canonical cache only; the local Enigma vault is canonical.
+`enigma quickstart` creates the local `.enigma` workspace, bundle, and proof artifacts with no provider or cloud credentials. Claude Desktop uses the `.mcpb` extension handoff first; Cursor and other config-based connector writes stay behind explicit `enigma connect <client> --dry-run` preview and a separate intentional connect command. `enigma drive health` reports a SMART-style memory-drive health packet (freshness, duplicate rate, tombstone backlog, stale derived artifacts, receipt coverage, connector health) from local metadata only; it is part of the Memory Drive surface in this release, and `enigma status` plus `enigma doctor` cover local passport counts, roots, and connector readiness in every build. Neither quickstart nor connector dry-run contacts providers, creates hosted accounts, syncs cloud state, or proves provider deletion/model forgetting.
 
 Optional public test-drive loop:
 
 ```sh
-npx --yes --package enigma-memory enigma test-drive --overwrite
+npx --yes --package enigma-memory enigma test-drive
 ```
 
-`enigma test-drive --overwrite` is zero-credential, local-only, and public-safe by default. It does not call external providers, contact hosted Enigma SaaS, require OpenAI/Anthropic/Cloudflare credentials, create accounts, or write third-party client configs.
+`enigma test-drive` is zero-credential, local-only, and public-safe by default when run in an empty or scratch directory. It does not call external providers, contact hosted Enigma SaaS, require OpenAI/Anthropic/Cloudflare credentials, create accounts, or write third-party client configs. If the output already exists, choose a new empty output directory; use `--overwrite` only when intentionally replacing local demo artifacts.
 
 ## Copyable starting points
 
@@ -54,9 +56,9 @@ The example app prints ids, counts, roots, and verification status only. It does
 The CI example installs Node 24, installs `enigma-memory` into a disposable npm project, exposes the package benchmark script, then runs:
 
 ```sh
-npx enigma test-drive --overwrite
-npx enigma setup --overwrite
-npx enigma doctor
+npx enigma test-drive
+npx enigma quickstart --bundle ./.enigma/bundle.json
+npx enigma doctor --bundle ./.enigma/bundle.json
 npm run benchmark:memory-suite -- --out benchmark-report.json
 ```
 
@@ -85,7 +87,7 @@ The proof-network path gives integrators a public, privacy-preserving adoption t
 5. Wire the same artifact contract into a connector, benchmark dashboard, or conformance test.
 
 ```sh
-npx --yes --package enigma-memory enigma test-drive --overwrite
+npx --yes --package enigma-memory enigma test-drive
 npx --yes --package enigma-memory enigma chain anchor --root sha256:8f8f... --root sha256:9a9a... --ref demo-local-vault --authority demo-public-authority --batch-ref demo-anchor-batch --out .enigma/proof-anchor-batch.json
 npx --yes --package enigma-memory enigma chain grant --subject did:example:agent --capability memory.read --scope demo-scope --resource-ref sha256:8f8f... --policy-hash sha256:7e7e... --expires-at 2026-07-01T00:00:00Z --grant-ref demo-grant --out .enigma/proof-capability-grant.json
 npx --yes --package enigma-memory enigma chain revoke --grant-hash sha256:6d6d... --reason scope-ended --revocation-ref demo-revocation --out .enigma/proof-capability-revocation.json
@@ -119,9 +121,9 @@ This path is intentionally copyable: npm install, run a local test drive, genera
 
 ## MCP client loop
 
-The same installed package can be used by Claude Desktop, Cursor, Kimi Code, or any generic MCP client. The smooth path is still one local setup plus a dry-run connector preview: `enigma setup --overwrite`, then `enigma connect claude-desktop --dry-run` or the matching client id. Remove `--dry-run` only when you explicitly want Enigma to write that client config. Manual snippets remain useful when a client needs a copied entry; replace the bundle path with the local path from your setup output, and restart the client.
+The same installed package can be used by Claude Desktop, Cursor, Kimi Code, or any generic MCP client. The smooth Claude path is one local quickstart plus the extension package: `enigma quickstart --bundle ./.enigma/bundle.json`, then `enigma claude-mcpb package --plain`. Cursor is the first config-preview example: `enigma connect cursor --bundle ./.enigma/bundle.json --dry-run`. Remove `--dry-run` only when you explicitly want Enigma to write that client config. Manual snippets remain useful when a client needs a copied entry; replace the bundle path with the local path from your quickstart output, and restart the client.
 
-Claude Desktop:
+Claude Desktop fallback, advanced only:
 
 ```json
 {

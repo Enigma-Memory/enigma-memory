@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Set up Enigma Memory in one guided flow.">
+  <title>Set up your Enigma Memory Drive</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="site-logo" href="./index.html">Enigma Memory</a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="./download.html">Download</a>
+        <a href="./launch-status.html">Launch status</a>
+        <a href="./setup.html">How it works</a>
+        <a href="./privacy.html">Privacy</a>
+        <a href="./help/index.html">Help</a>
+        <a href="./faq.html">FAQ</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <span class="eyebrow">First run</span>
+      <h1>Set up your Memory Drive in one guided flow.</h1>
+      <p>Enigma creates a private Memory Drive on this computer, looks for supported AI apps, and shows plain fix-it steps before you start using memory.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="./help/install.html">Open setup guide</a>
+      </div>
+      <p class="trust-note">The default setup is the desktop app wizard. Command-line details stay in the advanced appendix unless support asks you to use them.</p>
+    </section>
+
+    <section class="content-section first-run-map" aria-labelledby="map-heading">
+      <div>
+        <span class="eyebrow">Visual path</span>
+        <h2 id="map-heading">Four screens. No terminal. No JSON.</h2>
+        <p>General users should only need the desktop app: create the local drive, review detected apps, approve a connection preview, then check what happened.</p>
+      </div>
+      <div class="setup-map" role="list" aria-label="First-run setup map">
+        <article class="setup-map__card" role="listitem">
+          <span class="setup-map__label">Screen 01</span>
+          <h3>Create Memory Drive</h3>
+          <p>Private Memory Drive is created on this computer.</p>
+        </article>
+        <article class="setup-map__card" role="listitem">
+          <span class="setup-map__label">Screen 02</span>
+          <h3>Find AI apps</h3>
+          <p>Supported apps are detected without changing anything.</p>
+        </article>
+        <article class="setup-map__card setup-map__card--wide" role="listitem">
+          <span class="setup-map__label">Screen 03</span>
+          <h3>Preview, then approve</h3>
+          <p>Enigma shows what it will change before you approve.</p>
+        </article>
+        <article class="setup-map__card" role="listitem">
+          <span class="setup-map__label">Screen 04</span>
+          <h3>Memory Drive dashboard</h3>
+          <p>Health, proof counts, support summary, and fix-it actions in one place.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="content-section" aria-labelledby="steps-heading">
+      <h2 id="steps-heading">What happens during first run</h2>
+      <div class="steps">
+        <article class="step">
+          <span class="step__number">1</span>
+          <div class="step__content">
+            <h3>Create Memory Drive</h3>
+            <p>Enigma creates a private Memory Drive on this computer. No cloud account or provider login is required.</p>
+          </div>
+        </article>
+        <article class="step">
+          <span class="step__number">2</span>
+          <div class="step__content">
+            <h3>Connect supported apps</h3>
+            <p>Enigma finds installed AI apps, previews the connection change, and applies it only after you approve.</p>
+          </div>
+        </article>
+        <article class="step">
+          <span class="step__number">3</span>
+          <div class="step__content">
+            <h3>Review health</h3>
+            <p>The health dashboard shows whether your Memory Drive and connections are ready, and explains any fix-it actions.</p>
+          </div>
+        </article>
+        <article class="step">
+          <span class="step__number">4</span>
+          <div class="step__content">
+            <h3>Start using memory</h3>
+            <p>Once setup is green, your connected AI apps can ask your Memory Drive for context when you choose to use it.</p>
+          </div>
+        </article>
+      </div>
+
+      <details>
+        <summary>Need command-line setup?</summary>
+        <p>Use the <a href="./developers/cli.html">Developer CLI appendix</a> only if support asks for command-line steps or you already prefer terminal setup. It is not the default consumer path.</p>
+      </details>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer__inner">
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="./download.html">Download</a></li>
+          <li><a href="./setup.html">How it works</a></li>
+          <li><a href="./privacy.html">Privacy</a></li>
+          <li><a href="./launch-status.html">Launch status</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Support</h4>
+        <ul>
+          <li><a href="./help/index.html">Help hub</a></li>
+          <li><a href="./help/install.html">Install guide</a></li>
+          <li><a href="./help/troubleshooting.html">Troubleshooting</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Developers</h4>
+        <ul>
+          <li><a href="./developers/cli.html">CLI appendix</a></li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

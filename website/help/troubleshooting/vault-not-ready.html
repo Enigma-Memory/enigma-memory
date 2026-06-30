@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="What to do if Enigma Memory reports that your Memory Drive is not ready.">
+  <title>Memory Drive not ready</title>
+  <link rel="stylesheet" href="../../styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="site-logo" href="../../index.html">Enigma Memory</a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="../../download.html">Download</a>
+        <a href="../../setup.html">How it works</a>
+        <a href="../../privacy.html">Privacy</a>
+        <a href="../index.html">Help</a>
+        <a href="../../faq.html">FAQ</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <span class="eyebrow">Troubleshooting</span>
+      <h1>Memory Drive not ready.</h1>
+      <p>Enigma cannot find or open your local Memory Drive. Start with the repair buttons inside the desktop app; command-line repair is an advanced fallback at the bottom of this page.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="symptom-heading">
+      <h2 id="symptom-heading">Symptom</h2>
+      <p>The health dashboard shows a Memory Drive warning, or the setup wizard cannot finish creating your local drive.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="cause-heading">
+      <h2 id="cause-heading">Likely causes</h2>
+      <ul>
+        <li>Setup closed before the Memory Drive was created.</li>
+        <li>The drive or folder that holds Enigma’s data is not available right now.</li>
+        <li>A system permission is stopping Enigma from opening its own folder.</li>
+      </ul>
+    </section>
+
+    <section class="content-section" aria-labelledby="fix-heading">
+      <h2 id="fix-heading">Try this first</h2>
+      <ol>
+        <li>Open Enigma Memory and choose <strong>Create Memory Drive</strong> in the setup wizard.</li>
+        <li>If you already created one, choose <strong>Repair Memory Drive</strong> on the health dashboard.</li>
+        <li>If you moved the Memory Drive folder, make sure that drive or folder is connected and available.</li>
+      </ol>
+    </section>
+
+    <section class="content-section" aria-labelledby="fallback-heading">
+      <h2 id="fallback-heading">If that does not work</h2>
+      <ol>
+        <li>Restart Enigma Memory and check the health dashboard again.</li>
+        <li>If a backup exists, choose <strong>Restore from backup</strong> in the recovery prompt.</li>
+        <li>If no backup exists and Enigma still cannot open the Memory Drive, choose <strong>Safe reset</strong>. This starts a fresh Memory Drive and does not change Claude, Cursor, or other connected app settings.</li>
+      </ol>
+    </section>
+
+    <section class="content-section" aria-labelledby="support-heading">
+      <h2 id="support-heading">What to send support</h2>
+      <p>Safe to share: health status, app version, support code, and whether the Memory Drive was created before the warning appeared. Do not send raw memory, prompts, transcripts, credentials, account IDs, or local paths. See <a href="../support-safe-sharing.html">what is safe to share with support</a>.</p>
+    </section>
+
+    <section class="content-section">
+      <details>
+        <summary>Advanced command-line repair</summary>
+        <p>If the desktop app repair options do not resolve the issue, see the <a href="../../developers/cli.html">CLI appendix</a> for terminal-based repair commands. Run these only if you are comfortable with the command line.</p>
+      </details>
+    </section>
+    <section class="content-section">
+      <p><a href="../index.html">Back to help hub</a></p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer__inner">
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="../../download.html">Download</a></li>
+          <li><a href="../../setup.html">How it works</a></li>
+          <li><a href="../../privacy.html">Privacy</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Support</h4>
+        <ul>
+          <li><a href="../index.html">Help hub</a></li>
+          <li><a href="../install.html">Install guide</a></li>
+          <li><a href="../connect-apps.html">Connect apps</a></li>
+          <li><a href="../troubleshooting.html">Troubleshooting</a></li>
+          <li><a href="../support-safe-sharing.html">Safe support sharing</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Developers</h4>
+        <ul>
+          <li><a href="../../developers/cli.html">CLI appendix</a></li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

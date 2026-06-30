@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startServer } from "../src/server.mjs";
-import { createStore } from "../src/store.mjs";
+import { createStore, deriveDataEncryptionKey } from "../src/store.mjs";
 
 const TEST_KEY = "a".repeat(64);
 const tmpDir = mkdtempSync(join(tmpdir(), "cortex-http-"));
@@ -258,5 +258,119 @@ describe("auto-save endpoint", () => {
     server?.close();
     store?.close();
     rmSync(autoSaveTmpDir, { recursive: true, force: true });
+  });
+});
+
+describe("encryption isolation", () => {
+  let isoTmpDir;
+
+  before(() => {
+    isoTmpDir = mkdtempSync(join(tmpdir(), "cortex-iso-"));
+  });
+
+  after(() => {
+    rmSync(isoTmpDir, { recursive: true, force: true });
+  });
+
+  it("derives a 32-byte DEK from wallet entropy", () => {
+    const dek = deriveDataEncryptionKey(Buffer.from("alice-wallet-seed"));
+    assert.ok(Buffer.isBuffer(dek));
+    assert.equal(dek.length, 32);
+  });
+
+  it("derives different DEKs for different owners", () => {
+    const alice = deriveDataEncryptionKey(Buffer.from("alice-wallet-seed"));
+    const bob = deriveDataEncryptionKey(Buffer.from("bob-wallet-seed"));
+    assert.notDeepEqual(alice, bob);
+  });
+
+  it("derives different DEKs with and without passphrase", () => {
+    const without = deriveDataEncryptionKey(Buffer.from("alice-wallet-seed"));
+    const withPass = deriveDataEncryptionKey(
+      Buffer.from("alice-wallet-seed"),
+      "passphrase"
+    );
+    assert.notDeepEqual(without, withPass);
+  });
+
+  it("two users' stores cannot decrypt each other", () => {
+    const alicePath = join(isoTmpDir, "alice-isolated.sqlite");
+    const bobPath = join(isoTmpDir, "bob-isolated.sqlite");
+    const aliceDek = deriveDataEncryptionKey(Buffer.from("alice-wallet-seed"));
+    const bobDek = deriveDataEncryptionKey(Buffer.from("bob-wallet-seed"));
+
+    const aliceStore = createStore({ path: alicePath, dek: aliceDek });
+    aliceStore.put("secret", { text: "alice secret", owner: "alice" });
+    aliceStore.close();
+
+    const bobStore = createStore({ path: alicePath, dek: bobDek });
+    assert.throws(() => bobStore.get("secret"), /bad decrypt|wrong final block length|Unsupported state/i);
+    bobStore.close();
+  });
+
+  it("operator default key cannot decrypt a user-derived key", () => {
+    const userPath = join(isoTmpDir, "user-isolated.sqlite");
+    const userDek = deriveDataEncryptionKey(Buffer.from("user-wallet-seed"));
+
+    const userStore = createStore({ path: userPath, dek: userDek });
+    userStore.put("secret", { text: "user secret", owner: "user" });
+    userStore.close();
+
+    const operatorStore = createStore({ path: userPath });
+    assert.throws(() => operatorStore.get("secret"), /bad decrypt|wrong final block length|Unsupported state/i);
+    operatorStore.close();
+  });
+
+  it("HTTP server isolates authenticated users' memories", async () => {
+    const serverTmpDir = join(isoTmpDir, "http-auth");
+    const entropyMap = {
+      alice: Buffer.from("alice-http-wallet-seed"),
+      bob: Buffer.from("bob-http-wallet-seed"),
+    };
+    const server = await startServer(0, {
+      storePath: serverTmpDir,
+      skipSessionVerification: true,
+      getOwnerEntropy: (owner) => entropyMap[owner] ?? null,
+      embedder: makeTestEmbedder(),
+    });
+    const port = server.address().port;
+    const baseUrl = `http://127.0.0.1:${port}`;
+    try {
+      const aliceHeaders = {
+        "Content-Type": "application/json",
+        "x-cortex-owner": "alice",
+        "x-cortex-session-key": "alice-session",
+      };
+      const bobHeaders = {
+        "Content-Type": "application/json",
+        "x-cortex-owner": "bob",
+        "x-cortex-session-key": "bob-session",
+      };
+
+      const alicePost = await fetch(`${baseUrl}/ingest`, {
+        method: "POST",
+        headers: aliceHeaders,
+        body: JSON.stringify({
+          id: "iso-mem-1",
+          text: "alice hidden note",
+          owner: "alice",
+        }),
+      });
+      assert.equal(alicePost.status, 201);
+
+      const aliceGet = await fetch(`${baseUrl}/retrieve/iso-mem-1`, {
+        headers: aliceHeaders,
+      });
+      assert.equal(aliceGet.status, 200);
+      const aliceBody = await aliceGet.json();
+      assert.equal(aliceBody.text, "alice hidden note");
+
+      const bobGet = await fetch(`${baseUrl}/retrieve/iso-mem-1`, {
+        headers: bobHeaders,
+      });
+      assert.equal(bobGet.status, 404);
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
   });
 });

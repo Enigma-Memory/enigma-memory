@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { canonicalize, receiptHash, sha256Hex, verifyReceipt } from '../../core/src/index.js';
+import { canonicalize, MerkleSet, receiptHash, sha256Hex, verifyReceipt } from '../../core/src/index.js';
 import {
   createMemoryAccessReceipt,
   createMemoryOptimizationPlan,
@@ -8,6 +8,50 @@ import {
 
 const PASSPORT_SCHEMA = 'enigma.passport.v1';
 const CONTEXT_PACK_SCHEMA = 'enigma.context_pack.v1';
+const CONTEXT_PASSPORT_SCHEMA = 'enigma.context_passport.v1';
+const PROOF_OF_NON_USE_SCHEMA = 'enigma.proof_of_non_use.v1';
+const VERIFIED_STATUS = 'verified';
+const FAILED_PROOF_STATUS = 'failed';
+const FAIL_CLOSED_STATUS = 'fail_closed';
+const PROOF_POLICY_DECISIONS = new Set(['allow', 'deny', 'redact', 'quarantine', 'tombstone_only']);
+const PROOF_VERIFIER_STATUSES = new Set([VERIFIED_STATUS, FAILED_PROOF_STATUS, 'inconclusive']);
+const CONTEXT_PASSPORT_FIELDS = Object.freeze([
+  'schema',
+  'passport_id',
+  'issued_at',
+  'subject_ref',
+  'query_commitment',
+  'selected_context_root',
+  'omitted_context_root',
+  'tombstone_context_root',
+  'selected_count',
+  'omitted_count',
+  'tombstone_count',
+  'capability_ids',
+  'policy_ids',
+  'proof_refs',
+]);
+const PROOF_OF_NON_USE_FIELDS = Object.freeze([
+  'schema',
+  'proof_id',
+  'issued_at',
+  'subject_ref',
+  'query_commitment',
+  'candidate_set_root',
+  'selected_set_root',
+  'omitted_set_root',
+  'tombstone_set_root',
+  'candidate_count',
+  'selected_count',
+  'omitted_count',
+  'tombstone_count',
+  'policy_id',
+  'policy_decision',
+  'verifier_status',
+  'verifier_ref',
+  'receipt_log_root',
+  'receipt_refs',
+]);
 const ZERO_ROOT = `sha256:${'0'.repeat(64)}`;
 const ROOT_RE = /^sha256:[a-f0-9]{64}$/;
 const PREVIOUS_RECEIPT_RE = /^(GENESIS|sha256:[a-f0-9]{64})$/;
@@ -582,6 +626,222 @@ function receiptDigest(receipt) {
   }
 }
 
+function merkleRootFrom(values) {
+  return new MerkleSet(sortedRefs(values)).root();
+}
+
+function sortedRefs(values) {
+  const refs = [];
+  for (const value of values ?? []) {
+    if (value === undefined || value === null) continue;
+    const ref = String(value);
+    if (ref.length > 0) refs.push(ref);
+  }
+  return [...new Set(refs)].sort();
+}
+
+function receiptRefsFromReceipts(receipts) {
+  const refs = [];
+  for (const receipt of receipts ?? []) {
+    const digest = typeof receipt === 'string' ? receipt : receiptDigest(publicReceipt(receipt)) ?? receiptDigest(receipt);
+    if (typeof digest === 'string' && digest.length > 0) refs.push(digest);
+  }
+  return sortedRefs(refs);
+}
+
+function receiptRefsFromContextPack(contextPack) {
+  return sortedRefs([
+    ...(contextPack?.receipt_hashes ?? []),
+    ...receiptRefsFromReceipts(contextPack?.receipts),
+    ...receiptRefsFromReceipts(contextPack?.retrieval_receipts),
+    ...receiptRefsFromReceipts(contextPack?.injection_receipts),
+  ]);
+}
+
+function receiptRefsFromArgs(args, contextPack) {
+  return sortedRefs([
+    ...(args.proof_refs ?? args.proofRefs ?? []),
+    ...(args.receipt_refs ?? args.receiptRefs ?? []),
+    ...receiptRefsFromContextPack(contextPack),
+  ]);
+}
+
+function hashedRef(prefix, value) {
+  return `${prefix}_${sha256Hex(canonical(value)).slice(0, 32)}`;
+}
+
+function queryCommitment(args, contextPack) {
+  const explicit = args.query_commitment ?? args.queryCommitment;
+  if (explicit !== undefined) return String(explicit);
+  return `sha256:${sha256Hex(String(args.query ?? contextPack?.query ?? ''))}`;
+}
+
+function policyIdsFrom(args, passport, contextPack) {
+  const ids = sortedRefs([
+    ...(args.policy_ids ?? args.policyIds ?? []),
+    ...(passport?.policies ?? []),
+    ...((contextPack?.receipts ?? []).map((receipt) => receipt?.policy_id).filter(Boolean)),
+  ]);
+  return ids.length > 0 ? ids : ['local-default'];
+}
+
+function capabilityIdsFrom(args) {
+  return sortedRefs(args.capability_ids ?? args.capabilityIds ?? ['capability:context-passport']);
+}
+
+function explicitRefs(args, snakeKey, camelKey) {
+  const refs = args[snakeKey] ?? args[camelKey];
+  return refs === undefined ? undefined : sortedRefs(refs);
+}
+
+function contextPackFromArgs(args) {
+  const contextPack = args.contextPack ?? args.context_pack ?? args.pack;
+  if (contextPack) return contextPack;
+  if (args.vault) return compileContextPack(args);
+  return undefined;
+}
+
+function contextSelectionSummary(args = {}) {
+  const contextPack = args.contextPack ?? args.context_pack ?? args.pack;
+  const passport = args.passport;
+  const selected = explicitRefs(args, 'selected_context_refs', 'selectedContextRefs')
+    ?? explicitRefs(args, 'selected_refs', 'selectedRefs')
+    ?? sortedRefs(memoryAddressesFromPack(contextPack));
+  const selectedSet = new Set(selected);
+
+  const activeRefs = sortedRefs([
+    ...activeAddressesFrom(args.active_state ?? args.activeState),
+    ...activeAddressesFrom(args.vault),
+    ...activeAddressesFrom(passport),
+  ]);
+  const omitted = explicitRefs(args, 'omitted_context_refs', 'omittedContextRefs')
+    ?? explicitRefs(args, 'omitted_refs', 'omittedRefs')
+    ?? activeRefs.filter((ref) => !selectedSet.has(ref));
+  const tombstone = explicitRefs(args, 'tombstone_context_refs', 'tombstoneContextRefs')
+    ?? explicitRefs(args, 'tombstone_refs', 'tombstoneRefs')
+    ?? sortedRefs([
+      ...tombstoneAddressesFrom(args.tombstones),
+      ...tombstoneAddressesFrom(args.vault),
+      ...tombstoneAddressesFrom(passport),
+      ...(passport?.tombstone_addresses ?? []),
+    ]);
+
+  return {
+    selected,
+    omitted,
+    tombstone,
+    selected_context_root: merkleRootFrom(selected),
+    omitted_context_root: merkleRootFrom(omitted),
+    tombstone_context_root: merkleRootFrom(tombstone),
+    selected_count: selected.length,
+    omitted_count: omitted.length,
+    tombstone_count: tombstone.length,
+  };
+}
+
+function proofSelectionSummary(args = {}) {
+  const base = contextSelectionSummary(args);
+  const candidate = explicitRefs(args, 'candidate_refs', 'candidateRefs')
+    ?? sortedRefs([...base.selected, ...base.omitted, ...base.tombstone]);
+  return {
+    ...base,
+    candidate,
+    candidate_set_root: merkleRootFrom(candidate),
+    selected_set_root: merkleRootFrom(base.selected),
+    omitted_set_root: merkleRootFrom(base.omitted),
+    tombstone_set_root: merkleRootFrom(base.tombstone),
+    candidate_count: candidate.length,
+  };
+}
+
+function missingBoundaryFields(artifact, requiredFields) {
+  const errors = [];
+  for (const field of requiredFields) {
+    if (artifact?.[field] === undefined || artifact?.[field] === null) errors.push(`missing ${field}`);
+  }
+  return errors;
+}
+
+function validateRootField(artifact, field, errors) {
+  if (!ROOT_RE.test(artifact?.[field] ?? '')) errors.push(`invalid ${field}`);
+}
+
+function validateCountField(artifact, field, errors) {
+  if (!Number.isInteger(artifact?.[field]) || artifact[field] < 0) errors.push(`invalid ${field}`);
+}
+
+function validateRefArray(artifact, field, errors) {
+  const refs = artifact?.[field];
+  if (!Array.isArray(refs) || refs.length === 0) {
+    errors.push(`missing ${field}`);
+    return;
+  }
+  for (const ref of refs) {
+    if (typeof ref !== 'string' || ref.length === 0) errors.push(`invalid ${field}`);
+  }
+}
+
+function publicBoundaryArtifact(artifact) {
+  if (!artifact || typeof artifact !== 'object') return null;
+  const fields = artifact.schema === CONTEXT_PASSPORT_SCHEMA
+    ? CONTEXT_PASSPORT_FIELDS
+    : artifact.schema === PROOF_OF_NON_USE_SCHEMA
+      ? PROOF_OF_NON_USE_FIELDS
+      : [];
+  if (fields.length === 0) return null;
+  const out = {};
+  for (const field of fields) {
+    if (artifact[field] !== undefined) out[field] = artifact[field];
+  }
+  return out;
+}
+
+
+function invalidBoundaryResult(artifact, errors, status = FAIL_CLOSED_STATUS) {
+  const publicArtifact = publicBoundaryArtifact(artifact);
+  return {
+    valid: false,
+    verifier_status: status,
+    error: errors[0],
+    reason: errors[0],
+    errors,
+    public_artifact: publicArtifact,
+    canonical: publicArtifact ? canonical(publicArtifact) : null,
+  };
+}
+
+function validBoundaryResult(artifact) {
+  return {
+    valid: true,
+    verifier_status: VERIFIED_STATUS,
+    public_artifact: artifact,
+    canonical: canonical(artifact),
+  };
+}
+
+function compareRootAndCount(artifact, expected, rootField, countField, expectedRootField, expectedCountField, errors) {
+  if (artifact[rootField] !== expected[expectedRootField]) errors.push(`${rootField} mismatch`);
+  if (artifact[countField] !== expected[expectedCountField]) errors.push(`${countField} mismatch`);
+}
+
+function verifyRequiredReceiptRefs(artifactRefs, expectedRefs, errors, field) {
+  if (expectedRefs.length === 0) return;
+  const refs = new Set(artifactRefs);
+  for (const ref of expectedRefs) {
+    if (!refs.has(ref)) errors.push(`missing ${field} receipt ref: ${ref}`);
+  }
+}
+
+function verifyContextPackWhenTrusted(args, contextPack, errors) {
+  if (!contextPack || !trustedKeyOptions(args)) return;
+  try {
+    const result = verifyContextPack({ ...args, contextPack });
+    if (result?.valid !== true) errors.push(`context pack verification failed: ${result?.reason ?? 'invalid'}`);
+  } catch (error) {
+    errors.push(`context pack verification failed: ${error.message}`);
+  }
+}
+
 export function createPassport(args = {}) {
   const vault = args.vault;
   const createdAt = nowIso(args.now);
@@ -777,6 +1037,171 @@ export function verifyContextPack(args = {}) {
     public_context_pack: publicPack,
     canonical: canonical(publicPack),
   };
+}
+
+export function createContextPassport(args = {}) {
+  const contextPack = contextPackFromArgs(args);
+  const passport = args.passport ?? (args.vault ? createPassport({ vault: args.vault, now: args.now }) : undefined);
+  const summary = contextSelectionSummary({ ...args, contextPack, passport });
+  const proofRefs = receiptRefsFromArgs(args, contextPack);
+  if (proofRefs.length === 0) throw new Error('createContextPassport requires proof_refs or context pack receipts');
+  return {
+    schema: CONTEXT_PASSPORT_SCHEMA,
+    passport_id: args.passport_id ?? args.passportId ?? contextPack?.passport_id ?? passport?.passport_id ?? `context_passport_${randomUUID()}`,
+    issued_at: nowIso(args.now),
+    subject_ref: args.subject_ref ?? args.subjectRef ?? hashedRef('subject', passport?.owner?.subject_id ?? args.vault?.subject_id ?? contextPack?.passport_id ?? 'local-subject'),
+    query_commitment: queryCommitment(args, contextPack),
+    selected_context_root: summary.selected_context_root,
+    omitted_context_root: summary.omitted_context_root,
+    tombstone_context_root: summary.tombstone_context_root,
+    selected_count: summary.selected_count,
+    omitted_count: summary.omitted_count,
+    tombstone_count: summary.tombstone_count,
+    capability_ids: capabilityIdsFrom(args),
+    policy_ids: policyIdsFrom(args, passport, contextPack),
+    proof_refs: proofRefs,
+  };
+}
+
+export function verifyContextPassport(args = {}) {
+  const contextPassport = args.schema === CONTEXT_PASSPORT_SCHEMA ? args : (args.contextPassport ?? args.context_passport ?? args.passportArtifact ?? args.artifact);
+  if (!contextPassport || contextPassport.schema !== CONTEXT_PASSPORT_SCHEMA) {
+    return invalidBoundaryResult(contextPassport, ['verifyContextPassport requires an enigma.context_passport.v1 artifact']);
+  }
+
+  const errors = missingBoundaryFields(contextPassport, [
+    'schema',
+    'passport_id',
+    'issued_at',
+    'subject_ref',
+    'query_commitment',
+    'selected_context_root',
+    'omitted_context_root',
+    'tombstone_context_root',
+    'selected_count',
+    'omitted_count',
+    'tombstone_count',
+    'capability_ids',
+    'policy_ids',
+    'proof_refs',
+  ]);
+  validateRootField(contextPassport, 'query_commitment', errors);
+  validateRootField(contextPassport, 'selected_context_root', errors);
+  validateRootField(contextPassport, 'omitted_context_root', errors);
+  validateRootField(contextPassport, 'tombstone_context_root', errors);
+  validateCountField(contextPassport, 'selected_count', errors);
+  validateCountField(contextPassport, 'omitted_count', errors);
+  validateCountField(contextPassport, 'tombstone_count', errors);
+  validateRefArray(contextPassport, 'capability_ids', errors);
+  validateRefArray(contextPassport, 'policy_ids', errors);
+  validateRefArray(contextPassport, 'proof_refs', errors);
+
+  const contextPack = args.contextPack ?? args.context_pack ?? args.pack;
+  if (contextPack || args.vault || args.passport || args.active_state || args.activeState || args.tombstones) {
+    const expected = contextSelectionSummary({ ...args, contextPack });
+    compareRootAndCount(contextPassport, expected, 'selected_context_root', 'selected_count', 'selected_context_root', 'selected_count', errors);
+    compareRootAndCount(contextPassport, expected, 'omitted_context_root', 'omitted_count', 'omitted_context_root', 'omitted_count', errors);
+    compareRootAndCount(contextPassport, expected, 'tombstone_context_root', 'tombstone_count', 'tombstone_context_root', 'tombstone_count', errors);
+  }
+
+  verifyContextPackWhenTrusted(args, contextPack, errors);
+  verifyRequiredReceiptRefs(contextPassport.proof_refs ?? [], receiptRefsFromContextPack(contextPack), errors, 'proof_refs');
+  if (errors.length > 0) return invalidBoundaryResult(contextPassport, errors);
+  return validBoundaryResult(contextPassport);
+}
+
+export function createProofOfNonUse(args = {}) {
+  const contextPack = contextPackFromArgs(args);
+  const passport = args.passport ?? (args.vault ? createPassport({ vault: args.vault, now: args.now }) : undefined);
+  const roots = rootsFromVault(args.vault);
+  const receiptLogRoot = args.receipt_log_root ?? args.receiptLogRoot ?? contextPack?.receipt_log_root ?? roots.receipt_log_root;
+  const policyId = args.policy_id ?? args.policyId ?? contextPack?.receipts?.find((receipt) => receipt?.policy_id)?.policy_id ?? passport?.policies?.[0] ?? args.vault?.policy_id ?? 'local-default';
+  const policyDecision = args.policy_decision ?? args.policyDecision ?? 'allow';
+  const verifierRef = args.verifier_ref ?? args.verifierRef ?? hashedRef('verifier', { schema: PROOF_OF_NON_USE_SCHEMA, policy_id: policyId });
+  if (!PROOF_POLICY_DECISIONS.has(policyDecision)) throw new Error('createProofOfNonUse policy_decision must be allow, deny, redact, quarantine, or tombstone_only');
+  const summary = proofSelectionSummary({ ...args, contextPack, passport });
+  const receiptRefs = receiptRefsFromArgs(args, contextPack);
+  if (receiptRefs.length === 0) throw new Error('createProofOfNonUse requires receipt_refs or context pack receipts');
+  return {
+    schema: PROOF_OF_NON_USE_SCHEMA,
+    proof_id: args.proof_id ?? args.proofId ?? `proof_non_use_${randomUUID()}`,
+    issued_at: nowIso(args.now),
+    subject_ref: args.subject_ref ?? args.subjectRef ?? hashedRef('subject', passport?.owner?.subject_id ?? args.vault?.subject_id ?? contextPack?.passport_id ?? 'local-subject'),
+    query_commitment: queryCommitment(args, contextPack),
+    candidate_set_root: summary.candidate_set_root,
+    selected_set_root: summary.selected_set_root,
+    omitted_set_root: summary.omitted_set_root,
+    tombstone_set_root: summary.tombstone_set_root,
+    candidate_count: summary.candidate_count,
+    selected_count: summary.selected_count,
+    omitted_count: summary.omitted_count,
+    tombstone_count: summary.tombstone_count,
+    policy_id: String(policyId),
+    policy_decision: policyDecision,
+    verifier_status: VERIFIED_STATUS,
+    verifier_ref: verifierRef,
+    receipt_log_root: receiptLogRoot,
+    receipt_refs: receiptRefs,
+  };
+}
+
+export function verifyProofOfNonUse(args = {}) {
+  const proof = args.schema === PROOF_OF_NON_USE_SCHEMA ? args : (args.proofOfNonUse ?? args.proof_of_non_use ?? args.proof ?? args.artifact);
+  if (!proof || proof.schema !== PROOF_OF_NON_USE_SCHEMA) {
+    return invalidBoundaryResult(proof, ['verifyProofOfNonUse requires an enigma.proof_of_non_use.v1 artifact']);
+  }
+
+  const errors = missingBoundaryFields(proof, [
+    'schema',
+    'proof_id',
+    'issued_at',
+    'subject_ref',
+    'query_commitment',
+    'candidate_set_root',
+    'selected_set_root',
+    'omitted_set_root',
+    'tombstone_set_root',
+    'candidate_count',
+    'selected_count',
+    'omitted_count',
+    'tombstone_count',
+    'policy_id',
+    'policy_decision',
+    'verifier_status',
+    'verifier_ref',
+    'receipt_log_root',
+    'receipt_refs',
+  ]);
+  validateRootField(proof, 'query_commitment', errors);
+  validateRootField(proof, 'candidate_set_root', errors);
+  validateRootField(proof, 'selected_set_root', errors);
+  validateRootField(proof, 'omitted_set_root', errors);
+  validateRootField(proof, 'tombstone_set_root', errors);
+  validateCountField(proof, 'candidate_count', errors);
+  validateCountField(proof, 'selected_count', errors);
+  validateCountField(proof, 'omitted_count', errors);
+  validateCountField(proof, 'tombstone_count', errors);
+  if (typeof proof.policy_id !== 'string' || proof.policy_id.length === 0) errors.push('invalid policy_id');
+  if (!PROOF_POLICY_DECISIONS.has(proof.policy_decision)) errors.push('invalid policy_decision');
+  if (!PROOF_VERIFIER_STATUSES.has(proof.verifier_status)) errors.push('invalid verifier_status');
+  if (typeof proof.verifier_ref !== 'string' || proof.verifier_ref.length === 0) errors.push('invalid verifier_ref');
+  validateRootField(proof, 'receipt_log_root', errors);
+  validateRefArray(proof, 'receipt_refs', errors);
+
+  const contextPack = args.contextPack ?? args.context_pack ?? args.pack;
+  if (contextPack || args.vault || args.passport || args.active_state || args.activeState || args.tombstones || args.candidate_refs || args.candidateRefs) {
+    const expected = proofSelectionSummary({ ...args, contextPack });
+    compareRootAndCount(proof, expected, 'candidate_set_root', 'candidate_count', 'candidate_set_root', 'candidate_count', errors);
+    compareRootAndCount(proof, expected, 'selected_set_root', 'selected_count', 'selected_set_root', 'selected_count', errors);
+    compareRootAndCount(proof, expected, 'omitted_set_root', 'omitted_count', 'omitted_set_root', 'omitted_count', errors);
+    compareRootAndCount(proof, expected, 'tombstone_set_root', 'tombstone_count', 'tombstone_set_root', 'tombstone_count', errors);
+  }
+
+  if (contextPack && proof.receipt_log_root !== contextPack.receipt_log_root) errors.push('receipt_log_root mismatch');
+  verifyContextPackWhenTrusted(args, contextPack, errors);
+  verifyRequiredReceiptRefs(proof.receipt_refs ?? [], receiptRefsFromContextPack(contextPack), errors, 'receipt_refs');
+  if (errors.length > 0) return invalidBoundaryResult({ ...proof, verifier_status: FAILED_PROOF_STATUS }, errors);
+  return validBoundaryResult({ ...proof, verifier_status: VERIFIED_STATUS });
 }
 
 

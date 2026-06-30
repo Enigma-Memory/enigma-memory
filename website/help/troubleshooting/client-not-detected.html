@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="What to do if Enigma Memory does not detect your AI app.">
+  <title>AI app not detected</title>
+  <link rel="stylesheet" href="../../styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="site-logo" href="../../index.html">Enigma Memory</a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="../../download.html">Download</a>
+        <a href="../../setup.html">How it works</a>
+        <a href="../../privacy.html">Privacy</a>
+        <a href="../index.html">Help</a>
+        <a href="../../faq.html">FAQ</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <span class="eyebrow">Troubleshooting</span>
+      <h1>AI app not detected.</h1>
+      <p>If you have not installed Claude, Cursor, or another supported app yet, this is not a problem. You can continue without apps and connect one later.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="symptom-heading">
+      <h2 id="symptom-heading">Symptom</h2>
+      <p>Enigma Memory does not list a supported AI app during client detection, or the app status shows Not installed when you expect it to be found.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="no-app-heading">
+      <h2 id="no-app-heading">No supported apps found yet</h2>
+      <p>Continue without apps. Enigma can finish setup, create your Memory Drive, and keep proof activity local before any AI app is connected.</p>
+      <ol>
+        <li>Click <strong>Continue without apps</strong> in Enigma Memory.</li>
+        <li>Install Claude Desktop, Cursor, or another supported app when you are ready.</li>
+        <li>Open the app once, return to Enigma Memory, then click <strong>Refresh detection</strong>.</li>
+      </ol>
+    </section>
+
+    <section class="content-section" aria-labelledby="cause-heading">
+      <h2 id="cause-heading">Likely causes</h2>
+      <ul>
+        <li>The app was installed but never opened, so its settings area does not exist yet.</li>
+        <li>The app was installed in a location Enigma cannot read.</li>
+        <li>The app is not a supported client.</li>
+      </ul>
+    </section>
+
+    <section class="content-section" aria-labelledby="fix-heading">
+      <h2 id="fix-heading">If an installed app is missing</h2>
+      <ol>
+        <li>Make sure the app is installed.</li>
+        <li>Open the app at least once and close it.</li>
+        <li>Return to Enigma Memory and click <strong>Refresh detection</strong>.</li>
+        <li>If the app appears, click <strong>Connect</strong> and approve the previewed change.</li>
+      </ol>
+    </section>
+
+    <section class="content-section" aria-labelledby="fallback-heading">
+      <h2 id="fallback-heading">If that does not work</h2>
+      <ol>
+        <li>Restart the AI app and Enigma Memory, then refresh detection again.</li>
+        <li>Check that you are using a supported client version.</li>
+        <li>If the app is supported but still not detected, use advanced manual settings only from the troubleshooting panel.</li>
+      </ol>
+    </section>
+
+    <section class="content-section" aria-labelledby="support-heading">
+      <h2 id="support-heading">What to send support</h2>
+      <p>Safe to share: app version, OS family and version, the connector ID shown in Enigma, and the visible support code. Do not send raw memory, prompts, transcripts, credentials, account IDs, or complete app settings files. See <a href="../support-safe-sharing.html">what is safe to share with support</a>.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="supported-heading">
+      <h2 id="supported-heading">Supported app list</h2>
+      <p>For the current consumer connection flow, see <a href="../connect-apps/other-supported-clients.html">other supported clients</a> or the dedicated guides for <a href="../connect-apps/claude-desktop.html">Claude Desktop</a> and <a href="../connect-apps/cursor.html">Cursor</a>.</p>
+    </section>
+
+    <section class="content-section">
+      <details>
+        <summary>Advanced manual connection</summary>
+        <p>Manual app settings are for developers and troubleshooting only. If the desktop app cannot detect a supported client, see the <a href="../../developers/cli.html">CLI appendix</a> for manual snippets and connector commands.</p>
+      </details>
+    </section>
+    <section class="content-section">
+      <p><a href="../index.html">Back to help hub</a></p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer__inner">
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="../../download.html">Download</a></li>
+          <li><a href="../../setup.html">How it works</a></li>
+          <li><a href="../../privacy.html">Privacy</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Support</h4>
+        <ul>
+          <li><a href="../index.html">Help hub</a></li>
+          <li><a href="../install.html">Install guide</a></li>
+          <li><a href="../connect-apps.html">Connect apps</a></li>
+          <li><a href="../troubleshooting.html">Troubleshooting</a></li>
+          <li><a href="../support-safe-sharing.html">Safe support sharing</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Developers</h4>
+        <ul>
+          <li><a href="../../developers/cli.html">CLI appendix</a></li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

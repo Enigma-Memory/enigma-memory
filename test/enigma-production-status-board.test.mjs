@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import {
   buildProductionStatusBoard,
+  renderProductionStatusBoardPlain,
   PRODUCTION_STATUS_BOARD_SCHEMA,
 } from '../scripts/build-production-status-board.mjs';
 
@@ -109,6 +110,26 @@ test('production status board summarizes current launch posture', () => {
   assert.match(board.immediate_operator_queue.join('\n'), /production:cloudflare-credentials/);
   assert.equal(new Set(board.immediate_operator_queue).size, board.immediate_operator_queue.length);
   assert.doesNotMatch(JSON.stringify(board), /Bearer\s+[A-Za-z0-9._~+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|sk-[A-Za-z0-9_-]{16,}/i);
+});
+
+test('production status board plain output is readable and claim-bounded', () => {
+  const board = buildProductionStatusBoard({
+    goalAudit: goalAudit(),
+    dependencies: dependencies(),
+    workplan: workplan(),
+  }, { generated_at: '2026-06-24T00:03:00.000Z' });
+  const plain = renderProductionStatusBoardPlain(board);
+
+  assert.match(plain, /^Enigma production status board\n/);
+  assert.match(plain, /Status: blocked/);
+  assert.match(plain, /Launch ready: no/);
+  assert.match(plain, /Local package ready: yes/);
+  assert.match(plain, /Next phase: cloudflare_credentials/);
+  assert.match(plain, /Next: npm run production:cloudflare-credentials/);
+  assert.match(plain, /External blocker: cloudflare_credentials/);
+  assert.match(plain, /Boundary: public-safe status summary only/);
+  assert.doesNotMatch(plain, /^\s*\{/);
+  assert.doesNotMatch(plain, /Bearer\s+[A-Za-z0-9._~+/=-]{12,}|C:\\Users\\|\/home\/|raw_memory|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/i);
 });
 
 test('production status board surfaces hosted ref detail summary without full catalog', () => {
@@ -301,4 +322,40 @@ test('production status board CLI writes blocked public-safe JSON with exit 1', 
   const written = JSON.parse(await readFile(paths.out, 'utf8'));
   assert.equal(written.status, 'blocked');
   assert.equal(written.local_package_ready, true);
+});
+
+test('production status board CLI writes JSON evidence while printing plain output', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-production-status-plain-'));
+  const paths = {
+    goal: join(dir, 'goal.json'),
+    dependencies: join(dir, 'dependencies.json'),
+    workplan: join(dir, 'workplan.json'),
+    out: join(dir, 'status.json'),
+  };
+  await writeFile(paths.goal, `${JSON.stringify(goalAudit(), null, 2)}\n`, 'utf8');
+  await writeFile(paths.dependencies, `${JSON.stringify(dependencies(), null, 2)}\n`, 'utf8');
+  await writeFile(paths.workplan, `${JSON.stringify(workplan(), null, 2)}\n`, 'utf8');
+  await assert.rejects(
+    () => execFileAsync(process.execPath, [
+      'scripts/build-production-status-board.mjs',
+      '--goal-audit', paths.goal,
+      '--dependencies', paths.dependencies,
+      '--workplan', paths.workplan,
+      '--out', paths.out,
+      '--plain',
+    ], { cwd: process.cwd(), timeout: 10000, windowsHide: true }),
+    (error) => {
+      assert.equal(error.code, 1);
+      assert.match(error.stdout, /^Enigma production status board\n/);
+      assert.match(error.stdout, /Status: blocked/);
+      assert.match(error.stdout, /Boundary: public-safe status summary only/);
+      assert.doesNotMatch(error.stdout, /^\s*\{/);
+      assert.equal(error.stdout.includes(dir), false);
+      assert.equal(error.stdout.includes(paths.out), false);
+      return true;
+    },
+  );
+  const written = JSON.parse(await readFile(paths.out, 'utf8'));
+  assert.equal(written.schema, PRODUCTION_STATUS_BOARD_SCHEMA);
+  assert.equal(written.status, 'blocked');
 });

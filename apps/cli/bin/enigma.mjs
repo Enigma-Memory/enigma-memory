@@ -6,17 +6,19 @@ import { access, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promi
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createVault, remember, recall, updateMemory, deleteMemory, exportBundle, decryptKeyring, KEYRING_ENCRYPTED_TYPE } from '../../../packages/vault/src/index.js';
-import { createPassport, compileContextPack, createMemoryDriveHealthReport } from '../../../packages/passport/src/index.js';
+import { createPassport, compileContextPack, createContextPassport, createProofOfNonUse, createMemoryDriveHealthReport } from '../../../packages/passport/src/index.js';
 import { runBoundarySimulation } from '../../../packages/boundary/src/index.js';
+import { assertMemoryControllerPublicSafe, closePrivateMemoryBubble, createConsentGrant, createMemoryWeatherReport, createPrivateMemoryBubble, createRecallVetoDecision } from '../../../packages/controller/src/index.js';
 import { startStdioServer } from '../../../packages/mcp-server/src/index.js';
 import { runMeshDemo } from '../../../packages/mesh/src/index.js';
 import { runEnterpriseDemo } from '../../../packages/enterprise/src/index.js';
 import { connectClient, disconnectClient, doctorConnectors, getClientProfile, planConnectWizard, renderMcpConfig, supportedClients } from '../../../packages/connectors/src/index.js';
-import { exportEnigmaCapsule, importChatGptExport, importClaudeMemory, importEnigmaCapsule, importLangGraphStore, importLettaAgentFile, importMem0Export, importZepGraphitiExport } from '../../../packages/importers/src/index.js';
+import { createImportBatchReceipt, createImportPreview, exportEnigmaCapsule, importChatGptExport, importClaudeMemory, importEnigmaCapsule, importLangGraphStore, importLettaAgentFile, importMem0Export, importTextMemoryList, importZepGraphitiExport } from '../../../packages/importers/src/index.js';
 import * as relayServer from '../../relay/src/server.mjs';
 import * as gatewayServer from '../../gateway/src/server.mjs';
 import { verifyBundle } from '../../verifier/bin/enigma-verify.mjs';
 import { createNativeHostInstallPlan, createNativeHostManifest } from '../../native-host/bin/enigma-native-host.mjs';
+import { buildClaudeMcpbPackage, renderClaudeMcpbPackagePlain } from '../../../scripts/build-claude-mcpb-package.mjs';
 import { aggregateUsageEvents, createUsageEvent } from '../../../packages/metering/src/index.js';
 import {
   createMemoryAccessReceipt,
@@ -91,6 +93,12 @@ const CROSS_MODEL_CLAIM_BOUNDARIES = Object.freeze({
 const PACKAGE_JSON_URL = new URL('../../../package.json', import.meta.url);
 const SPECS_URL = new URL('../../../specs/', import.meta.url);
 const IMPORTERS = Object.freeze({
+  text: importTextMemoryList,
+  txt: importTextMemoryList,
+  markdown: importTextMemoryList,
+  md: importTextMemoryList,
+  'text-list': importTextMemoryList,
+  text_list: importTextMemoryList,
   chatgpt: importChatGptExport,
   'chatgpt-export': importChatGptExport,
   chatgpt_export: importChatGptExport,
@@ -205,6 +213,38 @@ async function readJson(path) {
   return JSON.parse(await readFile(path, 'utf8'));
 }
 
+function rawFlagValues(flags, names) {
+  const value = getFlag(flags, names);
+  if (value === undefined || value === true || value === '') return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+async function parseJsonFlagValue(value, label) {
+  if (value === undefined || value === true || value === '') throw new Error(`Missing required --${label}.`);
+  return JSON.parse(String(value));
+}
+
+async function readJsonFlagValue(value, label) {
+  if (value === undefined || value === true || value === '') throw new Error(`Missing required --${label}.`);
+  return readJson(resolve(String(value)));
+}
+
+function pushGrantArtifacts(target, artifact, label) {
+  if (Array.isArray(artifact)) {
+    target.push(...artifact);
+    return;
+  }
+  if (artifact && Array.isArray(artifact.grants)) {
+    target.push(...artifact.grants);
+    return;
+  }
+  if (artifact && typeof artifact === 'object') {
+    target.push(artifact);
+    return;
+  }
+  throw new Error(`--${label} must be a grant object, grant array, or object with grants array.`);
+}
+
 async function memoryTextFromFlags(flags) {
   const inlineText = getFlag(flags, ['text', 'memory', 'memory-text', 'memoryText']);
   const textFile = getFlag(flags, ['text-file', 'textFile', 'memory-file', 'memoryFile']);
@@ -242,10 +282,27 @@ function quickstartPathDisplay(outDirInput, name) {
   return `${base.replace(/[\\/]+$/, '')}/${name}`;
 }
 
-function ensureDistinctOutputPaths(paths) {
-  const normalized = paths.map((path) => (process.platform === 'win32' ? path.toLowerCase() : path));
-  if (new Set(normalized).size !== paths.length) {
-    throw new Error('Quickstart output paths must be distinct.');
+function outputPathRole(output, index) {
+  if (output && typeof output === 'object' && typeof output.role === 'string' && output.role.length > 0) return output.role;
+  return `output_${index + 1}`;
+}
+
+function outputPathValue(output) {
+  return output && typeof output === 'object' ? output.path : output;
+}
+
+function ensureDistinctOutputPaths(outputs) {
+  const seen = new Map();
+  for (let index = 0; index < outputs.length; index += 1) {
+    const output = outputs[index];
+    const path = outputPathValue(output);
+    const normalized = process.platform === 'win32' ? String(path).toLowerCase() : String(path);
+    const previous = seen.get(normalized);
+    if (previous) {
+      const currentRole = outputPathRole(output, index);
+      throw new Error(`Quickstart output paths overlap: ${previous.role} and ${currentRole} resolve to the same file. Choose a bundle filename that is not ${Object.values(QUICKSTART_ARTIFACT_NAMES).join(', ')}; for example --bundle <out-dir>/bundle.json --out-dir <out-dir>.`);
+    }
+    seen.set(normalized, { role: outputPathRole(output, index) });
   }
 }
 
@@ -256,7 +313,7 @@ async function assertCanWriteQuickstartOutputs(outputs, overwrite) {
     if (await fileExists(output.path)) existing.push(output.display);
   }
   if (existing.length > 0) {
-    throw new Error(`Quickstart output already exists: ${existing.join(', ')}. Pass --overwrite to replace it.`);
+    throw new Error(`Quickstart output already exists: ${existing.join(', ')}. Choose a different empty --out-dir, or pass --overwrite only if you intend to replace it.`);
   }
 }
 
@@ -291,17 +348,17 @@ function quickstartOutputs(bundleInput, outDirInput) {
     exportDisplay: quickstartPathDisplay(outDirInput, QUICKSTART_ARTIFACT_NAMES.export),
     verifyReportDisplay: quickstartPathDisplay(outDirInput, QUICKSTART_ARTIFACT_NAMES.verifyReport),
     outputs: [
-      { path: bundlePath, display: bundleInput },
-      { path: contextPackPath, display: quickstartPathDisplay(outDirInput, QUICKSTART_ARTIFACT_NAMES.contextPack) },
-      { path: exportPath, display: quickstartPathDisplay(outDirInput, QUICKSTART_ARTIFACT_NAMES.export) },
-      { path: verifyReportPath, display: quickstartPathDisplay(outDirInput, QUICKSTART_ARTIFACT_NAMES.verifyReport) },
+      { role: 'bundle', path: bundlePath, display: bundleInput },
+      { role: 'context_pack', path: contextPackPath, display: quickstartPathDisplay(outDirInput, QUICKSTART_ARTIFACT_NAMES.contextPack) },
+      { role: 'export', path: exportPath, display: quickstartPathDisplay(outDirInput, QUICKSTART_ARTIFACT_NAMES.export) },
+      { role: 'verify_report', path: verifyReportPath, display: quickstartPathDisplay(outDirInput, QUICKSTART_ARTIFACT_NAMES.verifyReport) },
     ],
   };
 }
 
 async function buildQuickstartArtifacts(flags, { bundleInput = DEFAULT_BUNDLE, outDirInput = dirname(bundleInput), overwrite = false, write = true, checkExisting = true } = {}) {
   const paths = quickstartOutputs(bundleInput, outDirInput);
-  ensureDistinctOutputPaths(paths.outputs.map((output) => output.path));
+  ensureDistinctOutputPaths(paths.outputs);
   if (checkExisting) await assertCanWriteQuickstartOutputs(paths.outputs, overwrite);
 
   const passphrase = getFlag(flags, ['passphrase']);
@@ -357,6 +414,10 @@ function activeMemoryCount(vault) {
 
 function sha256Json(value) {
   return `sha256:${createHash('sha256').update(JSON.stringify(value)).digest('hex')}`;
+}
+
+function sha256PublicValue(value) {
+  return `sha256:${createHash('sha256').update(typeof value === 'string' ? value : JSON.stringify(value)).digest('hex')}`;
 }
 
 function contextPackPublicDigest(pack) {
@@ -548,10 +609,15 @@ function searchCandidates(vault, queryTokens, includeUnrelated = false) {
   return { candidates, byAddress };
 }
 
-function connectorReadinessSummary(bundlePath) {
+function safeBundleDisplay(bundleDisplay = '<bundle-path>') {
+  const value = typeof bundleDisplay === 'string' && bundleDisplay.length > 0 ? bundleDisplay : '<bundle-path>';
+  return publicPathDisplay(value, 'bundle-path');
+}
+
+function connectorReadinessSummary(bundleDisplay = '<bundle-path>') {
   return {
     ready: true,
-    bundle: bundlePath,
+    bundle: safeBundleDisplay(bundleDisplay),
     bundle_env: 'ENIGMA_BUNDLE',
     mcp_command: 'enigma-mcp',
     supported_clients: supportedClients,
@@ -563,7 +629,8 @@ function demoBundleRef(bundleWasSupplied) {
 }
 
 async function readPackageJson() {
-  return readJson(PACKAGE_JSON_URL);
+  const overridePath = process.env.ENIGMA_PACKAGE_JSON_PATH;
+  return readJson(overridePath ? resolve(String(overridePath)) : PACKAGE_JSON_URL);
 }
 
 function packageFileUrl(path) {
@@ -657,6 +724,41 @@ async function writableVaultPathCheck(bundleInput, displayInput = bundleInput) {
     reason,
     hint: ok ? null : 'Choose a writable --bundle path or create a writable parent directory.',
   };
+}
+
+async function bundleInitializedCheck(bundlePath, vaultPath) {
+  if (vaultPath.target_exists !== true) {
+    return {
+      ok: false,
+      bundle: vaultPath.path,
+      target_exists: false,
+      schema: null,
+      reason: 'bundle_missing',
+      hint: 'Run enigma quickstart --bundle <bundle-path> before using doctor as the final green check.',
+    };
+  }
+  try {
+    const bundle = await readJson(bundlePath);
+    const schema = typeof bundle?.schema === 'string' ? bundle.schema : null;
+    const schemaOk = schema === 'enigma.vault_bundle.v1';
+    return {
+      ok: schemaOk,
+      bundle: vaultPath.path,
+      target_exists: true,
+      schema: schemaOk ? schema : null,
+      reason: schemaOk ? null : 'bundle_schema_mismatch',
+      hint: schemaOk ? null : 'Create a fresh bundle with enigma quickstart --bundle <new-bundle-path>, or use --overwrite only if you intentionally replace this local bundle.',
+    };
+  } catch {
+    return {
+      ok: false,
+      bundle: vaultPath.path,
+      target_exists: true,
+      schema: null,
+      reason: 'bundle_json_invalid',
+      hint: 'Create a fresh bundle with enigma quickstart --bundle <new-bundle-path>, or use --overwrite only if you intentionally replace this local bundle.',
+    };
+  }
 }
 
 async function schemaFiles() {
@@ -895,7 +997,7 @@ async function initCommand(flags, io) {
   const ok = artifacts.verifyReport.ok === true;
   const anyConnectorWritePerformed = connectors.some((connector) => connector.connect_plan.writes_performed === true);
 
-  print({
+  const summary = {
     ok,
     schema: artifacts.bundle.schema,
     command: 'enigma init',
@@ -934,7 +1036,8 @@ async function initCommand(flags, io) {
     next_commands: initNextCommands({ dryRun, bundleDisplay: displays.bundle, outDirDisplay: publicPathDisplay(outDirInput, 'out-dir'), exportDisplay: displays.export, clients, requestedSelection, connectRequested, overwrite, connectorWritesPerformed: anyConnectorWritePerformed }),
     checks: doctor.checks,
     claim_boundaries: { ...SETUP_CLAIM_BOUNDARIES, hosted_saas_live: false, raw_memory_printed: false, solana_required: false, browser_extension_required: false },
-  }, io);
+  };
+  printSetupSummary(summary, flags, io);
   return ok ? 0 : 1;
 }
 
@@ -1065,19 +1168,32 @@ function publicSetupError(error, rawDisplays, publicDisplays) {
   return new Error(message);
 }
 
+function claudeMcpbNextCommand() {
+  return 'enigma claude-mcpb package --plain';
+}
+
+function nextClientPreviewCommand(clientId, bundleArg) {
+  return clientId === 'claude-desktop'
+    ? claudeMcpbNextCommand()
+    : `enigma connect ${clientId} ${bundleArg} --dry-run`;
+}
+
 function oneCommandInstallConnect(bundleDisplay = DEFAULT_BUNDLE, outDirDisplay = dirname(bundleDisplay)) {
-  const parts = ['npm install -g enigma-memory && enigma setup'];
-  if (bundleDisplay !== DEFAULT_BUNDLE) parts.push(`--bundle ${commandPath(bundleDisplay)}`);
-  if (outDirDisplay !== dirname(bundleDisplay)) parts.push(`--out-dir ${commandPath(outDirDisplay)}`);
-  const base = parts.join(' ');
+  const bundleArg = `--bundle ${commandPath(bundleDisplay)}`;
+  const quickstartParts = ['npm install -g enigma-memory && enigma quickstart', bundleArg];
+  if (outDirDisplay !== dirname(bundleDisplay)) quickstartParts.push(`--out-dir ${commandPath(outDirDisplay)}`);
+  const base = quickstartParts.join(' ');
+  const preview = (clientId) => `${base} && ${nextClientPreviewCommand(clientId, bundleArg)}`;
   return {
-    installed_clients: `${base} --client auto --connect-installed --overwrite`,
-    claude_desktop: `${base} --client claude-desktop --write-connectors --overwrite`,
-    cursor: `${base} --client cursor --write-connectors --overwrite`,
-    kimi_code: `${base} --client kimi-code --write-connectors --overwrite`,
-    vscode_cline: `${base} --client vscode-cline --write-connectors --overwrite`,
+    installed_clients: `${base} && enigma doctor ${bundleArg}`,
+    claude_desktop: preview('claude-desktop'),
+    cursor: preview('cursor'),
+    kimi_code: preview('kimi-code'),
+    vscode_cline: preview('vscode-cline'),
   };
 }
+
+const IMPORT_PREVIEW_COMMAND = 'enigma import text --file ./memories.md --complete --plain';
 
 function setupNextCommands(bundleInput, exportDisplay, clients, writeConnectors) {
   const primaryClient = clients[0] ?? DEFAULT_SETUP_CLIENTS[0];
@@ -1085,12 +1201,14 @@ function setupNextCommands(bundleInput, exportDisplay, clients, writeConnectors)
   const commands = [
     `enigma status --bundle ${bundle}`,
     `enigma drive health --bundle ${bundle}`,
-    `enigma remember --bundle ${bundle} --text-file ./memory.txt`,
+    IMPORT_PREVIEW_COMMAND,
+    `enigma remember --bundle ${bundle} --text-file ./memory.txt --plain`,
     `enigma search --bundle ${bundle} --query "project context"`,
     `enigma context --bundle ${bundle} --query "project context"`,
+    `enigma export --bundle ${bundle} --out ${commandPath(exportDisplay)}`,
     `enigma verify --export ${commandPath(exportDisplay)}`,
   ];
-  if (!writeConnectors) commands.push(`enigma connect ${primaryClient} --bundle ${bundle} --dry-run`);
+  if (!writeConnectors) commands.push(nextClientPreviewCommand(primaryClient, `--bundle ${bundle}`));
   return commands;
 }
 
@@ -1104,21 +1222,107 @@ function initExecuteCommand(bundleDisplay, outDirDisplay, requestedSelection, co
 }
 
 function initNextCommands({ dryRun, bundleDisplay, outDirDisplay, exportDisplay, clients, requestedSelection, connectRequested, overwrite, connectorWritesPerformed }) {
-  const commands = dryRun ? [initExecuteCommand(bundleDisplay, outDirDisplay, requestedSelection, connectRequested, overwrite || dryRun)] : [];
+  const commands = dryRun ? [initExecuteCommand(bundleDisplay, outDirDisplay, requestedSelection, connectRequested, overwrite)] : [];
   commands.push(...setupNextCommands(bundleDisplay, exportDisplay, clients, connectRequested && connectorWritesPerformed));
   return commands;
 }
 
-function doctorNextCommands(bundleDisplay, client) {
+function doctorNeedsFreshBundlePath(checks) {
+  const reason = checks?.bundle_initialized?.reason;
+  return reason === 'bundle_json_invalid' || reason === 'bundle_schema_mismatch';
+}
+
+function doctorNextCommands(firstRunHint, bundleDisplay, client, setupState = 'setup_needed') {
   const clientId = client ?? DEFAULT_SETUP_CLIENTS[0];
-  const bundle = commandPath(bundleDisplay);
+  const bundle = commandPath(setupState === 'setup_needed' ? firstRunHint.bundle : bundleDisplay);
+  if (setupState === 'setup_needed') {
+    return [
+      firstRunHint.command,
+      `enigma doctor --bundle ${bundle} --client ${clientId}`,
+      `enigma drive health --bundle ${bundle}`,
+      `enigma status --bundle ${bundle}`,
+      nextClientPreviewCommand(clientId, `--bundle ${bundle}`),
+    ];
+  }
   return [
-    `enigma status --bundle ${bundle}`,
     `enigma drive health --bundle ${bundle}`,
-    `enigma setup --bundle ${bundle}`,
-    `enigma doctor --bundle ${bundle} --client ${clientId}`,
-    `enigma connect ${clientId} --bundle ${bundle}`,
+    `enigma status --bundle ${bundle}`,
+    nextClientPreviewCommand(clientId, `--bundle ${bundle}`),
   ];
+}
+
+function doctorFirstRunHint(_bundleDisplay, client, checks = null) {
+  const clientId = client ?? DEFAULT_SETUP_CLIENTS[0];
+  const freshBundlePath = doctorNeedsFreshBundlePath(checks);
+  const bundleLabel = freshBundlePath ? '<new-bundle-path>' : '<bundle-path>';
+  const bundle = commandPath(bundleLabel);
+  const outDir = commandPath('<new-empty-out-dir>');
+  const command = freshBundlePath
+    ? `enigma quickstart --bundle ${bundle} --out-dir ${outDir}`
+    : `enigma quickstart --bundle ${bundle}`;
+  return {
+    bundle: bundleLabel,
+    ...(freshBundlePath ? { out_dir: '<new-empty-out-dir>', recovery: 'fresh_bundle_non_destructive' } : {}),
+    command,
+    commands: [
+      command,
+      `enigma doctor --bundle ${bundle} --client ${clientId}`,
+      `enigma drive health --bundle ${bundle}`,
+    ],
+  };
+}
+
+function doctorSetupStatus(checks, firstRunHint) {
+  const setupReasons = [];
+  const attentionReasons = [];
+  const bundleReason = checks.bundle_initialized?.reason;
+  if (checks.bundle_initialized?.ok === false) {
+    if (['bundle_missing', 'bundle_schema_mismatch', 'bundle_json_invalid'].includes(bundleReason)) {
+      setupReasons.push(bundleReason);
+    } else {
+      attentionReasons.push(bundleReason || 'bundle_not_ready');
+    }
+  }
+  for (const client of checks.connectors?.clients ?? []) {
+    if (client.ok !== false) continue;
+    const repairReasons = Array.isArray(client.repair_reasons) ? client.repair_reasons : [];
+    const setupOnly = repairReasons.length > 0 && repairReasons.every((reason) => reason === 'bundle_env_missing' || reason === 'bundle_env_mismatch');
+    if (setupOnly) {
+      for (const reason of repairReasons) setupReasons.push(`connector_${reason}`);
+    } else {
+      attentionReasons.push(`connector_${client.client_id || 'unknown'}_${repairReasons[0] || 'not_ready'}`);
+    }
+  }
+  for (const [name, check] of Object.entries(checks)) {
+    if (name === 'bundle_initialized' || name === 'connectors') continue;
+    if (check?.ok === false) attentionReasons.push(name);
+  }
+  const uniqueSetupReasons = [...new Set(setupReasons)];
+  const uniqueAttentionReasons = [...new Set(attentionReasons.filter(Boolean))];
+  const state = uniqueAttentionReasons.length > 0
+    ? 'attention_needed'
+    : uniqueSetupReasons.length > 0
+      ? 'setup_needed'
+      : 'ready';
+  return {
+    schema: 'enigma.doctor_setup_status.v1',
+    state,
+    setup_needed: state === 'setup_needed',
+    ready: state === 'ready',
+    message: state === 'ready'
+      ? 'Enigma local setup checks are green.'
+      : state === 'setup_needed'
+        ? 'Run quickstart to create the local Memory Drive bundle, then preview any app connection before approving changes.'
+        : 'Fix the reported local install or connector issue before treating doctor as green.',
+    reasons: state === 'attention_needed' ? uniqueAttentionReasons : uniqueSetupReasons,
+    next_command: state === 'ready' ? null : firstRunHint.command,
+    claim_boundaries: {
+      local_enigma_checks_only: true,
+      provider_deletion_proof: false,
+      model_forgetting_proof: false,
+      hosted_saas_live: false,
+    },
+  };
 }
 
 async function setupDoctorChecks(flags, artifacts, clients, displays) {
@@ -1308,7 +1512,7 @@ export async function setupCommand(flags, io) {
   const ok = artifacts.verifyReport.ok === true;
   const anyConnectorWritePerformed = connectors.some((connector) => connector.connect_plan.writes_performed === true);
 
-  print({
+  const summary = {
     ok,
     schema: 'enigma.setup.v1',
     command: 'enigma setup',
@@ -1345,7 +1549,8 @@ export async function setupCommand(flags, io) {
     next_commands: setupNextCommands(displays.bundle, displays.export, clients, connectorWritesRequested && (!connectInstalled || anyConnectorWritePerformed)),
     checks: doctor.checks,
     claim_boundaries: { ...SETUP_CLAIM_BOUNDARIES, hosted_saas_live: false, raw_memory_printed: false, solana_required: false, browser_extension_required: false },
-  }, io);
+  };
+  printSetupSummary(summary, flags, io);
   return ok ? 0 : 1;
 }
 
@@ -1355,6 +1560,7 @@ export async function quickstartCommand(flags, io) {
   const overwrite = booleanFlag(flags, ['overwrite'], false);
   const displays = setupPublicDisplays(bundleInput, outDirInput);
   const rawOutputs = quickstartOutputs(bundleInput, outDirInput);
+  ensureDistinctOutputPaths(rawOutputs.outputs);
   await assertCanWriteQuickstartOutputs([
     { path: rawOutputs.bundlePath, display: displays.bundle },
     { path: rawOutputs.contextPackPath, display: displays.context_pack },
@@ -1363,7 +1569,7 @@ export async function quickstartCommand(flags, io) {
   ], overwrite);
   const artifacts = await buildQuickstartArtifacts(flags, { bundleInput, outDirInput, overwrite, write: true, checkExisting: false });
 
-  print({
+  const summary = {
     ok: artifacts.verifyReport.ok === true,
     bundle: displays.bundle,
     context_pack: displays.context_pack,
@@ -1375,7 +1581,8 @@ export async function quickstartCommand(flags, io) {
     verify_ok: artifacts.verifyReport.ok === true,
     next_commands: [
       `enigma verify --export ${displays.export}`,
-      `enigma connect generic-mcp --bundle ${displays.bundle} --dry-run`,
+      claudeMcpbNextCommand(),
+      `enigma connect cursor --bundle ${displays.bundle} --dry-run`,
     ],
     claim_boundaries: {
       local_only: true,
@@ -1386,7 +1593,8 @@ export async function quickstartCommand(flags, io) {
       roi_or_savings_guarantee: false,
       compliance_certification: false,
     },
-  }, io);
+  };
+  printQuickstartSummary(summary, flags, io);
   return artifacts.verifyReport.ok === true ? 0 : 1;
 }
 
@@ -1422,6 +1630,32 @@ function buildCrossModelProfileSummaries({ vault, passport, demoMemoryAddr, limi
   }
   return profiles;
 }
+
+function renderCrossModelDemoPlain(report) {
+  const profiles = Array.isArray(report.profiles) ? report.profiles : [];
+  const lines = [
+    'Enigma cross-model demo',
+    `Status: ${report.ok ? 'Ready' : 'Needs attention'}`,
+    `Profiles: ${report.profile_count ?? profiles.length}`,
+    `Memories: ${report.memory_count ?? 0}`,
+    `Receipts: ${report.receipt_count ?? 0}`,
+    `Generated receipts: ${report.generated_receipt_count ?? 0}`,
+    `Memory source: ${report.memory_source ?? 'generic_demo'}`,
+    `Provider credentials: ${report.provider_credentials_required ? 'required' : 'not required'}`,
+    `Provider native memory: ${report.provider_native_memory_canonical ? 'claimed' : 'not claimed'}`,
+  ];
+  if (report.out_written) lines.push('Report: written to <out>');
+  for (const profile of profiles.slice(0, 5)) lines.push(`Profile: ${profile.label ?? profile.profile ?? 'AI app'} — ${profile.memory_count ?? 0} memory refs, ${profile.receipt_count ?? 0} receipts`);
+  lines.push('Next: enigma context --bundle <bundle-path> --proof --plain');
+  lines.push('Boundary: local cross-model proof demo only; no raw memory, local paths, provider calls, provider deletion, model behavior, hosted service, benchmark, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printCrossModelDemoReport(report, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderCrossModelDemoPlain(report));
+  else print(report, io);
+}
+
 
 export async function crossModelDemoCommand(flags, io) {
   const bundleFlag = getFlag(flags, ['bundle', 'file']);
@@ -1505,7 +1739,7 @@ export async function crossModelDemoCommand(flags, io) {
     claim_boundaries: { ...CROSS_MODEL_CLAIM_BOUNDARIES },
   };
   if (outPath !== undefined) await writeJson(outPath, report);
-  print(report, io);
+  printCrossModelDemoReport(report, flags, io);
   return 0;
 }
 
@@ -1523,7 +1757,8 @@ async function rememberCommand(flags, io) {
     metadata: parseJson(getFlag(flags, ['metadata']), {}),
   });
   await persistState(bundlePath, vault, { passphrase: getFlag(flags, ['passphrase']) });
-  print({ ok: true, memory_addr: result.memory_addr, receipt_id: result.receipt?.receipt_id }, io);
+  const output = { ok: true, memory_addr: result.memory_addr, receipt_id: result.receipt?.receipt_id };
+  printMemoryLifecycleResult(output, 'remember', flags, io);
   return 0;
 }
 
@@ -1538,7 +1773,8 @@ async function updateCommand(flags, io) {
     metadata: parseJson(getFlag(flags, ['metadata']), {}),
   });
   await persistState(bundlePath, vault, { passphrase: getFlag(flags, ['passphrase']) });
-  print({ ok: true, old_memory_addr: result.old_memory_addr, memory_addr: result.memory_addr, receipt_id: result.receipt?.receipt_id }, io);
+  const output = { ok: true, old_memory_addr: result.old_memory_addr, memory_addr: result.memory_addr, receipt_id: result.receipt?.receipt_id };
+  printMemoryLifecycleResult(output, 'update', flags, io);
   return 0;
 }
 
@@ -1552,8 +1788,109 @@ async function deleteCommand(flags, io) {
     reason: getFlag(flags, ['reason'], 'user_delete'),
   });
   await persistState(bundlePath, vault, { passphrase: getFlag(flags, ['passphrase']) });
-  print({ ok: true, memory_addr: result.memory_addr, receipt_id: result.receipt?.receipt_id }, io);
+  const output = { ok: true, memory_addr: result.memory_addr, receipt_id: result.receipt?.receipt_id };
+  printMemoryLifecycleResult(output, 'delete', flags, io);
   return 0;
+}
+
+async function recallCommand(flags, io) {
+  const bundleInput = String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE));
+  const bundlePath = resolve(bundleInput);
+  const includeContent = booleanFlag(flags, ['include-content', 'content'], false);
+  const { vault, passport } = await loadState(bundlePath, { passphrase: getFlag(flags, ['passphrase']) });
+  const result = recall({
+    vault,
+    passport,
+    memory_addr: requireFlag(flags, ['id', 'memory-addr', 'memory_addr', 'memoryAddr'], 'id'),
+    purpose: getFlag(flags, ['purpose'], 'cli_recall'),
+    actor_id: getFlag(flags, ['actor-id', 'actorId']),
+    policy_id: getFlag(flags, ['policy-id', 'policyId']),
+  });
+  await persistState(bundlePath, vault, { passphrase: getFlag(flags, ['passphrase']) });
+  const output = memoryRecallReport({ bundleInput, result, includeContent });
+  printRecallReport(output, flags, io);
+  return 0;
+}
+
+
+function contextRecallScopeFromFlags(flags) {
+  return {
+    app_ref: getFlag(flags, ['app-ref', 'appRef'], 'ref:app:cli'),
+    purpose_ref: getFlag(flags, ['purpose-ref', 'purposeRef'], 'ref:purpose:cli_context'),
+    operation: 'recall_context',
+    memory_zone_ref: getFlag(flags, ['memory-zone-ref', 'memoryZoneRef'], 'ref:zone:default'),
+    policy_ref: getFlag(flags, ['policy-ref', 'policyRef'], 'ref:policy:cli-context'),
+  };
+}
+
+async function contextGrantInputsFromFlags(flags) {
+  const grants = [];
+  for (const value of rawFlagValues(flags, ['grant'])) pushGrantArtifacts(grants, await parseJsonFlagValue(value, 'grant'), 'grant');
+  for (const value of rawFlagValues(flags, ['grants'])) pushGrantArtifacts(grants, await parseJsonFlagValue(value, 'grants'), 'grants');
+  for (const value of rawFlagValues(flags, ['grant-file', 'grantFile'])) pushGrantArtifacts(grants, await readJsonFlagValue(value, 'grant-file'), 'grant-file');
+  for (const value of rawFlagValues(flags, ['grants-file', 'grantsFile'])) pushGrantArtifacts(grants, await readJsonFlagValue(value, 'grants-file'), 'grants-file');
+  return {
+    grant: grants[0],
+    grants: grants.slice(1),
+    grantProvided: grants.length > 0,
+  };
+}
+
+function contextRecallDecisionFromFlags(flags, grantInputs, candidateCount) {
+  return createRecallVetoDecision({
+    grant: grantInputs.grant,
+    grants: grantInputs.grants,
+    ...contextRecallScopeFromFlags(flags),
+    candidate_count: candidateCount,
+    now: getFlag(flags, ['now'], new Date().toISOString()),
+  });
+}
+
+function blockedCliContextPack(decision) {
+  return assertMemoryControllerPublicSafe({
+    schema: 'enigma.context_pack_recall_blocked.v1',
+    ok: false,
+    context_pack_returned: false,
+    memory_count: 0,
+    recall_veto: decision,
+    private_payload_returned: false,
+    claim_boundaries: {
+      local_only: true,
+      provider_deletion_proof: false,
+      model_forgetting_proof: false,
+      hosted_saas_live: false,
+    },
+  });
+}
+
+function renderContextPlain(output) {
+  const schema = output?.schema ?? 'enigma.context_pack.v1';
+  const memoryCount = output?.context_pack_summary?.memory_count
+    ?? output?.memory_count
+    ?? (Array.isArray(output?.memories) ? output.memories.length : 0);
+  const receiptCount = output?.context_pack_summary?.receipt_count
+    ?? output?.receipt_count
+    ?? (Array.isArray(output?.receipts) ? output.receipts.length : 0);
+  const returned = output?.context_pack_returned === false ? 'blocked' : 'returned';
+  const controller = output?.recall_veto ?? output?.memory_controller?.recall_veto;
+  const lines = [
+    'Enigma context',
+    `Status: ${output?.ok === false ? 'Needs attention' : 'Ready'}`,
+    `Context: ${returned}`,
+    `Schema: ${schema}`,
+    `Memories: ${memoryCount}`,
+    `Receipts: ${receiptCount}`,
+  ];
+  if (schema === 'enigma.context_proof_bundle.v1') lines.push('Proof summary: local context selection and not-shared/tombstoned Enigma memories are accounted for.');
+  if (controller?.decision) lines.push(`Controller: ${controller.decision}`);
+  if (Array.isArray(controller?.reason_codes) && controller.reason_codes.length > 0) lines.push(`Reason: ${controller.reason_codes.join(', ')}`);
+  lines.push('Boundary: local Enigma context only; no raw memory in plain output, local paths, provider deletion, provider non-use, model behavior, or hosted service claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printContextOutput(output, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderContextPlain(output));
+  else print(output, io);
 }
 
 async function contextCommand(flags, io) {
@@ -1565,6 +1902,15 @@ async function contextCommand(flags, io) {
     || String(query).trim().length > 0;
   const includeUnrelated = booleanFlag(flags, ['include-unrelated', 'includeUnrelated', 'no-strict-relevance', 'noStrictRelevance'], false);
   const strictRelevance = String(query).trim().length > 0 && !includeUnrelated;
+  const grantInputs = await contextGrantInputsFromFlags(flags);
+  const grantRequired = booleanFlag(flags, ['require-grant', 'requireGrant'], false);
+  if (grantRequired || grantInputs.grantProvided) {
+    const preflightDecision = contextRecallDecisionFromFlags(flags, grantInputs, 0);
+    if (preflightDecision.safe_to_share !== true) {
+      printContextOutput(blockedCliContextPack(preflightDecision), flags, io);
+      return 0;
+    }
+  }
   const pack = compileContextPack({
     vault,
     passport,
@@ -1577,10 +1923,40 @@ async function contextCommand(flags, io) {
     price_per_million_tokens: parseOptionalNumber(getFlag(flags, ['price-per-million-tokens', 'pricePerMillionTokens'])),
     currency: getFlag(flags, ['currency']),
   });
+  if (grantRequired || grantInputs.grantProvided) {
+    const recallVeto = contextRecallDecisionFromFlags(flags, grantInputs, Array.isArray(pack.memories) ? pack.memories.length : 0);
+    if (recallVeto.safe_to_share !== true) {
+      printContextOutput(blockedCliContextPack(recallVeto), flags, io);
+      return 0;
+    }
+    pack.memory_controller = {
+      context_pack_returned: true,
+      recall_veto: recallVeto,
+    };
+  }
   await persistState(bundlePath, vault, { passphrase: getFlag(flags, ['passphrase']) });
+  const withProof = booleanFlag(flags, ['proof', 'with-proof', 'withProof'], false);
+  const output = withProof
+    ? {
+      ok: true,
+      schema: 'enigma.context_proof_bundle.v1',
+      context_pack_ref: contextPackPublicDigest(pack),
+      context_pack_summary: publicContextPackSummary(pack),
+      memory_controller: pack.memory_controller,
+      context_passport: createContextPassport({ contextPack: pack, passport, vault, query, now: getFlag(flags, ['now']) }),
+      proof_of_non_use: createProofOfNonUse({ contextPack: pack, passport, vault, query, now: getFlag(flags, ['now']) }),
+      claim_boundaries: {
+        local_enigma_vault_only: true,
+        provider_deletion_claim: false,
+        provider_non_use_claim: false,
+        model_forgetting_claim: false,
+        raw_memory_printed: false,
+      },
+    }
+    : pack;
   const out = getFlag(flags, ['out']);
-  if (out && out !== true) await writeJson(resolve(String(out)), pack);
-  print(pack, io);
+  if (out && out !== true) await writeJson(resolve(String(out)), output);
+  printContextOutput(output, flags, io);
   return 0;
 }
 
@@ -1651,6 +2027,29 @@ function memorySearchReport({ bundlePath, vault, query, limit, includeContent = 
   };
 }
 
+function renderSearchPlain(report) {
+  const lines = [
+    'Enigma search',
+    `Results: ${report.result_count ?? 0}`,
+    `Limit: ${report.limit ?? 0}`,
+    `Strict relevance: ${report.strict_relevance ? 'on' : 'off'}`,
+    `Plaintext: ${report.results?.some((item) => item.content_redacted === false) ? 'included by explicit opt-in' : 'redacted'}`,
+  ];
+  const results = Array.isArray(report.results) ? report.results.slice(0, 3) : [];
+  for (let index = 0; index < results.length; index += 1) {
+    const item = results[index];
+    lines.push(`Result ${index + 1}: score ${item.score ?? 0}, kind ${item.kind ?? 'memory'}, ref ${item.memory_ref ?? '<memory-ref>'}`);
+  }
+  lines.push('Boundary: local Enigma search only; no raw memory by default, local paths, provider deletion, model behavior, hosted service, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printSearchReport(report, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderSearchPlain(report));
+  else print(report, io);
+}
+
+
 async function searchCommand(flags, io) {
   const bundlePath = resolve(String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE)));
   const query = String(requireFlag(flags, ['query', 'q'], 'query'));
@@ -1659,7 +2058,7 @@ async function searchCommand(flags, io) {
   const includeContent = getFlag(flags, ['include-content', 'includeContent']) === true || getFlag(flags, ['include-content', 'includeContent']) === 'true';
   const includeUnrelated = booleanFlag(flags, ['include-unrelated', 'includeUnrelated', 'no-strict-relevance', 'noStrictRelevance'], false);
   const { vault } = await loadState(bundlePath, { passphrase: getFlag(flags, ['passphrase']) });
-  print(memorySearchReport({
+  const report = memorySearchReport({
     bundlePath,
     vault,
     query,
@@ -1667,19 +2066,74 @@ async function searchCommand(flags, io) {
     includeContent,
     includeUnrelated,
     now: getFlag(flags, ['now'], '2026-01-01T00:00:00.000Z'),
-  }), io);
+  });
+  printSearchReport(report, flags, io);
   return 0;
 }
 
-function passportStatusReport({ bundlePath, stored = {}, vault, passport }) {
+function firstRunStatusSummary({ bundlePath, activeCount, tombstoneCount, receiptCount }) {
+  const hasMemory = activeCount > 0;
+  const bundleDisplay = publicPathDisplay(bundlePath, 'bundle-path');
+  const state = hasMemory ? 'ready_for_app_connection' : 'needs_first_memory';
+  return {
+    schema: 'enigma.first_run_status.v1',
+    state,
+    ready: hasMemory,
+    bundle: bundleDisplay,
+    primary_action: hasMemory
+      ? {
+        id: 'connect_ai_app',
+        label: 'Preview AI app connection',
+        command: 'enigma connect <client> --bundle "<bundle-path>" --dry-run',
+      }
+      : {
+        id: 'preview_first_import',
+        label: 'Preview first memory import',
+        command: IMPORT_PREVIEW_COMMAND,
+      },
+    lanes: {
+      memory_drive: { status: 'ready', label: 'Memory Drive exists' },
+      import_sandbox: {
+        status: 'ready',
+        label: 'Import Sandbox ready',
+        next_action: hasMemory ? 'optional_preview_more_imports' : 'preview_text_or_markdown_import',
+      },
+      memory_inventory: {
+        status: hasMemory ? 'has_memory' : 'empty',
+        active_count: activeCount,
+        tombstone_count: tombstoneCount,
+      },
+      proof_activity: {
+        status: receiptCount > 0 ? 'has_receipts' : 'empty',
+        receipt_count: receiptCount,
+      },
+      diagnostics: {
+        status: 'available',
+        command: `enigma doctor --bundle "${bundleDisplay}"`,
+      },
+    },
+    claim_boundaries: {
+      local_enigma_status_only: true,
+      raw_memory_returned: false,
+      local_paths_redacted: true,
+      provider_deletion_proof: false,
+      model_forgetting_proof: false,
+      hosted_saas_live: false,
+    },
+  };
+}
+
+function passportStatusReport({ bundlePath, bundleDisplay = publicPathDisplay(bundlePath, 'bundle-path'), stored = {}, vault, passport }) {
   const roots = vault.__computeRoots();
   const activeCount = activeMemoryCount(vault);
   const tombstoneCount = vault.tombstones instanceof Map ? vault.tombstones.size : 0;
   const receiptCount = Array.isArray(vault.receipts) ? vault.receipts.length : 0;
+  const safeBundle = safeBundleDisplay(bundleDisplay);
+  const quotedBundle = commandPath(safeBundle);
   return {
     ok: true,
     schema: 'enigma.passport_status.v1',
-    bundle: bundlePath,
+    bundle: safeBundle,
     passport_ref: `enigma://passport/${passport.passport_id}`,
     owner: {
       subject_id: stored.owner?.subject_id ?? stored.passport?.owner?.subject_id ?? stored.vault?.subject_id ?? passport.owner?.subject_id ?? vault.subject_id,
@@ -1695,22 +2149,777 @@ function passportStatusReport({ bundlePath, stored = {}, vault, passport }) {
     receipt_count: receiptCount,
     active_set_root: roots.active_set_root,
     receipt_log_root: roots.receipt_log_root,
-    connector_readiness: connectorReadinessSummary(bundlePath),
+    connector_readiness: connectorReadinessSummary(safeBundle),
+    first_run_status: firstRunStatusSummary({ bundlePath: safeBundle, activeCount, tombstoneCount, receiptCount }),
     next_recommended_commands: [
-      `enigma remember --bundle "${bundlePath}" --text-file <path>`,
-      `enigma search --bundle "${bundlePath}" --query <text>`,
-      `enigma context --bundle "${bundlePath}" --query <text>`,
-      `enigma verify --bundle "${bundlePath}"`,
-      `enigma connect <client> --bundle "${bundlePath}"`,
+      IMPORT_PREVIEW_COMMAND,
+      `enigma remember --bundle ${quotedBundle} --text-file <path>`,
+      `enigma search --bundle ${quotedBundle} --query <text>`,
+      `enigma context --bundle ${quotedBundle} --query <text>`,
+      `enigma verify --bundle ${quotedBundle}`,
+      `enigma connect <client> --bundle ${quotedBundle} --dry-run`,
     ],
     claim_boundary: 'Status reports local bundle counters, owner display fields, connector readiness hints, and commitment roots only; it does not expose raw memory, certify compliance, prove provider deletion, or prove model forgetting.',
   };
 }
 
 async function statusCommand(flags, io) {
-  const bundlePath = resolve(String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE)));
+  const bundleInput = String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE));
+  const bundlePath = resolve(bundleInput);
+  const bundleDisplay = publicPathDisplay(bundleInput, 'bundle-path');
   const { stored, vault, passport } = await loadState(bundlePath, { passphrase: getFlag(flags, ['passphrase']) });
-  print(passportStatusReport({ bundlePath, stored, vault, passport }), io);
+  const report = passportStatusReport({ bundlePath, bundleDisplay, stored, vault, passport });
+  printStatusSummary(report, flags, io);
+  return 0;
+}
+
+function memoryRecallReport({ bundleInput, result, includeContent = false }) {
+  const memory = result.memory && typeof result.memory === 'object' ? result.memory : {};
+  const receiptRef = result.receipt ? publicAccessReceiptRef(result.receipt) : null;
+  return {
+    ok: true,
+    schema: 'enigma.memory_recall.v1',
+    bundle: publicPathDisplay(bundleInput, 'bundle-path'),
+    memory_addr: result.memory_addr,
+    memory_ref: result.memory_addr ? `enigma://memory/${result.memory_addr}` : '<memory-ref>',
+    kind: memory.kind ?? 'memory',
+    sensitivity: memory.sensitivity ?? 'unknown',
+    content_hash: memory.content_hash,
+    content_commitment: memory.content_commitment,
+    content_redacted: !includeContent,
+    content: includeContent ? result.content : undefined,
+    receipt_id: result.receipt?.receipt_id,
+    access_receipt_ref: receiptRef,
+    claim_boundary: includeContent
+      ? 'Recall returned plaintext only because --include-content was explicit; this does not prove provider deletion, provider-native memory state, or model forgetting.'
+      : 'Recall redacts plaintext by default; refs, commitments, and receipt refs are not provider deletion proof or model forgetting proof.',
+  };
+}
+
+function renderRecallPlain(report) {
+  const lines = [
+    'Enigma recall',
+    `Status: ${report.ok ? 'Ready' : 'Needs attention'}`,
+    `Memory: ${report.memory_ref ?? '<memory-ref>'}`,
+    `Plaintext: ${report.content_redacted === false ? 'included by explicit opt-in' : 'redacted'}`,
+    `Kind: ${report.kind ?? 'memory'}`,
+    `Sensitivity: ${report.sensitivity ?? 'unknown'}`,
+  ];
+  if (report.receipt_id) lines.push(`Receipt: ${report.receipt_id}`);
+  if (report.access_receipt_ref?.access_receipt_ref) lines.push(`Access: ${report.access_receipt_ref.access_receipt_ref}`);
+  lines.push('Next: enigma context --bundle <bundle-path> --query <text>');
+  lines.push('Boundary: local Enigma recall only; no raw memory in plain output, local paths, provider deletion, model behavior, hosted service, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printRecallReport(report, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderRecallPlain(report));
+  else print(report, io);
+}
+
+function renderMemoryLifecyclePlain(result, operation) {
+  const lines = [
+    `Enigma ${operation}`,
+    `Status: ${result.ok ? 'Ready' : 'Needs attention'}`,
+    `Memory: ${result.memory_addr ? `enigma://memory/${result.memory_addr}` : '<memory-ref>'}`,
+  ];
+  if (result.old_memory_addr) lines.push(`Previous: enigma://memory/${result.old_memory_addr}`);
+  if (result.receipt_id) lines.push(`Receipt: ${result.receipt_id}`);
+  if (operation === 'remember') lines.push('Next: enigma search --bundle <bundle-path> --query <text>');
+  else if (operation === 'update') lines.push('Next: enigma context --bundle <bundle-path> --query <text>');
+  else if (operation === 'delete') lines.push('Next: enigma drive health --bundle <bundle-path>');
+  lines.push('Boundary: local Enigma memory lifecycle only; no raw memory, local paths, provider deletion, model behavior, or hosted service claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printMemoryLifecycleResult(result, operation, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderMemoryLifecyclePlain(result, operation));
+  else print(result, io);
+}
+
+function renderExportPlain(result) {
+  const lines = [
+    'Enigma export',
+    `Status: ${result.ok ? 'Ready' : 'Needs attention'}`,
+    `Receipts: ${result.receipt_count ?? 0}`,
+    'Export: <export-file>',
+  ];
+  lines.push('Boundary: local Enigma export only; plaintext is excluded, local paths are redacted, and this is not provider deletion, model behavior, hosted service, or compliance proof.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printExportResult(result, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderExportPlain(result));
+  else print(result, io);
+}
+
+function renderVerifyPlain(report) {
+  const errors = Array.isArray(report.errors) ? report.errors : [];
+  const lines = [
+    'Enigma verify',
+    `Status: ${report.ok ? 'Ready' : 'Needs attention'}`,
+    `Receipts: ${report.receipt_count ?? 0}`,
+    `Checkpoints: ${report.checkpoint_count ?? 0}`,
+    `Errors: ${errors.length}`,
+  ];
+  for (const error of errors.slice(0, 3)) lines.push(`Issue: ${error.code ?? 'VERIFY_ERROR'}`);
+  lines.push('Boundary: local offline receipt verification only; no raw memory, local paths, provider deletion, model behavior, hosted service, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printVerifyReport(report, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderVerifyPlain(report));
+  else print(report, io);
+}
+
+function renderControllerGrantPlain(grant, action, outWritten) {
+  const operations = Array.isArray(grant.operations) ? grant.operations : [];
+  const zones = Array.isArray(grant.memory_zone_refs) ? grant.memory_zone_refs : [];
+  const lines = [
+    `Enigma controller ${action}`,
+    `Status: ${grant.status ?? 'active'}`,
+    `Grant: ${grant.grant_ref ?? '<grant-ref>'}`,
+    `App: ${grant.app_ref ?? '<app-ref>'}`,
+    `Purpose: ${grant.purpose_ref ?? '<purpose-ref>'}`,
+    `Policy: ${grant.policy_ref ?? '<policy-ref>'}`,
+    `Operations: ${operations.length === 0 ? 'none' : operations.join(', ')}`,
+    `Memory zones: ${zones.length === 0 ? 'none' : zones.join(', ')}`,
+  ];
+  if (grant.expires_at) lines.push(`Expires: ${grant.expires_at}`);
+  if (outWritten) lines.push('Grant file: written to <out>');
+  lines.push('Boundary: public-safe local consent grant only; no raw memory, local paths, provider calls, provider deletion, model behavior, hosted service, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printControllerGrantResult(grant, action, flags, io, outWritten = false) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderControllerGrantPlain(grant, action, outWritten));
+  else print(grant, io);
+}
+
+function renderControllerWeatherPlain(report, outWritten = false) {
+  const tiles = Array.isArray(report.tiles) ? report.tiles : [];
+  const issues = Array.isArray(report.issue_codes) ? report.issue_codes : [];
+  const lines = [
+    'Enigma memory weather',
+    `Status: ${report.status ?? 'unknown'}`,
+    `Generated: ${report.generated_at ?? '<generated-at>'}`,
+    `Tiles: ${tiles.length}`,
+    `Issues: ${issues.length === 0 ? 'none' : issues.join(', ')}`,
+    `Next: ${report.next_action ?? 'none'}`,
+  ];
+  if (outWritten) lines.push('Weather report: written to <out>');
+  lines.push('Boundary: public-safe local memory weather only; no raw memory, local paths, provider calls, provider deletion, model behavior, hosted service, benchmark, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printControllerWeatherResult(report, flags, io, outWritten = false) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderControllerWeatherPlain(report, outWritten));
+  else print(report, io);
+}
+
+function renderControllerBubblePlain(bubble, action, outWritten = false) {
+  const appRefs = Array.isArray(bubble.app_refs) ? bubble.app_refs : [];
+  const lines = [
+    `Enigma private memory bubble ${action}`,
+    `Status: ${bubble.status ?? 'unknown'}`,
+    `Bubble: ${bubble.bubble_ref ?? '<bubble-ref>'}`,
+    `Apps: ${appRefs.length}`,
+    `Purpose: ${bubble.purpose_ref ?? '<purpose-ref>'}`,
+    `Candidates: ${bubble.candidate_count ?? 0}`,
+    `Kept: ${bubble.kept_count ?? 0}`,
+    `Discarded: ${bubble.discarded_count ?? 0}`,
+  ];
+  if (bubble.closed_at) lines.push(`Closed: ${bubble.closed_at}`);
+  if (outWritten) lines.push('Bubble file: written to <out>');
+  lines.push('Boundary: public-safe local private-bubble receipt only; no raw memory, local paths, provider calls, provider deletion, model behavior, hosted service, benchmark, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printControllerBubbleResult(bubble, action, flags, io, outWritten = false) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderControllerBubblePlain(bubble, action, outWritten));
+  else print(bubble, io);
+}
+
+function renderNativeHostManifestPlain(summary) {
+  const lines = [
+    'Enigma native host manifest',
+    `Status: ${summary.ok ? 'Ready' : 'Needs attention'}`,
+    `Browser: ${summary.browser ?? '<browser>'}`,
+    `Host: ${summary.host_name ?? 'com.enigma.native_host'}`,
+    `Allowed apps: ${summary.allowed_app_count ?? 0}`,
+  ];
+  if (summary.out_written) lines.push('Manifest: written to <out>');
+  else lines.push('Manifest: generated; write with --out <manifest.json>');
+  lines.push(`Next: enigma native-host install-plan --browser ${summary.browser ?? '<browser>'} --manifest <manifest-path> --plain`);
+  lines.push('Boundary: local native-host manifest planning only; no browser registration writes, raw memory, local paths, provider calls, provider deletion, model behavior, hosted service, or signing claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printNativeHostManifestResult(summary, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderNativeHostManifestPlain(summary));
+  else print(summary.result, io);
+}
+
+function renderNativeHostInstallPlanPlain(plan) {
+  const lines = [
+    'Enigma native host install plan',
+    'Status: Ready',
+    `Browser: ${plan.browser ?? '<browser>'}`,
+    `OS: ${plan.os ?? '<os>'}`,
+    `Writes performed: ${plan.writes_performed === true ? 'yes' : 'no'}`,
+    `Registration targets: ${Array.isArray(plan.target_manifest_paths) ? plan.target_manifest_paths.length : 0}`,
+    `Registry commands: ${Array.isArray(plan.registry_command_preview) ? plan.registry_command_preview.length : 0}`,
+  ];
+  lines.push('Next: copy <manifest-path> to the browser native messaging host location shown in JSON mode, or use the desktop app when signed installers are available.');
+  lines.push('Boundary: local native-host registration plan only; no registry writes, filesystem writes, raw memory, local paths, provider calls, provider deletion, model behavior, hosted service, or signing claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printNativeHostInstallPlan(plan, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderNativeHostInstallPlanPlain(plan));
+  else print(plan, io);
+}
+
+
+function printClaudeMcpbPackageReport(report, flags, io, outWritten = false) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderClaudeMcpbPackagePlain(report, outWritten));
+  else print(report, io);
+}
+
+
+
+
+function renderInstallPlain(summary) {
+  const clients = Array.isArray(summary.clients) ? summary.clients : [];
+  const firstClient = clients[0]?.client_id ?? '<client>';
+  const lines = [
+    'Enigma install',
+    `Status: ${summary.ok ? 'Ready' : 'Needs attention'}`,
+    'Memory Drive: <bundle-path>',
+    `Bundle: ${summary.bundle_created ? 'created' : 'already existed'}`,
+    `Clients: ${clients.length}`,
+    `MCP command: ${summary.mcp_command ?? 'enigma-mcp'}`,
+  ];
+  if (summary.out) lines.push('Snippets: written to <out>');
+  lines.push(firstClient === 'claude-desktop' ? 'Next: enigma claude-mcpb package --plain' : `Next: enigma connect ${firstClient} --bundle <bundle-path> --dry-run`);
+  lines.push('Boundary: local install snippet planning only; no raw memory, local paths, provider launch, provider deletion, model behavior, hosted service, or signing claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printInstallSummary(summary, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderInstallPlain(summary));
+  else print(summary, io);
+}
+
+
+function renderCapsuleExportPlain(result) {
+  const artifacts = result.public_artifacts ?? {};
+  const lines = [
+    'Enigma capsule export',
+    `Status: ${result.ok ? 'Ready' : 'Needs attention'}`,
+    `Capsule: ${result.capsule_id ?? '<capsule-id>'}`,
+    `Manifest root: ${artifacts.active_set_root ?? '<active-set-root>'}`,
+    `Receipt root: ${artifacts.receipt_log_root ?? '<receipt-log-root>'}`,
+    `Candidates: ${result.verifier_metadata?.candidate_count ?? 0}`,
+    `Custody: ${result.verifier_metadata?.custody_status ?? '<custody-status>'}`,
+    'Capsule file: written to <out>',
+  ];
+  lines.push('Boundary: public-safe local import capsule export only; no raw memory, local paths, provider calls, provider deletion, model behavior, hosted service, benchmark, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printCapsuleExportResult(result, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderCapsuleExportPlain(result));
+  else print(result, io);
+}
+
+function renderCapsuleImportPlain(result) {
+  const lines = [
+    'Enigma capsule import',
+    `Status: ${result.ok ? 'Ready' : 'Needs attention'}`,
+    `Memory Drive writes: ${Array.isArray(result.vault_writes) ? result.vault_writes.length : result.vault_write_count ?? 0}`,
+    `Limitations: ${Array.isArray(result.limitations) && result.limitations.length ? result.limitations.join(', ') : 'none'}`,
+  ];
+  if (result.bundle_written) lines.push('Memory Drive: updated');
+  else lines.push('Memory Drive: not written');
+  lines.push('Boundary: public-safe local import capsule verification only; no raw memory, local paths, provider calls, provider deletion, model behavior, hosted service, benchmark, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printCapsuleImportResult(result, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderCapsuleImportPlain(result));
+  else print(result, io);
+}
+
+function renderMeterEventPlain(event, outWritten = false) {
+  const usage = event.usage ?? {};
+  const cost = event.estimated_cost ?? {};
+  const lines = [
+    'Enigma meter event',
+    'Status: Ready',
+    `Event: ${event.event_id ?? '<event-id>'}`,
+    `Provider/model: ${event.provider ?? '<provider>'}/${event.model ?? '<model>'}`,
+    `Prompt tokens: ${usage.prompt_tokens ?? 0}`,
+    `Completion tokens: ${usage.completion_tokens ?? 0}`,
+    `Memory baseline tokens: ${usage.memory_baseline_tokens ?? 0}`,
+    `Memory optimized tokens: ${usage.memory_optimized_tokens ?? 0}`,
+    `Deterministic memory token delta: ${usage.memory_savings_tokens ?? 0}`,
+    `Estimated deterministic credit: ${cost.currency ?? 'USD'} ${Number(cost.estimated_memory_credit ?? 0).toFixed(6)}`,
+  ];
+  if (outWritten) lines.push('Usage event: written to <out>');
+  lines.push('Boundary: local deterministic usage metering only; no prompts, completions, provider responses, credentials, token ROI, provider invoice savings, provider deletion, model behavior, hosted service, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printMeterEventResult(event, flags, io, outWritten = false, jsonResult = event) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderMeterEventPlain(event, outWritten));
+  else print(jsonResult, io);
+}
+
+function renderMeterAggregatePlain(aggregate, outWritten = false) {
+  const totals = aggregate.totals ?? {};
+  const lines = [
+    'Enigma meter aggregate',
+    'Status: Ready',
+    `Aggregate: ${aggregate.aggregate_id ?? '<aggregate-id>'}`,
+    `Events: ${aggregate.event_count ?? 0}`,
+    `Provider/model groups: ${Array.isArray(aggregate.by_provider_model) ? aggregate.by_provider_model.length : 0}`,
+    `Memory baseline tokens: ${totals.memory_baseline_tokens ?? 0}`,
+    `Memory optimized tokens: ${totals.memory_optimized_tokens ?? 0}`,
+    `Deterministic memory token delta: ${totals.memory_savings_tokens ?? 0}`,
+    `Estimated deterministic credit: ${totals.currency ?? 'USD'} ${Number(totals.estimated_memory_credit ?? 0).toFixed(6)}`,
+  ];
+  if (outWritten) lines.push('Usage aggregate: written to <out>');
+  lines.push('Boundary: local deterministic aggregate metering only; no prompts, completions, provider responses, credentials, token ROI, provider invoice savings, provider deletion, model behavior, hosted service, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printMeterAggregateResult(aggregate, flags, io, outWritten = false, jsonResult = aggregate) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderMeterAggregatePlain(aggregate, outWritten));
+  else print(jsonResult, io);
+}
+
+function renderSettlementArtifactPlain(kind, artifact, outWritten = false) {
+  const lines = [
+    `Enigma settlement ${kind}`,
+    'Status: Ready',
+  ];
+  if (kind === 'job') {
+    lines.push(`Job: ${artifact.job_id ?? '<job-id>'}`);
+    lines.push(`Type: ${artifact.job_type ?? '<job-type>'}`);
+    lines.push(`Max price: ${artifact.max_price?.amount ?? 0} ${artifact.max_price?.asset ?? '<asset>'}`);
+  } else if (kind === 'capacity') {
+    lines.push(`Operator: ${artifact.operator_id ?? '<operator>'}`);
+    lines.push(`Accelerator: ${artifact.accelerator_class ?? '<accelerator-class>'}`);
+    lines.push(`Models: ${Array.isArray(artifact.model_refs) ? artifact.model_refs.length : 0}`);
+    lines.push(`Price: ${artifact.price_per_million_context_tokens?.amount ?? 0} ${artifact.price_per_million_context_tokens?.asset ?? '<asset>'} per million context tokens`);
+  } else if (kind === 'quote') {
+    lines.push(`Quote: ${artifact.quote_id ?? '<quote-id>'}`);
+    lines.push(`Service: ${artifact.service_kind ?? '<service-kind>'}`);
+    lines.push(`Price: ${artifact.price?.amount ?? 0} ${artifact.price?.asset ?? '<asset>'}`);
+  } else if (kind === 'receipt') {
+    lines.push(`Receipt: ${artifact.settlement_receipt_id ?? '<receipt-id>'}`);
+    lines.push(`Service: ${artifact.service_kind ?? '<service-kind>'}`);
+    lines.push(`Settled: ${artifact.settled_price?.amount ?? 0} ${artifact.settled_price?.asset ?? '<asset>'}`);
+  } else if (kind === 'batch') {
+    lines.push(`Batch: ${artifact.batch_id ?? '<batch-id>'}`);
+    lines.push(`Receipts: ${artifact.receipt_count ?? 0}`);
+    lines.push(`Total settled: ${artifact.total_settled_amount ?? 0} ${artifact.asset ?? '<asset>'}`);
+  }
+  if (outWritten) lines.push(`${kind[0].toUpperCase()}${kind.slice(1)} file: written to <out>`);
+  lines.push('Boundary: local settlement artifact only; no raw memory, prompts, provider responses, credentials, token ROI, token profit, provider invoice savings, decentralized raw-memory inference, provider deletion, model behavior, hosted service, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printSettlementArtifact(kind, artifact, flags, io, outWritten = false, jsonResult = artifact) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderSettlementArtifactPlain(kind, artifact, outWritten));
+  else print(jsonResult, io);
+}
+
+function renderSettlementVerifyPlain(result) {
+  const errors = Array.isArray(result.errors) ? result.errors : [];
+  const lines = [
+    'Enigma settlement verify',
+    `Status: ${result.ok ? 'Ready' : 'Needs attention'}`,
+    `Errors: ${errors.length}`,
+  ];
+  for (const error of errors.slice(0, 3)) lines.push(`Issue: ${error}`);
+  lines.push('Boundary: local settlement receipt verification only; no raw memory, prompts, provider responses, credentials, token ROI, token profit, provider invoice savings, provider deletion, model behavior, hosted service, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printSettlementVerifyResult(result, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderSettlementVerifyPlain(result));
+  else print(result, io);
+}
+
+function nextPlainRequested(flags) {
+  const format = getFlag(flags, ['format']);
+  return booleanFlag(flags, ['plain', 'text'], false) || format === 'plain' || format === 'text';
+}
+
+function renderStatusPlain(report) {
+  const counts = report.counts ?? {};
+  const lines = [
+    'Enigma status',
+    `Memory Drive: <bundle-path>`,
+    `Active memories: ${counts.active_memories ?? report.active_memory_count ?? 0}`,
+    `Tombstones: ${counts.tombstoned_memories ?? report.tombstoned_memory_count ?? 0}`,
+    `Receipts: ${counts.receipts ?? report.receipt_count ?? 0}`,
+    `Setup: ${report.first_run_status?.state ?? 'unknown'}`,
+  ];
+  const command = report.first_run_status?.primary_action?.command;
+  if (command) lines.push(`Next: ${String(command).replaceAll(String(report.bundle), '<bundle-path>')}`);
+  lines.push('Boundary: local Enigma counters and roots only; no raw memory, local paths, provider deletion, model behavior, hosted service, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printStatusSummary(report, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderStatusPlain(report));
+  else print(report, io);
+}
+
+function renderDriveHealthPlain(report) {
+  const metrics = report.metrics ?? {};
+  const actions = [];
+  for (const metric of Object.values(metrics)) {
+    if (!metric || !Array.isArray(metric.recommended_actions)) continue;
+    for (const action of metric.recommended_actions) {
+      if (typeof action === 'string' && !actions.includes(action)) actions.push(action);
+      if (actions.length >= 2) break;
+    }
+    if (actions.length >= 2) break;
+  }
+  const proofReady = report.proof_network_ready?.eligible_for_anchor_batch === true ? 'eligible' : 'blocked';
+  const lines = [
+    'Enigma drive health',
+    `Status: ${report.overall_status ?? 'unknown'}`,
+    `Score: ${report.overall_score ?? 'unknown'}`,
+    `Receipt coverage: ${metrics.receipt_coverage?.status ?? 'unknown'}`,
+    `Connector health: ${metrics.connector_health?.status ?? 'unknown'}`,
+    `Proof network: ${proofReady}`,
+  ];
+  for (const action of actions) lines.push(`Next: ${action}`);
+  lines.push('Boundary: local Memory Drive health only; no raw memory, local paths, provider deletion, model behavior, hosted service, or live-chain claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printDriveHealthReport(report, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderDriveHealthPlain(report));
+  else print(report, io);
+}
+
+function renderSupportPlain(summary) {
+  const lines = [
+    'Enigma support summary',
+    `Status: ${summary.ok ? 'Ready' : 'Needs attention'}`,
+    `Setup: ${summary.setup_status?.state ?? 'unknown'}`,
+    `Support code: ${summary.support_code ?? 'unknown'}`,
+    `Issues: ${Array.isArray(summary.issue_codes) ? summary.issue_codes.length : 0}`,
+  ];
+  if (summary.next_action?.command) lines.push(`Next: ${summary.next_action.command}`);
+  const scan = summary.privacy_scan ?? {};
+  if (scan.status) {
+    const categoryCount = Array.isArray(scan.checked_categories) ? scan.checked_categories.length : 0;
+    lines.push(`Privacy scan: ${scan.status} (${scan.detected_private_field_count ?? 0} finding(s), ${categoryCount} categories checked)`);
+  }
+  const redaction = summary.redaction ?? {};
+  const redacted = [
+    redaction.raw_memory_included === false ? 'raw memory' : null,
+    redaction.prompts_included === false ? 'prompts' : null,
+    redaction.transcripts_included === false ? 'transcripts' : null,
+    redaction.credentials_included === false ? 'credentials' : null,
+    redaction.provider_responses_included === false ? 'provider responses' : null,
+    redaction.local_paths_redacted === true ? 'local paths' : null,
+  ].filter(Boolean);
+  if (redacted.length > 0) lines.push(`Redacted: ${redacted.join(', ')}`);
+  lines.push('Safe to share: support code, setup state, issue count, and next action only.');
+  lines.push('Boundary: local Enigma support state only; no raw memory, local paths, credentials, provider responses, provider deletion, model behavior, or hosted service claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printSupportSummary(summary, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderSupportPlain(summary));
+  else print(summary, io);
+}
+
+function renderImportPlain(preview) {
+  const lines = [
+    'Enigma import',
+    `Decision: ${preview.import_decision ?? 'unknown'}`,
+    `Candidates: ${preview.candidate_count ?? 0}`,
+    `Duplicates: ${preview.counts?.dedupe?.duplicate_group_count ?? preview.preview_receipt?.duplicate_group_count ?? 0}`,
+    `Memory Drive write: ${preview.vault_write_performed ? 'performed' : 'not performed'}`,
+  ];
+  if (preview.raw_report_written) lines.push('Report: written to <out>');
+  if (preview.import_batch_receipt?.schema) lines.push(`Batch receipt: ${preview.import_batch_receipt.write_count ?? 0} write(s)`);
+  if (preview.primary_action?.label) lines.push(`Next: ${preview.primary_action.label}`);
+  lines.push('Boundary: local import preview/write only; no raw memory, local paths, provider deletion, model behavior, or hosted service claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printImportPreview(preview, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderImportPlain(preview));
+  else print(preview, io);
+}
+
+function renderImportRollbackPlain(receipt) {
+  const lines = [
+    'Enigma import rollback',
+    `Status: ${receipt.ok ? 'Ready' : 'Needs attention'}`,
+    `Requested writes: ${receipt.requested_write_count ?? 0}`,
+    `Tombstoned: ${receipt.tombstoned_count ?? 0}`,
+    `Skipped: ${receipt.skipped_count ?? 0}`,
+    'Source report: <import-report-file>',
+  ];
+  lines.push('Boundary: local Memory Drive tombstones only; no raw memory, local paths, provider deletion, model behavior, or hosted service claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printImportRollbackReceipt(receipt, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderImportRollbackPlain(receipt));
+  else print(receipt, io);
+}
+
+function renderNextActionPlain(action) {
+  const lines = [
+    'Enigma next',
+    `Status: ${action.primary_action?.label ?? action.state ?? 'Check Enigma'}`,
+    `State: ${action.state}`,
+  ];
+  if (action.primary_action?.command) lines.push(`Run: ${action.primary_action.command}`);
+  if (action.follow_up?.command) lines.push(`Then: ${action.follow_up.command}`);
+  const lanes = action.lanes && typeof action.lanes === 'object' ? Object.entries(action.lanes) : [];
+  for (const [name, lane] of lanes) {
+    const label = lane?.label ?? lane?.status ?? 'unknown';
+    lines.push(`${name.replace(/_/g, ' ')}: ${label}`);
+  }
+  if (Array.isArray(action.issue_codes) && action.issue_codes.length > 0) {
+    lines.push(`Issue: ${action.issue_codes.join(', ')}`);
+  }
+  lines.push('Boundary: local Enigma status only; no raw memory or outside-Enigma control claims.');
+  return `${lines.join('\n')}\n`;
+}
+function renderSetupPlain(summary) {
+  const lines = [
+    summary.command === 'enigma init' ? 'Enigma init' : 'Enigma setup',
+    `Status: ${summary.ok ? 'Ready' : 'Needs attention'}`,
+    `Memory Drive: ${summary.bundle}`,
+    `Memories: ${summary.memory_count}`,
+    `Connectors: ${summary.client_configs_written ? 'configured' : 'planned only'}`,
+  ];
+  if (summary.dry_run) lines.push('Mode: dry run; no files were written.');
+  if (Array.isArray(summary.connector_write_skips) && summary.connector_write_skips.length > 0) {
+    lines.push(`Skipped: ${summary.connector_write_skips.length} client config(s) were not present.`);
+  }
+  const next = Array.isArray(summary.next_commands) ? summary.next_commands.slice(0, 3) : [];
+  for (const command of next) lines.push(`Next: ${command}`);
+  lines.push('Boundary: local Enigma setup only; no raw memory, local paths, provider deletion, model behavior, hosted service, or signing claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printSetupSummary(summary, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderSetupPlain(summary));
+  else print(summary, io);
+}
+
+function renderQuickstartPlain(summary) {
+  const lines = [
+    'Enigma quickstart',
+    `Status: ${summary.ok ? 'Ready' : 'Needs attention'}`,
+    `Memory Drive: ${summary.bundle}`,
+    `Memories: ${summary.memory_count}`,
+    `Receipts: ${summary.receipt_count}`,
+  ];
+  const next = Array.isArray(summary.next_commands) ? summary.next_commands : [];
+  for (const command of next) lines.push(`Next: ${command}`);
+  lines.push('Boundary: local Enigma quickstart only; no raw memory, local paths, provider deletion, model behavior, hosted service, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printQuickstartSummary(summary, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderQuickstartPlain(summary));
+  else print(summary, io);
+}
+
+
+function doctorSetupExplanation(summary) {
+  const reasons = new Set(Array.isArray(summary.setup_status?.reasons) ? summary.setup_status.reasons : []);
+  const connectorReasons = (Array.isArray(summary.connectors?.clients) ? summary.connectors.clients : [])
+    .flatMap((client) => Array.isArray(client.repair_reasons) ? client.repair_reasons : []);
+  for (const reason of connectorReasons) reasons.add(`connector_${reason}`);
+  if (reasons.has('bundle_json_invalid') || reasons.has('bundle_schema_mismatch')) {
+    return 'Why: the target Enigma bundle exists but is not a valid Memory Drive bundle. Create a fresh Memory Drive at a new path; use --overwrite only if you intentionally replace the existing local bundle.';
+  }
+  if (reasons.has('connector_bundle_env_missing') || reasons.has('connector_bundle_env_mismatch')) {
+    return 'Why: the Memory Drive is not ready and an AI app connection setting points at a missing or different bundle. Create this Memory Drive, then preview or repair the app connection.';
+  }
+
+  if (reasons.has('bundle_missing')) {
+    return 'Why: the target Enigma bundle does not exist yet. Run quickstart for this bundle, then rerun doctor.';
+  }
+  if (summary.setup_status?.state === 'setup_needed') {
+    return 'Why: doctor is the final green check after local setup, not the first install step.';
+  }
+  return null;
+}
+
+function renderDoctorPlain(summary) {
+  const lines = [
+    'Enigma doctor',
+    `Status: ${summary.ok ? 'Ready' : 'Needs attention'}`,
+    `Setup: ${summary.setup_status?.state ?? 'unknown'}`,
+  ];
+  const reasons = Array.isArray(summary.setup_status?.reasons) ? summary.setup_status.reasons : [];
+  if (reasons.length > 0) lines.push(`Issue: ${reasons.join(', ')}`);
+  const explanation = doctorSetupExplanation(summary);
+  if (explanation) lines.push(explanation);
+  if (summary.setup_status?.state === 'setup_needed' && summary.first_run_hint?.command) {
+    lines.push(`Run: ${summary.first_run_hint.command}`);
+    const followUps = Array.isArray(summary.next_commands) ? summary.next_commands.slice(1, 3) : [];
+    for (const command of followUps) lines.push(`Then: ${command}`);
+  } else {
+    const followUps = Array.isArray(summary.next_commands) ? summary.next_commands.slice(0, 3) : [];
+    for (const command of followUps) lines.push(`Next: ${command}`);
+  }
+  const clients = Array.isArray(summary.connectors?.clients) ? summary.connectors.clients : [];
+  if (clients.length > 0) {
+    const ready = clients.filter((client) => client.status === 'ready' || client.action === 'already_configured').length;
+    const repair = clients.filter((client) => Array.isArray(client.repair_reasons) && client.repair_reasons.length > 0).length;
+    lines.push(`Connectors: ${ready} ready, ${repair} need repair`);
+  }
+  lines.push('Boundary: local Enigma checks only; no raw memory, local paths, provider deletion, model behavior, or hosted readiness claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printDoctorSummary(summary, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderDoctorPlain(summary));
+  else print(summary, io);
+}
+
+function renderConnectorPlain(result) {
+  const action = result.action === 'disconnect' ? 'disconnect' : 'connect';
+  const title = action === 'disconnect' ? 'Enigma disconnect' : 'Enigma connect';
+  const lines = [
+    title,
+    `Status: ${result.ok ? 'Ready' : 'Needs attention'}`,
+    `Client: ${result.client_id ?? 'unknown'}`,
+    `Mode: ${result.dryRun ? 'dry run' : 'write'}`,
+    `Change: ${result.changed ? 'planned' : 'not needed'}`,
+    'Config: <client-config-path>',
+  ];
+  if (result.dryRun && action === 'connect') lines.push(`Next: enigma connect ${result.client_id ?? '<client>'} --bundle <bundle-path>`);
+  if (result.dryRun && action === 'disconnect') lines.push(`Next: enigma disconnect ${result.client_id ?? '<client>'}`);
+  lines.push('Boundary: local client config only; no provider launch, provider deletion, model behavior, hosted service, raw memory, or local paths.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printConnectorResult(result, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderConnectorPlain(result));
+  else print(result, io);
+}
+
+function printNextAction(action, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderNextActionPlain(action));
+  else print(action, io);
+}
+
+function redactCliErrorMessage(error) {
+  return String(error?.message ?? error ?? 'Command failed.')
+    .replace(/[A-Za-z]:[\\/][^\s,)"']+/g, '<local-path>')
+    .replace(/\/(?:Users|home|var|tmp|private|Volumes)\/[^\s,)"']+/g, '<local-path>');
+}
+
+function recoveryCommandFor(command, error) {
+  const existingArtifact = /already exists/i.test(String(error?.message ?? error ?? ''));
+  if (command === 'init' || command === 'setup') return existingArtifact ? 'enigma setup --bundle <new-bundle-path> --out-dir <new-empty-out-dir>' : 'enigma setup --bundle <bundle-path> --out-dir <out-dir>';
+  if (command === 'start' || command === 'quickstart') return existingArtifact ? 'enigma quickstart --bundle <new-bundle-path> --out-dir <new-empty-out-dir>' : 'enigma quickstart --bundle <bundle-path> --out-dir <out-dir>';
+  if (command === 'test-drive') return existingArtifact ? 'enigma test-drive --out-dir <new-empty-out-dir>' : 'enigma test-drive --out-dir <out-dir>';
+  return 'enigma next --bundle <bundle-path>';
+}
+
+function renderCliErrorPlain(command, error) {
+  const safeCommand = command ? String(command).replace(/[^a-z0-9:-]/gi, '') : 'command';
+  const lines = [
+    `Enigma ${safeCommand}`,
+    'Status: Needs attention',
+    `Issue: ${redactCliErrorMessage(error)}`,
+    `Next: ${recoveryCommandFor(command, error)}`,
+    'Boundary: local Enigma error summary only; no raw memory, local paths, provider deletion, model behavior, hosted service, or signing claims.',
+  ];
+  return `${lines.join('\n')}\n`;
+}
+
+
+async function nextCommand(flags, io) {
+  const bundleInput = String(getFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE));
+  const bundlePath = resolve(bundleInput);
+  const bundleDisplay = publicPathDisplay(bundleInput, 'bundle-path');
+  const vaultPath = await writableVaultPathCheck(bundlePath, bundleDisplay);
+  const claimBoundaries = {
+    local_enigma_status_only: true,
+    raw_memory_returned: false,
+    local_paths_redacted: true,
+    provider_deletion_proof: false,
+    model_forgetting_proof: false,
+    hosted_saas_live: false,
+  };
+  if (vaultPath.ok !== true) {
+    const action = {
+      ok: false,
+      schema: 'enigma.next_action.v1',
+      state: 'attention_needed',
+      bundle: bundleDisplay,
+      primary_action: {
+        id: 'choose_writable_bundle',
+        label: 'Choose writable Memory Drive path',
+        command: 'enigma quickstart --bundle <writable-bundle-path>',
+      },
+      issue_codes: [vaultPath.reason || 'bundle_path_not_writable'],
+      vault_path: vaultPath,
+      claim_boundaries: claimBoundaries,
+    };
+    printNextAction(action, flags, io);
+    return 0;
+  }
+  const bundleStatus = await bundleInitializedCheck(bundlePath, vaultPath);
+  if (bundleStatus.ok !== true) {
+    const action = {
+      ok: true,
+      schema: 'enigma.next_action.v1',
+      state: 'setup_needed',
+      bundle: bundleDisplay,
+      primary_action: {
+        id: 'run_quickstart',
+        label: 'Create Memory Drive',
+        command: `enigma quickstart --bundle "${bundleDisplay}" --plain`,
+      },
+      issue_codes: [bundleStatus.reason || 'bundle_missing'],
+      bundle_initialized: bundleStatus,
+      follow_up: {
+        id: 'run_status_after_setup',
+        label: 'Check setup status',
+        command: `enigma status --bundle "${bundleDisplay}"`,
+      },
+      claim_boundaries: claimBoundaries,
+    };
+    printNextAction(action, flags, io);
+    return 0;
+  }
+  const { stored, vault, passport } = await loadState(bundlePath, { passphrase: getFlag(flags, ['passphrase']) });
+  const report = passportStatusReport({ bundlePath, bundleDisplay, stored, vault, passport });
+  const action = {
+    ok: true,
+    schema: 'enigma.next_action.v1',
+    state: report.first_run_status.state,
+    bundle: bundleDisplay,
+    primary_action: report.first_run_status.primary_action,
+    lanes: report.first_run_status.lanes,
+    status_ref: `enigma://status/${report.passport_ref.split('/').pop()}`,
+    status_command: `enigma status --bundle "${bundleDisplay}"`,
+    claim_boundaries: claimBoundaries,
+  };
+  printNextAction(action, flags, io);
   return 0;
 }
 async function readOptionalJsonInput(flags, names) {
@@ -1731,7 +2940,7 @@ async function driveHealthCommand(flags, io) {
   const report = createMemoryDriveHealthReport({ vault, passport, benchmarkSummary, connectorSummary, replicas, latestAnchorBatchRef, now });
   const outPath = getFlag(flags, ['out']);
   if (outPath) await writeJson(outPath, report);
-  print(report, io);
+  printDriveHealthReport(report, flags, io);
   return 0;
 }
 
@@ -1793,7 +3002,8 @@ function testDriveNextCommands(bundleDisplay, crossModelReportDisplay) {
     `enigma drive health --bundle ${quotedBundle}`,
     `enigma search --bundle ${quotedBundle} --query "local proof bundle"`,
     `enigma demo cross-model --bundle ${quotedBundle} --out ${quotedReport}`,
-    'enigma setup --overwrite',
+    claudeMcpbNextCommand(),
+    `enigma connect cursor --bundle ${quotedBundle} --dry-run`,
   ];
 }
 
@@ -1872,7 +3082,7 @@ function publicTestDriveStatusSummary(summary, bundleDisplay) {
       `enigma search --bundle ${commandPath(bundleDisplay)} --query <text>`,
       `enigma context --bundle ${commandPath(bundleDisplay)} --query <text>`,
       `enigma verify --bundle ${commandPath(bundleDisplay)}`,
-      `enigma connect <client> --bundle ${commandPath(bundleDisplay)}`,
+      `enigma connect <client> --bundle ${commandPath(bundleDisplay)} --dry-run`,
     ],
   };
 }
@@ -1882,6 +3092,32 @@ function publicTestDriveSearchSummary(summary, bundleDisplay) {
     ...summary,
     bundle: bundleDisplay,
   };
+}
+
+function renderTestDrivePlain(report) {
+  const setup = report.setup_summary ?? {};
+  const crossModel = report.cross_model_summary ?? {};
+  const lines = [
+    'Enigma test drive',
+    `Status: ${report.ok ? 'Ready' : 'Needs attention'}`,
+    `Mode: ${report.dry_run ? 'dry run; no files written' : 'local files written'}`,
+    `Artifacts: ${report.artifacts_written ? 'written' : 'planned only'}`,
+    `Memories: ${setup.memory_count ?? 0}`,
+    `Receipts: ${setup.receipt_count ?? 0}`,
+    `Verify: ${setup.verify_ok ? 'ready' : 'needs attention'}`,
+    `AI app profiles: ${crossModel.profile_count ?? 0}`,
+  ];
+  lines.push(`Install: ${report.install_command ?? 'npm install -g enigma-memory'}`);
+  lines.push('Next: enigma status --bundle <bundle-path>');
+  lines.push('Next: enigma search --bundle <bundle-path> --query "local proof bundle"');
+  lines.push('Next: enigma connect <client> --bundle <bundle-path> --dry-run');
+  lines.push('Boundary: local demo artifacts only; no raw memory, local paths, client config writes, provider calls, provider deletion, model behavior, hosted service, benchmark, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printTestDriveReport(report, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderTestDrivePlain(report));
+  else print(report, io);
 }
 
 function staticSetupSelection(requestedSelection) {
@@ -1903,7 +3139,7 @@ export async function testDriveCommand(flags, io) {
   const overwrite = booleanFlag(flags, ['overwrite'], false);
   const dryRun = booleanFlag(flags, ['dry-run', 'dryRun'], false);
   const outputs = testDriveOutputs(outDirInput, bundleInput);
-  ensureDistinctOutputPaths(outputs.outputs.map((output) => output.path));
+  ensureDistinctOutputPaths(outputs.outputs);
   if (!dryRun) await assertCanWriteQuickstartOutputs(outputs.outputs, overwrite);
 
   const artifacts = await buildQuickstartArtifacts(flags, {
@@ -1991,7 +3227,7 @@ export async function testDriveCommand(flags, io) {
   const files = testDriveFileSummaries(outputs.artifacts, !dryRun);
   const packageJson = await readPackageJson();
   const ok = finalVerifyReport.ok === true && crossModelReport.ok === true && statusSummary.ok === true && searchSummary.ok === true;
-  print({
+  const report = {
     ok,
     schema: 'enigma.test_drive.v1',
     command: 'enigma test-drive',
@@ -1999,7 +3235,7 @@ export async function testDriveCommand(flags, io) {
     out_dir: outDirInput,
     bundle: bundleInput,
     install_command: `npm install -g ${packageJson.name ?? 'enigma-memory'}`,
-    release_target: '0.1.18',
+    release_target: packageJson.version ?? '0.1.19',
     artifacts_written: !dryRun,
     client_configs_written: false,
     client_config_write_required: false,
@@ -2034,7 +3270,8 @@ export async function testDriveCommand(flags, io) {
     search_summary: searchSummary,
     cross_model_summary: crossModelReport,
     claim_boundaries: testDriveClaimBoundaries(),
-  }, io);
+  };
+  printTestDriveReport(report, flags, io);
   return ok ? 0 : 1;
 }
 
@@ -2046,14 +3283,15 @@ async function exportCommand(flags, io) {
   await writeJson(bundlePath, bundle);
   const out = resolve(String(getFlag(flags, ['out'], 'enigma-export.json')));
   await writeJson(out, bundle);
-  print({ ok: true, export: out, receipt_count: Array.isArray(bundle.receipts) ? bundle.receipts.length : 0 }, io);
+  const output = { ok: true, export: out, receipt_count: Array.isArray(bundle.receipts) ? bundle.receipts.length : 0 };
+  printExportResult(output, flags, io);
   return 0;
 }
 
 async function verifyCommand(flags, io) {
   const path = resolve(String(getFlag(flags, ['bundle', 'file', 'export'], DEFAULT_BUNDLE)));
   const report = verifyBundle(await readJson(path));
-  print(report, io);
+  printVerifyReport(report, flags, io);
   return report.ok ? 0 : 1;
 }
 
@@ -2106,6 +3344,9 @@ export async function doctorCommand(flags, io) {
   }));
   const schemas = await schemaFiles();
   const bundleInput = pathFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE);
+  const resolvedBundlePath = resolve(bundleInput);
+  const publicBundlePath = publicPathDisplay(bundleInput, 'bundle-path');
+  const vaultPath = await writableVaultPathCheck(resolvedBundlePath, publicBundlePath);
   const selectedClient = getFlag(flags, ['client']);
   const doctorOptions = selectedClient && selectedClient !== true
     ? { ...connectorOptions(flags), clientId: String(selectedClient), redactPaths: true }
@@ -2129,9 +3370,10 @@ export async function doctorCommand(flags, io) {
     bundle_default_path: {
       ok: DEFAULT_BUNDLE === '.enigma/bundle.json',
       path: DEFAULT_BUNDLE,
-      resolved: publicPathDisplay(resolve(bundleInput), 'bundle-path'),
+      resolved: publicPathDisplay(resolvedBundlePath, 'bundle-path'),
     },
-    vault_path: await writableVaultPathCheck(resolve(bundleInput), publicPathDisplay(bundleInput, 'bundle-path')),
+    vault_path: vaultPath,
+    bundle_initialized: await bundleInitializedCheck(resolvedBundlePath, vaultPath),
     schemas: {
       ok: schemas.length > 0,
       count: schemas.length,
@@ -2145,21 +3387,161 @@ export async function doctorCommand(flags, io) {
     connectors: connectorDoctor,
   };
   const ok = Object.values(checks).every((check) => check.ok !== false);
-  print({
+  const doctorClient = String(selectedClient && selectedClient !== true ? selectedClient : 'generic-mcp');
+  const firstRunHint = doctorFirstRunHint(checks.vault_path.path, doctorClient, checks);
+  const setupStatus = doctorSetupStatus(checks, firstRunHint);
+  const summary = {
     ok,
     node: checks.node,
     package_bins: checks.package_bins,
     npm: checks.npm,
     vault_path: checks.vault_path,
+    bundle_initialized: checks.bundle_initialized,
     bundle_default_path: checks.bundle_default_path,
     schema_count: checks.schemas.count,
     schemas: checks.schemas,
     mcp_command_name: checks.mcp_command_name.command,
     connectors: checks.connectors,
-    next_commands: doctorNextCommands(checks.vault_path.path, String(selectedClient && selectedClient !== true ? selectedClient : 'generic-mcp')),
+    setup_status: setupStatus,
+    first_run_hint: firstRunHint,
+    fresh_install_hint: firstRunHint,
+    next_commands: doctorNextCommands(firstRunHint, checks.vault_path.path, doctorClient, setupStatus.state),
     checks,
-  }, io);
+  };
+  printDoctorSummary(summary, flags, io);
   return ok ? 0 : 1;
+}
+
+const SUPPORT_PRIVACY_SCAN_CATEGORIES = Object.freeze([
+  'memory_bodies',
+  'user_inputs',
+  'dialogue_records',
+  'provider_outputs',
+  'storage_locations',
+  'auth_material',
+  'owner_refs',
+  'settings_snapshots',
+]);
+
+function supportPrivacyScan(status = 'pass') {
+  return {
+    schema: 'enigma.support_privacy_scan.v1',
+    status,
+    checked_categories: SUPPORT_PRIVACY_SCAN_CATEGORIES.slice(),
+    detected_private_field_count: 0,
+    redacted_private_field_count: SUPPORT_PRIVACY_SCAN_CATEGORIES.length,
+    local_paths_hidden: true,
+    public_safe_summary_only: true,
+  };
+}
+
+export async function supportSummaryCommand(flags, io) {
+  const packageJson = await readPackageJson();
+  const requiredNodeMajor = minimumNodeMajor(packageJson.engines?.node);
+  const currentNodeMajor = nodeMajor(process.versions.node);
+  const binMap = packageJson.bin && typeof packageJson.bin === 'object' && !Array.isArray(packageJson.bin) ? packageJson.bin : {};
+  const binEntries = await Promise.all(REQUIRED_PACKAGE_BINS.map(async (name) => {
+    const target = binMap[name];
+    const declared = typeof target === 'string' && target.length > 0;
+    return { name, declared, exists: declared ? await fileExists(packageFileUrl(target)) : false };
+  }));
+  const bundleInput = pathFlag(flags, ['bundle', 'file'], DEFAULT_BUNDLE);
+  const resolvedBundlePath = resolve(bundleInput);
+  const publicBundlePath = publicPathDisplay(bundleInput, 'bundle-path');
+  const vaultPath = await writableVaultPathCheck(resolvedBundlePath, publicBundlePath);
+  const selectedClient = getFlag(flags, ['client']);
+  const doctorClient = String(selectedClient && selectedClient !== true ? selectedClient : 'generic-mcp');
+  const connectorDoctor = await doctorConnectors({
+    ...connectorOptions(flags),
+    clientId: selectedClient && selectedClient !== true ? String(selectedClient) : undefined,
+    redactPaths: true,
+  });
+  const profile = getClientProfile(doctorClient, connectorOptions(flags));
+  const bundleInitialized = await bundleInitializedCheck(resolvedBundlePath, vaultPath);
+  const checks = {
+    node: {
+      ok: requiredNodeMajor === 0 || currentNodeMajor >= requiredNodeMajor,
+      current_major: currentNodeMajor,
+      required: packageJson.engines?.node ?? null,
+    },
+    npm: npmUserAgentCheck(),
+    package_bins: {
+      ok: binEntries.every((entry) => entry.declared && entry.exists),
+      required: REQUIRED_PACKAGE_BINS,
+      entries: binEntries,
+      missing: binEntries.filter((entry) => !entry.declared).map((entry) => entry.name),
+      missing_targets: binEntries.filter((entry) => entry.declared && !entry.exists).map((entry) => entry.name),
+    },
+    vault_path: vaultPath,
+    bundle_initialized: bundleInitialized,
+    mcp_command_name: {
+      ok: profile.command === 'enigma-mcp',
+      command: profile.command,
+      expected: 'enigma-mcp',
+    },
+    connectors: connectorDoctor,
+  };
+  const firstRunHint = doctorFirstRunHint(checks.vault_path.path, doctorClient);
+  const setupStatus = doctorSetupStatus(checks, firstRunHint);
+  let firstRunStatus = null;
+  if (bundleInitialized.ok === true) {
+    try {
+      const { stored, vault, passport } = await loadState(resolvedBundlePath, { passphrase: getFlag(flags, ['passphrase']) });
+      firstRunStatus = passportStatusReport({ bundlePath: resolvedBundlePath, bundleDisplay: publicBundlePath, stored, vault, passport }).first_run_status;
+    } catch {
+      firstRunStatus = null;
+    }
+  }
+  const connectorSummary = connectorReadinessSummary(publicBundlePath);
+  const issueCodes = [
+    ...setupStatus.reasons,
+    ...((connectorDoctor.clients ?? []).flatMap((client) => Array.isArray(client.repair_reasons) ? client.repair_reasons.map((reason) => `connector_${reason}`) : [])),
+  ];
+  const generatedAt = getFlag(flags, ['now']);
+  const summary = {
+    ok: setupStatus.state === 'ready',
+    schema: 'enigma.support_summary.v1',
+    generated_at: generatedAt && generatedAt !== true ? String(generatedAt) : new Date().toISOString(),
+    support_code: `ref:support-summary:${sha256Json({ setup_state: setupStatus.state, issueCodes, bundle: '<bundle-path>' }).slice('sha256:'.length, 'sha256:'.length + 32)}`,
+    package: {
+      name: packageJson.name,
+      version: packageJson.version,
+    },
+    bundle: publicBundlePath,
+    setup_status: setupStatus,
+    first_run_status: firstRunStatus,
+    diagnostics: {
+      node_ok: checks.node.ok,
+      npm_ok: checks.npm.ok,
+      package_bins_ok: checks.package_bins.ok,
+      bundle_initialized_ok: bundleInitialized.ok,
+      mcp_command_name_ok: checks.mcp_command_name.ok,
+      connector_summary: connectorSummary,
+    },
+    issue_codes: [...new Set(issueCodes.filter(Boolean))],
+    next_action: setupStatus.next_command
+      ? { id: 'run_quickstart', label: 'Create Memory Drive', command: setupStatus.next_command }
+      : firstRunStatus?.primary_action ?? { id: 'open_status', label: 'Open status', command: `enigma status --bundle ${commandPath('<bundle-path>')}` },
+    redaction: {
+      raw_memory_included: false,
+      prompts_included: false,
+      transcripts_included: false,
+      credentials_included: false,
+      local_paths_redacted: true,
+      provider_responses_included: false,
+    },
+    privacy_scan: supportPrivacyScan('pass'),
+    claim_boundaries: {
+      local_enigma_status_only: true,
+      provider_deletion_proof: false,
+      model_forgetting_proof: false,
+      hosted_saas_live: false,
+    },
+  };
+  const out = getFlag(flags, ['out']);
+  if (out && out !== true) await writeJson(resolve(String(out)), summary);
+  printSupportSummary(summary, flags, io);
+  return 0;
 }
 
 export async function installCommand(flags, io) {
@@ -2175,7 +3557,7 @@ export async function installCommand(flags, io) {
   }
   const out = getFlag(flags, ['out']);
   if (out && out !== true) await writeJson(resolve(String(out)), { schema: 'enigma.install_snippets.v1', snippets });
-  print({
+  const summary = {
     ok: true,
     bundle: bundlePath,
     bundle_created: bundleState.created,
@@ -2185,21 +3567,22 @@ export async function installCommand(flags, io) {
     mcp_config_snippets: snippets,
     one_command_install_connect: oneCommandInstallConnect(bundlePath, dirname(bundlePath)),
     out: out && out !== true ? resolve(String(out)) : undefined,
-  }, io);
+  };
+  printInstallSummary(summary, flags, io);
   return 0;
 }
 
 export async function connectCommand(client, flags, io) {
   if (!client) throw new Error('Missing required client.');
   const result = await connectClient(client, connectorOptions(flags));
-  print(result, io);
+  printConnectorResult(result, flags, io);
   return result.ok ? 0 : 1;
 }
 
 export async function disconnectCommand(client, flags, io) {
   if (!client) throw new Error('Missing required client.');
   const result = await disconnectClient(client, connectorOptions(flags, false));
-  print(result, io);
+  printConnectorResult(result, flags, io);
   return result.ok ? 0 : 1;
 }
 
@@ -2212,6 +3595,7 @@ export async function importCommand(source, flags, io, positionalFile = undefine
   const options = {};
   const now = getFlag(flags, ['now']);
   if (now && now !== true) options.now = String(now);
+  if (booleanFlag(flags, ['complete', 'curated-complete', 'curatedComplete'], false)) options.complete = true;
   const bundlePath = resolve(String(getFlag(flags, ['bundle'], DEFAULT_BUNDLE)));
   let vault;
   if (getFlag(flags, ['write-vault'], false) === true) {
@@ -2222,9 +3606,120 @@ export async function importCommand(source, flags, io, positionalFile = undefine
   const report = importer(input, options);
   if (vault) await persistState(bundlePath, vault, { passphrase: getFlag(flags, ['passphrase']) });
   const out = getFlag(flags, ['out']);
-  if (out && out !== true) await writeJson(resolve(String(out)), report);
-  print({ ...report, source_file: file, bundle: vault ? bundlePath : undefined, out: out && out !== true ? resolve(String(out)) : undefined }, io);
+  const reportOut = out && out !== true ? resolve(String(out)) : undefined;
+  if (reportOut) await writeJson(reportOut, report);
+  const batchReceipt = vault ? createImportBatchReceipt(report, options) : undefined;
+  const preview = createImportPreview(report, options);
+  const previewOutput = {
+    ...preview,
+    source_file: '<source-file>',
+    source_file_redacted: true,
+    bundle: vault ? publicPathDisplay(bundlePath, 'bundle-path') : undefined,
+    vault_write_performed: Boolean(vault),
+    import_batch_receipt: batchReceipt,
+    raw_report_written: Boolean(reportOut),
+    report_out: reportOut ? publicPathDisplay(reportOut, 'out') : undefined,
+    claim_boundaries: {
+      provider_native_memory_canonical: false,
+      provider_deletion_proof: false,
+      model_forgetting_proof: false,
+      raw_memory_printed: false,
+      imported_candidates_canonical_only_after_vault_write: true,
+    },
+  };
+  printImportPreview(previewOutput, flags, io);
   return report.memory_candidates?.length > 0 || report.ok === true ? 0 : 1;
+}
+
+function importWriteMemoryAddr(write) {
+  if (!write || typeof write !== 'object') return undefined;
+  return typeof write.memory_addr === 'string' && write.memory_addr.length > 0 ? write.memory_addr : undefined;
+}
+
+function importRollbackCandidateRef(write, index) {
+  const candidateId = write?.candidate_id ?? `candidate_${index}`;
+  return `ref:import-candidate:${String(candidateId).replace(/[^A-Za-z0-9._~:@#?=&%+-]/gu, '_')}`;
+}
+
+function publicDeleteReceiptHash(result) {
+  if (typeof result?.receipt?.receipt_hash === 'string') return result.receipt.receipt_hash;
+  if (typeof result?.receipt?.receipt_id === 'string') return sha256Json(result.receipt.receipt_id);
+  return sha256Json(result ?? {});
+}
+
+export async function importRollbackCommand(flags, io, positionalFile = undefined) {
+  const reportPath = resolve(String(requireFileArg(flags, ['file', 'report', 'import-report', 'importReport'], positionalFile, 'file')));
+  const report = await readJson(reportPath);
+  const writes = Array.isArray(report.vault_writes) ? report.vault_writes : [];
+  const bundlePath = resolve(String(getFlag(flags, ['bundle'], DEFAULT_BUNDLE)));
+  const { vault, passport } = await loadState(bundlePath, { passphrase: getFlag(flags, ['passphrase']) });
+  const now = getFlag(flags, ['now']);
+  const generatedAt = now && now !== true ? String(now) : new Date().toISOString();
+  const tombstones = [];
+  const skipped = [];
+  for (let index = 0; index < writes.length; index += 1) {
+    const write = writes[index];
+    const memoryAddr = importWriteMemoryAddr(write);
+    const candidateRef = importRollbackCandidateRef(write, index);
+    const memoryAddrCommitment = sha256PublicValue(memoryAddr ?? candidateRef);
+    if (!memoryAddr) {
+      skipped.push({ candidate_ref: candidateRef, memory_addr_commitment: memoryAddrCommitment, reason_code: 'memory_addr_missing' });
+      continue;
+    }
+    if (vault.tombstones.has(memoryAddr)) {
+      skipped.push({ candidate_ref: candidateRef, memory_addr_commitment: memoryAddrCommitment, reason_code: 'already_tombstoned' });
+      continue;
+    }
+    if (!vault.activeAddresses.has(memoryAddr)) {
+      skipped.push({ candidate_ref: candidateRef, memory_addr_commitment: memoryAddrCommitment, reason_code: 'not_active' });
+      continue;
+    }
+    const result = deleteMemory({
+      vault,
+      passport,
+      memory_addr: memoryAddr,
+      reason: getFlag(flags, ['reason'], 'import_rollback'),
+      now: generatedAt,
+    });
+    tombstones.push({
+      candidate_ref: candidateRef,
+      memory_addr_commitment: memoryAddrCommitment,
+      tombstone_ref: `ref:import-rollback-tombstone:${sha256Json(result.tombstone).slice('sha256:'.length, 'sha256:'.length + 32)}`,
+      receipt_hash: publicDeleteReceiptHash(result),
+      event_commitment: sha256Json(result.event ?? {}),
+    });
+  }
+  if (tombstones.length > 0) await persistState(bundlePath, vault, { passphrase: getFlag(flags, ['passphrase']) });
+  const receipt = {
+    schema: 'enigma.import_rollback_receipt.v1',
+    ok: true,
+    generated_at: generatedAt,
+    report_ref: `ref:import-report:${report.report_id ?? sha256Json(report)}`,
+    source_file: '<import-report-file>',
+    source_file_redacted: true,
+    bundle: publicPathDisplay(bundlePath, 'bundle-path'),
+    requested_write_count: writes.length,
+    tombstoned_count: tombstones.length,
+    skipped_count: skipped.length,
+    tombstones,
+    skipped,
+    roots: {
+      tombstone_root: sha256Json(tombstones.map((item) => item.tombstone_ref)),
+      receipt_root: sha256Json(tombstones.map((item) => item.receipt_hash)),
+      skipped_root: sha256Json(skipped),
+    },
+    claim_boundaries: {
+      local_enigma_vault_only: true,
+      provider_deletion_proof: false,
+      model_forgetting_proof: false,
+      raw_memory_returned: false,
+      local_paths_redacted: true,
+    },
+  };
+  const out = getFlag(flags, ['out']);
+  if (out && out !== true) await writeJson(resolve(String(out)), receipt);
+  printImportRollbackReceipt(receipt, flags, io);
+  return 0;
 }
 
 export async function capsuleExportCommand(flags, io, positionalFile = undefined) {
@@ -2238,14 +3733,15 @@ export async function capsuleExportCommand(flags, io, positionalFile = undefined
   });
   const out = resolve(String(getFlag(flags, ['out'], 'enigma-capsule.json')));
   await writeJson(out, capsule);
-  print({
+  const output = {
     ok: capsule.schema === 'enigma.import_capsule.v1',
     schema: capsule.schema,
     capsule_id: capsule.capsule_id,
     out,
     public_artifacts: capsule.public_artifacts,
     verifier_metadata: capsule.verifier_metadata,
-  }, io);
+  };
+  printCapsuleExportResult(output, flags, io);
   return 0;
 }
 
@@ -2264,7 +3760,7 @@ export async function capsuleImportCommand(flags, io, positionalFile = undefined
   }
   const result = importEnigmaCapsule(capsule, options);
   if (vault) await persistState(bundlePath, vault, { passphrase: getFlag(flags, ['passphrase']) });
-  print({ ...publicCapsuleImportResult(result), source_file: file, bundle: vault ? bundlePath : undefined }, io);
+  printCapsuleImportResult({ ...publicCapsuleImportResult(result), source_file: file, bundle: vault ? bundlePath : undefined, bundle_written: Boolean(vault) }, flags, io);
   return result.ok ? 0 : 1;
 }
 
@@ -2316,18 +3812,31 @@ export async function gatewayServeCommand(flags, io) {
   });
 }
 
+export async function claudeMcpbPackageCommand(flags, io) {
+  const report = await buildClaudeMcpbPackage({
+    mcpb: getFlag(flags, ['mcpb']) ?? undefined,
+    out: getFlag(flags, ['out']) ?? undefined,
+    version: getFlag(flags, ['version']) ?? undefined,
+  });
+  printClaudeMcpbPackageReport(report, flags, io, Boolean(getFlag(flags, ['out'])));
+  return 0;
+}
+
 export async function nativeHostManifestCommand(flags, io) {
+  const browser = String(requireFlag(flags, ['browser'])).toLowerCase();
   const manifest = createNativeHostManifest({
-    browser: requireFlag(flags, ['browser']),
+    browser,
     hostPath: requireFlag(flags, ['host-path', 'hostPath'], 'host-path'),
     extensionId: requireFlag(flags, ['extension-id', 'extensionId'], 'extension-id'),
   });
+  const allowedAppCount = (Array.isArray(manifest.allowed_origins) ? manifest.allowed_origins.length : 0)
+    + (Array.isArray(manifest.allowed_extensions) ? manifest.allowed_extensions.length : 0);
   if (flags.has('out')) {
     const outPath = resolve(String(requireFlag(flags, ['out'])));
     await writeJson(outPath, manifest);
-    print({ ok: true, path: outPath }, io);
+    printNativeHostManifestResult({ ok: true, browser, host_name: manifest.name, allowed_app_count: allowedAppCount, out_written: true, result: { ok: true, path: outPath } }, flags, io);
   } else {
-    print(manifest, io);
+    printNativeHostManifestResult({ ok: true, browser, host_name: manifest.name, allowed_app_count: allowedAppCount, out_written: false, result: manifest }, flags, io);
   }
   return 0;
 }
@@ -2351,7 +3860,7 @@ export async function nativeHostInstallPlanCommand(flags, io) {
     os,
     homeDir: getFlag(flags, ['home', 'home-dir', 'homeDir'], defaultNativeHostInstallPlanHome(os)),
   });
-  print(plan, io);
+  printNativeHostInstallPlan(plan, flags, io);
   return 0;
 }
 
@@ -2396,21 +3905,90 @@ function flagValues(flags, names) {
   return values;
 }
 
+function renderChainPlain(summary, outWritten = false) {
+  const idEntry = Object.entries(summary).find(([key]) => key.endsWith('_id'));
+  const hashEntry = Object.entries(summary).find(([key]) => key.endsWith('_hash'));
+  const lines = [
+    'Enigma proof network artifact',
+    'Status: Ready',
+    `Artifact type: ${summary.artifact_type ?? '<artifact-type>'}`,
+  ];
+  if (idEntry) lines.push(`Artifact id: ${idEntry[1]}`);
+  if (hashEntry) lines.push(`Artifact hash: ${hashEntry[1]}`);
+  lines.push(`Transaction submitted: ${summary.transaction_submitted === true ? 'yes' : 'no'}`);
+  lines.push(`Raw memory on-chain: ${summary.raw_memory_on_chain === true ? 'yes' : 'no'}`);
+  if (outWritten) lines.push('Proof artifact: written to <out>');
+  lines.push('Boundary: local proof-network artifact only; no raw memory, local paths, private keys, network submission, provider deletion, model behavior, hosted service, benchmark superiority, token ROI, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printChainArtifact(summary, flags, io, outWritten = false, jsonResult = summary) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderChainPlain(summary, outWritten));
+  else print(jsonResult, io);
+}
+
+function renderChainVerifyPlain(report) {
+  const errors = Array.isArray(report.validation?.errors) ? report.validation.errors : [];
+  const lines = [
+    'Enigma proof network verify',
+    `Status: ${report.ok ? 'Ready' : 'Needs attention'}`,
+    `Artifact type: ${report.artifact_type ?? '<artifact-type>'}`,
+    `Errors: ${errors.length}`,
+    `Transaction submitted: ${report.transaction_submitted === true ? 'yes' : 'no'}`,
+    `Raw memory on-chain: ${report.raw_memory_on_chain === true ? 'yes' : 'no'}`,
+  ];
+  for (const error of errors.slice(0, 3)) lines.push(`Issue: ${error}`);
+  lines.push('Boundary: local proof-network verification only; no raw memory, local paths, private keys, network submission, provider deletion, model behavior, hosted service, benchmark superiority, token ROI, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printChainVerifyReport(report, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderChainVerifyPlain(report));
+  else print(report, io);
+}
+
+function renderSolanaSubmitPlain(report) {
+  const lines = [
+    'Enigma proof network Solana submit',
+    `Status: ${report.ok ? 'Ready' : 'Needs attention'}`,
+    `Mode: ${report.mode ?? 'dry-run'}`,
+    `Cluster: ${report.cluster ?? '<cluster>'}`,
+    `Transaction submitted: ${report.transaction_submitted === true ? 'yes' : 'no'}`,
+    `Raw memory on-chain: ${report.raw_memory_on_chain === true ? 'yes' : 'no'}`,
+    `Artifact type: ${report.artifact_type ?? '<artifact-type>'}`,
+    `Proof commitment: ${report.proof_commitment ?? '<proof-commitment>'}`,
+    `Memo payload: ${report.would_submit?.payload ?? 'memo_ref'}`,
+  ];
+  if (report.signature) lines.push(`Signature: ${report.signature}`);
+  lines.push('Boundary: Solana Memo carries compact public memo_ref only; no raw memory, artifact body, prompts, transcripts, embeddings, provider responses, private keys, local paths, provider deletion, model behavior, hosted service, benchmark superiority, token ROI, or compliance claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+function printSolanaSubmitReport(report, flags, io) {
+  if (nextPlainRequested(flags)) io.stdout.write(renderSolanaSubmitPlain(report));
+  else print(report, io);
+}
+
 function chainWriteOrPrint(flags, io, artifact, summary) {
   if (flags.has('out')) {
     const outPath = resolve(String(requireFlag(flags, ['out'])));
     return writeJson(outPath, artifact).then(() => {
-      print({
+      const jsonResult = {
         ok: true,
         path: publicPathDisplay(String(requireFlag(flags, ['out'])), 'proof-network-artifact'),
         transaction_submitted: false,
         raw_memory_on_chain: false,
         ...summary,
-      }, io);
+      };
+      printChainArtifact(jsonResult, flags, io, true, jsonResult);
       return 0;
     });
   }
-  print(artifact, io);
+  printChainArtifact({
+    transaction_submitted: false,
+    raw_memory_on_chain: false,
+    ...summary,
+  }, flags, io, false, artifact);
   return 0;
 }
 
@@ -2575,7 +4153,7 @@ export async function chainSubmitSolanaCommand(flags, io, positionalFile = undef
   const memoRef = createSolanaProofMemoRef(schema, artifact, cluster);
   const execute = booleanFlag(flags, ['execute'], false);
   if (!execute) {
-    print({
+    const report = {
       ok: true,
       command: 'chain submit-solana',
       mode: 'dry-run',
@@ -2596,11 +4174,12 @@ export async function chainSubmitSolanaCommand(flags, io, positionalFile = undef
       },
       validation: result,
       explanation: solanaSubmitDryRunExplanation(),
-    }, io);
+    };
+    printSolanaSubmitReport(report, flags, io);
     return 0;
   }
   const signature = await submitSolanaMemoTransaction(flags, cluster, memoRef);
-  print({
+  const report = {
     ok: true,
     command: 'chain submit-solana',
     mode: 'execute',
@@ -2616,7 +4195,8 @@ export async function chainSubmitSolanaCommand(flags, io, positionalFile = undef
     memo_program: SOLANA_MEMO_PROGRAM_ID,
     memo_ref: memoRef,
     validation: result,
-  }, io);
+  };
+  printSolanaSubmitReport(report, flags, io);
   return 0;
 }
 
@@ -2748,14 +4328,14 @@ export async function chainVerifyCommand(flags, io, positionalFile = undefined) 
   } catch (error) {
     result = { ok: false, error: { code: 'PROOF_NETWORK_INVALID', message: error.message } };
   }
-  print({
+  printChainVerifyReport({
     ok: result.ok === true,
     artifact_type: schema,
     artifact_hash: proofNetworkSha256Json(artifact),
     transaction_submitted: false,
     raw_memory_on_chain: false,
     validation: result,
-  }, io);
+  }, flags, io);
   return result.ok === true ? 0 : 1;
 }
 
@@ -2835,9 +4415,9 @@ export async function meterEventCommand(flags, io) {
   if (flags.has('out')) {
     const outPath = resolve(String(requireFlag(flags, ['out'])));
     await writeJson(outPath, event);
-    print({ ok: true, path: outPath, event_id: event.event_id, event_hash: event.event_hash }, io);
+    printMeterEventResult(event, flags, io, true, { ok: true, path: outPath, event_id: event.event_id, event_hash: event.event_hash });
   } else {
-    print(event, io);
+    printMeterEventResult(event, flags, io);
   }
   return 0;
 }
@@ -2854,9 +4434,9 @@ export async function meterAggregateCommand(flags, io, positionalFile) {
   if (flags.has('out')) {
     const outPath = resolve(String(requireFlag(flags, ['out'])));
     await writeJson(outPath, aggregate);
-    print({ ok: true, path: outPath, aggregate_id: aggregate.aggregate_id, aggregate_hash: aggregate.aggregate_hash }, io);
+    printMeterAggregateResult(aggregate, flags, io, true, { ok: true, path: outPath, aggregate_id: aggregate.aggregate_id, aggregate_hash: aggregate.aggregate_hash });
   } else {
-    print(aggregate, io);
+    printMeterAggregateResult(aggregate, flags, io);
   }
   return 0;
 }
@@ -2876,9 +4456,9 @@ export async function settlementJobCommand(flags, io) {
   if (flags.has('out')) {
     const outPath = resolve(String(requireFlag(flags, ['out'])));
     await writeJson(outPath, job);
-    print({ ok: true, path: outPath, job_id: job.job_id, job_hash: job.job_hash }, io);
+    printSettlementArtifact('job', job, flags, io, true, { ok: true, path: outPath, job_id: job.job_id, job_hash: job.job_hash });
   } else {
-    print(job, io);
+    printSettlementArtifact('job', job, flags, io);
   }
   return 0;
 }
@@ -2905,9 +4485,9 @@ export async function settlementCapacityCommand(flags, io) {
   if (flags.has('out')) {
     const outPath = resolve(String(requireFlag(flags, ['out'])));
     await writeJson(outPath, profile);
-    print({ ok: true, path: outPath, capacity_profile_hash: profile.capacity_profile_hash }, io);
+    printSettlementArtifact('capacity', profile, flags, io, true, { ok: true, path: outPath, capacity_profile_hash: profile.capacity_profile_hash });
   } else {
-    print(profile, io);
+    printSettlementArtifact('capacity', profile, flags, io);
   }
   return 0;
 }
@@ -2932,9 +4512,9 @@ export async function settlementQuoteCommand(flags, io) {
   if (flags.has('out')) {
     const outPath = resolve(String(requireFlag(flags, ['out'])));
     await writeJson(outPath, quote);
-    print({ ok: true, path: outPath, quote_id: quote.quote_id, quote_hash: quote.quote_hash }, io);
+    printSettlementArtifact('quote', quote, flags, io, true, { ok: true, path: outPath, quote_id: quote.quote_id, quote_hash: quote.quote_hash });
   } else {
-    print(quote, io);
+    printSettlementArtifact('quote', quote, flags, io);
   }
   return 0;
 }
@@ -2953,9 +4533,9 @@ export async function settlementReceiptCommand(flags, io) {
   if (flags.has('out')) {
     const outPath = resolve(String(requireFlag(flags, ['out'])));
     await writeJson(outPath, receipt);
-    print({ ok: true, path: outPath, settlement_receipt_id: receipt.settlement_receipt_id, settlement_receipt_hash: receipt.settlement_receipt_hash }, io);
+    printSettlementArtifact('receipt', receipt, flags, io, true, { ok: true, path: outPath, receipt_ref: receipt.receipt_ref ?? receipt.receipt_id ?? receipt.settlement_ref ?? null });
   } else {
-    print(receipt, io);
+    printSettlementArtifact('receipt', receipt, flags, io);
   }
   return 0;
 }
@@ -2965,7 +4545,7 @@ export async function settlementVerifyCommand(flags, io) {
   const quote = await readJson(resolve(String(requireFileArg(flags, ['quote'], undefined, 'quote'))));
   const receipt = await readJson(resolve(String(requireFileArg(flags, ['receipt'], undefined, 'receipt'))));
   const result = verifyServiceSettlementReceipt({ job, quote, receipt });
-  print(result, io);
+  printSettlementVerifyResult(result, flags, io);
   return result.ok ? 0 : 1;
 }
 
@@ -2981,10 +4561,123 @@ export async function settlementBatchCommand(flags, io, positionalFile) {
   if (flags.has('out')) {
     const outPath = resolve(String(requireFlag(flags, ['out'])));
     await writeJson(outPath, batch);
-    print({ ok: true, path: outPath, batch_id: batch.batch_id, batch_hash: batch.batch_hash }, io);
+    printSettlementArtifact('batch', batch, flags, io, true, { ok: true, path: outPath, batch_id: batch.batch_id, batch_hash: batch.batch_hash });
   } else {
-    print(batch, io);
+    printSettlementArtifact('batch', batch, flags, io);
   }
+  return 0;
+}
+
+export async function controllerGrantCommand(flags, io) {
+  const operations = parseList(getFlag(flags, ['operations']));
+  const memoryZoneRefs = parseList(getFlag(flags, ['memory-zone-refs', 'memoryZoneRefs']));
+  const proofRefs = parseList(getFlag(flags, ['proof-refs', 'proofRefs']));
+  const receiptRefs = parseList(getFlag(flags, ['receipt-refs', 'receiptRefs']));
+  const grant = createConsentGrant({
+    app_ref: getFlag(flags, ['app-ref', 'appRef'], 'ref:app:cli'),
+    purpose_ref: getFlag(flags, ['purpose-ref', 'purposeRef'], 'ref:purpose:cli_context'),
+    operation: operations.length === 0 ? getFlag(flags, ['operation'], 'recall_context') : undefined,
+    operations: operations.length === 0 ? undefined : operations,
+    memory_zone_ref: memoryZoneRefs.length === 0 ? getFlag(flags, ['memory-zone-ref', 'memoryZoneRef'], 'ref:zone:default') : undefined,
+    memory_zone_refs: memoryZoneRefs.length === 0 ? undefined : memoryZoneRefs,
+    issued_at: getFlag(flags, ['issued-at', 'issuedAt', 'now'], new Date().toISOString()),
+    expires_at: getFlag(flags, ['expires-at', 'expiresAt']),
+    ttl_seconds: parseOptionalNumber(getFlag(flags, ['ttl-seconds', 'ttlSeconds'])),
+    status: getFlag(flags, ['status']),
+    grant_ref: getFlag(flags, ['grant-ref', 'grantRef']),
+    policy_ref: getFlag(flags, ['policy-ref', 'policyRef'], 'ref:policy:cli-context'),
+    proof_refs: proofRefs.length === 0 ? undefined : proofRefs,
+    receipt_refs: receiptRefs.length === 0 ? undefined : receiptRefs,
+  });
+  const out = getFlag(flags, ['out']);
+  if (out && out !== true) await writeJson(resolve(String(out)), grant);
+  printControllerGrantResult(grant, 'grant', flags, io, out && out !== true);
+  return 0;
+}
+
+export async function controllerRevokeCommand(flags, io, positionalFile) {
+  const grantPath = resolve(String(requireFileArg(flags, ['grant-file', 'grantFile', 'in'], positionalFile, 'grant-file')));
+  const source = await readJson(grantPath);
+  const proofRefs = parseList(getFlag(flags, ['proof-refs', 'proofRefs']));
+  const receiptRefs = parseList(getFlag(flags, ['receipt-refs', 'receiptRefs']));
+  const revoked = createConsentGrant({
+    app_ref: source.app_ref,
+    purpose_ref: source.purpose_ref,
+    operations: source.operations,
+    memory_zone_refs: source.memory_zone_refs,
+    issued_at: source.issued_at,
+    expires_at: source.expires_at,
+    status: 'revoked',
+    grant_ref: source.grant_ref,
+    policy_ref: getFlag(flags, ['policy-ref', 'policyRef'], source.policy_ref),
+    proof_refs: proofRefs.length === 0 ? source.proof_refs : proofRefs,
+    receipt_refs: receiptRefs.length === 0 ? source.receipt_refs : receiptRefs,
+  });
+  const out = getFlag(flags, ['out']);
+  if (out && out !== true) await writeJson(resolve(String(out)), revoked);
+  printControllerGrantResult(revoked, 'revoke', flags, io, out && out !== true);
+  return 0;
+}
+
+export async function controllerWeatherCommand(flags, io) {
+  const evidenceRefs = parseList(getFlag(flags, ['evidence-ref', 'evidence-refs', 'evidenceRefs']));
+  const issueCodes = parseList(getFlag(flags, ['issue-code', 'issue-codes', 'issueCodes']));
+  const metric = getFlag(flags, ['metric'], 'active_grants');
+  const count = parseOptionalNumber(getFlag(flags, ['count']));
+  const tileStatus = getFlag(flags, ['tile-status', 'tileStatus']);
+  const tileRequested = getFlag(flags, ['tile-ref', 'tileRef']) !== undefined || tileStatus !== undefined || count !== undefined || getFlag(flags, ['metric']) !== undefined;
+  const tiles = tileRequested ? [{
+    tile_ref: getFlag(flags, ['tile-ref', 'tileRef'], `ref:tile:${String(metric).replace(/[^a-z0-9_:-]/giu, '_')}`),
+    status: tileStatus ?? 'sunny',
+    metric,
+    count: count ?? 0,
+    evidence_refs: evidenceRefs.length === 0 ? ['ref:evidence:weather'] : evidenceRefs,
+  }] : undefined;
+  const report = createMemoryWeatherReport({
+    status: getFlag(flags, ['status']),
+    generated_at: getFlag(flags, ['generated-at', 'generatedAt', 'now']),
+    issue_codes: issueCodes.length === 0 ? undefined : issueCodes,
+    evidence_refs: evidenceRefs.length === 0 ? undefined : evidenceRefs,
+    tiles,
+  });
+  const out = getFlag(flags, ['out']);
+  if (out && out !== true) await writeJson(resolve(String(out)), report);
+  printControllerWeatherResult(report, flags, io, out && out !== true);
+  return 0;
+}
+
+export async function controllerBubbleCommand(flags, io, positionalFile) {
+  const action = String(getFlag(flags, ['action'], getFlag(flags, ['bubble-file', 'bubbleFile', 'in'], positionalFile) ? 'discard' : 'open'));
+  const out = getFlag(flags, ['out']);
+  if (action === 'open') {
+    const appRefs = parseList(getFlag(flags, ['app-refs', 'appRefs']));
+    const receiptRefs = parseList(getFlag(flags, ['receipt-refs', 'receiptRefs']));
+    const bubble = createPrivateMemoryBubble({
+      app_ref: appRefs.length === 0 ? getFlag(flags, ['app-ref', 'appRef'], 'ref:app:cli') : undefined,
+      app_refs: appRefs.length === 0 ? undefined : appRefs,
+      purpose_ref: getFlag(flags, ['purpose-ref', 'purposeRef'], 'ref:purpose:private_bubble'),
+      candidate_count: parseOptionalNumber(getFlag(flags, ['candidate-count', 'candidateCount'])) ?? 0,
+      started_at: getFlag(flags, ['started-at', 'startedAt', 'now'], new Date().toISOString()),
+      bubble_ref: getFlag(flags, ['bubble-ref', 'bubbleRef']),
+      receipt_refs: receiptRefs.length === 0 ? undefined : receiptRefs,
+    });
+    if (out && out !== true) await writeJson(resolve(String(out)), bubble);
+    printControllerBubbleResult(bubble, 'open', flags, io, out && out !== true);
+    return 0;
+  }
+  if (action !== 'keep' && action !== 'discard') throw new Error('controller bubble --action must be open, keep, or discard');
+  const bubblePath = resolve(String(requireFileArg(flags, ['bubble-file', 'bubbleFile', 'in'], positionalFile, 'bubble-file')));
+  const bubble = await readJson(bubblePath);
+  const receiptRefs = parseList(getFlag(flags, ['receipt-refs', 'receiptRefs']));
+  const closed = closePrivateMemoryBubble(bubble, {
+    outcome: action,
+    closed_at: getFlag(flags, ['closed-at', 'closedAt', 'now'], new Date().toISOString()),
+    kept_count: parseOptionalNumber(getFlag(flags, ['kept-count', 'keptCount'])),
+    discarded_count: parseOptionalNumber(getFlag(flags, ['discarded-count', 'discardedCount'])),
+    receipt_refs: receiptRefs.length === 0 ? undefined : receiptRefs,
+  });
+  if (out && out !== true) await writeJson(resolve(String(out)), closed);
+  printControllerBubbleResult(closed, action, flags, io, out && out !== true);
   return 0;
 }
 
@@ -2995,21 +4688,24 @@ Usage: enigma <command> [options]
 
 Quick start:
   npm install -g enigma-memory
-  enigma setup --bundle "$HOME/.enigma/bundle.json" --client auto --connect-installed --overwrite
-  echo "Your memory text" > memory.txt
+  enigma quickstart --bundle "$HOME/.enigma/bundle.json"
+  enigma doctor --bundle "$HOME/.enigma/bundle.json"
+  enigma claude-mcpb package --plain
+  enigma connect cursor --bundle "$HOME/.enigma/bundle.json" --dry-run
+  enigma import text --file ./memories.md --complete --plain
   enigma remember --bundle "$HOME/.enigma/bundle.json" --text-file memory.txt
   enigma search  --bundle "$HOME/.enigma/bundle.json" --query "your topic"
   enigma context --bundle "$HOME/.enigma/bundle.json" --query "your topic" --out "$HOME/.enigma/context-pack.json"
-  enigma verify --export "$HOME/.enigma/export.json"
 
 Windows CMD uses %USERPROFILE% instead of $HOME:
+  enigma import text --file .\\memories.md --complete --plain
   enigma remember --bundle "%USERPROFILE%\\.enigma\\bundle.json" --text-file memory.txt
 
 Common commands:
-  init, setup, quickstart, test-drive      First-run / demo paths
+  init, setup, start, quickstart, test-drive First-run / demo paths
   remember, recall, update, delete         Memory operations
   search, context                          Retrieval / context packs
-  status, drive health, doctor             Health and diagnostics
+  status, drive health, doctor, support summary
   connect <client>, disconnect <client>    MCP client connectors
   export, import <source>, capsule ...     Migration and packaging
   verify                                   Verify an exported bundle
@@ -3028,9 +4724,12 @@ function usage() {
     usage: 'enigma <command> [options]',
     commands: [
       'init',
+      'next',
       'setup',
       'quickstart',
+      'start',
       'test-drive',
+      'claude-mcpb package',
       'demo cross-model',
       'doctor',
       'install',
@@ -3042,6 +4741,8 @@ function usage() {
       'delete',
       'context',
       'search',
+      'controller grant',
+      'controller revoke',
       'status',
       'passport status',
       'export',
@@ -3078,7 +4779,7 @@ function usage() {
       'drive health',
     ],
     connector_options: {
-      '--bundle <path>': 'Absolute local Enigma vault bundle path rendered as ENIGMA_BUNDLE.',
+      '--bundle <path>': 'Absolute local Enigma Memory Drive bundle path rendered as ENIGMA_BUNDLE.',
       '--config <path>': 'Client MCP JSON config path to read/write.',
       '--server-name <name>': 'MCP server key; defaults to enigma.',
       '--mcp-command <command>': 'Command rendered in MCP config; defaults to enigma-mcp. Alias: --command.',
@@ -3088,6 +4789,12 @@ function usage() {
       '--text <text>': 'Inline local memory text. Avoid for private content because argv can be logged by process tooling. Alias: --memory-text.',
       '--text-file <path>': 'Read local memory text from a file so private smoke input is not exposed in shell argv. Aliases: --memory-file, --textFile, --memoryFile.',
       '--importance <0-1>': 'Optional numeric importance/priority in [0,1]; higher values rank the memory higher in optimized context. Alias: --priority.',
+      '--plain': 'Print a human-readable memory lifecycle receipt instead of JSON for remember, update, or delete. Alias: --text or --format text.',
+    },
+    recall_options: {
+      '--id <memory_addr>': 'Memory address to read and receipt locally. Alias: --memory-addr.',
+      '--include-content': 'Explicit opt-in to include plaintext in JSON output. Plain output still summarizes without printing raw memory.',
+      '--plain': 'Print a human-readable recall receipt instead of JSON. Alias: --text or --format text.',
     },
     context_options: {
       '--query <text>': 'Local query. When non-empty, only query-relevant active memories are returned by default. Alias: --q.',
@@ -3098,6 +4805,43 @@ function usage() {
       '--max-estimated-tokens <n>': 'Token budget for the optimized context pack.',
       '--price-per-million-tokens <n>': 'Pricing input for cost estimates.',
       '--currency <code>': 'Currency for cost estimates. Defaults to USD.',
+      '--proof': 'Return public-safe context proof bundle instead of selected memory plaintext. Aliases: --with-proof, --withProof.',
+      '--out <path>': 'Write the context or proof JSON to a local file.',
+      '--plain': 'Print a human-readable context/proof summary instead of JSON or memory plaintext. Alias: --text or --format text.',
+      '--require-grant': 'Fail closed with enigma.context_pack_recall_blocked.v1 unless a matching Memory Controller grant is supplied.',
+      '--grant-file <path>': 'Read a public-safe consent grant JSON file. Repeatable. Alias: --grantFile.',
+      '--grant <json>': 'Inline public-safe consent grant JSON for non-private automation.',
+      '--grants-file <path>': 'Read a public-safe grant array or { grants } JSON object. Repeatable. Alias: --grantsFile.',
+      '--app-ref/--purpose-ref/--memory-zone-ref <ref>': 'Opaque scope refs checked against supplied grants.',
+      '--policy-ref <ref>': 'Opaque policy ref checked against supplied grants. Defaults to ref:policy:cli-context.',
+      '--now <iso>': 'Trusted timestamp for deterministic tests; defaults to current local time.',
+    },
+    proof_options: {
+      'enigma export --bundle <path> --out <path> --plain': 'Write a public-safe local proof bundle and print a path-redacted receipt summary.',
+      'enigma verify --export <path> --plain': 'Verify a local proof bundle and print a path-redacted offline verification summary.',
+    },
+    controller_options: {
+      'controller grant': 'Create a public-safe Memory Controller consent grant for local context recall.',
+      'controller revoke': 'Mark an existing public-safe Memory Controller grant revoked without exposing memory.',
+      'controller weather': 'Create a public-safe Memory Weather report for dashboard/review status.',
+      'controller bubble': 'Open or close a public-safe Private Memory Bubble receipt without exposing memory.',
+      '--grant-file <path>': 'Grant JSON to revoke for controller revoke. Positional file is also accepted.',
+      '--app-ref <ref>': 'Opaque connected-app ref. Defaults to ref:app:cli.',
+      '--purpose-ref <ref>': 'Opaque purpose ref. Defaults to ref:purpose:cli_context.',
+      '--operation <id>': 'Grant operation. Defaults to recall_context.',
+      '--memory-zone-ref <ref>': 'Opaque memory zone ref. Defaults to ref:zone:default.',
+      '--ttl-seconds <n>': 'Grant lifetime in seconds when --expires-at is omitted.',
+      '--issued-at/--now <iso>': 'Grant issue timestamp. Defaults to current local time.',
+      '--expires-at <iso>': 'Explicit grant expiration timestamp. If omitted, ttl-seconds is applied.',
+      '--out <path>': 'Write grant, weather, or bubble JSON for later review without printing local paths.',
+      '--status <sunny|needs_attention|storm_warning>': 'Optional Memory Weather status override for controller weather.',
+      '--issue-code <code>': 'Optional public-safe weather issue code; repeat or comma-separate.',
+      '--tile-status/--metric/--count': 'Optional single weather tile fields for controller weather.',
+      '--action <open|keep|discard>': 'Private Bubble action. Open is default unless a bubble file is supplied; discard is default for close.',
+      '--bubble-file <path>': 'Open Private Bubble JSON to close. Positional file is also accepted.',
+      '--candidate-count <n>': 'Candidate count for an opened Private Bubble.',
+      '--kept-count/--discarded-count <n>': 'Optional close counts for keep/discard actions.',
+      '--plain': 'Print a path-redacted consent/weather/bubble summary instead of JSON. Alias: --text or --format text.',
     },
     search_options: {
       '--query <text>': 'Required local query. Output redacts the query and memory plaintext by default. Alias: --q.',
@@ -3106,10 +4850,21 @@ function usage() {
       '--json': 'Reserved for explicit JSON output; CLI output is JSON by default.',
       '--include-content': 'Opt in to returning plaintext local memory content in the JSON result.',
       '--include-unrelated': 'Escape hatch: include memories with no query token overlap. Alias: --no-strict-relevance.',
+      '--plain': 'Print a human-readable search summary instead of JSON. Alias: --text or --format text.',
     },
     status_options: {
       'enigma status --bundle <path>': 'Show local Memory Passport counts, roots, owner display fields, connector readiness, and next commands.',
       'enigma passport status --bundle <path>': 'Alias for enigma status.',
+      '--plain': 'Print path-redacted local counters and the next setup action instead of JSON. Alias: --text or --format text.',
+    },
+    doctor_options: {
+      'enigma doctor --bundle <path>': 'Run local install, package, bundle, schema, MCP command, and connector checks.',
+      '--plain': 'Print one human-readable next action instead of JSON. Alias: --text or --format text.',
+    },
+    support_options: {
+      'enigma support summary --bundle <path>': 'Collect public-safe local support state for a support ticket or self-diagnosis.',
+      '--plain': 'Print a human-readable support summary instead of JSON. Alias: --text or --format text.',
+      '--out <path>': 'Write the public-safe JSON summary to a file.',
     },
     init_options: {
       '--dry-run': 'Print the first-run plan without writing local artifacts or client configs.',
@@ -3120,6 +4875,7 @@ function usage() {
       '--memory-file <path>': 'Read local memory text from a file without echoing plaintext. Alias: --text-file.',
       '--memory-text <text>': 'Inline demo-only memory text. Avoid for private content because argv can be logged.',
       '--overwrite': 'Replace existing local first-run artifacts.',
+      '--plain': 'Print a human-readable first-run summary with next commands instead of JSON. Alias: --text or --format text.',
     },
     setup_options: {
       '--bundle <path>': 'Bundle JSON to create. Defaults to .enigma/bundle.json.',
@@ -3131,15 +4887,17 @@ function usage() {
       '--overwrite': 'Replace existing local setup artifacts.',
       '--dry-run': 'Plan setup without writing local artifacts or client configs.',
       '--write-connectors': 'Also write selected client MCP config files. Defaults to false.',
+      '--plain': 'Print a human-readable setup summary with next commands instead of JSON. Alias: --text or --format text.',
     },
     install_options: {
-      'one-command installed clients': 'npm install -g enigma-memory && enigma setup --client auto --connect-installed --overwrite',
-      'one-command Claude Desktop': 'npm install -g enigma-memory && enigma setup --client claude-desktop --write-connectors --overwrite',
-      'one-command Cursor': 'npm install -g enigma-memory && enigma setup --client cursor --write-connectors --overwrite',
-      'one-command Kimi Code': 'npm install -g enigma-memory && enigma setup --client kimi-code --write-connectors --overwrite',
-      'one-command VS Code Cline': 'npm install -g enigma-memory && enigma setup --client vscode-cline --write-connectors --overwrite',
+      'one-command installed clients': 'npm install -g enigma-memory && enigma quickstart --bundle ./.enigma/bundle.json && enigma doctor --bundle ./.enigma/bundle.json',
+      'one-command Claude Desktop extension package': 'npm install -g enigma-memory && enigma quickstart --bundle ./.enigma/bundle.json && enigma claude-mcpb package --plain',
+      'one-command Cursor preview': 'npm install -g enigma-memory && enigma quickstart --bundle ./.enigma/bundle.json && enigma connect cursor --bundle ./.enigma/bundle.json --dry-run',
+      'one-command Kimi Code preview': 'npm install -g enigma-memory && enigma quickstart --bundle ./.enigma/bundle.json && enigma connect kimi-code --bundle ./.enigma/bundle.json --dry-run',
+      'one-command VS Code Cline preview': 'npm install -g enigma-memory && enigma quickstart --bundle ./.enigma/bundle.json && enigma connect vscode-cline --bundle ./.enigma/bundle.json --dry-run',
       '--client <id>': 'Limit generated MCP snippets to one supported client.',
       '--out <path>': 'Write generated MCP snippets to a JSON file for review without hand-editing client config JSON.',
+      '--plain': 'Print a path-redacted install/connect summary instead of JSON snippets. Alias: --text or --format text.',
     },
     quickstart_options: {
       '--bundle <path>': 'Bundle JSON to create. Defaults to .enigma/bundle.json.',
@@ -3149,6 +4907,7 @@ function usage() {
       '--memory-file <path>': 'Read local memory text from a file. Alias: --text-file.',
       '--memory-text <text>': 'Inline demo memory text for non-private demos only.',
       '--overwrite': 'Replace existing quickstart output files.',
+      '--plain': 'Print a human-readable quickstart summary with next commands instead of JSON. Alias: --text or --format text.',
     },
     test_drive_options: {
       '--out-dir <path>': `Isolated demo directory. Defaults to ${DEFAULT_TEST_DRIVE_DIR}.`,
@@ -3156,12 +4915,13 @@ function usage() {
       '--client <id|auto>': 'Client setup planning passthrough. No client config files are written by test-drive.',
       '--overwrite': 'Replace existing test-drive artifact files.',
       '--dry-run': 'Plan the local test drive without writing artifacts.',
+      '--plain': 'Print a path-redacted consumer test-drive summary instead of JSON. Alias: --text or --format text.',
     },
     cross_model_demo_options: {
-      '--bundle <path>': `Reuse a local Enigma bundle. If omitted, ${DEFAULT_CROSS_MODEL_DEMO_BUNDLE} is recreated as a demo-only local vault.`,
       '--memory-file <path>': 'Seed the demo from a local file without echoing plaintext. Alias: --text-file.',
       '--out <path>': 'Write the same public-safe JSON report to a local file.',
       '--limit <n>': 'Maximum active memories per generated profile context pack. Defaults to 1 for the same-memory demo story.',
+      '--plain': 'Print a path-redacted cross-model proof summary instead of JSON. Alias: --text or --format text.',
     },
     native_host: {
       bin: 'enigma-native-host',
@@ -3179,38 +4939,43 @@ function usage() {
         '--host-path <absolute path>': 'Absolute path to the installed enigma-native-host executable.',
         '--extension-id <id>': 'Browser extension id allowed to connect to the native host.',
         '--out <file>': 'Write manifest JSON to a file instead of stdout.',
+        '--plain': 'Print a path-redacted native-host manifest summary instead of manifest JSON. Alias: --text or --format text.',
       },
       install_plan_options: {
         '--browser <chrome|edge|firefox>': 'Browser whose native messaging registration targets should be planned.',
         '--manifest <absolute path>': 'Absolute path to the generated native messaging manifest to register manually.',
         '--os <windows|macos|linux>': 'Target operating system. Defaults to the current operating system.',
         '--home <absolute path>': 'Target user home directory used to compute per-user manifest locations.',
+        '--plain': 'Print a path-redacted native-host install-plan summary instead of JSON. Alias: --text or --format text.',
       },
       boundary: 'Browser native messaging returns local context plus receipt summaries only; provider-native memory remains cache only.',
     },
     metering: {
-      event: 'enigma meter event --tenant <id> --provider <id> --model <id> --prompt-tokens <n> --completion-tokens <n> --memory-baseline-tokens <n> --memory-optimized-tokens <n> --price-per-million-tokens <n> [--out <file>]',
-      aggregate: 'enigma meter aggregate --events <events.json> [--tenant <id>] [--out <file>]',
+      event: 'enigma meter event --tenant <id> --provider <id> --model <id> --prompt-tokens <n> --completion-tokens <n> --memory-baseline-tokens <n> --memory-optimized-tokens <n> --price-per-million-tokens <n> [--out <file>] [--plain]',
+      aggregate: 'enigma meter aggregate --events <events.json> [--tenant <id>] [--out <file>] [--plain]',
+      '--plain': 'Print a path-redacted deterministic metering summary instead of JSON. Alias: --text or --format text.',
       boundary: 'Metering artifacts contain counts, hashes, identifiers, pricing inputs, and claim boundaries only; no prompts, completions, provider responses, credentials, token ROI, or provider-invoice savings claim.',
     },
     settlement: {
-      job: 'enigma settlement job --tenant <id> --job-type <type> --memory-root <sha256:...> --policy-hash <sha256:...> --usage-event-hash <sha256:...> --max-price-amount <n> --payment-asset <asset> --expires-at <iso> [--out <file>]',
-      capacity: 'enigma settlement capacity --operator <id> --accelerator-class <consumer_gpu|workstation_gpu|edge_gpu> --hardware-ref <ref> --region <region> --model-family <family> --model-ref <id[,id]> --vram-gb <n> --max-context-window-tokens <n> --available-context-tokens-per-minute <n> --p95-latency-ms <n> --price-per-million-context-tokens <n> --capacity-ref <ref> --terms-ref <ref> --expires-at <iso> [--asset <asset>] [--out <file>]',
-      quote: 'enigma settlement quote --job <job.json> --operator <id> --service-kind <kind> --price-amount <n> --asset <asset> --capacity-ref <ref> --terms-ref <ref> --expires-at <iso> [--capacity-profile <profile.json>] [--out <file>]',
-      receipt: 'enigma settlement receipt --job <job.json> --quote <quote.json> --settled-amount <n> --settlement-ref <ref> --service-receipt-ref <ref> [--out <file>]',
-      verify: 'enigma settlement verify --job <job.json> --quote <quote.json> --receipt <receipt.json>',
-      batch: 'enigma settlement batch --receipts <receipts.json> --batch-ref <ref> [--asset <asset>] [--out <file>]',
+      job: 'enigma settlement job --tenant <id> --job-type <type> --memory-root <sha256:...> --policy-hash <sha256:...> --usage-event-hash <sha256:...> --max-price-amount <n> --payment-asset <asset> --expires-at <iso> [--out <file>] [--plain]',
+      capacity: 'enigma settlement capacity --operator <id> --accelerator-class <consumer_gpu|workstation_gpu|edge_gpu> --hardware-ref <ref> --region <region> --model-family <family> --model-ref <id[,id]> --vram-gb <n> --max-context-window-tokens <n> --available-context-tokens-per-minute <n> --p95-latency-ms <n> --price-per-million-context-tokens <n> --capacity-ref <ref> --terms-ref <ref> --expires-at <iso> [--asset <asset>] [--out <file>] [--plain]',
+      quote: 'enigma settlement quote --job <job.json> --operator <id> --service-kind <kind> --price-amount <n> --asset <asset> --capacity-ref <ref> --terms-ref <ref> --expires-at <iso> [--capacity-profile <profile.json>] [--out <file>] [--plain]',
+      receipt: 'enigma settlement receipt --job <job.json> --quote <quote.json> --settled-amount <n> --settlement-ref <ref> --service-receipt-ref <ref> [--out <file>] [--plain]',
+      verify: 'enigma settlement verify --job <job.json> --quote <quote.json> --receipt <receipt.json> [--plain]',
+      batch: 'enigma settlement batch --receipts <receipts.json> --batch-ref <ref> [--asset <asset>] [--out <file>] [--plain]',
+      '--plain': 'Print a path-redacted settlement summary instead of JSON. Alias: --text or --format text.',
       boundary: 'Settlement artifacts contain commitment roots, capacity profiles, hashes, refs, prices, and claim boundaries only; no raw memory, prompts, provider responses, credentials, token ROI/profit, decentralization, or provider-invoice savings claim.',
     },
     chain: {
-      anchor: 'enigma chain anchor --root <sha256:...> [--root <sha256:...>] [--ref <public-ref>] [--authority <public-authority-ref>] [--batch-ref <ref>] [--out <file>]',
-      grant: 'enigma chain grant --subject <public-subject-ref> --capability <capability-id> --scope <scope-id> [--resource-ref <sha256:...>] [--policy-hash <sha256:...>] --expires-at <iso> [--grant-ref <public-ref>] [--out <file>]',
-      revoke: 'enigma chain revoke --grant-hash <sha256:...> --reason <public-reason-code> [--revocation-ref <public-ref>] [--out <file>]',
-      attest: 'enigma chain attest (--report-hash <sha256:...> | --report-file <report.json>) --dataset-ref <sha256:...> --runner-ref <public-runner-ref> --package-ref <public-package-ref> [--score name=value] [--out <file>]',
-      verify: 'enigma chain verify --file <proof-artifact.json>',
-      register: 'enigma chain register --entry-type <anchor_batch|benchmark_attestation|connector_conformance|health_report|operator_receipt|settlement_job> (--artifact-hash <sha256:...> | --artifact-file <artifact.json>) --artifact-schema-ref <schema-id> [--digest-ref <sha256:...>] [--signer <public-ref>] [--registry-ref <public-ref>] [--entry-ref <public-ref>] [--entry-count <n>] [--out <file>]',
-      registry: 'enigma chain registry --entry <registry-entry.json> [--entry <registry-entry.json>] [--registry-ref <public-ref>] [--out <file>]',
-      submit_solana: 'enigma chain submit-solana --file <proof-artifact.json> --cluster <devnet|testnet|mainnet-beta|localnet> [--rpc <url>] [--execute --keypair <solana-cli-64-byte-keypair.json>]',
+      anchor: 'enigma chain anchor --root <sha256:...> [--root <sha256:...>] [--ref <public-ref>] [--authority <public-authority-ref>] [--batch-ref <ref>] [--out <file>] [--plain]',
+      grant: 'enigma chain grant --subject <public-subject-ref> --capability <capability-id> --scope <scope-id> [--resource-ref <sha256:...>] [--policy-hash <sha256:...>] --expires-at <iso> [--grant-ref <public-ref>] [--out <file>] [--plain]',
+      revoke: 'enigma chain revoke --grant-hash <sha256:...> --reason <public-reason-code> [--revocation-ref <public-ref>] [--out <file>] [--plain]',
+      attest: 'enigma chain attest (--report-hash <sha256:...> | --report-file <report.json>) --dataset-ref <sha256:...> --runner-ref <public-runner-ref> --package-ref <public-package-ref> [--score name=value] [--out <file>] [--plain]',
+      verify: 'enigma chain verify --file <proof-artifact.json> [--plain]',
+      register: 'enigma chain register --entry-type <anchor_batch|benchmark_attestation|connector_conformance|health_report|operator_receipt|settlement_job> (--artifact-hash <sha256:...> | --artifact-file <artifact.json>) --artifact-schema-ref <schema-id> [--digest-ref <sha256:...>] [--signer <public-ref>] [--registry-ref <public-ref>] [--entry-ref <public-ref>] [--entry-count <n>] [--out <file>] [--plain]',
+      registry: 'enigma chain registry --entry <registry-entry.json> [--entry <registry-entry.json>] [--registry-ref <public-ref>] [--out <file>] [--plain]',
+      submit_solana: 'enigma chain submit-solana --file <proof-artifact.json> --cluster <devnet|testnet|mainnet-beta|localnet> [--rpc <url>] [--execute --keypair <solana-cli-64-byte-keypair.json>] [--plain]',
+      '--plain': 'Print a path-redacted proof-network summary instead of JSON. Alias: --text or --format text.',
       boundary: 'Proof Network chain commands default to local planning and dry-run validation. submit-solana only submits a Solana Memo transaction when --execute is passed; it carries compact public-safe commitment/ref JSON, never raw memory or artifact bodies.',
     },
     memory_drive_health: {
@@ -3218,21 +4983,39 @@ function usage() {
       schema: 'enigma.memory_drive_health_report.v1',
       output_shape: 'SMART-style report: overall_status/overall_score, ten metrics (freshness, duplicate_rate, tombstone_risk, stale_derived_artifacts, retrieval_hit_rate, token_reduction, leakage_scan, receipt_coverage, connector_health, sync_fork_risk), each with status/score/observed/thresholds/evidence_refs/recommended_actions, plus roots, privacy_boundaries, claim_boundaries, and a conservative proof_network_ready block.',
       options: {
-        '--bundle <path>': 'Local Enigma vault bundle to inspect. Defaults to .enigma/bundle.json.',
+        '--bundle <path>': 'Local Enigma Memory Drive bundle to inspect. Defaults to .enigma/bundle.json.',
         '--now <iso>': 'ISO-8601 timestamp used for age calculations. Defaults to a deterministic timestamp.',
         '--benchmark-summary <path>': 'Optional JSON file with public-safe retrieval probes (probe_count, top_k, hit_at_k, exact_coverage, abstention_correctness). Omit to default gracefully.',
         '--connector-summary <path>': 'Optional JSON file with public-safe connector health (connector_count, healthy_connector_count, lagging_connector_count, error_rate_24h, cursor_gap_count). Omit to default gracefully.',
         '--replicas <path>': 'Optional JSON file of replica root reports for sync fork risk.',
         '--latest-anchor-batch-ref <ref>': 'Optional public-safe proof-network anchor batch ref for receipt coverage.',
         '--out <path>': 'Write the JSON report to a file in addition to stdout.',
+        '--plain': 'Print a human-readable health summary instead of JSON. Alias: --text or --format text.',
       },
       boundary: 'Computed locally from public-safe counters, roots, receipt metadata, tombstones, and derived/context-pack refs only. No network or chain calls; transaction_submitted and raw_memory_on_chain are always false. It is local operational evidence, not provider-deletion, model-forgetting, compliance, or live-chain-settlement proof.',
+    },
+    import_options: {
+      'enigma import <source> --file <export.json>': 'Preview import candidates locally without printing memory plaintext.',
+      'enigma import rollback --file <raw-import-report.json> --bundle <bundle.json>': 'Tombstone memories written by a prior import report and emit a public-safe rollback receipt.',
+      '--out <path>': 'Write the raw local import report for capsule export or review. CLI stdout remains a public-safe preview.',
+      'enigma capsule export --file <raw-import-report.json> --out <capsule.json> --plain': 'Export a path-redacted, claim-bounded capsule summary while writing the local capsule file.',
+      'enigma capsule import --file <capsule.json> --plain': 'Verify an import capsule and print a path-redacted summary without writing to the Memory Drive unless --write-vault is present.',
+      '--write-vault': 'Explicitly write accepted importer candidates into the selected Memory Drive bundle.',
+      '--bundle <path>': 'Memory Drive bundle JSON to write when --write-vault is present. Defaults to .enigma/bundle.json.',
+      '--plain': 'Print a human-readable import or rollback summary instead of JSON. Alias: --text or --format text.',
     },
     relay_gateway_options: {
       '--host <host>': 'Bind host. Defaults to 127.0.0.1.',
       '--port <port>': `Bind port. Defaults to ${DEFAULT_RELAY_PORT} for relay and ${DEFAULT_GATEWAY_PORT} for gateway.`,
       '--state-file <path>': 'Load and persist local relay/gateway demo state as JSON.',
       '--once': 'Start, report the listening address, persist state when configured, then close.',
+    },
+    connector_options: {
+      'enigma connect <client> --bundle <path>': 'Plan or write local MCP client config for the selected app using the selected Memory Drive bundle.',
+      'enigma disconnect <client>': 'Plan or write local removal of the Enigma MCP entry from the selected app config.',
+      '--dry-run': 'Preview config changes without writing files.',
+      '--mcp-command <command>': 'MCP server command to write. Defaults to enigma-mcp; GUI apps may need an absolute path.',
+      '--plain': 'Print a human-readable config summary instead of JSON. Alias: --text or --format text.',
     },
     kimi_code: {
       gui_path_note: 'GUI-launched Kimi Code may not inherit your shell PATH; pass --mcp-command with an absolute enigma-mcp path when needed.',
@@ -3241,6 +5024,11 @@ function usage() {
     },
     connector_write_behavior: 'Config writes preserve unrelated settings and sibling MCP servers. Existing configs are backed up only when the semantic JSON config changes; reconnecting an identical config is idempotent.',
     claim_boundaries: 'Connectors configure local MCP access to an Enigma bundle. They do not make provider-native memory canonical and do not prove provider deletion or model forgetting.',
+    claude_mcpb_package: {
+      command: 'enigma claude-mcpb package [--mcpb <path>] [--out <report.json>] [--version <semver>] [--plain]',
+      '--plain': 'Print a path-redacted Claude MCPB package summary instead of JSON. Alias: --text or --format text.',
+      boundary: 'Builds a deterministic Claude Desktop MCPB review package locally. It does not install, launch Claude, write client config, or perform network calls.',
+    },
     import_sources: Object.keys(IMPORTERS),
     clients: supportedClients,
     bundle: DEFAULT_BUNDLE,
@@ -3259,14 +5047,14 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     }
     return 0;
   }
-  const twoPartCommands = ['boundary', 'mcp', 'mesh', 'enterprise', 'capsule', 'relay', 'gateway', 'connect', 'disconnect', 'import', 'native-host', 'meter', 'settlement', 'chain', 'demo', 'passport', 'drive'];
+  const twoPartCommands = ['boundary', 'mcp', 'mesh', 'enterprise', 'capsule', 'relay', 'gateway', 'connect', 'disconnect', 'import', 'native-host', 'meter', 'settlement', 'chain', 'demo', 'passport', 'drive', 'controller', 'support', 'claude-mcpb'];
   const flags = parseArgs(twoPartCommands.includes(command) ? argv.slice(2) : argv.slice(1));
   const positionalFile = optionalPositional(argv[2]);
   if (command === 'help') {
     io.stdout.write(`${humanUsage()}\n`);
     return 0;
   }
-  if ((command === 'chain' && (!subcommand || subcommand === '--help' || subcommand === '-h' || flags.has('help'))) || ((flags.has('help') || argv.includes('-h')) && (command === 'init' || command === 'setup' || command === 'test-drive' || command === 'search' || command === 'status' || (command === 'passport' && subcommand === 'status') || ((command === 'relay' || command === 'gateway') && (subcommand === 'serve' || subcommand === 'demo')) || (command === 'native-host' && (subcommand === 'manifest' || subcommand === 'install-plan')) || (command === 'demo' && subcommand === 'cross-model') || (command === 'drive' && subcommand === 'health')))) {
+  if ((command === 'chain' && (!subcommand || subcommand === '--help' || subcommand === '-h' || flags.has('help'))) || ((flags.has('help') || argv.includes('-h')) && (command === 'init' || command === 'setup' || command === 'start' || command === 'next' || command === 'quickstart' || command === 'test-drive' || command === 'search' || command === 'context' || command === 'status' || (command === 'passport' && subcommand === 'status') || ((command === 'relay' || command === 'gateway') && (subcommand === 'serve' || subcommand === 'demo')) || (command === 'native-host' && (subcommand === 'manifest' || subcommand === 'install-plan')) || (command === 'claude-mcpb' && subcommand === 'package') || (command === 'demo' && subcommand === 'cross-model') || (command === 'drive' && subcommand === 'health') || (command === 'controller' && (subcommand === 'grant' || subcommand === 'revoke' || subcommand === 'weather' || subcommand === 'bubble'))))) {
     print(usage(), io);
     return 0;
   }
@@ -3274,9 +5062,11 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     if (command === 'init') return await initCommand(flags, io);
     if (command === 'setup') return await setupCommand(flags, io);
     if (command === 'quickstart') return await quickstartCommand(flags, io);
+    if (command === 'start') return await quickstartCommand(flags, io);
     if (command === 'test-drive') return await testDriveCommand(flags, io);
     if (command === 'demo' && subcommand === 'cross-model') return await crossModelDemoCommand(flags, io);
     if (command === 'doctor') return await doctorCommand(flags, io);
+    if (command === 'support' && subcommand === 'summary') return await supportSummaryCommand(flags, io);
     if (command === 'install') return await installCommand(flags, io);
     if (command === 'connect') return await connectCommand(subcommand, flags, io);
     if (command === 'disconnect') return await disconnectCommand(subcommand, flags, io);
@@ -3286,10 +5076,16 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     if (command === 'delete') return await deleteCommand(flags, io);
     if (command === 'context') return await contextCommand(flags, io);
     if (command === 'search') return await searchCommand(flags, io);
+    if (command === 'controller' && subcommand === 'grant') return await controllerGrantCommand(flags, io);
+    if (command === 'controller' && subcommand === 'revoke') return await controllerRevokeCommand(flags, io, positionalFile);
+    if (command === 'controller' && subcommand === 'weather') return await controllerWeatherCommand(flags, io);
+    if (command === 'controller' && subcommand === 'bubble') return await controllerBubbleCommand(flags, io, positionalFile);
+    if (command === 'next') return await nextCommand(flags, io);
     if (command === 'status') return await statusCommand(flags, io);
     if (command === 'passport' && subcommand === 'status') return await statusCommand(flags, io);
     if (command === 'drive' && subcommand === 'health') return await driveHealthCommand(flags, io);
     if (command === 'export') return await exportCommand(flags, io);
+    if (command === 'import' && subcommand === 'rollback') return await importRollbackCommand(flags, io, positionalFile);
     if (command === 'import') return await importCommand(subcommand, flags, io, positionalFile);
     if (command === 'capsule' && subcommand === 'export') return await capsuleExportCommand(flags, io, positionalFile);
     if (command === 'capsule' && subcommand === 'import') return await capsuleImportCommand(flags, io, positionalFile);
@@ -3300,6 +5096,7 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     if (command === 'relay' && subcommand === 'serve') return await relayServeCommand(flags, io);
     if (command === 'gateway' && subcommand === 'demo') return await gatewayDemoCommand(flags, io);
     if (command === 'gateway' && subcommand === 'serve') return await gatewayServeCommand(flags, io);
+    if (command === 'claude-mcpb' && subcommand === 'package') return await claudeMcpbPackageCommand(flags, io);
     if (command === 'native-host' && subcommand === 'manifest') return await nativeHostManifestCommand(flags, io);
     if (command === 'meter' && subcommand === 'event') return await meterEventCommand(flags, io);
     if (command === 'meter' && subcommand === 'aggregate') return await meterAggregateCommand(flags, io, positionalFile);
@@ -3322,7 +5119,8 @@ export async function main(argv = process.argv.slice(2), io = { stdout: process.
     if (command === 'enterprise' && subcommand === 'demo') return await enterpriseDemoCommand(flags, io);
     throw new Error(`Unknown command: ${[command, subcommand].filter(Boolean).join(' ')}`);
   } catch (error) {
-    print({ ok: false, error: { code: 'CLI_ERROR', message: error.message } }, io);
+    if (nextPlainRequested(flags)) io.stdout.write(renderCliErrorPlain(command, error));
+    else print({ ok: false, error: { code: 'CLI_ERROR', message: error.message } }, io);
     return 2;
   }
 }

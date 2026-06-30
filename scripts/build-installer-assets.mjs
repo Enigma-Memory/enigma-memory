@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 export const INSTALLER_ASSET_SCHEMA = 'enigma.installer_assets.v1';
 export const INSTALLER_ASSET_PACKAGE = 'enigma-memory';
-export const INSTALLER_ASSET_VERSION = '0.1.18';
+export const INSTALLER_ASSET_VERSION = '0.1.19';
 export const INSTALLER_ASSET_GENERATED_AT = '1970-01-01T00:00:00.000Z';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
@@ -17,7 +17,7 @@ const POSIX_ABSOLUTE_RE = /(?:^|[\s"'`=:(])\/(?:Users|home|tmp|var|private|mnt|V
 const CONTROL_RE = /[\0\r]/u;
 
 function usage() {
-  return `Usage: node scripts/build-installer-assets.mjs --out-dir <dir> [--write|--dry-run]\n\nBuilds public-safe source installer assets for enigma-memory. Dry-run is the default and returns the deterministic manifest without writing files.\n`;
+  return `Usage: node scripts/build-installer-assets.mjs --out-dir <dir> [--write|--dry-run] [--plain]\n\nBuilds public-safe source installer assets for enigma-memory. Dry-run is the default and returns the deterministic manifest without writing files. --plain prints a human-readable installer asset summary.\n`;
 }
 
 function readRequiredValue(argv, index, flag) {
@@ -27,7 +27,7 @@ function readRequiredValue(argv, index, flag) {
 }
 
 export function parseInstallerAssetArgs(argv = process.argv.slice(2)) {
-  const options = { outDir: DEFAULT_OUTPUT_DIR, dryRun: true, write: false };
+  const options = { outDir: DEFAULT_OUTPUT_DIR, dryRun: true, write: false, plain: false };
   let sawDryRun = false;
   let sawWrite = false;
 
@@ -46,6 +46,9 @@ export function parseInstallerAssetArgs(argv = process.argv.slice(2)) {
       sawWrite = true;
       options.write = true;
       options.dryRun = false;
+    } else if (arg === '--plain' || arg === '--text' || arg === '--format=text' || (arg === '--format' && argv[index + 1] === 'text')) {
+      options.plain = true;
+      if (arg === '--format') index += 1;
     } else {
       throw new Error(`Unknown argument: ${arg}`);
     }
@@ -95,14 +98,14 @@ function assertPublicSafe(content, label = 'asset') {
 
 function windowsInstallerScript() {
   return `# Enigma Memory source installer for Windows PowerShell.
-# Dry-run is the default; pass -Execute to mutate global npm state and create local setup files.
+# Dry-run is the default; pass -Execute to mutate global npm state and create local quickstart files.
 param(
   [switch]$Execute,
   [string]$Bundle = '.\\.enigma\\bundle.json'
 )
 $ErrorActionPreference = 'Stop'
 $PackageName = '${INSTALLER_ASSET_PACKAGE}'
-$NextClientConnect = 'enigma connect <client> --dry-run'
+$NextClientConnect = 'enigma connect <client> --bundle <bundle> --dry-run'
 
 Write-Output 'Enigma Memory Windows installer source asset'
 Write-Output 'Default mode: dry-run. No native .exe, code-signing, tokens, or hosted credentials are included.'
@@ -112,8 +115,8 @@ Write-Output "Bundle: $Bundle"
 $steps = @(
   'npm install -g enigma-memory',
   'enigma test-drive --dry-run',
-  'enigma setup --bundle <bundle> --overwrite',
-  'enigma doctor',
+  'enigma quickstart --bundle <bundle>',
+  'enigma doctor --bundle <bundle>',
   "Next client-connect preview: $NextClientConnect"
 )
 
@@ -125,8 +128,8 @@ if (-not $Execute) {
 
 npm install -g $PackageName
 enigma test-drive --dry-run
-enigma setup --bundle $Bundle --overwrite
-enigma doctor
+enigma quickstart --bundle $Bundle
+enigma doctor --bundle $Bundle
 Write-Output "Next client-connect preview: $NextClientConnect"
 `;
 }
@@ -135,7 +138,7 @@ function linuxInstallerScript() {
   return [
     '#!/usr/bin/env sh',
     '# Enigma Memory source installer for Linux.',
-    '# Dry-run is the default; pass --execute to mutate global npm state and create local setup files.',
+    '# Dry-run is the default; pass --execute to mutate global npm state and create local quickstart files.',
     'set -eu',
     '',
     'execute=0',
@@ -158,7 +161,7 @@ function linuxInstallerScript() {
     'done',
     '',
     `package='${INSTALLER_ASSET_PACKAGE}'`,
-    "next_client_connect='enigma connect <client> --dry-run'",
+    "next_client_connect='enigma connect <client> --bundle <bundle> --dry-run'",
     "printf '%s\\n' 'Enigma Memory Linux installer source asset'",
     "printf '%s\\n' 'Default mode: dry-run. No native package, signing key, tokens, or hosted credentials are included.'",
     'printf \'%s\\n\' "Package: $package"',
@@ -168,16 +171,16 @@ function linuxInstallerScript() {
     "  printf '%s\\n' 'Preview only. Re-run with --execute after reviewing these steps.'",
     "  printf '%s\\n' 'DRY-RUN: npm install -g enigma-memory'",
     "  printf '%s\\n' 'DRY-RUN: enigma test-drive --dry-run'",
-    "  printf '%s\\n' 'DRY-RUN: enigma setup --bundle <bundle> --overwrite'",
-    "  printf '%s\\n' 'DRY-RUN: enigma doctor'",
+    "  printf '%s\\n' 'DRY-RUN: enigma quickstart --bundle <bundle>'",
+    "  printf '%s\\n' 'DRY-RUN: enigma doctor --bundle <bundle>'",
     '  printf \'%s\\n\' "DRY-RUN: Next client-connect preview: $next_client_connect"',
     '  exit 0',
     'fi',
     '',
     'npm install -g "$package"',
     'enigma test-drive --dry-run',
-    'enigma setup --bundle "$bundle" --overwrite',
-    'enigma doctor',
+    'enigma quickstart --bundle "$bundle"',
+    'enigma doctor --bundle "$bundle"',
     'printf \'%s\\n\' "Next client-connect preview: $next_client_connect"',
     '',
   ].join('\n');
@@ -188,9 +191,9 @@ function homebrewFormulaDraft() {
 # Release engineering must replace the tarball URL and sha256 after a real source archive exists.
 # Post-install smoke path:
 #   enigma test-drive --dry-run
-#   enigma setup --overwrite
-#   enigma doctor
-#   enigma connect <client> --dry-run
+#   enigma quickstart --bundle ./.enigma/bundle.json
+#   enigma doctor --bundle ./.enigma/bundle.json
+#   enigma connect <client> --bundle ./.enigma/bundle.json --dry-run
 class EnigmaMemory < Formula
   desc "Provider-agnostic AI memory passport and offline-verifiable proof layer"
   homepage "https://github.com/Enigma-Memory/enigma-memory"
@@ -213,9 +216,9 @@ class EnigmaMemory < Formula
   test do
     assert_match "enigma", shell_output("#{bin}/enigma --help")
     assert_match "enigma.test_drive.v1", shell_output("#{bin}/enigma test-drive --dry-run")
-    assert_match "enigma.setup.v1", shell_output("#{bin}/enigma setup --dry-run")
-    shell_output("#{bin}/enigma doctor")
-    puts "Next client-connect preview: enigma connect <client> --dry-run"
+    assert_match "enigma.quickstart.v1", shell_output("#{bin}/enigma quickstart --bundle ./.enigma/bundle.json")
+    shell_output("#{bin}/enigma doctor --bundle ./.enigma/bundle.json")
+    puts "Next client-connect preview: enigma connect <client> --bundle ./.enigma/bundle.json --dry-run"
   end
 end
 `;
@@ -231,12 +234,12 @@ Current supported path:
 \`\`\`sh
 npm install -g ${INSTALLER_ASSET_PACKAGE}
 enigma test-drive --dry-run
-enigma setup --overwrite
-enigma doctor
-enigma connect <client> --dry-run
+enigma quickstart --bundle ./.enigma/bundle.json
+enigma doctor --bundle ./.enigma/bundle.json
+enigma connect <client> --bundle ./.enigma/bundle.json --dry-run
 \`\`\`
 
-\`enigma connect <client> --dry-run\` is the next client-connect preview command. Remove \`--dry-run\` only after reviewing the planned client config change.
+\`enigma connect <client> --bundle ./.enigma/bundle.json --dry-run\` is the next client-connect preview command. Remove \`--dry-run\` only after reviewing the planned client config change.
 
 Blockers before shipping a native .pkg:
 
@@ -261,10 +264,10 @@ function macosPkgManifest() {
     commands: [
       ['npm', 'install', '-g', INSTALLER_ASSET_PACKAGE],
       ['enigma', 'test-drive', '--dry-run'],
-      ['enigma', 'setup', '--overwrite'],
-      ['enigma', 'doctor'],
+      ['enigma', 'quickstart', '--bundle', './.enigma/bundle.json'],
+      ['enigma', 'doctor', '--bundle', './.enigma/bundle.json'],
     ],
-    next_client_connect: ['enigma', 'connect', '<client>', '--dry-run'],
+    next_client_connect: ['enigma', 'connect', '<client>', '--bundle', './.enigma/bundle.json', '--dry-run'],
     execution_gate: {
       default_mode: 'dry-run',
       mutation_requires: ['--execute', '-Execute'],
@@ -322,10 +325,10 @@ export function buildInstallerAssets(options = {}, runtime = {}) {
       default_preview_commands: [
         'npm install -g enigma-memory',
         'enigma test-drive --dry-run',
-        'enigma setup --overwrite',
-        'enigma doctor',
+        'enigma quickstart --bundle ./.enigma/bundle.json',
+        'enigma doctor --bundle ./.enigma/bundle.json',
       ],
-      next_client_connect: 'enigma connect <client> --dry-run',
+      next_client_connect: 'enigma connect <client> --bundle ./.enigma/bundle.json --dry-run',
       mutation_requires: ['--execute', '-Execute'],
     },
     safety: {
@@ -349,6 +352,24 @@ export function buildInstallerAssets(options = {}, runtime = {}) {
     assets: Object.freeze([...assets, manifestAsset].sort(compareAssetPath)),
   });
 }
+
+export function renderInstallerAssetsPlain(result) {
+  const lines = [
+    'Enigma installer assets',
+    `Status: ${result.public_safe ? 'Ready' : 'Needs attention'}`,
+    `Version: ${result.version ?? '<version>'}`,
+    `Mode: ${result.mode ?? '<mode>'}`,
+    `Files: ${Array.isArray(result.files) ? result.files.length : 0}`,
+    `Native installers generated: ${result.generated_native_installers ? 'yes' : 'no'}`,
+    `Source assets only: ${result.source_assets_only ? 'yes' : 'no'}`,
+    `Default dry-run: ${result.safety?.default_dry_run ? 'yes' : 'no'}`,
+    `Writes require flag: ${result.safety?.requires_write_flag_for_filesystem_mutation ? 'yes' : 'no'}`,
+  ];
+  for (const file of (Array.isArray(result.files) ? result.files.slice(0, 8) : [])) lines.push(`Asset: ${file.path} — ${file.bytes} bytes`);
+  lines.push('Boundary: public-safe source installer assets only; no native signed installers, notarization, package-manager publication, credentials, account ids, local paths, raw memory, prompts, provider responses, provider deletion, model behavior, hosted service, compliance, benchmark superiority, token ROI, or provider invoice savings claims.');
+  return `${lines.join('\n')}\n`;
+}
+
 
 async function writeAssets(outDir, assets) {
   const root = resolvePath(outDir);
@@ -374,7 +395,7 @@ export async function runBuildInstallerAssets(argv = process.argv.slice(2), io =
     if (!result.dry_run) await writeAssets(options.outDir, result.assets);
     const publicResult = { ...result };
     delete publicResult.assets;
-    stdout.write(`${jsonStable(publicResult)}`);
+    stdout.write(options.plain ? renderInstallerAssetsPlain(publicResult) : `${jsonStable(publicResult)}`);
     return 0;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

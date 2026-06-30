@@ -1,3 +1,7 @@
+# Tauri generated files
+apps/desktop-tauri/gen/schemas/
+apps/desktop-tauri/ui/server.log
+
 # Dependencies and package outputs
 node_modules/
 npm-debug.log*

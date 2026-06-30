@@ -19,32 +19,36 @@ From the package root, validate the extension before loading or zipping it:
 node scripts/package-browser-extension.mjs
 ```
 
-The command emits public-safe JSON with a deterministic file list, SHA-256 checksums, and safety fields. To also write a deterministic local ZIP for manual inspection or enterprise review:
+The command emits public-safe JSON with a deterministic file list, SHA-256 checksums, and safety fields. Use `--plain` when a release owner needs a readable, path-redacted summary:
 
 ```sh
-node scripts/package-browser-extension.mjs --zip ./dist/enigma-browser-extension.zip
+node scripts/package-browser-extension.mjs --plain
+```
+
+To also write a deterministic local ZIP for manual inspection or enterprise review:
+
+```sh
+node scripts/package-browser-extension.mjs --zip ./dist/enigma-browser-extension.zip --plain
 ```
 
 The ZIP command does not publish, sign, upload, or submit the extension.
 
 ## Install the native host and MCP connector first
 
-Install the npm package, create the local bundle, and let Enigma merge the MCP server entry into the selected client config. Pick the command for the client you use:
+Install the npm package, create the local bundle, and use the lowest-friction connector path for the app you use most often:
 
 ```sh
-npm install -g enigma-memory && enigma setup --client claude-desktop --write-connectors --overwrite
-npm install -g enigma-memory && enigma setup --client cursor --write-connectors --overwrite
-npm install -g enigma-memory && enigma setup --client kimi-code --write-connectors --overwrite
-npm install -g enigma-memory && enigma setup --client vscode-cline --write-connectors --overwrite
+npm install -g enigma-memory
+enigma quickstart --bundle ./.enigma/bundle.json
+enigma claude-mcpb package --mcpb ./.enigma/claude/enigma-memory.mcpb --out ./.enigma/claude/enigma-memory-mcpb.json --plain
+enigma connect cursor --bundle ./.enigma/bundle.json --dry-run
+enigma connect kimi-code --bundle ./.enigma/bundle.json --dry-run
+enigma connect vscode-cline --bundle ./.enigma/bundle.json --dry-run
 ```
 
-If you want Enigma to touch only client config files that already exist, use:
+For Claude Desktop, open the generated `.mcpb` package in Claude and test the connection after restart; Enigma does not write Claude settings for that extension handoff. For other clients, when the dry-run names the intended client and bundle, repeat that single `enigma connect <client> --bundle ./.enigma/bundle.json` command without `--dry-run`.
 
-```sh
-npm install -g enigma-memory && enigma setup --client auto --connect-installed --overwrite
-```
-
-Set `ENIGMA_BUNDLE` for the browser-launched host process to the same bundle path reported by setup, or point the native-host manifest at a small local wrapper that sets `ENIGMA_BUNDLE=<absolute-bundle-path>` before launching `enigma-native-host`. Native messaging manifests require an absolute executable path; they do not expand shell aliases, `~`, `$HOME`, `%USERPROFILE%`, or command arguments.
+Set `ENIGMA_BUNDLE` for the browser-launched host process to the same bundle path used with quickstart, or point the native-host manifest at a small local wrapper that sets `ENIGMA_BUNDLE=<absolute-bundle-path>` before launching `enigma-native-host`. Native messaging manifests require an absolute executable path; they do not expand shell aliases, `~`, `$HOME`, `%USERPROFILE%`, or command arguments.
 
 Resolve the absolute host executable path:
 

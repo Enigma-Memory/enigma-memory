@@ -1,0 +1,178 @@
+name: Desktop release (signed)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v0.1.18)'
+        required: true
+        default: 'v0.1.18'
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+  actions: write
+env:
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: short
+  UPDATER_MANIFEST_URL: "https://enigmamemory.com/releases/desktop/manifest.json"
+
+jobs:
+  build:
+    name: Build signed desktop app (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            bundle: nsis
+          - os: macos-latest
+            bundle: dmg
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set up Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop-tauri
+
+      - name: Cache Tauri CLI
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin
+          key: ${{ runner.os }}-tauri-cli-v2
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version ^2 --locked
+
+      - name: Run package metadata check
+        run: npm run check
+
+      - name: Run desktop tests
+        working-directory: apps/desktop-tauri
+        run: cargo test
+
+      - name: Set up Azure Code Signing (Windows)
+        if: matrix.os == 'windows-latest' && secrets.AZURE_CODESIGN_ACCOUNT_NAME != ''
+        shell: pwsh
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_CODESIGN_ACCOUNT_NAME: ${{ secrets.AZURE_CODESIGN_ACCOUNT_NAME }}
+          AZURE_CODESIGN_CERT_PROFILE_NAME: ${{ secrets.AZURE_CODESIGN_CERT_PROFILE_NAME }}
+          AZURE_CODESIGN_ENDPOINT: ${{ secrets.AZURE_CODESIGN_ENDPOINT }}
+        run: |
+          # Install the Azure Code Signing client tools.
+          # URLs are pinned to known stable releases; update as needed.
+          $toolsDir = "$env:RUNNER_TEMP\acs"
+          New-Item -ItemType Directory -Force -Path $toolsDir | Out-Null
+          Invoke-WebRequest -Uri "https://www.nuget.org/api/v2/package/Azure.CodeSigning/" -OutFile "$toolsDir\acs.zip"
+          Expand-Archive -Path "$toolsDir\acs.zip" -DestinationPath "$toolsDir\acs" -Force
+          # Add nuget tool binaries to PATH
+          $acsBin = Get-ChildItem -Path "$toolsDir\acs" -Recurse -Filter "Azure.CodeSigning.Dlib.dll" | Select-Object -First 1
+          if (-not $acsBin) { throw "Azure.CodeSigning.Dlib.dll not found" }
+          $env:PATH = "$($acsBin.DirectoryName);$env:PATH"
+          Write-Output "ACS_TOOLS_DIR=$($acsBin.DirectoryName)" >> $env:GITHUB_ENV
+
+      - name: Build Tauri app (signed)
+        working-directory: apps/desktop-tauri
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Windows Azure signing
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_CODESIGN_ACCOUNT_NAME: ${{ secrets.AZURE_CODESIGN_ACCOUNT_NAME }}
+          AZURE_CODESIGN_CERT_PROFILE_NAME: ${{ secrets.AZURE_CODESIGN_CERT_PROFILE_NAME }}
+          AZURE_CODESIGN_ENDPOINT: ${{ secrets.AZURE_CODESIGN_ENDPOINT }}
+          # macOS signing
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: cargo tauri build --bundles ${{ matrix.bundle }}
+
+      - name: Upload signed installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: enigma-desktop-${{ matrix.os }}-${{ github.event.inputs.tag || github.ref_name }}
+          path: |
+            apps/desktop-tauri/target/release/bundle/nsis/*.exe
+            apps/desktop-tauri/target/release/bundle/dmg/*.dmg
+            apps/desktop-tauri/target/release/bundle/app/*.app
+
+  release-manifest:
+    name: Sign and publish updater manifest
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Generate Tauri updater key pair
+        id: keygen
+        working-directory: apps/desktop-tauri
+        run: |
+          # Generate a one-time key for this dry-run step. In production the
+          # private key must be stored as TAURI_SIGNING_PRIVATE_KEY secret and
+          # the public key must be committed in tauri.conf.json.
+          npx @tauri-apps/cli signer generate --force
+
+      - name: Sign update manifest
+        env:
+          ENIGMA_DESKTOP_VERSION: ${{ github.event.inputs.tag || github.ref_name }}
+          UPDATE_SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          # Tauri updater artifacts (latest.json + signed installers) are
+          # produced by `cargo tauri build`. This placeholder finds the
+          # generated manifest and attaches a detached Ed25519 signature.
+          # TODO: switch to Tauri-native per-installer signatures once the
+          # signing key and manifest format are finalized.
+          manifest=$(find ./artifacts -name 'latest.json' -o -name '*.json' | head -1)
+          if [ -n "$manifest" ]; then
+            node scripts/sign-update-manifest.mjs --manifest "$manifest" --out ./manifest.json.sig --write
+          else
+            echo '{"version":"'"$ENIGMA_DESKTOP_VERSION"'","pub_date":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'","platforms":{}}' > ./manifest.json
+          fi
+
+      - name: Upload manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: updater-manifest
+          path: |
+            ./manifest.json*

@@ -4,8 +4,11 @@ import { createCapsuleManifest, createMeshNode, verifyCapsuleManifest } from '..
 
 const REPORT_SCHEMA = 'enigma.import_report.v1';
 const CAPSULE_SCHEMA = 'enigma.import_capsule.v1';
+const PREVIEW_SCHEMA = 'enigma.import_preview.v1';
 const CAPSULE_PAYLOAD_SCHEMA = 'enigma.import_capsule_payload.v1';
 const VERIFIER_METADATA_SCHEMA = 'enigma.import_capsule_verifier_metadata.v1';
+const IMMUNE_INGRESS_SCHEMA = 'enigma.immune_scan_report.v1';
+const IMMUNE_INGRESS_DEFAULT_SOURCE = 'importer_candidate_ingress';
 const DEFAULT_NOW = '1970-01-01T00:00:00.000Z';
 const DEFAULT_EXPIRY = '2100-01-01T00:00:00.000Z';
 const CONFIDENCE_ORDER = new Map([
@@ -95,6 +98,17 @@ function textLines(value) {
     .split(/\r?\n/)
     .map((line) => line.replace(/^[-*]\s+/, '').trim())
     .filter(Boolean);
+}
+
+function curatedTextLines(value) {
+  if (typeof value !== 'string') return [];
+  return value
+    .split(/\r?\n/)
+    .map((line) => line
+      .replace(/^\s*(?:[-*+]|\d+[.)]|\[[ xX]\])\s+/u, '')
+      .replace(/^\s{0,3}#{1,6}\s+/u, '')
+      .trim())
+    .filter((line) => line.length > 0 && !/^[-*_]{3,}$/u.test(line));
 }
 
 function firstString(record, names) {
@@ -284,6 +298,257 @@ function normalizeMetadata(value, extra = {}) {
   return metadata;
 }
 
+const IMMUNE_DETECTOR_IDS = Object.freeze({
+  rawPublicField: 'enigma.detector.forbidden_field.raw_public_payload.v1',
+  secretField: 'enigma.detector.forbidden_field.secret_or_credential.v1',
+  providerResponseField: 'enigma.detector.forbidden_field.provider_response.v1',
+  embeddingField: 'enigma.detector.forbidden_field.embedding.v1',
+  secretValue: 'enigma.detector.secret_value.v1',
+  localPathValue: 'enigma.detector.local_path_value.v1',
+  forbiddenClaimValue: 'enigma.detector.forbidden_claim_value.v1',
+  rawStringCandidate: 'enigma.detector.raw_string_candidate.v1',
+  cyclicCandidate: 'enigma.detector.cyclic_candidate.v1'
+});
+
+const RAW_PUBLIC_FIELD_KEYS = new Set([
+  'body',
+  'completion',
+  'completions',
+  'content',
+  'conversation',
+  'conversations',
+  'memory',
+  'memories',
+  'message',
+  'messages',
+  'plaintext',
+  'plainmemory',
+  'prompt',
+  'prompts',
+  'rawmemory',
+  'response',
+  'responses',
+  'summary',
+  'text',
+  'transcript',
+  'transcripts',
+  'value'
+]);
+
+const SECRET_FIELD_KEYS = new Set([
+  'accesstoken',
+  'apikey',
+  'apisecret',
+  'bearer',
+  'clientsecret',
+  'credential',
+  'credentials',
+  'password',
+  'privatekey',
+  'refreshtoken',
+  'secret',
+  'seedphrase',
+  'token'
+]);
+
+const PROVIDER_RESPONSE_FIELD_KEYS = new Set([
+  'providerresponse',
+  'providerresponses',
+  'providerresponsebody',
+  'responsebody'
+]);
+
+const EMBEDDING_FIELD_KEYS = new Set([
+  'embedding',
+  'embeddings',
+  'embeddingvector',
+  'embeddingvectors',
+  'vector',
+  'vectors'
+]);
+
+const PUBLIC_COMMITMENT_FIELD_RE = /(?:hash|root|ref|refs|id|ids|count|counts|schema|status|decision|policy|capability|signature|signer|nullifier|timestamp|generatedat|issuedat|expiresat)$/u;
+const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{16,}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}|(?:seed phrase|mnemonic phrase|api key secret|access token|refresh token|private key))/iu;
+const RAW_PUBLIC_VALUE_RE = /(?:raw memory|private prompt|plaintext prompt|plain text prompt|full transcript|decrypted memory|decrypted capsule|provider response|embedding vector|launch-code phrase)/iu;
+const LOCAL_PATH_VALUE_RE = /(?:^|[\s"'`(])(?:[A-Za-z]:[\\/][^\s"'`<>]+|\\\\[^\\/]+[\\/][^\s"'`<>]+|\/(?:Users|home)\/[^\s"'`<>]+)/u;
+const FORBIDDEN_CLAIM_VALUE_RE = /(?:provider(?:-native|-side|\s+native|\s+side)?\s+(?:deletion|erasure|memory control|forgetting)|model\s+(?:forgetting|forgot|erasure)|makes?\s+models?\s+forget|deleted\s+from\s+every\s+provider|compliance\s+certification|certified\s+compliant|hosted\s+saas\s+ready|byoc\s+ready|benchmark\s+(?:superiority|leader)|raw\s+embeddings?\s+(?:safe|public)|hardware\s+tamper[-\s]?proof|patent(?:able|ability)|legal\s+conclusion)/iu;
+const RAW_PUBLIC_FIELD_RE = /(?:(?:raw|plain|plaintext|cleartext|decrypted).*(?:memory|prompt|text|content|message|transcript|conversation|response|body)|(?:memory|prompt|text|content|message|transcript|conversation|response|body).*(?:raw|plain|plaintext|cleartext|decrypted)|(?:prompt|message|transcript|conversation|memory|content|text)(?:body|value))$/u;
+const SECRET_FIELD_RE = /(?:apikey|apisecret|accesstoken|refreshtoken|tokenvalue|credential|password|privatekey|clientsecret|secretkey|seedphrase|mnemonic|bearertoken)/u;
+const PROVIDER_RESPONSE_FIELD_RE = /(?:provider.*responses?|responses?.*body)$/u;
+const EMBEDDING_FIELD_RE = /(?:embedding|embeddings|embeddingvector|embeddingvectors|vector|vectors)$/u;
+
+function normalizePublicToken(value, fallback) {
+  const token = String(value ?? '').toLowerCase().replace(/[^a-z0-9_.:-]+/gu, '_').replace(/^_+|_+$/gu, '');
+  return token.length > 0 && token.length <= 96 ? token : fallback;
+}
+
+function hasMeaningfulForbiddenValue(value) {
+  if (value === undefined || value === null || value === false) return false;
+  if (typeof value === 'string') return value.length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  if (isRecord(value)) return Object.keys(value).length > 0;
+  return true;
+}
+
+function detectorIdsForField(key, value) {
+  if (!hasMeaningfulForbiddenValue(value)) return [];
+  const normalized = normalizedMetadataKey(key);
+  if (PUBLIC_COMMITMENT_FIELD_RE.test(normalized)) return [];
+  const detectors = [];
+  if (PROVIDER_RESPONSE_FIELD_KEYS.has(normalized) || PROVIDER_RESPONSE_FIELD_RE.test(normalized)) detectors.push(IMMUNE_DETECTOR_IDS.providerResponseField);
+  if (EMBEDDING_FIELD_KEYS.has(normalized) || EMBEDDING_FIELD_RE.test(normalized)) detectors.push(IMMUNE_DETECTOR_IDS.embeddingField);
+  if (SECRET_FIELD_KEYS.has(normalized) || SECRET_FIELD_RE.test(normalized)) detectors.push(IMMUNE_DETECTOR_IDS.secretField);
+  if (RAW_PUBLIC_FIELD_KEYS.has(normalized) || RAW_PUBLIC_FIELD_RE.test(normalized)) detectors.push(IMMUNE_DETECTOR_IDS.rawPublicField);
+  return detectors;
+}
+
+function detectorIdsForString(value) {
+  const detectors = [];
+  if (SECRET_VALUE_RE.test(value)) detectors.push(IMMUNE_DETECTOR_IDS.secretValue);
+  if (RAW_PUBLIC_VALUE_RE.test(value)) detectors.push(IMMUNE_DETECTOR_IDS.rawPublicField);
+  if (LOCAL_PATH_VALUE_RE.test(value)) detectors.push(IMMUNE_DETECTOR_IDS.localPathValue);
+  if (FORBIDDEN_CLAIM_VALUE_RE.test(value)) detectors.push(IMMUNE_DETECTOR_IDS.forbiddenClaimValue);
+  return detectors;
+}
+
+function addAntigen(antigens, detector_id, candidate_ref, path_ref) {
+  antigens.push({
+    detector_id,
+    antigen_ref: `antigen_${shortHash({ detector_id, candidate_ref, path_ref })}`
+  });
+}
+
+function candidateOpaqueRef(candidate, index) {
+  try {
+    return `candidate_${shortHash({ index, root: rootOf(candidate) })}`;
+  } catch {
+    return `candidate_${shortHash({ index, uncanonicalizable: true, type: Object.prototype.toString.call(candidate) })}`;
+  }
+}
+
+function scanImmuneIngressValue(value, candidate_ref, antigens, path_ref, seen) {
+  if (typeof value === 'string') {
+    for (const detector of detectorIdsForString(value)) addAntigen(antigens, detector, candidate_ref, path_ref);
+    return;
+  }
+  if (value === null || typeof value !== 'object') return;
+  if (seen.has(value)) {
+    addAntigen(antigens, IMMUNE_DETECTOR_IDS.cyclicCandidate, candidate_ref, path_ref);
+    return;
+  }
+  seen.add(value);
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => scanImmuneIngressValue(item, candidate_ref, antigens, `${path_ref}.${index}`, seen));
+    seen.delete(value);
+    return;
+  }
+  for (const [key, child] of Object.entries(value)) {
+    const childPathRef = `${path_ref}.${shortHash(key)}`;
+    for (const detector of detectorIdsForField(key, child)) addAntigen(antigens, detector, candidate_ref, childPathRef);
+    scanImmuneIngressValue(child, candidate_ref, antigens, childPathRef, seen);
+  }
+  seen.delete(value);
+}
+
+function immuneIngressCandidates(input, options = {}) {
+  const candidatesKey = options.candidates_key ?? options.candidatesKey;
+  if (candidatesKey !== undefined && isRecord(input) && Array.isArray(input[candidatesKey])) return input[candidatesKey];
+  if (Array.isArray(input)) return input;
+  if (!isRecord(input)) return input === undefined || input === null ? [] : [input];
+  for (const key of ['memory_candidates', 'memoryCandidates', 'candidates', 'candidate_objects', 'candidateObjects', 'items']) {
+    if (Array.isArray(input[key])) return input[key];
+  }
+  if (Object.prototype.hasOwnProperty.call(input, 'candidate')) return [input.candidate];
+  return [input];
+}
+
+function immuneIngressReportFromCandidates(candidates, options = {}) {
+  const source_type = normalizePublicToken(options.source_type ?? options.sourceType, IMMUNE_INGRESS_DEFAULT_SOURCE);
+  const generated_at = nowFrom(options);
+  const allAntigenRefs = [];
+  const candidateReports = candidates.map((candidate, index) => {
+    const candidate_ref = candidateOpaqueRef(candidate, index);
+    const antigens = [];
+    if (typeof candidate === 'string') addAntigen(antigens, IMMUNE_DETECTOR_IDS.rawStringCandidate, candidate_ref, 'candidate');
+    scanImmuneIngressValue(candidate, candidate_ref, antigens, 'candidate', new WeakSet());
+    const detector_ids = uniqueStrings(antigens.map((antigen) => antigen.detector_id));
+    const antigenRefs = antigens.map((antigen) => antigen.antigen_ref);
+    allAntigenRefs.push(...antigenRefs);
+    return {
+      candidate_ref,
+      quarantine_decision: antigens.length > 0 ? 'quarantine' : 'accept',
+      antigen_count: antigens.length,
+      detector_ids,
+      antigen_refs: antigenRefs,
+      antigen_root: new MerkleSet(antigenRefs).root()
+    };
+  });
+  const quarantined = candidateReports.filter((candidate) => candidate.quarantine_decision === 'quarantine');
+  const accepted = candidateReports.filter((candidate) => candidate.quarantine_decision === 'accept');
+  const detector_ids = uniqueStrings(candidateReports.flatMap((candidate) => candidate.detector_ids));
+  const antigenRefs = allAntigenRefs;
+  const candidateRefs = candidateReports.map((candidate) => candidate.candidate_ref);
+  const quarantineRefs = quarantined.map((candidate) => candidate.candidate_ref);
+  const roots = {
+    candidate_root: new MerkleSet(candidateRefs).root(),
+    accepted_root: new MerkleSet(accepted.map((candidate) => candidate.candidate_ref)).root(),
+    quarantine_root: new MerkleSet(quarantineRefs).root(),
+    antigen_root: new MerkleSet(antigenRefs).root()
+  };
+  const findings = quarantined.map((candidate) => ({
+    finding_ref: `finding_${shortHash({ candidate_ref: candidate.candidate_ref, antigen_root: candidate.antigen_root })}`,
+    subject_ref: candidate.candidate_ref,
+    detector_ids: candidate.detector_ids,
+    antigen_count: candidate.antigen_count,
+    status: 'quarantined',
+    risk: 'high',
+    antigen_refs: candidate.antigen_refs,
+    antigen_root: candidate.antigen_root
+  }));
+  return {
+    schema: IMMUNE_INGRESS_SCHEMA,
+    report_id: `immune_scan_${shortHash({ source_type, generated_at, findings, roots })}`,
+    generated_at,
+    scan_root: new MerkleSet([...candidateRefs, ...antigenRefs]).root(),
+    antigen_envelope_refs: antigenRefs,
+    detector_ids,
+    findings,
+    counts: {
+      candidate_count: candidateReports.length,
+      accepted_candidate_count: accepted.length,
+      quarantined_candidate_count: quarantined.length,
+      antigen_count: candidateReports.reduce((sum, candidate) => sum + candidate.antigen_count, 0)
+    },
+    status: {
+      ok: quarantined.length === 0,
+      quarantine_decision: quarantined.length === 0 ? 'accept' : 'quarantine'
+    },
+    quarantine_refs: quarantineRefs,
+    roots,
+    public_payload_only: true,
+    private_payload_detected: antigenRefs.length > 0
+  };
+}
+
+export function createImmuneIngressReport(input = [], options = {}) {
+  return immuneIngressReportFromCandidates(immuneIngressCandidates(input, options), options);
+}
+
+export function quarantineImmuneIngressCandidates(input = [], options = {}) {
+  return createImmuneIngressReport(input, options);
+}
+
+export function assertImmuneIngressPublicSafe(input = [], options = {}) {
+  const report = quarantineImmuneIngressCandidates(input, options);
+  if (!report.status.ok) {
+    const error = new Error(`Immune ingress quarantine required: ${report.counts.antigen_count} antigen(s) detected.`);
+    error.name = 'ImmuneIngressQuarantineError';
+    error.report = report;
+    throw error;
+  }
+  return report;
+}
+
 function makeCandidate({ importer, sourceType, content, source_refs, limitations, confidence, kind, metadata }) {
   const normalizedContent = stringValue(content);
   if (!normalizedContent) return null;
@@ -336,6 +601,263 @@ function reportFrom(importer, sourceType, input, candidates, baseLimitations, op
     memory_candidates: memoryCandidates,
     vault_writes
   };
+}
+
+function publicWriteRef(write, index) {
+  return `ref:import-write:${shortHash({
+    index,
+    candidate_id: write?.candidate_id,
+    memory_addr: write?.memory_addr,
+    receipt_hash: write?.receipt_hash,
+    event_id: write?.event_id,
+  })}`;
+}
+
+function importBatchReceiptWrites(reports) {
+  const writes = [];
+  let index = 0;
+  for (const report of reports) {
+    const reportRef = `ref:import-report:${report.report_id ?? shortHash({ index, report })}`;
+    for (const write of asArray(report.vault_writes).filter(isRecord)) {
+      const writeRef = publicWriteRef(write, index);
+      writes.push({
+        write_ref: writeRef,
+        report_ref: reportRef,
+        candidate_ref: `ref:import-candidate:${String(write.candidate_id ?? `candidate_${index}`).replace(/[^A-Za-z0-9._~:@#?=&%+-]/gu, '_')}`,
+        memory_addr_commitment: rootOf(write.memory_addr ?? ''),
+        receipt_hash: typeof write.receipt_hash === 'string' ? write.receipt_hash : rootOf(write.receipt ?? writeRef),
+        ...(typeof write.event_id === 'string' ? { event_commitment: rootOf(write.event_id) } : {}),
+      });
+      index += 1;
+    }
+  }
+  return writes;
+}
+
+export function createImportBatchReceipt(input, options = {}) {
+  const reports = normalizeReportsForPreview(input);
+  const reportRefs = reports.map((report, index) => `ref:import-report:${report.report_id ?? shortHash({ index, report })}`);
+  const writes = importBatchReceiptWrites(reports);
+  const writeRefs = writes.map((write) => write.write_ref);
+  const generatedAt = nowFrom(options);
+  const batchId = `batch_${shortHash({ reportRefs, writeRefs, generated_at: generatedAt })}`;
+  return {
+    schema: 'enigma.import_batch_receipt.v1',
+    batch_id: batchId,
+    generated_at: generatedAt,
+    report_count: reports.length,
+    write_count: writes.length,
+    report_refs: reportRefs,
+    writes,
+    roots: {
+      report_root: new MerkleSet(reportRefs).root(),
+      write_root: new MerkleSet(writeRefs).root(),
+      memory_addr_commitment_root: new MerkleSet(writes.map((write) => write.memory_addr_commitment)).root(),
+      receipt_hash_root: new MerkleSet(writes.map((write) => write.receipt_hash)).root(),
+    },
+    rollback_boundary: {
+      local_vault_writes_identified: writes.length > 0,
+      raw_memory_required_in_public_receipt: false,
+      tombstone_or_undo_requires_local_vault_access: true,
+    },
+    claim_boundaries: {
+      local_enigma_vault_only: true,
+      raw_memory_returned: false,
+      provider_deletion_proof: false,
+      model_forgetting_proof: false,
+      hosted_saas_live: false,
+    },
+  };
+}
+
+function normalizeReportsForPreview(input) {
+  if (Array.isArray(input)) return input.filter(isRecord);
+  if (!isRecord(input)) return [];
+  if (Array.isArray(input.reports)) return input.reports.filter(isRecord);
+  if (Array.isArray(input.report)) return input.report.filter(isRecord);
+  return [input];
+}
+
+function previewCandidateRef(candidate, index) {
+  if (typeof candidate.candidate_id === 'string' && candidate.candidate_id.length > 0) {
+    return `ref:import-candidate:${candidate.candidate_id.replace(/[^A-Za-z0-9._~:@#?=&%+-]/gu, '_')}`;
+  }
+  return `ref:import-candidate:${shortHash({ index, candidate })}`;
+}
+
+function importPreviewAction(candidate, report) {
+  if (candidate.confidence === 'low') return 'review_before_import';
+  if (report.complete !== true) return 'review_before_import';
+  if (Array.isArray(candidate.limitations) && candidate.limitations.length > 0) return 'review_before_import';
+  return 'ready_for_import';
+}
+
+function importPreviewCandidates(reports) {
+  const previews = [];
+  let index = 0;
+  for (const report of reports) {
+    for (const candidate of asArray(report.memory_candidates).filter(isRecord)) {
+      const action = importPreviewAction(candidate, report);
+      previews.push({
+        candidate_ref: previewCandidateRef(candidate, index),
+        importer: report.importer ?? 'unknown',
+        source_type: report.source_type ?? 'unknown',
+        kind: candidate.kind ?? 'fact',
+        confidence: normalizeConfidence(candidate.confidence, 'medium'),
+        recommended_action: action,
+        content_commitment: rootOf(candidate.content ?? ''),
+        source_ref_count: asArray(candidate.source_refs).length,
+        limitation_count: asArray(candidate.limitations).length,
+        metadata_commitment: rootOf(candidate.metadata ?? {}),
+      });
+      index += 1;
+    }
+  }
+  return previews;
+}
+
+function importPreviewDuplicateSummary(candidates) {
+  const groups = new Map();
+  for (const candidate of candidates) {
+    if (!groups.has(candidate.content_commitment)) groups.set(candidate.content_commitment, []);
+    groups.get(candidate.content_commitment).push(candidate);
+  }
+  const duplicateGroups = [];
+  for (const [contentCommitment, groupCandidates] of groups.entries()) {
+    if (groupCandidates.length < 2) continue;
+    duplicateGroups.push({
+      duplicate_group_ref: `ref:import-duplicate:${shortHash({ contentCommitment, candidate_refs: groupCandidates.map((candidate) => candidate.candidate_ref) })}`,
+      content_commitment: contentCommitment,
+      candidate_count: groupCandidates.length,
+      candidate_refs: groupCandidates.map((candidate) => candidate.candidate_ref),
+    });
+  }
+  const byCandidateRef = new Map();
+  for (const group of duplicateGroups) {
+    group.candidate_refs.forEach((candidateRef, index) => {
+      byCandidateRef.set(candidateRef, {
+        duplicate_group_ref: group.duplicate_group_ref,
+        duplicate_index: index,
+        duplicate_candidate_count: group.candidate_count,
+      });
+    });
+  }
+  const decoratedCandidates = candidates.map((candidate) => ({
+    ...candidate,
+    is_duplicate: byCandidateRef.has(candidate.candidate_ref),
+    ...(byCandidateRef.get(candidate.candidate_ref) ?? {}),
+  }));
+  return {
+    candidates: decoratedCandidates,
+    duplicate_groups: duplicateGroups,
+    counts: {
+      duplicate_group_count: duplicateGroups.length,
+      duplicate_candidate_count: [...byCandidateRef.keys()].length,
+      unique_content_count: groups.size,
+    },
+  };
+}
+
+function importPreviewCounts(candidates) {
+  const confidence = { high: 0, medium: 0, low: 0 };
+  const recommended_actions = { ready_for_import: 0, review_before_import: 0 };
+  for (const candidate of candidates) {
+    if (Object.prototype.hasOwnProperty.call(confidence, candidate.confidence)) confidence[candidate.confidence] += 1;
+    recommended_actions[candidate.recommended_action] += 1;
+  }
+  return { confidence, recommended_actions };
+}
+
+function importPreviewDecision(candidates, counts, duplicateCounts) {
+  if (candidates.length === 0) return 'empty';
+  if (duplicateCounts.duplicate_group_count > 0) return 'needs_review';
+  if (counts.recommended_actions.review_before_import > 0) return 'needs_review';
+  return 'ready_for_import';
+}
+
+function importPreviewPrimaryAction(decision) {
+  const actions = {
+    empty: {
+      id: 'choose_import_file',
+      label: 'Choose memory file',
+      description: 'Pick a local memory export or curated memory list to preview.',
+    },
+    needs_review: {
+      id: 'review_import_candidates',
+      label: 'Review before importing',
+      description: 'Review low-confidence, incomplete, or caveated candidates before anything is written.',
+    },
+    ready_for_import: {
+      id: 'approve_import',
+      label: 'Import selected memories',
+      description: 'Approve this local import batch before Enigma writes candidates into the vault.',
+    },
+  };
+  return {
+    ...actions[decision],
+    writes_vault: decision === 'ready_for_import',
+    requires_explicit_approval: true,
+    public_safe: true,
+  };
+}
+
+export function createImportPreview(input, options = {}) {
+  const reports = normalizeReportsForPreview(input);
+  const rawCandidates = importPreviewCandidates(reports);
+  const duplicateSummary = importPreviewDuplicateSummary(rawCandidates);
+  const candidates = duplicateSummary.candidates;
+  const reportRefs = reports.map((report, index) => `ref:import-report:${report.report_id ?? shortHash({ index, report })}`);
+  const sourceTypes = uniqueStrings(reports.map((report) => report.source_type).filter(Boolean));
+  const importers = uniqueStrings(reports.map((report) => report.importer).filter(Boolean));
+  const limitations = uniqueStrings(reports.flatMap((report) => asArray(report.limitations).filter((item) => typeof item === 'string')));
+  const candidateRefs = candidates.map((candidate) => candidate.candidate_ref);
+  const counts = {
+    ...importPreviewCounts(candidates),
+    dedupe: duplicateSummary.counts,
+  };
+  const decision = importPreviewDecision(candidates, counts, duplicateSummary.counts);
+  const generatedAt = nowFrom(options);
+  const previewId = `preview_${shortHash({ reportRefs, candidateRefs, generated_at: generatedAt })}`;
+  const preview = {
+    schema: PREVIEW_SCHEMA,
+    preview_id: previewId,
+    generated_at: generatedAt,
+    report_count: reports.length,
+    importers,
+    source_types: sourceTypes,
+    candidate_count: candidates.length,
+    candidates,
+    counts,
+    limitations,
+    duplicate_groups: duplicateSummary.duplicate_groups,
+    roots: {
+      report_root: new MerkleSet(reportRefs).root(),
+      candidate_preview_root: new MerkleSet(candidateRefs).root(),
+      content_commitment_root: new MerkleSet(candidates.map((candidate) => candidate.content_commitment)).root(),
+    },
+    private_plaintext_boundary: {
+      raw_plaintext_returned: false,
+      default_action: 'preview_only',
+      write_requires_explicit_approval: true,
+      public_artifact_policy: 'hashes_counts_refs_and_commitments_only',
+    },
+    import_decision: decision,
+    primary_action: importPreviewPrimaryAction(decision),
+    preview_receipt: {
+      schema: 'enigma.import_preview_receipt.v1',
+      preview_ref: `ref:import-preview:${previewId}`,
+      candidate_count: candidates.length,
+      ready_for_import_count: counts.recommended_actions.ready_for_import,
+      review_before_import_count: counts.recommended_actions.review_before_import,
+      duplicate_group_count: duplicateSummary.counts.duplicate_group_count,
+      duplicate_candidate_count: duplicateSummary.counts.duplicate_candidate_count,
+      explicit_import_required: true,
+      raw_plaintext_returned: false,
+      vault_write_performed: false,
+      public_artifact_policy: 'hashes_counts_refs_and_commitments_only',
+    },
+  };
+  return preview;
 }
 
 function uniqueSourceRefs(refs) {
@@ -405,6 +927,56 @@ function pathsFromMapping(mapping) {
     if (content) paths.push({ key, role, message, content });
   }
   return paths;
+}
+
+export function importTextMemoryList(input, options = {}) {
+  const parsed = parseMaybeJson(input);
+  const sourceType = 'curated_text';
+  const explicitComplete = options.complete === true || (isRecord(parsed) && explicitCompleteness(parsed) === true);
+  const limitations = collectLimitations(parsed, explicitComplete ? [] : [
+    'Curated text imports are local user-provided notes with unknown completeness unless --complete or an explicit complete flag is supplied',
+    'Each non-empty line is treated as a separate memory candidate unless the file is structured JSON with memories/items'
+  ]);
+  const candidates = [];
+  const completeInput = isRecord(parsed)
+    ? parsed
+    : {
+      text: typeof parsed === 'string' ? parsed : stringValue(parsed),
+      complete: options.complete === true ? true : undefined,
+    };
+  const explicitItems = [
+    ...asArray(isRecord(parsed) ? parsed.memories : undefined),
+    ...asArray(isRecord(parsed) ? parsed.memory : undefined),
+    ...asArray(isRecord(parsed) ? parsed.items : undefined),
+    ...asArray(isRecord(parsed) ? parsed.notes : undefined),
+  ];
+  if (explicitItems.length > 0) {
+    explicitItems.forEach((item, index) => {
+      const content = firstString(item, ['memory', 'content', 'text', 'value', 'summary', 'note']) || stringValue(item);
+      addCandidate(candidates, {
+        importer: 'importTextMemoryList',
+        sourceType,
+        content,
+        source_refs: [sourceRef(sourceType, `items/${index}`, item?.id ?? item?.memory_id ?? item?.key, item)],
+        limitations,
+        confidence: item?.confidence ?? options.confidence ?? 'user_confirmed',
+        kind: item?.kind ?? 'fact',
+        metadata: { ...(isRecord(item) ? item : {}), curated_text: true }
+      });
+    });
+  } else {
+    curatedTextLines(stringValue(completeInput.text ?? parsed)).forEach((line, index) => addCandidate(candidates, {
+      importer: 'importTextMemoryList',
+      sourceType,
+      content: line,
+      source_refs: [sourceRef(sourceType, `lines/${index}`, undefined, line)],
+      limitations,
+      confidence: options.confidence ?? 'user_confirmed',
+      kind: 'curated_note',
+      metadata: { curated_text: true, line_index: index }
+    }));
+  }
+  return reportFrom('importTextMemoryList', sourceType, completeInput, candidates, limitations, options);
 }
 
 export function importChatGptExport(input, options = {}) {
@@ -1071,12 +1643,18 @@ export function runImporterDemo(options = {}) {
 }
 
 export default {
+  importTextMemoryList,
   importChatGptExport,
   importClaudeMemory,
   importMem0Export,
   importLettaAgentFile,
   importLangGraphStore,
   importZepGraphitiExport,
+  createImmuneIngressReport,
+  quarantineImmuneIngressCandidates,
+  assertImmuneIngressPublicSafe,
+  createImportPreview,
+  createImportBatchReceipt,
   exportEnigmaCapsule,
   importEnigmaCapsule,
   runImporterDemo

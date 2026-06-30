@@ -9,11 +9,10 @@
   - `cargo check --workspace`, `anchor build --no-idl`, and `anchor test --skip-build` pass in CI (all 28 Anchor tests green on Run #175).
 - ✅ **Solana credentials configured** — devnet wallet stored as GitHub secret `SOLANA_DEVNET_WALLET`.
   - Public key: `FasTsgodYjJwiiZ1eAxHmocVCvKcKNiXZYVJUZiZ3rh7`
-- ✅ **Local Windows development path documented** — WSL2 setup script and GitHub Codespaces devcontainer available.
-- ⚠️ **Mainnet deployment credentials not configured** — devnet only; custody policy documented in `specs/bottleneck-solutions-architecture.md`.
+- ✅ **Local build environments** — Docker images for Anchor/Solana (`cortex-v3/Dockerfile`) and Tauri Linux (`apps/desktop-tauri/Dockerfile`) plus `docker-compose.build.yml` provide reproducible builds without host-native toolchains.
+- ⚠️ **Mainnet deployment credentials not configured** — devnet only; custody policy documented in `docs/public-launch/mainnet-custody-plan.md`.
 
 ## Technical
-
 - ✅ **Session PDA + invisible session keys** implemented in `capability_registry`; session variants in `memory_registry`, `budget_escrow`, `royalty_router`.
 - ✅ **USDC/SPL token settlement** finalized in `budget_escrow` with Token/Token-2022 support.
 - ✅ **SAL/ENIGMA token program** created with mint, transfer, staking, veSAL lockup, and voting scaffolding.
@@ -21,16 +20,17 @@
 - ✅ **Auto-save policy engine** with category-based rules and immunology filtering.
 - ✅ **Verifiable memory prototype** with Merkle proofs and search-commitment guest stub.
 - ✅ **Privy embedded wallet + model connection UI** in webapp; session authorization and dashboard screens built.
-- ⚠️ **Production TEE hardware attestation** not yet integrated; cryptographic baseline exists.
-- ⚠️ **On-chain ZK verifier** not yet deployed; guest stub produces commitments only.
-
-## Legal / Launch
-
-- ⚠️ **Token issuance requires legal review** — technical contracts ready; public launch deferred to counsel opinion.
-- ⚠️ **Consumer app launch requires security audit and compliance review** — user deferred to a later date.
-- ⚠️ **External security audit has not started** — checklist is in `specs/security-audit-checklist.md`.
-- ⚠️ **Mainnet deployment** requires user-configured custody and `SOLANA_MAINNET_WALLET`; see `deploy/MAINNET_SETUP.md` and `specs/bottleneck-solutions-architecture.md`.
-
-## Notes
+- ✅ **MCP server verifies on-chain `Capability`/`Session` PDAs** before memory/budget tool calls.
+- ✅ **`cortex_treasury` custodies real SPL tokens** via CPI `transfer_checked` deposits/withdrawals.
+- ✅ **Vector search is pluggable** — SQLite fallback, pgvector/Qdrant HNSW backends.
+- ✅ **Signed desktop app scaffold** created in `apps/desktop-tauri/` with Tauri v2, consumer onboarding wizard, and health dashboard UI.
+- ✅ **One-click connector engine** implemented for Claude Desktop (`.mcpb` + fallback), Cursor, Kimi Code, VS Code/Cline, Roo, OpenCode, and Generic MCP with backup/rollback/repair.
+- ✅ **Consumer docs and website** created: desktop-first README, `docs/install-anywhere.md` rewrite, and `website/` static pages.
+- ✅ **Bundled Enigma engine/sidecar bridge** implemented in Tauri commands: ServiceHandle spawns node engine, captures logs, bounded restart on crash, clean shutdown.
+- ✅ **In-app help panel + public help articles** created under `website/help/` and `apps/desktop-tauri/ui/help.js`.
+- ✅ **QA smoke scenarios + support playbooks** added in `docs/public-launch/`.
+- ✅ **Release/build pipeline** added: Tauri bundle config, GitHub Actions `desktop-build.yml`, Ed25519 update-manifest signer, release evidence generator.
+- ✅ **Opt-in crash reporting** implemented: redacted panic reports written locally; upload only after explicit opt-in. No memory, wallet, or path data included.
+- 🔄 **Signed installers and code signing** — Azure Artifact Signing is blocked because Azure Portal rejected `Azure subscription 1` as free/trial/sponsored during Artifact Signing account creation. Upgrade/switch to an eligible paid Azure subscription before Public Trust validation and certificate profile setup. Apple Developer enrollment still pending Apple ID credentials/2FA. Scaffolding at `docs/public-launch/code-signing-setup.md` and `.github/workflows/desktop-release.yml`.
 
 Use this file to track progress against blockers.

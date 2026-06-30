@@ -83,6 +83,19 @@ function optionalText(value, fallback = null) {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : fallback;
 }
 
+function summarizePublicSafeReleasePacketApproval(value) {
+  const approval = value && typeof value === 'object' ? value : {};
+  const summary = {
+    status: optionalText(approval.status, 'pending'),
+    release_packet_ref: optionalText(approval.release_packet_ref),
+    claim_boundary_reviewer_ref: optionalText(approval.claim_boundary_reviewer_ref),
+    approval_ref: optionalText(approval.approval_ref),
+    approved_at: optionalText(approval.approved_at),
+  };
+  assertNoUnsafeOutput('public-safe release packet approval', summary);
+  return summary;
+}
+
 function shellArg(value) {
   const text = requireText('command argument', value);
   if (/^[A-Za-z0-9_./:@%+=,-]+$/u.test(text)) return text;
@@ -101,6 +114,7 @@ function parseArgs(argv) {
     operatorAcceptancePacket: null,
     infrastructureReadiness: null,
     releaseAudit: null,
+    plain: false,
   };
   for (let index = 0; index < argv.length;) {
     const token = argv[index];
@@ -121,13 +135,18 @@ function parseArgs(argv) {
     else if (token === '--infrastructure-readiness' || token === '--infrastructureReadiness') out.infrastructureReadiness = readValue(token);
     else if (token === '--release-audit' || token === '--releaseAudit') out.releaseAudit = readValue(token);
     else if (token === '--out') out.out = readValue(token);
+    else if (token === '--plain' || token === '--text' || token === '--format=text' || (token === '--format' && argv[index + 1] === 'text')) {
+      out.plain = true;
+      if (token === '--format') index += 1;
+      index += 1;
+    }
     else throw new UsageError(`unknown option ${token}`);
   }
   return out;
 }
 
 function usage() {
-  return `Usage: node scripts/build-production-handoff-packet.mjs --site <dir> [options]\n\nOptions:\n  --project-name <name>             Cloudflare Pages project name. Default: enigma-memory.\n  --domain <host>                   Public domain. Default: enigmamemory.com.\n  --live-url <url>                  Current public URL to observe. Default: https://enigmamemory.com/.\n  --expect-title <text>             Expected live title fragment. Default: Enigma.\n  --infrastructure-readiness <file> Completed infrastructure readiness JSON to summarize.\n  --operator-acceptance-packet <file> Completed operator packet JSON to validate and summarize.\n  --release-audit <file>            Completed enigma.release_audit.v1 JSON proving current release gates.\n  --cloudflare-env-file <path>      Optional local .env-style Cloudflare secret file; values are loaded but never printed.\n  --out <file>                      Write packet JSON to a file and print the same JSON.`;
+  return `Usage: node scripts/build-production-handoff-packet.mjs --site <dir> [options]\n\nOptions:\n  --project-name <name>             Cloudflare Pages project name. Default: enigma-memory.\n  --domain <host>                   Public domain. Default: enigmamemory.com.\n  --live-url <url>                  Current public URL to observe. Default: https://enigmamemory.com/.\n  --expect-title <text>             Expected live title fragment. Default: Enigma.\n  --infrastructure-readiness <file> Completed infrastructure readiness JSON to summarize.\n  --operator-acceptance-packet <file> Completed operator packet JSON to validate and summarize.\n  --release-audit <file>            Completed enigma.release_audit.v1 JSON proving current release gates.\n  --cloudflare-env-file <file>      Optional local secret env file. Values are consumed only for deploy readiness and never printed.\n  --out <file>                      Write JSON output.\n  --plain                           Print a human-readable handoff summary while --out preserves JSON evidence.\n`;
 }
 
 function summarizeInfrastructure(readiness) {
@@ -399,6 +418,7 @@ export async function buildProductionHandoffPacket(input = {}, options = {}) {
 
   const releaseAuditSummary = summarizeReleaseAudit(providedReleaseAudit);
   assertNoUnsafeOutput('release audit summary', releaseAuditSummary);
+  const publicSafeReleasePacketApproval = summarizePublicSafeReleasePacketApproval(input.publicSafeReleasePacketApproval ?? input.public_safe_release_packet_approval);
 
   const blockers = [
     ...pageSummary.deployment_blockers.map((item) => `pages: ${item}`),
@@ -426,6 +446,7 @@ export async function buildProductionHandoffPacket(input = {}, options = {}) {
     infrastructure: infrastructureSummary,
     operator_acceptance: operatorSummary,
     release_audit: releaseAuditSummary,
+    public_safe_release_packet_approval: publicSafeReleasePacketApproval,
     hosted_probe_worker: {
       schema: hostedProbe.schema,
       ok: hostedProbe.ok,
@@ -441,12 +462,37 @@ export async function buildProductionHandoffPacket(input = {}, options = {}) {
     claim_boundary: [
       'This is a handoff packet for production operators and follow-on AI assistants.',
       'It summarizes current local artifacts and blockers without printing tokens, credentials, local paths, raw memory, personal contact data, or provider secrets.',
-      'go_live_ready is false until Cloudflare deploy evidence, hosted backend live checks, completed operator acceptance, and release audit evidence are all current and direct.',
+      'go_live_ready summarizes local production handoff readiness only; public beta remains held until PR merge, npm publish, desktop signing, clean-machine QA, and public_safe_release_packet_approval evidence are supplied to the beta QA matrix.',
     ],
   };
   assertNoUnsafeMaterial('production handoff packet', packet);
   return packet;
 }
+
+export function renderProductionHandoffPlain(packet) {
+  const blockers = Array.isArray(packet.blockers) ? packet.blockers : [];
+  const nextActions = Array.isArray(packet.next_actions) ? packet.next_actions : [];
+  const lines = [
+    'Enigma production handoff',
+    `Status: ${packet.go_live_ready ? 'Ready' : 'Needs attention'}`,
+    `Domain: ${packet.project?.domain ?? '<domain>'}`,
+    `Go-live ready: ${packet.go_live_ready ? 'yes' : 'no'}`,
+    `Local static artifact: ${packet.local_static_artifact_ready ? 'ready' : 'not ready'}`,
+    `Cloudflare token present: ${packet.credentials_present?.cloudflare_api_token ? 'yes' : 'no'}`,
+    `Cloudflare account id present: ${packet.credentials_present?.cloudflare_account_id ? 'yes' : 'no'}`,
+    `Hosted live: ${packet.infrastructure?.hosted_live_ready ? 'yes' : 'no'}`,
+    `Operator acceptance: ${packet.operator_acceptance?.ok ? 'ready' : 'blocked'}`,
+    `Release audit: ${packet.release_audit?.ok ? 'ready' : 'blocked'}`,
+    `Public-safe packet approval: ${packet.public_safe_release_packet_approval?.status ?? 'pending'}`,
+    `Blockers: ${blockers.length}`,
+    `Next actions: ${nextActions.length}`,
+  ];
+  for (const blocker of blockers.slice(0, 5)) lines.push(`Blocker: ${blocker}`);
+  for (const action of nextActions.slice(0, 5)) lines.push(`Next: ${action.id ?? '<action>'} — ${action.owner ?? 'owner-needed'}`);
+  lines.push('Boundary: public-safe production handoff summary only; no credentials, account ids, local paths, raw memory, prompts, transcripts, provider responses, provider deletion, model behavior, hosted-service certification, infrastructure deployment, operator approval, launch certification, compliance, benchmark superiority, token ROI, or provider invoice savings claims.');
+  return `${lines.join('\n')}\n`;
+}
+
 
 export async function runCli(argv = process.argv.slice(2), options = {}) {
   const parsed = parseArgs(argv);
@@ -460,7 +506,7 @@ export async function runCli(argv = process.argv.slice(2), options = {}) {
     await mkdir(dirname(outPath), { recursive: true });
     await writeFile(outPath, json, 'utf8');
   }
-  return { json: packet };
+  return parsed.plain ? { text: renderProductionHandoffPlain(packet), json: packet } : { json: packet };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

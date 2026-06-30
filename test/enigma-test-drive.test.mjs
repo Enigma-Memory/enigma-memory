@@ -42,7 +42,8 @@ function expectedNextCommands(bundle, crossModelReport) {
     `enigma drive health --bundle ${quoted(bundle)}`,
     `enigma search --bundle ${quoted(bundle)} --query "local proof bundle"`,
     `enigma demo cross-model --bundle ${quoted(bundle)} --out ${quoted(crossModelReport)}`,
-    'enigma setup --overwrite',
+    'enigma claude-mcpb package --plain',
+    `enigma connect cursor --bundle ${quoted(bundle)} --dry-run`,
   ];
 }
 
@@ -60,6 +61,13 @@ async function runTestDrive(args) {
   return { code, stdout: io.stdout(), stderr: io.stderr(), json: io.json() };
 }
 
+async function runTestDriveText(args) {
+  const io = makeIo();
+  const code = await main(['test-drive', ...args], io.io);
+  return { code, stdout: io.stdout(), stderr: io.stderr() };
+}
+
+
 test('test-drive dry-run writes nothing and reports public tester commands', async () => {
   const root = await mkdtemp(join(tmpdir(), 'enigma-test-drive-dry-run-'));
   const outDir = join(root, 'demo');
@@ -76,7 +84,29 @@ test('test-drive dry-run writes nothing and reports public tester commands', asy
   assert.equal(json.install_command, 'npm install -g enigma-memory');
   assert.deepEqual(json.next_commands, expectedNextCommands(json.bundle, json.files.find((file) => file.role === 'cross_model_report').path));
   assert.equal(json.next_commands.every((command) => command.startsWith('enigma ')), true);
+  assert.equal(json.next_commands.some((command) => /setup --overwrite/.test(command)), false);
+  assert.equal(json.next_commands.some((command) => /claude-mcpb package --plain/.test(command)), true);
   assert.equal(await pathExists(outDir), false);
+  assertPublicSafe(stdout, ['private test-drive canary']);
+});
+
+test('test-drive plain dry-run gives path-redacted consumer summary', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'enigma-test-drive-plain-'));
+  const outDir = join(root, 'demo');
+
+  const { code, stdout, stderr } = await runTestDriveText(['--out-dir', outDir, '--dry-run', '--plain']);
+
+  assert.equal(code, 0, stderr);
+  assert.match(stdout, /^Enigma test drive\n/);
+  assert.match(stdout, /Status: Ready/);
+  assert.match(stdout, /Mode: dry run; no files written/);
+  assert.match(stdout, /Artifacts: planned only/);
+  assert.match(stdout, /Next: enigma status --bundle <bundle-path>/);
+  assert.match(stdout, /Next: enigma connect <client> --bundle <bundle-path> --dry-run/);
+  assert.doesNotMatch(stdout, /setup --overwrite|Next: enigma connect <client> --bundle <bundle-path>\n/);
+  assert.match(stdout, /Boundary: local demo artifacts only/);
+  assert.doesNotMatch(stdout, /^\s*\{/);
+  assert.equal(stdout.includes(root), false);
   assertPublicSafe(stdout, ['private test-drive canary']);
 });
 
@@ -151,6 +181,17 @@ test('test-drive rerun without overwrite fails safely and preserves existing art
   assert.equal(result.json.ok, false);
   assert.equal(result.json.error.code, 'CLI_ERROR');
   assert.match(result.json.error.message, /already exists|overwrite/i);
+
+  const plain = await runTestDriveText(['--out-dir', outDir, '--plain']);
+  assert.equal(plain.code, 2);
+  assert.match(plain.stdout, /^Enigma test-drive\n/);
+  assert.match(plain.stdout, /Status: Needs attention/);
+  assert.match(plain.stdout, /Issue: Quickstart output already exists/);
+  assert.match(plain.stdout, /Next: enigma test-drive --out-dir <new-empty-out-dir>/);
+  assert.doesNotMatch(plain.stdout.split('\n').find((line) => line.startsWith('Next:')) ?? '', /--overwrite/);
+  assert.match(plain.stdout, /Boundary: local Enigma error summary only/);
+  assert.doesNotMatch(plain.stdout, /^\s*\{/);
+  assert.equal(plain.stdout.includes(root), false);
   const after = await Promise.all(artifactPaths.map((path) => readFile(path, 'utf8')));
   assert.deepEqual(after, before);
 });

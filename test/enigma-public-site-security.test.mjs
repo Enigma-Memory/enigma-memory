@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFile } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import {
   PUBLIC_SITE_SECURITY_RESULT_SCHEMA,
@@ -40,6 +41,17 @@ test('public site security validator accepts clean static artifact', async () =>
   assert.equal(result.checked.has_index, true);
   assert.equal(result.checked.has_headers, true);
   assert.equal(result.blockers.length, 0);
+});
+
+test('public website source passes local security validator', async () => {
+  const site = fileURLToPath(new URL('../website', import.meta.url));
+  const result = await validatePublicSiteSecurity({ site }, { generated_at: '2026-06-23T12:00:00.000Z' });
+  assert.equal(result.schema, PUBLIC_SITE_SECURITY_RESULT_SCHEMA);
+  assert.equal(result.ok, true);
+  assert.equal(result.status, 'accepted');
+  assert.equal(result.blockers.length, 0);
+  assert.equal(result.checked.has_index, true);
+  assert.equal(result.checked.has_headers, true);
 });
 
 test('public site security validator blocks personal info, private files, and source maps', async () => {

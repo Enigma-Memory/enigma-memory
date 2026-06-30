@@ -8,6 +8,7 @@ import { promisify } from 'node:util';
 import {
   CLOUDFLARE_TOKEN_REQUEST_SCHEMA,
   buildCloudflareTokenRequest,
+  renderCloudflareTokenRequestPlain,
 } from '../scripts/build-cloudflare-token-request.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -80,6 +81,29 @@ test('Cloudflare token request reports unresolved permission groups fail-closed'
   assert.match(packet.unresolved_permission_groups.map((item) => item.key).join('\n'), /pages_read/);
 });
 
+test('Cloudflare token request plain output is readable and claim-bounded', async () => {
+  const packet = await buildCloudflareTokenRequest({
+    mode: 'all',
+    accountId: 'acct_123',
+    tokenName: 'enigma-memory-prod',
+    permissionGroupsJson: permissionGroups(),
+    generated_at: '2026-06-24T00:00:00.000Z',
+  });
+  const plain = renderCloudflareTokenRequestPlain(packet);
+
+  assert.match(plain, /^Enigma Cloudflare token request\n/);
+  assert.match(plain, /Status: Ready/);
+  assert.match(plain, /Mode: all/);
+  assert.match(plain, /Token name: enigma-memory-prod/);
+  assert.match(plain, /Required permissions: 8/);
+  assert.match(plain, /Resolved permissions: 8/);
+  assert.match(plain, /Token created: no/);
+  assert.match(plain, /Token value printed: no/);
+  assert.match(plain, /Boundary: public-safe Cloudflare token request skeleton only/);
+  assert.doesNotMatch(plain, /^\s*\{/);
+  assert.doesNotMatch(plain, /acct_123|Bearer|PRIVATE KEY|sk-|cf-token|raw_memory|C:\\Users\\|\/home\/|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/i);
+});
+
 test('Cloudflare token request CLI writes public-safe JSON', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'enigma-token-request-'));
   const groupsPath = join(dir, 'permission-groups.json');
@@ -105,4 +129,38 @@ test('Cloudflare token request CLI writes public-safe JSON', async () => {
   assert.equal(stdoutPacket.ok, true);
   assert.equal(filePacket.token_request.name, 'enigma-memory-prod');
   assert.doesNotMatch(result.stdout, /cf-token-present-but-never-printed|Bearer|PRIVATE KEY|sk-/i);
+});
+
+test('Cloudflare token request CLI writes JSON while printing plain output', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-token-request-plain-'));
+  const groupsPath = join(dir, 'permission-groups.json');
+  const outPath = join(dir, 'token-request.json');
+  await writeFile(groupsPath, JSON.stringify(permissionGroups(), null, 2), 'utf8');
+  const result = await execFileAsync(process.execPath, [
+    'scripts/build-cloudflare-token-request.mjs',
+    '--permission-groups', groupsPath,
+    '--mode', 'hosted-probe',
+    '--account-id', 'acct_123',
+    '--token-name', 'enigma-memory-hosted-probe',
+    '--out', outPath,
+    '--plain',
+  ], {
+    cwd: process.cwd(),
+    env: { ...process.env, CLOUDFLARE_API_TOKEN: 'cf-token-present-but-never-printed' },
+    timeout: 10000,
+    windowsHide: true,
+  });
+  assert.equal(result.stderr, '');
+  assert.match(result.stdout, /^Enigma Cloudflare token request\n/);
+  assert.match(result.stdout, /Mode: hosted-probe/);
+  assert.match(result.stdout, /Status: Ready/);
+  assert.match(result.stdout, /Boundary: public-safe Cloudflare token request skeleton only/);
+  assert.doesNotMatch(result.stdout, /^\s*\{/);
+  assert.equal(result.stdout.includes(dir), false);
+  assert.equal(result.stdout.includes(outPath), false);
+  assert.equal(result.stdout.includes(groupsPath), false);
+  assert.doesNotMatch(result.stdout, /acct_123|cf-token-present-but-never-printed|Bearer|PRIVATE KEY|sk-/i);
+  const filePacket = JSON.parse(await readFile(outPath, 'utf8'));
+  assert.equal(filePacket.schema, CLOUDFLARE_TOKEN_REQUEST_SCHEMA);
+  assert.equal(filePacket.mode, 'hosted-probe');
 });

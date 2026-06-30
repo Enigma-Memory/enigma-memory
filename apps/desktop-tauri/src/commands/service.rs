@@ -1,0 +1,1761 @@
+use crate::commands::{crash, diagnostics, run_cli};
+use crate::{AppState, DesktopConfig};
+use chrono::Utc;
+use regex::Regex;
+use serde_json::{json, Value};
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
+use std::sync::{Arc, OnceLock};
+use std::time::{SystemTime, UNIX_EPOCH};
+use tokio::process::{Child, Command};
+use tokio::sync::oneshot;
+
+/// Configuration for the Enigma engine sidecar.
+#[derive(Debug, Clone)]
+pub struct ServiceConfig {
+    pub program: PathBuf,
+    pub args: Vec<String>,
+    pub work_dir: Option<PathBuf>,
+    pub env: HashMap<String, String>,
+    pub max_restarts: usize,
+    pub restart_delay_secs: u64,
+    pub log_capacity: usize,
+}
+
+impl Default for ServiceConfig {
+    fn default() -> Self {
+        Self {
+            program: PathBuf::from("node"),
+            args: Vec::new(),
+            work_dir: None,
+            env: HashMap::new(),
+            max_restarts: 5,
+            restart_delay_secs: 3,
+            log_capacity: 500,
+        }
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ServiceStatus {
+    pub running: bool,
+    pub pid: u32,
+    pub restarts: usize,
+    pub uptime_secs: u64,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub(crate) struct ReadinessAction {
+    pub id: &'static str,
+    pub label: &'static str,
+    pub command: &'static str,
+    pub description: &'static str,
+    pub issue_code: Option<&'static str>,
+    pub local_only: bool,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub(crate) struct LocalReadinessModel {
+    pub diagnostics_status: &'static str,
+    pub offline_ready: bool,
+    pub offline_ready_explanation: &'static str,
+    pub issue_codes: Vec<&'static str>,
+    pub primary_action: ReadinessAction,
+    pub recovery_actions: Vec<ReadinessAction>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct LocalReadinessInput<'a> {
+    pub service_running: bool,
+    pub memory_drive_status: &'a str,
+    pub health_status: &'a str,
+    pub clients: Option<&'a Value>,
+    pub pending_crash_reports: usize,
+}
+
+#[derive(Debug, Clone)]
+struct LogLine {
+    ts: chrono::DateTime<Utc>,
+    stream: &'static str,
+    message: String,
+}
+
+/// Long-running handle for the Enigma engine sidecar.
+pub struct ServiceHandle {
+    config: ServiceConfig,
+    running: AtomicBool,
+    pid: AtomicU32,
+    started_at: AtomicU64,
+    restart_count: AtomicUsize,
+    shutdown: AtomicBool,
+    logs: parking_lot::Mutex<std::collections::VecDeque<LogLine>>,
+    stop_tx: parking_lot::Mutex<Option<oneshot::Sender<()>>>,
+}
+
+impl ServiceHandle {
+    pub fn new(config: ServiceConfig) -> Self {
+        Self {
+            config,
+            running: AtomicBool::new(false),
+            pid: AtomicU32::new(0),
+            started_at: AtomicU64::new(0),
+            restart_count: AtomicUsize::new(0),
+            shutdown: AtomicBool::new(false),
+            logs: parking_lot::Mutex::new(std::collections::VecDeque::with_capacity(128)),
+            stop_tx: parking_lot::Mutex::new(None),
+        }
+    }
+
+    pub fn status(&self) -> ServiceStatus {
+        let running = self.running.load(Ordering::SeqCst);
+        let pid = self.pid.load(Ordering::SeqCst);
+        let restarts = self.restart_count.load(Ordering::SeqCst);
+        let started = self.started_at.load(Ordering::SeqCst);
+        let uptime_secs = if running && started > 0 {
+            let now = current_epoch_millis();
+            now.saturating_sub(started) / 1000
+        } else {
+            0
+        };
+        ServiceStatus {
+            running,
+            pid,
+            restarts,
+            uptime_secs,
+        }
+    }
+
+    pub fn logs(&self, limit: usize) -> Vec<String> {
+        let guard = self.logs.lock();
+        guard
+            .iter()
+            .rev()
+            .take(limit)
+            .rev()
+            .map(|line| {
+                format!(
+                    "[{}] [{}] {}",
+                    line.ts.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+                    line.stream,
+                    redact_log(&line.message)
+                )
+            })
+            .collect()
+    }
+
+    /// Start the sidecar. If it is already running this is a no-op.
+    pub async fn start(self: Arc<Self>) -> Result<(), String> {
+        if self.running.load(Ordering::SeqCst) {
+            return Ok(());
+        }
+
+        self.shutdown.store(false, Ordering::SeqCst);
+
+        let mut cmd = Command::new(&self.config.program);
+        cmd.args(&self.config.args)
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .kill_on_drop(true);
+
+        if let Some(dir) = &self.config.work_dir {
+            cmd.current_dir(dir);
+        }
+        for (k, v) in &self.config.env {
+            cmd.env(k, v);
+        }
+
+        let mut child = cmd
+            .spawn()
+            .map_err(|e| format!("failed to spawn sidecar: {e}"))?;
+        let pid = child.id().unwrap_or(0);
+        let stdout = child.stdout.take().ok_or("missing stdout")?;
+        let stderr = child.stderr.take().ok_or("missing stderr")?;
+
+        self.running.store(true, Ordering::SeqCst);
+        self.pid.store(pid, Ordering::SeqCst);
+        self.started_at
+            .store(current_epoch_millis(), Ordering::SeqCst);
+
+        let (tx, rx) = oneshot::channel();
+        *self.stop_tx.lock() = Some(tx);
+
+        self.spawn_reader(stdout, "stdout");
+        self.spawn_reader(stderr, "stderr");
+        self.clone().spawn_watcher(child, rx);
+
+        self.push_log(LogLine {
+            ts: Utc::now(),
+            stream: "service",
+            message: format!("started pid={pid}"),
+        });
+        Ok(())
+    }
+
+    /// Request a clean shutdown of the sidecar.
+    pub async fn stop(&self) -> Result<(), String> {
+        self.shutdown.store(true, Ordering::SeqCst);
+        if let Some(tx) = self.stop_tx.lock().take() {
+            let _ = tx.send(());
+        }
+        // Wait briefly for the watcher to finish.
+        for _ in 0..50 {
+            if !self.running.load(Ordering::SeqCst) {
+                break;
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        }
+        self.push_log(LogLine {
+            ts: Utc::now(),
+            stream: "service",
+            message: "stop requested".to_string(),
+        });
+        Ok(())
+    }
+
+    fn spawn_reader<R: tokio::io::AsyncRead + Send + Unpin + 'static>(
+        self: &Arc<Self>,
+        pipe: R,
+        stream: &'static str,
+    ) {
+        let this = self.clone();
+        tokio::spawn(async move {
+            use tokio::io::{AsyncBufReadExt, BufReader};
+            let reader = BufReader::new(pipe);
+            let mut lines = reader.lines();
+            while let Ok(Some(line)) = lines.next_line().await {
+                this.push_log(LogLine {
+                    ts: Utc::now(),
+                    stream,
+                    message: line,
+                });
+            }
+        });
+    }
+
+    fn spawn_watcher(self: Arc<Self>, mut child: Child, mut stop_rx: oneshot::Receiver<()>) {
+        tokio::spawn(async move {
+            let result = tokio::select! {
+                biased;
+                _ = &mut stop_rx => {
+                    drop(child);
+                    Ok(None)
+                }
+                status = child.wait() => status.map(Some),
+            };
+
+            self.running.store(false, Ordering::SeqCst);
+            self.pid.store(0, Ordering::SeqCst);
+
+            let message = match result {
+                Ok(Some(status)) => format!("exited code={}", status.code().unwrap_or(-1)),
+                Ok(None) => "stopped".to_string(),
+                Err(e) => format!("wait error: {e}"),
+            };
+            self.push_log(LogLine {
+                ts: Utc::now(),
+                stream: "service",
+                message,
+            });
+
+            if self.shutdown.load(Ordering::SeqCst) {
+                return;
+            }
+
+            let restarts = self.restart_count.load(Ordering::SeqCst);
+            if restarts >= self.config.max_restarts {
+                self.push_log(LogLine {
+                    ts: Utc::now(),
+                    stream: "service",
+                    message: format!("max restarts reached ({restarts})"),
+                });
+                return;
+            }
+
+            tokio::time::sleep(tokio::time::Duration::from_secs(
+                self.config.restart_delay_secs,
+            ))
+            .await;
+            self.restart_count.fetch_add(1, Ordering::SeqCst);
+            let _ = self.start().await;
+        });
+    }
+
+    fn push_log(&self, line: LogLine) {
+        let mut guard = self.logs.lock();
+        if guard.len() >= self.config.log_capacity {
+            guard.pop_front();
+        }
+        guard.push_back(line);
+    }
+}
+
+pub(crate) fn dashboard_status_from_drive_health(
+    status: Option<&str>,
+) -> (&'static str, &'static str) {
+    match status.unwrap_or("unknown") {
+        "healthy" | "ready" | "ok" => ("ready", "healthy"),
+        "watch" | "degraded" | "critical" => ("ready", "fix-needed"),
+        "missing" => ("missing", "needs-setup"),
+        "error" => ("error", "error"),
+        _ => ("unknown", "error"),
+    }
+}
+
+fn dashboard_offline_ready(
+    service_running: bool,
+    memory_drive_status: &str,
+    health_status: &str,
+) -> bool {
+    service_running && memory_drive_status == "ready" && health_status == "healthy"
+}
+
+fn readiness_action(
+    id: &'static str,
+    label: &'static str,
+    command: &'static str,
+    description: &'static str,
+    issue_code: Option<&'static str>,
+) -> ReadinessAction {
+    ReadinessAction {
+        id,
+        label,
+        command,
+        description,
+        issue_code,
+        local_only: true,
+    }
+}
+
+fn default_readiness_action() -> ReadinessAction {
+    readiness_action(
+        "open_memory_dashboard",
+        "Review local status",
+        "get_health",
+        "Review the local desktop health summary before taking action.",
+        None,
+    )
+}
+
+fn push_readiness_issue(
+    issue_codes: &mut Vec<&'static str>,
+    recovery_actions: &mut Vec<ReadinessAction>,
+    code: &'static str,
+) {
+    if issue_codes.iter().any(|existing| *existing == code) {
+        return;
+    }
+
+    issue_codes.push(code);
+    match code {
+        "service_stopped" => recovery_actions.push(readiness_action(
+            "start_local_service",
+            "Start local service",
+            "start_service",
+            "Start the local Enigma service on this device.",
+            Some(code),
+        )),
+        "memory_drive_missing" => recovery_actions.push(readiness_action(
+            "create_memory_drive",
+            "Create Memory Drive",
+            "create_memory_drive",
+            "Create the local Memory Drive bundle needed for offline memory.",
+            Some(code),
+        )),
+        "memory_drive_fix_needed" => recovery_actions.push(readiness_action(
+            "review_memory_drive_health",
+            "Review Memory Drive health",
+            "get_memory_drive_status",
+            "Run the local Memory Drive health check and repair the local bundle before continuing.",
+            Some(code),
+        )),
+        "connector_repair_required" => {
+            recovery_actions.push(readiness_action(
+                "repair_app_connection",
+                "Repair app connection",
+                "repair_client_config",
+                "Repair the app connection after user approval.",
+                Some(code),
+            ));
+            recovery_actions.push(readiness_action(
+                "rollback_app_connection",
+                "Restore app backup",
+                "rollback_client_config",
+                "Restore the latest Enigma backup if repair is not desired.",
+                Some(code),
+            ));
+        }
+        "connector_rollback_available" => recovery_actions.push(readiness_action(
+            "rollback_app_connection",
+            "Restore app backup",
+            "rollback_client_config",
+            "Restore the latest Enigma backup.",
+            Some(code),
+        )),
+        "pending_crash_reports" => recovery_actions.push(readiness_action(
+            "review_pending_crash_reports",
+            "Review pending crash reports",
+            "get_crash_reporting_status",
+            "Review locally stored crash report metadata before choosing a local recovery step.",
+            Some(code),
+        )),
+        _ => recovery_actions.push(default_readiness_action()),
+    }
+}
+
+fn connector_recovery_issue(clients: Option<&Value>) -> Option<&'static str> {
+    let clients = clients.and_then(Value::as_array)?;
+    let mut needs_repair = false;
+
+    for client in clients {
+        let status = client.get("status").and_then(Value::as_str).unwrap_or("");
+        let action = client
+            .get("recommended_action")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        if status.contains("rollback") || action == "rollback" {
+            return Some("connector_rollback_available");
+        }
+        if status == "malformed" || status == "repair-required" || action == "repair" {
+            needs_repair = true;
+        }
+    }
+
+    if needs_repair {
+        Some("connector_repair_required")
+    } else {
+        None
+    }
+}
+
+pub(crate) fn local_readiness_model(input: LocalReadinessInput<'_>) -> LocalReadinessModel {
+    let mut issue_codes = Vec::new();
+    let mut recovery_actions = Vec::new();
+
+    if !input.service_running {
+        push_readiness_issue(&mut issue_codes, &mut recovery_actions, "service_stopped");
+    }
+    if input.memory_drive_status == "missing" || input.health_status == "needs-setup" {
+        push_readiness_issue(
+            &mut issue_codes,
+            &mut recovery_actions,
+            "memory_drive_missing",
+        );
+    } else if input.memory_drive_status != "ready" || input.health_status != "healthy" {
+        push_readiness_issue(
+            &mut issue_codes,
+            &mut recovery_actions,
+            "memory_drive_fix_needed",
+        );
+    }
+    if let Some(issue) = connector_recovery_issue(input.clients) {
+        push_readiness_issue(&mut issue_codes, &mut recovery_actions, issue);
+    }
+    if input.pending_crash_reports > 0 {
+        push_readiness_issue(
+            &mut issue_codes,
+            &mut recovery_actions,
+            "pending_crash_reports",
+        );
+    }
+
+    let offline_ready = dashboard_offline_ready(
+        input.service_running,
+        input.memory_drive_status,
+        input.health_status,
+    );
+    let offline_ready_explanation = if offline_ready {
+        "Local service is running and Memory Drive is healthy."
+    } else if !input.service_running {
+        "Offline memory is not ready because the local service is stopped."
+    } else if input.memory_drive_status == "missing" || input.health_status == "needs-setup" {
+        "Offline memory is not ready because Memory Drive is not set up on this device."
+    } else if input.memory_drive_status != "ready" || input.health_status != "healthy" {
+        "Offline memory is not ready because Memory Drive needs local attention."
+    } else {
+        "Offline memory is not ready because local readiness checks need attention."
+    };
+    let primary_action = recovery_actions
+        .first()
+        .cloned()
+        .unwrap_or_else(default_readiness_action);
+    let diagnostics_status = if issue_codes.is_empty() {
+        "passed"
+    } else {
+        "warning"
+    };
+
+    LocalReadinessModel {
+        diagnostics_status,
+        offline_ready,
+        offline_ready_explanation,
+        issue_codes,
+        primary_action,
+        recovery_actions,
+    }
+}
+
+async fn setup_bundle(config: &crate::DesktopConfig) -> Result<Value, String> {
+    let bundle = config.bundle_path.to_string_lossy();
+    run_cli(config, &["setup", "--bundle", &bundle, "--overwrite"]).await
+}
+
+async fn drive_health(config: &crate::DesktopConfig) -> Result<Value, String> {
+    let bundle = config.bundle_path.to_string_lossy();
+    let report = run_cli(config, &["drive", "health", "--bundle", &bundle]).await?;
+    let (memory_drive_status, health_status) =
+        dashboard_status_from_drive_health(report.get("overall_status").and_then(|v| v.as_str()));
+    Ok(json!({
+        "memory_drive_status": memory_drive_status,
+        "health_status": health_status,
+        "report": report,
+    }))
+}
+
+async fn proof_activity_summary(config: &crate::DesktopConfig) -> Value {
+    let bundle = config.bundle_path.to_string_lossy();
+    let status = match run_cli(config, &["status", "--bundle", &bundle]).await {
+        Ok(status) => status,
+        Err(_) => {
+            return attach_desktop_public_export_scan(json!({
+                "ok": false,
+                "schema": "enigma.desktop_proof_activity.v1",
+                "proof_status": "setup_needed",
+                "receipt_count": 0,
+                "active_memory_count": 0,
+                "tombstoned_memory_count": 0,
+                "verifier_status": "not_run",
+                "next_action": {
+                    "id": "create_memory_drive",
+                    "label": "Create Memory Drive",
+                    "kind": "local_action",
+                },
+                "redaction": {
+                    "raw_memory_included": false,
+                    "prompts_included": false,
+                    "transcripts_included": false,
+                    "credentials_included": false,
+                    "provider_responses_included": false,
+                    "local_paths_redacted": true,
+                },
+                "claim_boundaries": {
+                    "local_enigma_events_only": true,
+                    "provider_deletion_proof": false,
+                    "model_forgetting_proof": false,
+                    "hosted_saas_live": false,
+                },
+            }));
+        }
+    };
+    let receipt_count = status
+        .get("receipt_count")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let active_memory_count = status
+        .get("active_memory_count")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let tombstoned_memory_count = status
+        .get("tombstoned_memory_count")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let proof_status = if receipt_count > 0 {
+        "has_receipts"
+    } else {
+        "empty"
+    };
+    let next_action = if receipt_count > 0 {
+        json!({
+            "id": "review_proof_activity",
+            "label": "Review proof activity",
+            "kind": "local_review",
+        })
+    } else {
+        json!({
+            "id": "import_or_remember_memory",
+            "label": "Import or add a memory",
+            "kind": "local_action",
+        })
+    };
+
+    attach_desktop_public_export_scan(json!({
+        "ok": true,
+        "schema": "enigma.desktop_proof_activity.v1",
+        "proof_status": proof_status,
+        "receipt_count": receipt_count,
+        "active_memory_count": active_memory_count,
+        "tombstoned_memory_count": tombstoned_memory_count,
+        "roots": {
+            "active_set_root": status.get("active_set_root").and_then(Value::as_str).unwrap_or(""),
+            "receipt_log_root": status.get("receipt_log_root").and_then(Value::as_str).unwrap_or(""),
+        },
+        "verifier_status": "not_run",
+        "evidence_status": "local_counts_and_roots_only",
+        "next_action": next_action,
+        "redaction": {
+            "raw_memory_included": false,
+            "prompts_included": false,
+            "transcripts_included": false,
+            "credentials_included": false,
+            "provider_responses_included": false,
+            "local_paths_redacted": true,
+        },
+        "claim_boundaries": {
+            "local_enigma_events_only": true,
+            "provider_deletion_proof": false,
+            "provider_non_use_proof": false,
+            "model_forgetting_proof": false,
+            "hosted_saas_live": false,
+        },
+    }))
+}
+
+fn connector_card_status(result: &crate::connector::engine::DetectResult) -> &'static str {
+    if !result.installed {
+        "not-installed"
+    } else if result.parse_error {
+        "malformed"
+    } else if result.action == "repair" || !result.ok {
+        "repair-required"
+    } else if result.server_entry_exists && result.env_ok && result.command_ok {
+        "connected"
+    } else {
+        "ready"
+    }
+}
+
+fn connector_card_value(result: crate::connector::engine::DetectResult) -> Value {
+    let mut value = json!({
+        "id": result.client_id,
+        "name": result.display_name,
+        "status": connector_card_status(&result),
+        "recommended_action": result.action,
+        "repair_reasons": result.repair_reasons,
+        "parse_error": result.parse_error,
+        "restart_guidance": result.restart_guidance,
+        "checks": {
+            "installed": result.installed,
+            "server_entry_exists": result.server_entry_exists,
+            "env_ok": result.env_ok,
+            "command_ok": result.command_ok,
+        },
+    });
+    if let Some(error) = result.error {
+        value["error"] = json!(error);
+    }
+    value
+}
+
+pub(crate) async fn detect_clients_internal() -> Result<Value, String> {
+    use crate::connector::engine::{ConnectorEngine, EngineContext};
+    let ctx = EngineContext::from_env().map_err(|e| e.to_string())?;
+    let engine = ConnectorEngine::new();
+    let results = engine.detect_all(&ctx);
+    let clients: Vec<Value> = results.into_iter().map(connector_card_value).collect();
+    Ok(json!(clients))
+}
+
+fn current_epoch_millis() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
+}
+
+/// Redact absolute paths and credential-like tokens from a log line.
+pub fn redact_log(line: &str) -> String {
+    let out = log_path_regex().replace_all(line, "<path>");
+    log_token_regex()
+        .replace_all(out.as_ref(), "<token>")
+        .into_owned()
+}
+
+fn log_path_regex() -> &'static Regex {
+    static PATH_RE: OnceLock<Regex> = OnceLock::new();
+    PATH_RE.get_or_init(|| {
+        Regex::new(r"(?i)([A-Z]:[/\\\\][^\\s<>|?*]+|/(?:Users|home|tmp|var|opt|usr|etc|private|Volumes)[/\\\\]?[^\\s<>|?*]*)")
+            .expect("service path redaction regex must compile")
+    })
+}
+
+fn log_token_regex() -> &'static Regex {
+    static TOKEN_RE: OnceLock<Regex> = OnceLock::new();
+    TOKEN_RE.get_or_init(|| {
+        Regex::new(r"\b(?:sk-[a-zA-Z0-9_\-]{20,}|key-[a-zA-Z0-9_\-]{16,})\b")
+            .expect("service token redaction regex must compile")
+    })
+}
+
+fn redact_command_error(error: impl std::fmt::Display) -> String {
+    redact_log(&error.to_string())
+}
+
+fn parse_public_client_id(id: &str) -> Result<crate::connector::engine::ClientId, String> {
+    id.parse::<crate::connector::engine::ClientId>()
+        .map_err(|_| "unknown client".to_string())
+}
+
+fn public_test_summary(test: &crate::connector::engine::TestResult) -> Value {
+    json!({
+        "ok": test.ok,
+        "parse_ok": test.parse_ok,
+        "entry_present": test.entry_present,
+        "entry_correct": test.entry_correct,
+        "bundle_ok": test.bundle_ok,
+        "restart_needed": test.restart_needed,
+    })
+}
+
+fn import_sandbox_report_path(config: &DesktopConfig) -> std::path::PathBuf {
+    config
+        .bundle_path
+        .parent()
+        .map(std::path::Path::to_path_buf)
+        .unwrap_or_else(std::env::temp_dir)
+        .join("import-sandbox-last-report.json")
+}
+
+async fn run_text_import(
+    config: &DesktopConfig,
+    text: String,
+    write_vault: bool,
+) -> Result<Value, String> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return Err("import text is empty".to_string());
+    }
+    if trimmed.len() > 200_000 {
+        return Err("import text is too large".to_string());
+    }
+
+    let dir = config
+        .bundle_path
+        .parent()
+        .map(std::path::Path::to_path_buf)
+        .unwrap_or_else(std::env::temp_dir);
+    std::fs::create_dir_all(&dir).map_err(redact_command_error)?;
+    let file = dir.join(format!("import-sandbox-{}.md", current_epoch_millis()));
+    std::fs::write(&file, text).map_err(redact_command_error)?;
+
+    let file_arg = file.to_string_lossy().into_owned();
+    let bundle_arg = config.bundle_path.to_string_lossy().into_owned();
+    let report_file = if write_vault {
+        Some(import_sandbox_report_path(config))
+    } else {
+        None
+    };
+    let report_arg = report_file
+        .as_ref()
+        .map(|path| path.to_string_lossy().into_owned());
+    let result = if write_vault {
+        run_cli(
+            config,
+            &[
+                "import",
+                "text",
+                "--file",
+                &file_arg,
+                "--complete",
+                "--write-vault",
+                "--bundle",
+                &bundle_arg,
+                "--out",
+                report_arg
+                    .as_deref()
+                    .unwrap_or("import-sandbox-last-report.json"),
+            ],
+        )
+        .await
+    } else {
+        run_cli(
+            config,
+            &["import", "text", "--file", &file_arg, "--complete"],
+        )
+        .await
+    };
+
+    let _ = std::fs::remove_file(&file);
+    let mut output = result.map_err(redact_command_error)?;
+    if write_vault {
+        output["rollback_available"] = json!(true);
+        output["rollback_ref"] = json!("latest-import-sandbox-batch");
+        output["raw_report_stored_locally"] = json!(true);
+        output["raw_report_path_redacted"] = json!(true);
+    }
+    Ok(output)
+}
+
+pub fn default_sidecar_config(config: &DesktopConfig) -> ServiceConfig {
+    let args = vec![
+        config.cli_path.to_string_lossy().into_owned(),
+        "mcp".to_string(),
+        "serve".to_string(),
+    ];
+    ServiceConfig {
+        program: config.node_path.clone(),
+        args,
+        work_dir: None,
+        env: HashMap::new(),
+        max_restarts: 5,
+        restart_delay_secs: 3,
+        log_capacity: 500,
+    }
+}
+
+// ----------------------------------------------------------------------
+// Tauri commands
+// ----------------------------------------------------------------------
+
+#[tauri::command]
+pub async fn start_service(state: tauri::State<'_, AppState>) -> Result<Value, String> {
+    let service = state.service.clone();
+    service.start().await?;
+    Ok(json!(state.service.status()))
+}
+
+#[tauri::command]
+pub async fn stop_service(state: tauri::State<'_, AppState>) -> Result<Value, String> {
+    state.service.stop().await?;
+    Ok(json!(state.service.status()))
+}
+
+#[tauri::command]
+pub async fn get_service_status(state: tauri::State<'_, AppState>) -> Result<Value, String> {
+    Ok(json!(state.service.status()))
+}
+
+#[tauri::command]
+pub async fn get_service_logs(
+    state: tauri::State<'_, AppState>,
+    limit: Option<usize>,
+) -> Result<Value, String> {
+    Ok(json!(state.service.logs(limit.unwrap_or(100))))
+}
+
+#[tauri::command]
+pub async fn create_memory_drive(state: tauri::State<'_, AppState>) -> Result<Value, String> {
+    let bundle = state.config.bundle_path.to_string_lossy();
+    run_cli(
+        &state.config,
+        &["setup", "--bundle", &bundle, "--overwrite"],
+    )
+    .await
+}
+
+#[tauri::command]
+pub async fn get_memory_drive_status(state: tauri::State<'_, AppState>) -> Result<Value, String> {
+    drive_health(&state.config).await
+}
+
+#[tauri::command]
+pub async fn create_vault(state: tauri::State<'_, AppState>) -> Result<Value, String> {
+    let drive = setup_bundle(&state.config).await?;
+    let service = state.service.status();
+    let setup_ok = drive.get("ok").and_then(|v| v.as_bool()).unwrap_or(false);
+    let memory_drive_status = if setup_ok { "ready" } else { "error" };
+    let health_status = if setup_ok { "healthy" } else { "error" };
+    let pending_crash_reports = pending_crash_report_count().await;
+    let clients = Value::Array(Vec::new());
+    let readiness = local_readiness_model(LocalReadinessInput {
+        service_running: service.running,
+        memory_drive_status,
+        health_status,
+        clients: Some(&clients),
+        pending_crash_reports,
+    });
+    Ok(json!({
+        "memory_drive_status": memory_drive_status,
+        "health_status": health_status,
+        "connected_app_count": 0,
+        "proof_status": "idle",
+        "update_status": "current",
+        "diagnostics_status": readiness.diagnostics_status,
+        "offline_ready": readiness.offline_ready,
+        "offline_ready_explanation": readiness.offline_ready_explanation,
+        "issue_codes": &readiness.issue_codes,
+        "primary_action": &readiness.primary_action,
+        "recovery_actions": &readiness.recovery_actions,
+        "pending_crash_reports": pending_crash_reports,
+        "service": service,
+    }))
+}
+
+#[tauri::command]
+pub async fn detect_clients(_state: tauri::State<'_, AppState>) -> Result<Value, String> {
+    detect_clients_internal().await
+}
+
+#[tauri::command]
+pub async fn preview_client_config(
+    _state: tauri::State<'_, AppState>,
+    id: String,
+) -> Result<Value, String> {
+    use crate::connector::engine::{ConnectOptions, ConnectorEngine, EngineContext};
+
+    let client = parse_public_client_id(&id)?;
+    let ctx = EngineContext::from_env().map_err(redact_command_error)?;
+    let engine = ConnectorEngine::new();
+    let plan = engine
+        .preview_connect(client, &ctx, &ConnectOptions::dry_run())
+        .map_err(redact_command_error)?;
+
+    Ok(json!({
+        "id": client.as_str(),
+        "ok": plan.ok,
+        "action": plan.action,
+        "status": "preview-ready",
+        "plan": plan.public_preview(),
+        "claim_boundaries": {
+            "local_config_only": true,
+            "writes_performed": false,
+            "provider_launched": false,
+            "provider_deletion_proof": false,
+            "model_forgetting_proof": false,
+        },
+    }))
+}
+
+#[tauri::command]
+pub async fn connect_client(
+    _state: tauri::State<'_, AppState>,
+    id: String,
+) -> Result<Value, String> {
+    use crate::connector::engine::{ClientId, ConnectOptions, ConnectorEngine, EngineContext};
+
+    let client = id
+        .parse::<ClientId>()
+        .map_err(|_| format!("unknown client: {id}"))?;
+    let ctx = EngineContext::from_env().map_err(|e| e.to_string())?;
+    let engine = ConnectorEngine::new();
+    engine
+        .connect(client, &ctx, &ConnectOptions::confirmed())
+        .map_err(|e| e.to_string())?;
+    Ok(json!({ "id": id, "status": "connected" }))
+}
+
+#[tauri::command]
+pub async fn preview_disconnect_client(
+    _state: tauri::State<'_, AppState>,
+    id: String,
+) -> Result<Value, String> {
+    use crate::connector::engine::{ConnectOptions, ConnectorEngine, EngineContext};
+
+    let client = parse_public_client_id(&id)?;
+    let ctx = EngineContext::from_env().map_err(redact_command_error)?;
+    let engine = ConnectorEngine::new();
+    let plan = engine
+        .preview_disconnect(client, &ctx, &ConnectOptions::dry_run())
+        .map_err(redact_command_error)?;
+
+    Ok(json!({
+        "id": client.as_str(),
+        "ok": plan.ok,
+        "action": plan.action,
+        "status": "disconnect-preview-ready",
+        "plan": plan.public_preview(),
+        "claim_boundaries": {
+            "local_config_only": true,
+            "writes_performed": false,
+            "removes_only_enigma_entry": true,
+            "provider_launched": false,
+            "provider_deletion_proof": false,
+            "model_forgetting_proof": false,
+        },
+    }))
+}
+
+#[tauri::command]
+pub async fn disconnect_client(
+    _state: tauri::State<'_, AppState>,
+    id: String,
+) -> Result<Value, String> {
+    use crate::connector::engine::{ClientId, ConnectOptions, ConnectorEngine, EngineContext};
+
+    let client = id
+        .parse::<ClientId>()
+        .map_err(|_| format!("unknown client: {id}"))?;
+    let ctx = EngineContext::from_env().map_err(|e| e.to_string())?;
+    let engine = ConnectorEngine::new();
+    engine
+        .disconnect(client, &ctx, &ConnectOptions::confirmed())
+        .map_err(|e| e.to_string())?;
+    Ok(json!({ "id": id, "status": "ready" }))
+}
+
+#[tauri::command]
+pub async fn get_claude_mcpb_handoff(_state: tauri::State<'_, AppState>) -> Result<Value, String> {
+    use crate::connector::claude::{
+        create_claude_desktop_mcpb_connection_plan, create_claude_desktop_mcpb_health,
+        create_claude_desktop_mcpb_manifest, McpbHealthOptions,
+    };
+    use crate::connector::engine::EngineContext;
+
+    let ctx = EngineContext::from_env().map_err(redact_command_error)?;
+    let manifest = create_claude_desktop_mcpb_manifest(env!("CARGO_PKG_VERSION"));
+    let connection_plan = create_claude_desktop_mcpb_connection_plan(ctx.platform);
+    let health = create_claude_desktop_mcpb_health(McpbHealthOptions {
+        mcpb_installed: false,
+        testing: false,
+        restart_required: false,
+        advanced_fallback: false,
+        test_evidence: None,
+        repair_required: false,
+        repair_reasons: Vec::new(),
+    });
+
+    Ok(json!({
+        "ok": true,
+        "schema": "enigma.desktop_claude_mcpb_handoff.v1",
+        "client_id": "claude-desktop",
+        "display_name": "Claude Desktop",
+        "preferred_path": "mcpb_extension",
+        "writes_performed": false,
+        "automatic_config_write": false,
+        "manifest": manifest,
+        "connection_plan": connection_plan,
+        "health": health,
+        "next_action": {
+            "id": "install_mcpb",
+            "label": "Install Claude extension",
+            "description": "Open the Enigma Claude extension package in Claude Desktop, then test the connection."
+        },
+        "claim_boundaries": {
+            "local_handoff_only": true,
+            "enigma_writes_claude_config": false,
+            "provider_launched": false,
+            "provider_deletion_proof": false,
+            "model_forgetting_proof": false,
+            "hosted_saas_live": false
+        }
+    }))
+}
+
+#[tauri::command]
+pub async fn repair_client_config(
+    _state: tauri::State<'_, AppState>,
+    id: String,
+) -> Result<Value, String> {
+    use crate::connector::engine::{ConnectOptions, ConnectorEngine, EngineContext};
+
+    let client = parse_public_client_id(&id)?;
+    let ctx = EngineContext::from_env().map_err(redact_command_error)?;
+    let engine = ConnectorEngine::new();
+    let result = engine
+        .repair(client, &ctx, &ConnectOptions::confirmed())
+        .map_err(redact_command_error)?;
+
+    let mut response = json!({
+        "id": client.as_str(),
+        "ok": result.ok,
+        "action": result.action,
+        "status": result.action,
+    });
+
+    if let Some(plan) = result.plan {
+        if !plan.restart_guidance.is_empty() {
+            response["restart_guidance"] = json!(plan.restart_guidance);
+        }
+        response["plan"] = plan.public_preview();
+    }
+
+    if let Some(test) = result.test {
+        let summary = public_test_summary(&test);
+        response["test_result_summary"] = summary.clone();
+        response["test"] = summary;
+    }
+
+    Ok(response)
+}
+
+#[tauri::command]
+pub async fn test_client_config(
+    _state: tauri::State<'_, AppState>,
+    id: String,
+) -> Result<Value, String> {
+    use crate::connector::engine::{ConnectorEngine, EngineContext, TestOptions};
+
+    let client = parse_public_client_id(&id)?;
+    let ctx = EngineContext::from_env().map_err(redact_command_error)?;
+    let engine = ConnectorEngine::new();
+    let result = engine
+        .test(client, &ctx, &TestOptions::default())
+        .map_err(redact_command_error)?;
+    let summary = public_test_summary(&result);
+
+    Ok(json!({
+        "id": client.as_str(),
+        "ok": result.ok,
+        "status": if result.ok { "test-passed" } else { "repair-required" },
+        "test_result_summary": summary,
+        "test": summary,
+        "claim_boundaries": {
+            "local_config_only": true,
+            "provider_launched": false,
+            "provider_deletion_proof": false,
+            "model_forgetting_proof": false,
+        },
+    }))
+}
+
+#[tauri::command]
+pub async fn preview_import_text(
+    state: tauri::State<'_, AppState>,
+    text: String,
+) -> Result<Value, String> {
+    run_text_import(&state.config, text, false).await
+}
+
+#[tauri::command]
+pub async fn approve_import_text(
+    state: tauri::State<'_, AppState>,
+    text: String,
+) -> Result<Value, String> {
+    run_text_import(&state.config, text, true).await
+}
+
+#[tauri::command]
+pub async fn rollback_import_text(state: tauri::State<'_, AppState>) -> Result<Value, String> {
+    let report_file = import_sandbox_report_path(&state.config);
+    if !report_file.exists() {
+        return Err("no import rollback report is available".to_string());
+    }
+    let report_arg = report_file.to_string_lossy().into_owned();
+    let bundle_arg = state.config.bundle_path.to_string_lossy().into_owned();
+    let mut receipt = run_cli(
+        &state.config,
+        &[
+            "import",
+            "rollback",
+            "--file",
+            &report_arg,
+            "--bundle",
+            &bundle_arg,
+        ],
+    )
+    .await
+    .map_err(redact_command_error)?;
+    let _ = std::fs::remove_file(&report_file);
+    receipt["rollback_ref"] = json!("latest-import-sandbox-batch");
+    receipt["raw_report_path_redacted"] = json!(true);
+    receipt["desktop_surface"] = json!({
+        "schema": "enigma.desktop_import_rollback_surface.v1",
+        "local_paths_hidden": true,
+        "raw_memory_hidden": true,
+    });
+    Ok(receipt)
+}
+
+#[tauri::command]
+pub async fn rollback_client_config(
+    _state: tauri::State<'_, AppState>,
+    id: String,
+) -> Result<Value, String> {
+    use crate::connector::engine::{ConnectorEngine, EngineContext, RollbackOptions};
+
+    let client = parse_public_client_id(&id)?;
+    let ctx = EngineContext::from_env().map_err(redact_command_error)?;
+    let engine = ConnectorEngine::new();
+    let plan = engine
+        .rollback(
+            client,
+            &ctx,
+            &RollbackOptions {
+                backup_path: None,
+                confirmed: true,
+            },
+        )
+        .map_err(redact_command_error)?;
+
+    Ok(json!({
+        "id": client.as_str(),
+        "ok": plan.ok,
+        "action": plan.action,
+        "status": plan.action,
+        "restart_guidance": plan.restart_guidance,
+        "plan": plan.public_preview(),
+    }))
+}
+
+fn desktop_public_export_privacy_scan(value: &Value) -> Value {
+    let forbidden_keys = diagnostics::find_forbidden_keys(value);
+    let serialized = serde_json::to_string(value).unwrap_or_default();
+    let redacted_serialized =
+        serde_json::to_string(&diagnostics::redact_paths(value)).unwrap_or_default();
+    let local_paths_found =
+        serialized != redacted_serialized || log_path_regex().is_match(&serialized);
+    let credential_text_found = log_token_regex().is_match(&serialized);
+    let auth_material_found = credential_text_found
+        || forbidden_keys
+            .iter()
+            .any(|key| matches!(key.as_str(), "token" | "api_key" | "private_key" | "secret" | "password"));
+    let owner_ref_found = forbidden_keys
+        .iter()
+        .any(|key| matches!(key.as_str(), "account_id" | "customer_id"));
+    let raw_logs_found = forbidden_keys
+        .iter()
+        .any(|key| matches!(key.as_str(), "raw_log" | "raw_logs"));
+    let complete_settings_found = forbidden_keys
+        .iter()
+        .any(|key| matches!(key.as_str(), "settings" | "complete_settings"));
+    let detected_private_field_count = forbidden_keys.len()
+        + if local_paths_found { 1 } else { 0 }
+        + if credential_text_found { 1 } else { 0 };
+    let export_allowed = forbidden_keys.is_empty() && !local_paths_found && !credential_text_found;
+    json!({
+        "schema": "enigma.desktop_public_export_privacy_scan.v1",
+        "status": if export_allowed { "pass" } else { "blocked" },
+        "export_allowed": export_allowed,
+        "forbidden_keys": forbidden_keys,
+        "checked_categories": [
+            "memory_bodies",
+            "user_inputs",
+            "dialogue_records",
+            "provider_outputs",
+            "storage_locations",
+            "auth_material",
+            "owner_refs",
+            "settings_snapshots",
+            "raw_logs",
+        ],
+        "detected_private_field_count": detected_private_field_count,
+        "redacted_private_field_count": 9,
+        "raw_memory_denied": true,
+        "prompts_denied": true,
+        "transcripts_denied": true,
+        "credentials_denied": !auth_material_found,
+        "tokens_denied": !auth_material_found,
+        "private_keys_denied": !auth_material_found,
+        "provider_responses_denied": true,
+        "local_paths_denied": !local_paths_found,
+        "account_identifiers_denied": !owner_ref_found,
+        "customer_identifiers_denied": !owner_ref_found,
+        "raw_logs_denied": !raw_logs_found,
+        "complete_settings_denied": !complete_settings_found,
+        "claim_boundary": "Local desktop export privacy scan only; it does not prove provider deletion, model forgetting, hosted services, release signing, or compliance.",
+    })
+}
+
+fn scan_allows_export(scan: &Value) -> bool {
+    scan.get("export_allowed")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+}
+
+fn attach_desktop_public_export_scan(mut value: Value) -> Value {
+    let scan = desktop_public_export_privacy_scan(&value);
+    value["privacy_scan"] = scan.clone();
+    value["export_allowed"] = json!(scan_allows_export(&scan));
+    value
+}
+
+fn ensure_desktop_public_export_allowed(value: &Value) -> Result<Value, String> {
+    let scan = desktop_public_export_privacy_scan(value);
+    if scan_allows_export(&scan) {
+        Ok(scan)
+    } else {
+        Err("Desktop export privacy scan blocked this public export.".to_string())
+    }
+}
+
+async fn build_support_summary(config: &DesktopConfig) -> Result<Value, String> {
+    let bundle = config.bundle_path.to_string_lossy();
+    let mut summary = run_cli(
+        config,
+        &[
+            "support",
+            "summary",
+            "--bundle",
+            &bundle,
+            "--client",
+            "generic-mcp",
+        ],
+    )
+    .await
+    .map_err(redact_command_error)?;
+    let scan = desktop_public_export_privacy_scan(&summary);
+    summary["desktop_surface"] = json!({
+        "schema": "enigma.desktop_support_summary_surface.v1",
+        "local_paths_hidden": true,
+        "raw_memory_hidden": true,
+        "shareable_by_default": false,
+        "privacy_scan_status": scan.get("status").and_then(Value::as_str).unwrap_or("blocked"),
+        "export_allowed": scan_allows_export(&scan),
+    });
+    summary["privacy_scan"] = scan;
+    summary["export_allowed"] = json!(summary["desktop_surface"]["export_allowed"]
+        .as_bool()
+        .unwrap_or(false));
+    Ok(summary)
+}
+
+fn support_summary_export_path(config: &DesktopConfig) -> std::path::PathBuf {
+    let file_name = format!(
+        "enigma-support-summary-{}.json",
+        Utc::now().format("%Y%m%dT%H%M%SZ")
+    );
+    config
+        .bundle_path
+        .parent()
+        .map(std::path::Path::to_path_buf)
+        .unwrap_or_else(std::env::temp_dir)
+        .join(file_name)
+}
+
+fn proof_activity_export_path(config: &DesktopConfig) -> std::path::PathBuf {
+    let file_name = format!(
+        "enigma-proof-activity-{}.json",
+        Utc::now().format("%Y%m%dT%H%M%SZ")
+    );
+    config
+        .bundle_path
+        .parent()
+        .map(std::path::Path::to_path_buf)
+        .unwrap_or_else(std::env::temp_dir)
+        .join(file_name)
+}
+
+#[tauri::command]
+pub async fn get_support_summary(state: tauri::State<'_, AppState>) -> Result<Value, String> {
+    build_support_summary(&state.config).await
+}
+
+#[tauri::command]
+pub async fn export_support_summary(
+    state: tauri::State<'_, AppState>,
+    approve: bool,
+) -> Result<Value, String> {
+    if !approve {
+        return Err("User approval is required before exporting support summary.".to_string());
+    }
+    let summary = build_support_summary(&state.config).await?;
+    let scan = ensure_desktop_public_export_allowed(&summary)?;
+    let out_path = support_summary_export_path(&state.config);
+    if let Some(parent) = out_path.parent() {
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(redact_command_error)?;
+    }
+    let payload = serde_json::to_string_pretty(&summary).map_err(redact_command_error)?;
+    tokio::fs::write(out_path.as_path(), payload)
+        .await
+        .map_err(redact_command_error)?;
+    Ok(json!({
+        "exported": true,
+        "schema": "enigma.desktop_support_summary_export.v1",
+        "path": "<support-summary-file>",
+        "local_paths_hidden": true,
+        "raw_memory_hidden": true,
+        "shareable_by_default": false,
+        "privacy_scan": scan,
+        "export_allowed": true,
+    }))
+}
+
+#[tauri::command]
+pub async fn get_proof_activity(state: tauri::State<'_, AppState>) -> Result<Value, String> {
+    Ok(proof_activity_summary(&state.config).await)
+}
+
+#[tauri::command]
+pub async fn export_proof_activity(
+    state: tauri::State<'_, AppState>,
+    approve: bool,
+) -> Result<Value, String> {
+    if !approve {
+        return Err("User approval is required before exporting proof activity.".to_string());
+    }
+    let activity = proof_activity_summary(&state.config).await;
+    let scan = ensure_desktop_public_export_allowed(&activity)?;
+    let out_path = proof_activity_export_path(&state.config);
+    if let Some(parent) = out_path.parent() {
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(redact_command_error)?;
+    }
+    let payload = serde_json::to_string_pretty(&activity).map_err(redact_command_error)?;
+    tokio::fs::write(out_path.as_path(), payload)
+        .await
+        .map_err(redact_command_error)?;
+    Ok(json!({
+        "exported": true,
+        "schema": "enigma.desktop_proof_activity_export.v1",
+        "path": "<proof-activity-file>",
+        "local_paths_hidden": true,
+        "raw_memory_hidden": true,
+        "shareable_by_default": false,
+        "privacy_scan": scan,
+        "export_allowed": true,
+    }))
+}
+
+pub(crate) async fn pending_crash_report_count() -> usize {
+    crash::get_crash_reporting_status()
+        .await
+        .ok()
+        .and_then(|status| status.get("pending_count").and_then(Value::as_u64))
+        .unwrap_or(0) as usize
+}
+
+#[tauri::command]
+pub async fn get_health(state: tauri::State<'_, AppState>) -> Result<Value, String> {
+    let service = state.service.status();
+    let drive = drive_health(&state.config).await.unwrap_or_else(|_| {
+        json!({
+            "memory_drive_status": "unknown",
+            "health_status": "error",
+        })
+    });
+    let clients = detect_clients_internal().await.unwrap_or_default();
+    let connected_count = clients
+        .as_array()
+        .map(|arr| {
+            arr.iter()
+                .filter(|c| c.get("status").and_then(|s| s.as_str()) == Some("connected"))
+                .count()
+        })
+        .unwrap_or(0);
+    let memory_drive_status = drive
+        .get("memory_drive_status")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown");
+    let health_status = drive
+        .get("health_status")
+        .and_then(|v| v.as_str())
+        .unwrap_or("error");
+
+    let proof = proof_activity_summary(&state.config).await;
+    let proof_status = proof
+        .get("proof_status")
+        .and_then(|v| v.as_str())
+        .unwrap_or("idle");
+
+    let pending_crash_reports = pending_crash_report_count().await;
+    let readiness = local_readiness_model(LocalReadinessInput {
+        service_running: service.running,
+        memory_drive_status,
+        health_status,
+        clients: Some(&clients),
+        pending_crash_reports,
+    });
+
+    Ok(json!({
+        "memory_drive_status": memory_drive_status,
+        "health_status": health_status,
+        "connected_app_count": connected_count,
+        "proof_status": proof_status,
+        "proof_activity": proof,
+        "update_status": "current",
+        "diagnostics_status": readiness.diagnostics_status,
+        "offline_ready": readiness.offline_ready,
+        "offline_ready_explanation": readiness.offline_ready_explanation,
+        "issue_codes": &readiness.issue_codes,
+        "primary_action": &readiness.primary_action,
+        "recovery_actions": &readiness.recovery_actions,
+        "pending_crash_reports": pending_crash_reports,
+        "service": service,
+    }))
+}
+#[tauri::command]
+pub async fn shutdown_service(state: tauri::State<'_, AppState>) -> Result<Value, String> {
+    state.service.stop().await?;
+    get_health(state).await
+}
+
+// ----------------------------------------------------------------------
+// Tests
+// ----------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn redaction_strips_paths_and_tokens() {
+        let raw = "Loaded /home/user/.enigma/bundle.json and C:\\Users\\user\\AppData\\Roaming\\.enigma; token sk-abc123def456ghi789jkl012mn345op and key-abcdef0123456789";
+        let redacted = redact_log(raw);
+        assert!(!redacted.contains("/home/user"));
+        assert!(!redacted.contains("C:\\Users"));
+        assert!(!redacted.contains("sk-abc"));
+        assert!(!redacted.contains("key-abcdef"));
+        assert!(redacted.contains("<path>"));
+        assert!(redacted.contains("<token>"));
+    }
+
+    fn detect_fixture(action: &'static str) -> crate::connector::engine::DetectResult {
+        crate::connector::engine::DetectResult {
+            ok: true,
+            client_id: "claude-desktop".to_string(),
+            display_name: "Claude Desktop",
+            platform: crate::connector::engine::Platform::Win32,
+            config_path: "<redacted>".to_string(),
+            exists: true,
+            installed: true,
+            server_entry_exists: false,
+            command_ok: false,
+            args_ok: false,
+            bundle_env_present: false,
+            bundle_env_ok: false,
+            env_ok: false,
+            action,
+            repair_reasons: Vec::new(),
+            parse_error: false,
+            error: None,
+            restart_guidance: "Restart Claude Desktop.",
+        }
+    }
+
+    #[test]
+    fn connector_card_preserves_public_repair_detection() {
+        let mut connected = detect_fixture("already_configured");
+        connected.server_entry_exists = true;
+        connected.env_ok = true;
+        connected.command_ok = true;
+        assert_eq!(connector_card_status(&connected), "connected");
+
+        let mut malformed = detect_fixture("repair");
+        malformed.ok = false;
+        malformed.parse_error = true;
+        malformed.repair_reasons = vec!["config_parse_error".to_string()];
+        let malformed_value = connector_card_value(malformed);
+        assert_eq!(malformed_value["status"].as_str(), Some("malformed"));
+        assert_eq!(
+            malformed_value["recommended_action"].as_str(),
+            Some("repair")
+        );
+        assert_eq!(
+            malformed_value["repair_reasons"][0].as_str(),
+            Some("config_parse_error")
+        );
+        assert_eq!(malformed_value["parse_error"].as_bool(), Some(true));
+        assert_eq!(malformed_value["checks"]["installed"].as_bool(), Some(true));
+
+        let mut missing = detect_fixture("missing_client_config");
+        missing.installed = false;
+        assert_eq!(connector_card_status(&missing), "not-installed");
+    }
+
+    #[test]
+    fn dashboard_health_adapter_matches_public_desktop_contract() {
+        assert_eq!(
+            dashboard_status_from_drive_health(Some("healthy")),
+            ("ready", "healthy")
+        );
+        assert_eq!(
+            dashboard_status_from_drive_health(Some("ready")),
+            ("ready", "healthy")
+        );
+        assert_eq!(
+            dashboard_status_from_drive_health(Some("ok")),
+            ("ready", "healthy")
+        );
+        assert_eq!(
+            dashboard_status_from_drive_health(Some("watch")),
+            ("ready", "fix-needed")
+        );
+        assert_eq!(
+            dashboard_status_from_drive_health(Some("degraded")),
+            ("ready", "fix-needed")
+        );
+        assert_eq!(
+            dashboard_status_from_drive_health(Some("critical")),
+            ("ready", "fix-needed")
+        );
+        assert_eq!(
+            dashboard_status_from_drive_health(Some("missing")),
+            ("missing", "needs-setup")
+        );
+        assert_eq!(
+            dashboard_status_from_drive_health(Some("error")),
+            ("error", "error")
+        );
+        assert_eq!(
+            dashboard_status_from_drive_health(None),
+            ("unknown", "error")
+        );
+    }
+
+    #[test]
+    fn offline_ready_requires_running_ready_and_healthy() {
+        assert!(dashboard_offline_ready(true, "ready", "healthy"));
+        assert!(!dashboard_offline_ready(false, "ready", "healthy"));
+        assert!(!dashboard_offline_ready(true, "missing", "healthy"));
+        assert!(!dashboard_offline_ready(true, "ready", "fix-needed"));
+    }
+
+    #[test]
+    fn local_readiness_explains_stopped_service_and_primary_action() {
+        let model = local_readiness_model(LocalReadinessInput {
+            service_running: false,
+            memory_drive_status: "ready",
+            health_status: "healthy",
+            clients: None,
+            pending_crash_reports: 0,
+        });
+
+        assert!(!model.offline_ready);
+        assert!(model
+            .offline_ready_explanation
+            .contains("local service is stopped"));
+        assert!(model.issue_codes.contains(&"service_stopped"));
+        assert_eq!(model.primary_action.command, "start_service");
+        assert_eq!(model.diagnostics_status, "warning");
+    }
+
+    #[test]
+    fn local_readiness_lists_local_recovery_actions() {
+        let clients = json!([
+            {
+                "status": "repair-required",
+                "recommended_action": "repair"
+            }
+        ]);
+        let missing = local_readiness_model(LocalReadinessInput {
+            service_running: true,
+            memory_drive_status: "missing",
+            health_status: "needs-setup",
+            clients: Some(&clients),
+            pending_crash_reports: 1,
+        });
+
+        assert!(missing.issue_codes.contains(&"memory_drive_missing"));
+        assert!(missing.issue_codes.contains(&"connector_repair_required"));
+        assert!(missing.issue_codes.contains(&"pending_crash_reports"));
+        assert!(missing
+            .recovery_actions
+            .iter()
+            .any(|action| action.command == "create_memory_drive"));
+        let repair_action = missing
+            .recovery_actions
+            .iter()
+            .find(|action| action.command == "repair_client_config")
+            .expect("repair action");
+        assert_eq!(repair_action.id, "repair_app_connection");
+        assert_eq!(repair_action.label, "Repair app connection");
+        assert!(
+            !(repair_action.description.contains("connector")
+                && repair_action.description.contains("configuration"))
+        );
+        let rollback_action = missing
+            .recovery_actions
+            .iter()
+            .find(|action| action.command == "rollback_client_config")
+            .expect("rollback action");
+        assert_eq!(rollback_action.id, "rollback_app_connection");
+        assert_eq!(rollback_action.label, "Restore app backup");
+        assert!(
+            !(rollback_action.description.contains("connector")
+                && rollback_action.description.contains("configuration"))
+        );
+        assert!(missing
+            .recovery_actions
+            .iter()
+            .any(|action| action.command == "get_crash_reporting_status"));
+
+        let fix_needed = local_readiness_model(LocalReadinessInput {
+            service_running: true,
+            memory_drive_status: "ready",
+            health_status: "fix-needed",
+            clients: None,
+            pending_crash_reports: 0,
+        });
+        assert!(fix_needed.issue_codes.contains(&"memory_drive_fix_needed"));
+    }
+
+    #[test]
+    fn desktop_public_export_privacy_scan_fails_closed() {
+        let safe = json!({
+            "schema": "enigma.desktop_proof_activity.v1",
+            "receipt_count": 1,
+            "redaction": {
+                "raw_memory_included": false,
+                "local_paths_redacted": true
+            }
+        });
+        let safe_scan = desktop_public_export_privacy_scan(&safe);
+        assert_eq!(safe_scan["status"].as_str(), Some("pass"));
+        assert_eq!(safe_scan["export_allowed"].as_bool(), Some(true));
+        assert_eq!(safe_scan["detected_private_field_count"].as_u64(), Some(0));
+        assert_eq!(safe_scan["redacted_private_field_count"].as_u64(), Some(9));
+        assert_eq!(safe_scan["tokens_denied"].as_bool(), Some(true));
+        assert_eq!(safe_scan["account_identifiers_denied"].as_bool(), Some(true));
+
+        let raw_memory = json!({
+            "schema": "enigma.desktop_proof_activity.v1",
+            "raw_memory": "private text"
+        });
+        let raw_scan = desktop_public_export_privacy_scan(&raw_memory);
+        assert_eq!(raw_scan["status"].as_str(), Some("blocked"));
+        assert_eq!(raw_scan["export_allowed"].as_bool(), Some(false));
+        assert!(raw_scan["forbidden_keys"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|key| key.as_str() == Some("raw_memory")));
+        assert_eq!(raw_scan["detected_private_field_count"].as_u64(), Some(1));
+        assert_eq!(raw_scan["raw_memory_denied"].as_bool(), Some(true));
+
+        let path = json!({
+            "schema": "enigma.desktop_proof_activity.v1",
+            "note": "C:\\Users\\person\\.enigma\\bundle.json"
+        });
+        let path_scan = desktop_public_export_privacy_scan(&path);
+        assert_eq!(path_scan["status"].as_str(), Some("blocked"));
+        assert_eq!(path_scan["local_paths_denied"].as_bool(), Some(false));
+        assert_eq!(path_scan["detected_private_field_count"].as_u64(), Some(1));
+    }
+
+    #[tokio::test]
+    async fn service_restarts_crashed_process_up_to_max() {
+        let program = if cfg!(windows) { "cmd" } else { "sh" };
+        let args = if cfg!(windows) {
+            vec!["/c".to_string(), "echo enigma-sidecar-ready".to_string()]
+        } else {
+            vec!["-c".to_string(), "echo enigma-sidecar-ready".to_string()]
+        };
+        let service = Arc::new(ServiceHandle::new(ServiceConfig {
+            program: PathBuf::from(program),
+            args,
+            work_dir: None,
+            env: HashMap::new(),
+            max_restarts: 2,
+            restart_delay_secs: 0,
+            log_capacity: 200,
+        }));
+        service.clone().start().await.unwrap();
+
+        tokio::time::timeout(Duration::from_secs(10), async {
+            while service.status().restarts < 2 {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+        })
+        .await
+        .expect("service should reach max restarts");
+
+        service.stop().await.unwrap();
+        assert!(!service.status().running);
+    }
+
+    #[tokio::test]
+    async fn service_stop_kills_running_child() {
+        let program = if cfg!(windows) { "cmd" } else { "sh" };
+        let args = if cfg!(windows) {
+            vec!["/c".to_string(), "ping -n 30 127.0.0.1".to_string()]
+        } else {
+            vec!["-c".to_string(), "sleep 30".to_string()]
+        };
+        let service = Arc::new(ServiceHandle::new(ServiceConfig {
+            program: PathBuf::from(program),
+            args,
+            work_dir: None,
+            env: HashMap::new(),
+            max_restarts: 0,
+            restart_delay_secs: 0,
+            log_capacity: 200,
+        }));
+        service.clone().start().await.unwrap();
+        assert!(service.status().running);
+        service.stop().await.unwrap();
+        assert!(!service.status().running);
+    }
+}

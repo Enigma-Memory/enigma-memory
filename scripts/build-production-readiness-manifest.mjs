@@ -185,19 +185,44 @@ export async function buildProductionReadinessManifest(options = {}) {
   return validateInfrastructureReadinessManifest(manifest);
 }
 
+export function renderProductionReadinessManifestPlain(manifest) {
+  const refs = manifest.refs ?? {};
+  const blockers = Array.isArray(manifest.external_blockers) ? manifest.external_blockers : [];
+  const requiredCount = GATEWAY_REQUIRED_DEPENDENCIES.length;
+  const presentCount = GATEWAY_REQUIRED_DEPENDENCIES.filter((key) => refs[key] !== undefined).length;
+  const lines = [
+    'Enigma production readiness manifest',
+    `Status: ${blockers.length === 0 ? 'Ready' : 'Needs attention'}`,
+    `Mode: ${manifest.mode ?? 'hosted-live'}`,
+    `Public site: ${manifest.public_site?.url ?? '<public-site>'}`,
+    `Cloudflare project: ${manifest.cloudflare_pages?.project_name ?? 'enigma-memory'}`,
+    `Relay endpoint: ${manifest.relay?.url ?? '<relay>'}`,
+    `Gateway endpoint: ${manifest.gateway?.url ?? '<gateway>'}`,
+    `Dependency refs: ${presentCount}/${requiredCount}`,
+    `Operator decision: ${manifest.operator_acceptance?.decision ?? '<decision>'}`,
+    `External blockers: ${blockers.length}`,
+  ];
+  for (const blocker of blockers.slice(0, 8)) lines.push(`Blocker: ${blocker}`);
+  lines.push('Boundary: public-safe readiness manifest only; no credentials, account ids, local paths, raw memory, prompts, transcripts, provider responses, hosted readiness certification, infrastructure deployment, operator approval, provider deletion, model behavior, compliance, benchmark superiority, token ROI, or provider invoice savings claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+
 async function main() {
   const flags = parseArgs();
   const manifest = await buildProductionReadinessManifest({ flags });
   const out = getFlag(flags, ['out']);
+  const plain = getFlag(flags, ['plain', 'text']) === true || getFlag(flags, ['format']) === 'text';
   const text = `${JSON.stringify(manifest, null, 2)}\n`;
   if (out && out !== true) {
     const path = resolve(String(out));
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, text, 'utf8');
-    process.stdout.write(`${JSON.stringify({ ok: true, out: path, schema: manifest.schema, external_blockers: manifest.external_blockers }, null, 2)}\n`);
+    if (plain) process.stdout.write(renderProductionReadinessManifestPlain(manifest));
+    else process.stdout.write(`${JSON.stringify({ ok: true, out: path, schema: manifest.schema, external_blockers: manifest.external_blockers }, null, 2)}\n`);
     return;
   }
-  process.stdout.write(text);
+  process.stdout.write(plain ? renderProductionReadinessManifestPlain(manifest) : text);
 }
 
 const invokedPath = process.argv[1] ? resolve(process.argv[1]) : '';

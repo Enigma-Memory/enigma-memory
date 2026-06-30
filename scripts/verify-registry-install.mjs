@@ -47,7 +47,7 @@ function rejectControlCharacters(value, label) {
 }
 
 export function usage() {
-  return `Usage: node scripts/verify-registry-install.mjs [--execute] [--package <name>] [--version <version>] [--tmp-dir <path>] [--skip-network]\n\nDry-run is the default and prints the public-safe planned command set. Execute mode installs the package into a temporary prefix and runs selected installed bin files directly. --skip-network validates the plan without running npm install or installed bins.\n`;
+  return `Usage: node scripts/verify-registry-install.mjs [--execute] [--package <name>] [--version <version>] [--tmp-dir <path>] [--skip-network] [--plain]\n\nDry-run is the default and prints the public-safe planned command set. Execute mode installs the package into a temporary prefix and runs selected installed bin files directly. --skip-network validates the plan without running npm install or installed bins. --plain prints a human-readable summary.\n`;
 }
 
 export function parseRegistryInstallArgs(argv = process.argv.slice(2)) {
@@ -58,6 +58,7 @@ export function parseRegistryInstallArgs(argv = process.argv.slice(2)) {
     packageVersion: DEFAULT_REGISTRY_VERSION,
     tmpDir: undefined,
     skipNetwork: false,
+    plain: false,
   };
   let sawDryRun = false;
   let sawExecute = false;
@@ -85,6 +86,9 @@ export function parseRegistryInstallArgs(argv = process.argv.slice(2)) {
       index += 1;
     } else if (arg === '--skip-network') {
       options.skipNetwork = true;
+    } else if (arg === '--plain' || arg === '--text' || arg === '--format=text' || (arg === '--format' && argv[index + 1] === 'text')) {
+      options.plain = true;
+      if (arg === '--format') index += 1;
     } else {
       throw new Error('Unknown argument.');
     }
@@ -392,6 +396,29 @@ export function registryInstallCliOutput(output) {
   return output;
 }
 
+export function renderRegistryInstallPlain(output) {
+  const counts = output.commands?.reduce((acc, command) => {
+    acc[command.status] = (acc[command.status] ?? 0) + 1;
+    return acc;
+  }, {}) ?? {};
+  const lines = [
+    'Enigma registry install verifier',
+    `Status: ${output.ok ? 'Ready' : 'Needs attention'}`,
+    `Mode: ${output.mode ?? '<mode>'}`,
+    `Package: ${output.package?.spec ?? '<package>@<version>'}`,
+    `Node: ${output.node?.required ?? '>=24'} current major ${output.node?.current_major ?? '<unknown>'}`,
+    `Commands: ${Array.isArray(output.commands) ? output.commands.length : 0}`,
+    `Preview: ${counts.preview ?? 0}`,
+    `Validated: ${counts.validated ?? 0}`,
+    `Passed: ${counts.passed ?? 0}`,
+    `Failed: ${counts.failed ?? 0}`,
+    `Network skipped: ${output.skip_network ? 'yes' : 'no'}`,
+    `External mutation: ${output.execute && !output.skip_network ? 'npm install in temp prefix only' : 'no'}`,
+  ];
+  lines.push('Boundary: public-safe registry install verification only; no package publication, npm token, account ID, local absolute path, raw memory, prompts, provider responses, provider deletion, model behavior, hosted service, signing evidence, compliance, benchmark superiority, token ROI, or provider invoice savings claims.');
+  return `${lines.join('\n')}\n`;
+}
+
 async function main() {
   const args = parseRegistryInstallArgs();
   if (args.help) {
@@ -399,7 +426,7 @@ async function main() {
     return;
   }
   const output = await runRegistryInstallVerification(args);
-  process.stdout.write(`${JSON.stringify(registryInstallCliOutput(output), null, 2)}\n`);
+  process.stdout.write(args.plain ? renderRegistryInstallPlain(output) : `${JSON.stringify(registryInstallCliOutput(output), null, 2)}\n`);
   if (output.ok !== true) process.exitCode = 1;
 }
 

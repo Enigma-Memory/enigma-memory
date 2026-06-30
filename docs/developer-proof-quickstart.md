@@ -29,8 +29,7 @@ Start in an empty working directory or a scratch directory inside your project. 
 mkdir -p .enigma/proof-quickstart
 
 npx --yes --package enigma-memory enigma test-drive \
-  --out-dir .enigma/proof-quickstart/test-drive \
-  --overwrite
+  --out-dir .enigma/proof-quickstart/test-drive
 ```
 
 For a project-local install, add the package first and then run the same CLI:
@@ -38,8 +37,7 @@ For a project-local install, add the package first and then run the same CLI:
 ```sh
 npm install enigma-memory
 npx enigma test-drive \
-  --out-dir .enigma/proof-quickstart/test-drive \
-  --overwrite
+  --out-dir .enigma/proof-quickstart/test-drive
 ```
 
 The test drive creates local Enigma demo artifacts. Treat full local bundles as private until reviewed. For a proof-network flow, publish only reviewed hashes, roots, refs, and verifier output.
@@ -49,8 +47,7 @@ If you are working from a source checkout instead of npm, run the CLI directly f
 ```sh
 cd enigma
 node apps/cli/bin/enigma.mjs test-drive \
-  --out-dir ../.enigma/proof-quickstart/test-drive \
-  --overwrite
+  --out-dir ../.enigma/proof-quickstart/test-drive
 ```
 
 ## 2. Create a Solana-ready anchor batch

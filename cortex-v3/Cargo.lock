@@ -805,15 +805,7 @@ name = "cortex_treasury"
 version = "0.0.1"
 dependencies = [
  "anchor-lang",
- "blake3",
- "block-buffer 0.10.4",
- "budget_escrow",
- "digest 0.10.7",
- "indexmap",
- "jobserver",
- "proc-macro-crate 3.3.0",
- "proc-macro2",
- "zeroize_derive",
+ "anchor-spl",
 ]
 
 [[package]]

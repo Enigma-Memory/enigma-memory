@@ -1,0 +1,291 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.enigma.ai/claim-ledger-v1.schema.json",
+  "title": "Enigma Claim Ledger v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "ledger_id",
+    "generated_at",
+    "release_status",
+    "public_safety",
+    "release_gate",
+    "evidence_refs",
+    "claims"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "enigma.claim_ledger.v1" },
+    "ledger_id": { "$ref": "#/$defs/publicRef" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "release_status": { "$ref": "#/$defs/releaseStatus" },
+    "release_ref": { "$ref": "#/$defs/publicRef" },
+    "schema_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/schemaId" },
+      "uniqueItems": true
+    },
+    "public_safety": { "$ref": "#/$defs/publicSafety" },
+    "release_gate": { "$ref": "#/$defs/releaseGate" },
+    "evidence_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/publicRef" },
+      "uniqueItems": true
+    },
+    "claims": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/claimEntry" }
+    }
+  },
+  "$defs": {
+    "schemaId": {
+      "type": "string",
+      "pattern": "^enigma\\.[a-z0-9_]+\\.v1$"
+    },
+    "publicRef": {
+      "type": "string",
+      "pattern": "^(sha256:[a-f0-9]{64}|root:[a-z0-9][a-z0-9._:-]*|urn:enigma:[a-z0-9][a-z0-9._:-]*|schema:enigma\\.[a-z0-9_]+\\.v1|artifact:[a-z0-9][a-z0-9._:-]*|release:[a-z0-9][a-z0-9._:-]*|review:[a-z0-9][a-z0-9._:-]*|signer:[a-z0-9][a-z0-9._:-]*|signature:[a-z0-9][a-z0-9._:-]*|policy:[a-z0-9][a-z0-9._:-]*|capability:[a-z0-9][a-z0-9._:-]*|nullifier:[a-z0-9][a-z0-9._:-]*)$"
+    },
+    "releaseStatus": {
+      "type": "string",
+      "enum": ["draft", "blocked", "internal_review", "approved", "published", "expired", "withdrawn"]
+    },
+    "claimStatus": {
+      "type": "string",
+      "enum": ["allowed", "conditional", "prohibited"]
+    },
+    "boundary": {
+      "type": "string",
+      "enum": [
+        "local_vault_state_transition",
+        "receipt_chain_root",
+        "active_root",
+        "quarantine_root",
+        "tombstone_root",
+        "context_passport_selected_root",
+        "context_passport_omitted_root",
+        "context_passport_tombstone_root",
+        "capability_grant",
+        "capability_revocation",
+        "offline_verifier_output",
+        "public_release_metadata",
+        "public_evidence_metadata",
+        "provider_deletion",
+        "model_forgetting",
+        "provider_native_memory_control",
+        "compliance_certification",
+        "benchmark_superiority",
+        "hosted_saas_readiness",
+        "byoc_readiness",
+        "patentability_or_legal_conclusion",
+        "raw_embeddings_safe_public_metadata",
+        "hardware_tamper_proofing"
+      ]
+    },
+    "evidenceRequirement": {
+      "type": "string",
+      "enum": [
+        "local_validator_output",
+        "receipt_chain_root",
+        "active_root",
+        "quarantine_root",
+        "tombstone_root",
+        "context_passport_roots",
+        "capability_artifact_ref",
+        "offline_verifier_output",
+        "release_metadata_ref",
+        "review_approval_ref",
+        "expiry_review_ref",
+        "prohibited_claim_boundary_ref",
+        "live_deployment_evidence_ref",
+        "external_provider_evidence_ref",
+        "legal_security_approval_ref",
+        "benchmark_methodology_ref"
+      ]
+    },
+    "publicSafety": {
+      "type": "object",
+      "required": [
+        "public_payload_only",
+        "private_payload_detected",
+        "raw_memory_absent",
+        "prompts_transcripts_absent",
+        "embeddings_absent",
+        "provider_responses_absent",
+        "credentials_absent",
+        "local_paths_absent",
+        "evidence_refs_only"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "public_payload_only": { "const": true },
+        "private_payload_detected": { "const": false },
+        "raw_memory_absent": { "const": true },
+        "prompts_transcripts_absent": { "const": true },
+        "embeddings_absent": { "const": true },
+        "provider_responses_absent": { "const": true },
+        "credentials_absent": { "const": true },
+        "local_paths_absent": { "const": true },
+        "evidence_refs_only": { "const": true },
+        "scanner_ref": { "$ref": "#/$defs/publicRef" },
+        "scanned_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "releaseGate": {
+      "type": "object",
+      "required": [
+        "tokenless_publishing_required",
+        "long_lived_publishing_credentials_used",
+        "long_lived_publishing_credentials_present",
+        "publishing_evidence_refs"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "tokenless_publishing_required": { "const": true },
+        "long_lived_publishing_credentials_used": { "const": false },
+        "long_lived_publishing_credentials_present": { "const": false },
+        "publishing_evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/publicRef" },
+          "uniqueItems": true
+        },
+        "blocker_refs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/publicRef" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "review": {
+      "type": "object",
+      "required": ["reviewer_ref", "review_status", "review_due_at", "expires_at"],
+      "additionalProperties": false,
+      "properties": {
+        "reviewer_ref": { "$ref": "#/$defs/publicRef" },
+        "review_status": {
+          "type": "string",
+          "enum": ["not_started", "in_review", "approved", "blocked", "expired", "withdrawn"]
+        },
+        "reviewed_at": { "type": "string", "format": "date-time" },
+        "review_due_at": { "type": "string", "format": "date-time" },
+        "expires_at": { "type": "string", "format": "date-time" },
+        "approval_ref": { "$ref": "#/$defs/publicRef" }
+      }
+    },
+    "claimEntry": {
+      "type": "object",
+      "required": [
+        "claim_id",
+        "claim_status",
+        "claim_text",
+        "boundary",
+        "evidence_requirements",
+        "evidence_refs",
+        "release_status",
+        "review",
+        "public_safety",
+        "not_proven"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "claim_id": { "$ref": "#/$defs/publicRef" },
+        "claim_status": { "$ref": "#/$defs/claimStatus" },
+        "claim_text": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "boundary": { "$ref": "#/$defs/boundary" },
+        "evidence_requirements": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/evidenceRequirement" },
+          "uniqueItems": true
+        },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/publicRef" },
+          "uniqueItems": true
+        },
+        "release_status": { "$ref": "#/$defs/releaseStatus" },
+        "review": { "$ref": "#/$defs/review" },
+        "public_safety": { "$ref": "#/$defs/publicSafety" },
+        "not_proven": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": [
+              "provider_deletion",
+              "model_forgetting",
+              "provider_native_memory_control",
+              "compliance_certification",
+              "benchmark_superiority",
+              "hosted_saas_readiness",
+              "byoc_readiness",
+              "patentability_or_legal_conclusion",
+              "raw_embeddings_safe_public_metadata",
+              "hardware_tamper_proofing"
+            ]
+          },
+          "uniqueItems": true
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "claim_status": { "enum": ["allowed", "conditional"] } }
+          },
+          "then": {
+            "properties": {
+              "boundary": {
+                "enum": [
+                  "local_vault_state_transition",
+                  "receipt_chain_root",
+                  "active_root",
+                  "quarantine_root",
+                  "tombstone_root",
+                  "context_passport_selected_root",
+                  "context_passport_omitted_root",
+                  "context_passport_tombstone_root",
+                  "capability_grant",
+                  "capability_revocation",
+                  "offline_verifier_output",
+                  "public_release_metadata",
+                  "public_evidence_metadata"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "claim_status": { "const": "prohibited" } }
+          },
+          "then": {
+            "properties": {
+              "boundary": {
+                "enum": [
+                  "provider_deletion",
+                  "model_forgetting",
+                  "provider_native_memory_control",
+                  "compliance_certification",
+                  "benchmark_superiority",
+                  "hosted_saas_readiness",
+                  "byoc_readiness",
+                  "patentability_or_legal_conclusion",
+                  "raw_embeddings_safe_public_metadata",
+                  "hardware_tamper_proofing"
+                ]
+              },
+              "evidence_requirements": {
+                "contains": { "const": "prohibited_claim_boundary_ref" }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

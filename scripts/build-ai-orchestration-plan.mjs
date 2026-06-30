@@ -9,7 +9,7 @@ const SECRET_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{1
 const LOCAL_PATH_RE = /(?<![A-Za-z])(?:[A-Za-z]:[\\/]|\\\\[^\\/]+[\\/][^\\/]+|\/(?:Users|home)\/[^\s"']+)/u;
 
 function parseArgs(argv = process.argv.slice(2)) {
-  const out = { statusBoard: null, out: null, help: false };
+  const out = { statusBoard: null, out: null, plain: false, help: false };
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     const readValue = () => {
@@ -21,13 +21,17 @@ function parseArgs(argv = process.argv.slice(2)) {
     if (token === '--status-board' || token === '--statusBoard') out.statusBoard = readValue();
     else if (token === '--out') out.out = readValue();
     else if (token === '--help' || token === '-h') out.help = true;
+    else if (token === '--plain' || token === '--text' || token === '--format=text' || (token === '--format' && argv[index + 1] === 'text')) {
+      out.plain = true;
+      if (token === '--format') index += 1;
+    }
     else throw new Error(`Unknown AI orchestration option: ${token}`);
   }
   return out;
 }
 
 function usage() {
-  return 'Usage: node scripts/build-ai-orchestration-plan.mjs --status-board <production-status-board.json> [--out <file>]\n\nBuilds a public-safe AI/operator orchestration plan from the current production status board.\n';
+  return 'Usage: node scripts/build-ai-orchestration-plan.mjs --status-board <production-status-board.json> [--out <file>] [--plain]\n\nBuilds a public-safe AI/operator orchestration plan from the current production status board. --plain prints a human-readable Workflowz-style orchestration summary while --out preserves JSON evidence.\n';
 }
 
 async function readJson(path, label) {
@@ -115,12 +119,22 @@ function buildRoleLanes(statusBoard) {
       acceptance: ['production:cloudflare-credentials reports credentials_present:true', 'No token values, account ids, local paths, or contact data appear in artifacts.'],
     }),
     buildLane({
+      id: 'no_friction_advisor',
+      role: 'Public beta Advisor',
+      model: 'Advisor',
+      charter: 'Rank the lowest-friction public-user path, keep next actions copy-pasteable, and stop architecture/coding lanes from optimizing developer convenience over consumer setup.',
+      owns: ['consumer_friction_ranking', 'public_beta_advisor', 'next_actions', 'copy_paste_setup'],
+      blockers: [...blockersFor(credentialPhase), ...blockersFor(workerPhase), ...blockersFor(hostedPhase)].slice(0, 8),
+      commands: ['npm run public-beta:review -- --plain', 'npm run production:orchestration -- --status-board .enigma/production-status-board-current.json --plain'],
+      acceptance: ['Advisor output ranks the next public-user blocker before any code lane starts.', 'Next actions are copy-pasteable and do not require secrets, account ids, raw memory, local paths, or provider responses.', 'Advisor decision remains hold until public beta evidence proves readiness.'],
+    }),
+    buildLane({
       id: 'gpt55_architecture',
       role: 'Architecture and structure planner',
       model: 'GPT-5.5',
       charter: 'Keep the end-to-end production graph coherent, claim-bounded, and testable while external credentials and hosted refs are supplied.',
       owns: ['execution_order', 'claim_boundaries', 'status_board', 'workplan'],
-      waits_for: ['human_operator_credentials'],
+      waits_for: ['no_friction_advisor', 'human_operator_credentials'],
       blockers: [...blockersFor(workerPhase), ...blockersFor(hostedPhase)].slice(0, 8),
       commands: ['npm run production:status -- --goal-audit .enigma/goal-audit-current.json --dependencies .enigma/production-dependencies-current.json --workplan .enigma/production-workplan-current.json --out .enigma/production-status-board-current.json', 'npm run production:workplan -- --dependencies .enigma/production-dependencies-current.json --operator-acceptance .enigma/operator-acceptance-template-result.json --hosted-ref-catalog .enigma/operator-evidence-starter/hosted-ref-catalog.json --out .enigma/production-workplan-current.json'],
       acceptance: ['Status board has fresh_input_evidence:true.', 'Workplan execution_order covers every phase and has no cycles.', 'No broad completion claim is emitted while external blockers remain.'],
@@ -171,10 +185,10 @@ function buildWaves(statusBoard, lanes) {
       acceptance: ['Cloudflare credentials are available only out-of-band and validated by production:cloudflare-credentials.'],
     },
     {
-      id: 'wave_2_architecture_and_coding',
-      objective: 'Architect, implement, and verify the next production-hardening slice against current blockers.',
-      lanes: ['gpt55_architecture', 'kimi_coding'].filter((id) => laneById.has(id)),
-      acceptance: ['Changed scripts/tests/docs pass targeted checks before review.'],
+      id: 'wave_2_advisor_architecture_and_coding',
+      objective: 'Advisor-rank friction, then architect, implement, and verify the next production-hardening slice against current blockers.',
+      lanes: ['no_friction_advisor', 'gpt55_architecture', 'kimi_coding'].filter((id) => laneById.has(id)),
+      acceptance: ['Advisor ranks the next no-friction blocker before implementation.', 'Changed scripts/tests/docs pass targeted checks before review.'],
     },
     {
       id: 'wave_3_review_and_acceptance',
@@ -204,7 +218,7 @@ export function buildAiOrchestrationPlan(inputs = {}, options = {}) {
     source_status_next_phase_id: statusBoard.next_phase_id ?? null,
     source_status_fresh_input_evidence: statusBoard.fresh_input_evidence === true,
     next_phase_details: statusBoard.next_phase?.details ?? null,
-    orchestration_mode: 'human_secret_custody_plus_ai_architecture_coding_review',
+    orchestration_mode: 'human_secret_custody_plus_advisor_architecture_coding_review',
     role_lane_count: lanes.length,
     wave_count: 4,
     lanes,
@@ -213,15 +227,34 @@ export function buildAiOrchestrationPlan(inputs = {}, options = {}) {
       'Cloudflare token values, account ids, registrar purchases, payments, 2FA, CAPTCHAs, and legal approvals stay human-controlled unless explicitly and safely provided out-of-band.',
       'No AI lane may mark the goal complete without fresh goal/dependency/workplan evidence and launch_ready:true.',
       'No lane may paste secrets, personal information, raw memory, prompts, transcripts, provider responses, or private keys into public artifacts.',
+      'Advisor recommendations rank friction and evidence gaps only; they never override release gates, reviewer approval, signing evidence, npm publication evidence, or human secret custody.',
     ],
     claim_boundary: [
       'This artifact orchestrates work from existing production status evidence; it does not invoke external AI systems, create accounts, deploy infrastructure, approve operators, or certify launch readiness.',
       'Kimi/GPT role labels are execution lanes and review responsibilities, not proof that an external model has already performed the work.',
       'Launch readiness remains false until status, dependency, goal, hosted, and operator evidence all prove readiness with fresh current inputs.',
+      'Advisor lane output is a release-owner decision aid, not a launch approval, hosted-service claim, or proof that public users have completed clean-machine QA.',
     ],
   };
   assertPublicSafe(plan);
   return plan;
+}
+
+export function renderAiOrchestrationPlanPlain(plan) {
+  const lines = [
+    'Enigma AI orchestration plan',
+    `Status: ${plan.status ?? 'blocked'}`,
+    `Launch ready: ${plan.launch_ready ? 'yes' : 'no'}`,
+    `Mode: ${plan.orchestration_mode ?? '<mode>'}`,
+    `Role lanes: ${plan.role_lane_count ?? 0}`,
+    `Waves: ${plan.wave_count ?? 0}`,
+    `Source next phase: ${plan.source_status_next_phase_id ?? 'none'}`,
+    `Fresh source evidence: ${plan.source_status_fresh_input_evidence ? 'yes' : 'no'}`,
+  ];
+  for (const wave of Array.isArray(plan.waves) ? plan.waves : []) lines.push(`Wave: ${wave.id} — ${wave.objective}`);
+  for (const lane of Array.isArray(plan.lanes) ? plan.lanes.slice(0, 5) : []) lines.push(`Lane: ${lane.id} — ${lane.role}; blockers ${lane.blocker_count ?? 0}`);
+  lines.push('Boundary: public-safe orchestration summary only; no external AI invocation, account creation, deploy, infrastructure approval, launch certification, credentials, account ids, raw memory, local paths, provider responses, provider deletion, model behavior, hosted service, compliance, benchmark superiority, token ROI, or provider invoice savings claims.');
+  return `${lines.join('\n')}\n`;
 }
 
 export async function main(argv = process.argv.slice(2)) {
@@ -234,7 +267,7 @@ export async function main(argv = process.argv.slice(2)) {
     await mkdir(dirname(args.out), { recursive: true });
     await writeFile(args.out, json, 'utf8');
   }
-  return { text: json, status: plan.launch_ready ? 0 : 1 };
+  return { text: args.plain ? renderAiOrchestrationPlanPlain(plan) : json, status: plan.launch_ready ? 0 : 1 };
 }
 
 if (fileURLToPath(import.meta.url) === process.argv[1]) {

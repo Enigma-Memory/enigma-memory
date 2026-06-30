@@ -8,6 +8,7 @@ import { promisify } from 'node:util';
 import {
   PRODUCTION_HANDOFF_PACKET_SCHEMA,
   buildProductionHandoffPacket,
+  renderProductionHandoffPlain,
 } from '../scripts/build-production-handoff-packet.mjs';
 import { buildOperatorAcceptancePacket } from '../scripts/build-operator-acceptance-packet.mjs';
 
@@ -124,6 +125,8 @@ test('production handoff packet summarizes current blockers without secrets', as
   assert.equal(packet.operator_acceptance.blocker_breakdown.manifest, 2);
   assert.equal(packet.operator_acceptance.blocker_breakdown.release_audit, 2);
   assert.equal(packet.hosted_probe_worker.schema, 'enigma.hosted_probe_worker_bundle.v1');
+  assert.equal(packet.public_safe_release_packet_approval.status, 'pending');
+  assert.equal(packet.public_safe_release_packet_approval.release_packet_ref, null);
   assert.equal(packet.hosted_probe_worker.ok, true);
   assert.deepEqual(packet.hosted_probe_worker.default_routes, ['/livez', '/readyz']);
   assert.equal(packet.hosted_probe_worker.mutates_cloudflare, false);
@@ -142,6 +145,33 @@ test('production handoff packet summarizes current blockers without secrets', as
   assert.doesNotMatch(JSON.stringify(packet), /Bearer|PRIVATE KEY|sk-/i);
   assert.equal(packet.project.local_site_path_redacted, true);
   assert.doesNotMatch(JSON.stringify(packet), /enigma production handoff site-/);
+});
+
+test('production handoff plain output is readable and claim-bounded', async () => {
+  const site = await writeSite();
+  const packet = await buildProductionHandoffPacket({
+    site,
+    projectName: 'enigma-memory',
+    domain: 'enigmamemory.com',
+    liveUrl: 'https://enigmamemory.com/',
+    expectTitle: 'Enigma',
+  }, {
+    env: { CLOUDFLARE_API_TOKEN: 'cf-token-present-but-never-printed' },
+    generated_at: '2026-06-24T00:00:00.000Z',
+    fetchImpl: fakeFetch(),
+  });
+  const plain = renderProductionHandoffPlain(packet);
+
+  assert.match(plain, /^Enigma production handoff\n/);
+  assert.match(plain, /Status: Needs attention/);
+  assert.match(plain, /Domain: enigmamemory\.com/);
+  assert.match(plain, /Go-live ready: no/);
+  assert.match(plain, /Blockers: /);
+  assert.match(plain, /Next: /);
+  assert.match(plain, /Boundary: public-safe production handoff summary only/);
+  assert.match(plain, /Public-safe packet approval: pending/);
+  assert.doesNotMatch(plain, /^\s*\{/);
+  assert.doesNotMatch(plain, /cf-token-present|Bearer|PRIVATE KEY|sk-|raw_memory|C:\\Users\\|\/home\/|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/i);
 });
 
 test('production handoff next actions omit completed Cloudflare token and static deploy work', async () => {
@@ -251,6 +281,13 @@ test('production handoff can mark go-live ready only with release audit evidence
     infrastructureReadiness: readyInfrastructure(),
     operatorAcceptancePacket,
     releaseAudit: readyReleaseAudit(),
+    publicSafeReleasePacketApproval: {
+      status: 'approved',
+      release_packet_ref: 'ref:evidence:public-safe-release-packet',
+      claim_boundary_reviewer_ref: 'ref:review:claim-boundary',
+      approval_ref: 'ref:approval:public-beta-release',
+      approved_at: '2026-06-30',
+    },
   }, {
     env: {
       CLOUDFLARE_API_TOKEN: 'cf-token-present-but-never-printed',
@@ -264,6 +301,8 @@ test('production handoff can mark go-live ready only with release audit evidence
   assert.equal(packet.infrastructure.hosted_live_ready, true);
   assert.equal(packet.release_audit.ok, true);
   assert.equal(packet.release_audit.required_failed_count, 0);
+  assert.equal(packet.public_safe_release_packet_approval.status, 'approved');
+  assert.equal(packet.public_safe_release_packet_approval.approval_ref, 'ref:approval:public-beta-release');
   assert.ok(packet.release_audit.gate_names.includes('whitepaper-claims-validator'));
   const actionIds = packet.next_actions.map((item) => item.id).join('\n');
   assert.doesNotMatch(actionIds, /provision-hosted-backend|generate-operator-evidence-starter|complete-operator-acceptance|final-release-audit/);
@@ -432,6 +471,36 @@ test('production handoff packet CLI writes public-safe handoff JSON', async () =
   assert.match(stdoutPacket.blockers.join('\n'), /CLOUDFLARE_API_TOKEN is absent|missing refs\.backend_host/);
   assert.doesNotMatch(result.stdout, /Bearer|PRIVATE KEY|sk-/i);
   assert.doesNotMatch(result.stdout, /enigma-production-handoff-out-|enigma production handoff site-/i);
+});
+
+test('production handoff CLI writes JSON while printing plain output', async () => {
+  const site = await writeSite();
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-production-handoff-plain-'));
+  const outPath = join(dir, 'packet.json');
+  const result = await execFileAsync(process.execPath, [
+    'scripts/build-production-handoff-packet.mjs',
+    '--site', site,
+    '--project-name', 'enigma-memory',
+    '--domain', 'enigmamemory.com',
+    '--live-url', 'data:text/html,%3Ctitle%3EEnigma%20%E2%80%94%20Verifiable%20AI%20memory%20plane%3C%2Ftitle%3E',
+    '--out', outPath,
+    '--plain',
+  ], {
+    cwd: process.cwd(),
+    env: { ...process.env, CLOUDFLARE_API_TOKEN: '' },
+    timeout: 15000,
+    windowsHide: true,
+  });
+  assert.equal(result.stderr, '');
+  assert.match(result.stdout, /^Enigma production handoff\n/);
+  assert.match(result.stdout, /Status: Needs attention/);
+  assert.match(result.stdout, /Boundary: public-safe production handoff summary only/);
+  assert.doesNotMatch(result.stdout, /^\s*\{/);
+  assert.equal(result.stdout.includes(dir), false);
+  assert.equal(result.stdout.includes(outPath), false);
+  const filePacket = JSON.parse(await readFile(outPath, 'utf8'));
+  assert.equal(filePacket.schema, PRODUCTION_HANDOFF_PACKET_SCHEMA);
+  assert.equal(filePacket.go_live_ready, false);
 });
 
 test('production handoff CLI redacts unreadable packet paths from errors', async () => {

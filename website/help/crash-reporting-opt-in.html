@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Enigma Memory crash reporting is off by default. Learn what is shared, what stays private, and how to opt in or out.">
+  <title>Crash reporting opt-in for Enigma Memory</title>
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="site-logo" href="../index.html">Enigma Memory</a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="../download.html">Download</a>
+        <a href="../setup.html">How it works</a>
+        <a href="../privacy.html">Privacy</a>
+        <a href="./index.html">Help</a>
+        <a href="../faq.html">FAQ</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <span class="eyebrow">Crash reporting</span>
+      <h1>Crash reporting is off by default.</h1>
+      <p>You choose whether Enigma Memory can send safe crash diagnostics. Crash reports are designed to exclude memory, prompts, wallet data, and local paths.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="sent-heading">
+      <h2 id="sent-heading">What is sent if you opt in</h2>
+      <p>When crash reporting is on and the app panics, Enigma sends a small report that contains only:</p>
+      <ul>
+        <li>The Enigma Memory app version.</li>
+        <li>Your operating-system family, such as Windows, macOS, or Linux.</li>
+        <li>A coarse timestamp, rounded to the nearest hour.</li>
+        <li>The first line of the panic message, with no stack trace beyond the originating module name.</li>
+      </ul>
+      <p>This information is enough for the team to spot regressions across platforms and releases without exposing anything personal.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="never-heading">
+      <h2 id="never-heading">What is never sent</h2>
+      <p>Crash reports never include:</p>
+      <ul>
+        <li>Memory contents, prompts, transcripts, or provider responses.</li>
+        <li>Wallet addresses, private keys, or credentials of any kind.</li>
+        <li>Local file paths, Memory Drive locations, or account identifiers.</li>
+        <li>Full stack traces, heap dumps, or log files.</li>
+      </ul>
+
+      <div class="boundary-callout">
+        <strong>Boundary note:</strong> Crash reports are designed to be shareable with support without redaction. If you are ever unsure, keep crash reporting off and use the <a href="./support-safe-sharing.html">safe support sharing guide</a> instead.
+      </div>
+    </section>
+
+    <section class="content-section" aria-labelledby="settings-heading">
+      <h2 id="settings-heading">How to opt in or out</h2>
+      <ol>
+        <li>Open Enigma Memory.</li>
+        <li>Go to <strong>Settings</strong> &gt; <strong>Support</strong>.</li>
+        <li>Toggle <strong>Send crash reports</strong> on or off.</li>
+      </ol>
+      <p>The change takes effect immediately. If you turn crash reporting off, any pending reports stay on your device and are not transmitted.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="pending-heading">
+      <h2 id="pending-heading">Send pending reports</h2>
+      <p>If a crash happened while reporting was off, or if the report could not be sent immediately, Enigma keeps a pending report locally. When you opt in, a <strong>Send pending reports</strong> button appears in <strong>Settings</strong> &gt; <strong>Support</strong>.</p>
+      <p>Clicking it sends only the pending reports that were created after you enabled crash reporting. You can review the count before confirming.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="support-heading">
+      <h2 id="support-heading">Before you send anything else</h2>
+      <p>For screenshots, copied diagnostics, or support emails, use the <a href="./support-safe-sharing.html">safe support sharing guide</a>. Do not include raw memory text, prompts, transcripts, credentials, account IDs, or local file paths.</p>
+    </section>
+    <section class="content-section">
+      <p><a href="./index.html">Back to help hub</a></p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer__inner">
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="../download.html">Download</a></li>
+          <li><a href="../setup.html">How it works</a></li>
+          <li><a href="../privacy.html">Privacy</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Support</h4>
+        <ul>
+          <li><a href="./index.html">Help hub</a></li>
+          <li><a href="./install.html">Install guide</a></li>
+          <li><a href="./connect-apps.html">Connect apps</a></li>
+          <li><a href="./troubleshooting.html">Troubleshooting</a></li>
+          <li><a href="./support-safe-sharing.html">Safe support sharing</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Developers</h4>
+        <ul>
+          <li><a href="../developers/cli.html">CLI appendix</a></li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

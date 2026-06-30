@@ -570,8 +570,7 @@ function appendEvent(vault, fields) {
   vault.receipts.push(receipt);
   vault.sequence += 1;
   vault.updated_at = event.timestamp;
-  vault.active_set_root = activeSetRoot;
-  vault.receipt_log_root = computeReceiptLogRootFrom(vault.receipts);
+  Object.assign(vault, lifecycleRoots(vault));
   return { event, receipt };
 }
 
@@ -652,16 +651,234 @@ function publicRecord(record) {
   return pruneUndefined(sanitizePublicValue(record));
 }
 
+function requireVault(input, functionName) {
+  const vault = input?.vault ?? input;
+  if (!vault) throw new Error(`${functionName} requires a vault`);
+  return vault;
+}
+
+function signerRef(signer) {
+  if (!signer || typeof signer !== 'object') return undefined;
+  return pruneUndefined({
+    key_id: signer.key_id ?? signer.keyId,
+    alg: signer.alg,
+    publicKey: signer.publicKey,
+  });
+}
+
+function signatureRef(signature) {
+  if (!signature || typeof signature !== 'object') return undefined;
+  return pruneUndefined({
+    alg: signature.alg,
+    value: signature.value,
+  });
+}
+
+function sortedMapValues(mapLike) {
+  if (!mapLike) return [];
+  if (typeof mapLike.values === 'function') return [...mapLike.values()];
+  if (Array.isArray(mapLike)) return mapLike;
+  return [];
+}
+
+function quarantineAddresses(vault) {
+  const out = new Set(vault.quarantineAddresses ?? []);
+  for (const [memoryAddr, record] of vault.memories ?? []) {
+    if (record?.state === 'quarantine' || record?.state === 'quarantined') out.add(memoryAddr);
+  }
+  return sortedStrings(out);
+}
+
+function publicTombstone(tombstone) {
+  if (!tombstone || typeof tombstone !== 'object') return undefined;
+  return pruneUndefined({
+    schema: tombstone.schema ?? 'enigma.deletion_tombstone.v1',
+    memory_addr: tombstone.memory_addr,
+    operation: tombstone.operation,
+    successor_addr: tombstone.successor_addr,
+    tombstoned_at: tombstone.tombstoned_at,
+    reason_hash: tombstone.reason ? asSha256(String(tombstone.reason)) : undefined,
+  });
+}
+
+function tombstoneRootItems(vault) {
+  return sortedMapValues(vault.tombstones)
+    .map(publicTombstone)
+    .filter(Boolean)
+    .sort((a, b) => String(a.memory_addr).localeCompare(String(b.memory_addr)))
+    .map((tombstone) => asSha256(canonical(tombstone)));
+}
+
+function lifecycleRoots(vault) {
+  const active = sortedStrings(vault.activeAddresses ?? []);
+  const quarantine = quarantineAddresses(vault);
+  const tombstones = tombstoneRootItems(vault);
+  const activeSetRoot = computeSetRoot(active);
+  const quarantineSetRoot = computeSetRoot(quarantine);
+  const tombstoneSetRoot = computeSetRoot(tombstones);
+  const receiptLogRoot = computeReceiptLogRootFrom(vault.receipts ?? []);
+  return {
+    active_set_root: activeSetRoot,
+    quarantine_set_root: quarantineSetRoot,
+    tombstone_set_root: tombstoneSetRoot,
+    receipt_log_root: receiptLogRoot,
+    lifecycle_root: computeSetRoot([activeSetRoot, quarantineSetRoot, tombstoneSetRoot, receiptLogRoot]),
+  };
+}
+
+function applyLifecycleRoots(vault) {
+  return Object.assign(vault, lifecycleRoots(vault));
+}
+
+function projectLifecycleReceipt(receipt) {
+  if (!receipt || typeof receipt !== 'object') return undefined;
+  return pruneUndefined({
+    schema: 'enigma.lifecycle_receipt_projection.v1',
+    receipt_id: receipt.receipt_id,
+    receipt_hash: hashReceipt(receipt),
+    event_hash: receipt.event_hash,
+    operation: receipt.operation,
+    tenant_id: receipt.tenant_id,
+    subject_id: receipt.subject_id,
+    memory_addr: receipt.memory_addr,
+    source_addr: receipt.source_addr,
+    policy_id: receipt.policy_id,
+    sequence: receipt.sequence,
+    previous_receipt_hash: receipt.previous_receipt_hash,
+    active_set_root: receipt.active_set_root,
+    receipt_log_root: receipt.receipt_log_root,
+    timestamp: receipt.timestamp,
+    signer: signerRef(receipt.signer),
+    signature: signatureRef(receipt.signature),
+  });
+}
+
+function lifecycleStateForReceipt(receipt) {
+  if (receipt?.operation === 'delete') return 'tombstone';
+  if (receipt?.operation === 'quarantine') return 'quarantine';
+  return 'active';
+}
+
+function projectLifecycleReceiptRef(receipt) {
+  if (!receipt || typeof receipt !== 'object') return undefined;
+  const receiptHash = hashReceipt(receipt);
+  return pruneUndefined({
+    sequence: receipt.sequence,
+    receipt_ref: receipt.receipt_id ?? receiptHash,
+    receipt_hash: receiptHash,
+    previous_receipt_hash: receipt.previous_receipt_hash,
+    lifecycle_state: lifecycleStateForReceipt(receipt),
+  });
+}
+
+function lifecycleLogId(vault, roots, issuedAt) {
+  return `log_${sha256Hex(canonical({
+    schema: 'enigma.lifecycle_receipt_log.id.v1',
+    vault_id: vault.vault_id,
+    receipt_log_root: roots.receipt_log_root,
+    lifecycle_root: roots.lifecycle_root,
+    issued_at: issuedAt,
+  })).slice(0, 32)}`;
+}
+
+function refHash(value) {
+  return asSha256(canonical(value));
+}
+
+
+export function buildLifecycleRootSummary(args = {}) {
+  const vault = requireVault(args, 'buildLifecycleRootSummary');
+  const roots = lifecycleRoots(vault);
+  const active = sortedStrings(vault.activeAddresses ?? []);
+  const quarantine = quarantineAddresses(vault);
+  const tombstones = tombstoneRootItems(vault);
+  return pruneUndefined({
+    schema: 'enigma.lifecycle_root_summary.v1',
+    vault_id: vault.vault_id,
+    tenant_id: vault.tenant_id,
+    subject_id: vault.subject_id,
+    policy_id: vault.policy_id,
+    sequence: vault.sequence,
+    active_count: active.length,
+    quarantine_count: quarantine.length,
+    tombstone_count: tombstones.length,
+    receipt_count: Array.isArray(vault.receipts) ? vault.receipts.length : 0,
+    active_set_root: roots.active_set_root,
+    quarantine_set_root: roots.quarantine_set_root,
+    tombstone_set_root: roots.tombstone_set_root,
+    active_root: roots.active_set_root,
+    quarantine_root: roots.quarantine_set_root,
+    tombstone_root: roots.tombstone_set_root,
+    receipt_log_root: roots.receipt_log_root,
+    lifecycle_root: roots.lifecycle_root,
+    updated_at: vault.updated_at,
+    signer: signerRef(vault.signer),
+  });
+}
+
+export function buildMemoryBoundaryTransactionSummary(args = {}) {
+  const vault = requireVault(args, 'buildMemoryBoundaryTransactionSummary');
+  const receipt = args.receipt ?? args.transaction ?? vault.receipts?.[vault.receipts.length - 1];
+  const projection = projectLifecycleReceipt(receipt);
+  if (!projection) throw new Error('buildMemoryBoundaryTransactionSummary requires at least one receipt');
+  return pruneUndefined({
+    schema: 'enigma.memory_boundary_transaction_summary.v1',
+    vault_id: vault.vault_id,
+    tenant_id: vault.tenant_id,
+    subject_id: vault.subject_id,
+    operation: projection.operation,
+    sequence: projection.sequence,
+    timestamp: projection.timestamp,
+    memory_addr: projection.memory_addr,
+    source_addr: projection.source_addr,
+    policy_id: projection.policy_id,
+    event_hash: projection.event_hash,
+    receipt_hash: projection.receipt_hash,
+    previous_receipt_hash: projection.previous_receipt_hash,
+    active_set_root: projection.active_set_root,
+    receipt_log_root: projection.receipt_log_root,
+    lifecycle_root: buildLifecycleRootSummary({ vault }).lifecycle_root,
+    signer: projection.signer,
+    signature: projection.signature,
+    public_safe: true,
+  });
+}
+
+export function buildPublicLifecycleReceiptLog(args = {}) {
+  const vault = requireVault(args, 'buildPublicLifecycleReceiptLog');
+  const receiptRefs = (vault.receipts ?? []).map(projectLifecycleReceiptRef).filter(Boolean);
+  if (receiptRefs.length === 0) throw new Error('buildPublicLifecycleReceiptLog requires at least one receipt');
+  const roots = buildLifecycleRootSummary({ vault });
+  const issuedAt = args.now ? nowIso(args.now) : vault.updated_at;
+  const latestReceipt = vault.receipts?.[vault.receipts.length - 1];
+  const logId = lifecycleLogId(vault, roots, issuedAt);
+  return pruneUndefined({
+    schema: 'enigma.lifecycle_receipt_log.v1',
+    log_id: logId,
+    log_ref: refHash({ schema: 'enigma.lifecycle_receipt_log.ref.v1', log_id: logId, receipt_log_root: roots.receipt_log_root }),
+    subject_ref: refHash({ schema: 'enigma.subject_ref.v1', subject_id: vault.subject_id }),
+    tenant_ref: refHash({ schema: 'enigma.tenant_ref.v1', tenant_id: vault.tenant_id }),
+    epoch: vault.sequence,
+    previous_log_root: latestReceipt?.receipt_log_root ?? ZERO_ROOT,
+    receipt_refs: receiptRefs,
+    active_root: roots.active_set_root,
+    quarantine_root: roots.quarantine_set_root,
+    tombstone_root: roots.tombstone_set_root,
+    receipt_log_root: roots.receipt_log_root,
+    issued_at: issuedAt,
+    signer_ref: refHash(signerRef(vault.signer) ?? { key_id: vault.signer?.key_id ?? null }),
+    signature_ref: latestReceipt?.signature ? refHash(signatureRef(latestReceipt.signature)) : undefined,
+  });
+}
+
+
 function attachInternals(vault) {
   Object.defineProperties(vault, {
     __recordEvent: { value: (fields) => appendEvent(vault, fields), enumerable: false },
     __getRecord: { value: (memoryAddr) => vault.memories.get(memoryAddr), enumerable: false },
     __getPlaintext: { value: (memoryAddr) => decryptContent(vault, vault.memories.get(memoryAddr)), enumerable: false },
     __computeRoots: {
-      value: () => ({
-        active_set_root: computeSetRoot(vault.activeAddresses),
-        receipt_log_root: computeReceiptLogRootFrom(vault.receipts),
-      }),
+      value: () => lifecycleRoots(vault),
       enumerable: false,
     },
   });
@@ -707,11 +924,16 @@ export function createVault(args = {}) {
     receipts: [],
     activeAddresses: new Set(),
     tombstones: new Map(),
+    quarantineAddresses: new Set(),
     sequence: 0,
     active_set_root: ZERO_ROOT,
+    quarantine_set_root: ZERO_ROOT,
+    tombstone_set_root: ZERO_ROOT,
     receipt_log_root: ZERO_ROOT,
+    lifecycle_root: ZERO_ROOT,
     keyringType,
   };
+  applyLifecycleRoots(vault);
   return attachInternals(vault);
 }
 
@@ -1047,9 +1269,7 @@ export function importBundle(args = {}) {
   const lifecycle = reconcileImportedLifecycle(bundle, vault.memories, vault.receipts);
   vault.activeAddresses = lifecycle.active;
   vault.tombstones = lifecycle.tombstones;
-  const roots = vault.__computeRoots();
-  vault.active_set_root = roots.active_set_root;
-  vault.receipt_log_root = roots.receipt_log_root;
+  applyLifecycleRoots(vault);
   appendEvent(vault, {
     operation: 'import',
     actor_id: args.actor_id ?? args.actorId,

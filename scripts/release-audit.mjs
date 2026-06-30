@@ -35,6 +35,7 @@ const RELEASE_PROVENANCE_SCHEMA = 'enigma.release_provenance.v1';
 const REVIEW_PACKET_SCHEMA = 'enigma.review_packet.v1';
 const MEMORY_OPTIMIZATION_BENCHMARK_SCHEMA = 'enigma.memory_optimization_benchmark.v1';
 const MEMORY_OPTIMIZATION_BENCHMARK_SCRIPT = join(PROJECT_ROOT, 'scripts', 'memory-optimization-benchmark.mjs');
+const LOCAL_PACK_INSTALL_SCRIPT = join(PROJECT_ROOT, 'scripts', 'verify-local-pack-install.mjs');
 const PRODUCTION_READINESS_MANIFEST_BUILDER_SCRIPT = join(PROJECT_ROOT, 'scripts', 'build-production-readiness-manifest.mjs');
 const PRODUCTION_STORAGE_MIGRATION_SCRIPT = join(PROJECT_ROOT, 'scripts', 'build-production-storage-migration.mjs');
 const OPERATOR_ACCEPTANCE_VALIDATOR_SCRIPT = join(PROJECT_ROOT, 'scripts', 'validate-operator-acceptance.mjs');
@@ -157,10 +158,13 @@ async function nodeTestInvocation() {
   const entries = await readdir(join(PROJECT_ROOT, 'test'), { withFileTypes: true });
   const testFiles = entries
     .filter((entry) => entry.isFile() && entry.name.endsWith('.test.mjs'))
-    .map((entry) => join('test', entry.name))
+    .map((entry) => `test/${entry.name}`)
     .sort();
   if (testFiles.length === 0) throw new Error('No test/*.test.mjs files found.');
-  return { command: process.execPath, args: ['--test', ...testFiles], label: 'npm test' };
+  const args = ['--test'];
+  if (process.platform === 'win32') args.push('--test-concurrency=1');
+  args.push(...testFiles);
+  return { command: process.execPath, args, label: 'npm test' };
 }
 
 function localOnlyEnv(extra = {}) {
@@ -314,6 +318,34 @@ function summarizePack(stdout) {
   const tarball = lines(stdout).find((line) => line.endsWith('.tgz')) ?? null;
   if (!tarball) throw new Error('npm pack --dry-run did not report a .tgz tarball name.');
   return { tarball };
+}
+
+function summarizeLocalPackInstall(stdout) {
+  const json = parseJson(stdout);
+  requireJsonField(json, ['schema'], (value) => value === 'enigma.local_pack_install_smoke.v1', 'Local pack install smoke schema mismatch.');
+  requireJsonField(json, ['ok'], (value) => value === true, 'Local pack install smoke did not report ok: true.');
+  requireJsonField(json, ['install', 'global_install'], (value) => value === false, 'Local pack install smoke must not use global install.');
+  requireJsonField(json, ['install', 'registry_install'], (value) => value === false, 'Local pack install smoke must not use registry install.');
+  requireJsonField(json, ['install', 'npm_publish'], (value) => value === false, 'Local pack install smoke must not publish.');
+  requireJsonField(json, ['install', 'optional_dependencies_omitted'], (value) => value === true, 'Local pack install smoke must omit optional dependencies.');
+  requireJsonField(json, ['install', 'offline_mode'], (value) => value === true, 'Local pack install smoke must enable npm offline mode.');
+  const checks = requireJsonField(json, ['checks'], Array.isArray, 'Local pack install smoke omitted checks.');
+  if (checks.length < 3) throw new Error('Local pack install smoke did not run enough entrypoint checks.');
+  const binShimChecks = requireJsonField(json, ['bin_shim_checks'], Array.isArray, 'Local pack install smoke omitted bin shim checks.');
+  if (binShimChecks.length < 5) throw new Error('Local pack install smoke did not run enough installed bin shim checks.');
+  const exportChecks = requireJsonField(json, ['export_checks'], (value) => value && typeof value === 'object' && !Array.isArray(value), 'Local pack install smoke omitted package export checks.');
+  requireJsonField(exportChecks, ['evidence', 'schema'], (value) => value === 'enigma.local_pack_exports_smoke.v1', 'Local pack install smoke used an unexpected package export schema.');
+  requireJsonField(exportChecks, ['evidence', 'optional_dependencies_required'], (value) => value === false, 'Local pack export smoke must not require optional dependencies.');
+  return {
+    schema: json.schema,
+    tarball: json.package?.tarball ?? null,
+    temp_prefix_install: json.install?.command === 'npm install --prefix <temp-prefix> --ignore-scripts --omit=optional --offline <local-tarball>',
+    check_count: checks.length,
+    checked_entrypoints: checks.map((check) => check.entrypoint),
+    bin_shim_count: binShimChecks.length,
+    checked_bin_shims: binShimChecks.map((check) => check.bin),
+    export_specifier_count: exportChecks.specifier_count ?? null,
+  };
 }
 
 function requireJsonField(value, path, predicate, message) {
@@ -2884,7 +2916,7 @@ export async function runAiOrchestrationPlanGate() {
     if (!Array.isArray(parsed.lanes) || parsed.lanes.length !== parsed.role_lane_count || parsed.role_lane_count < 5) throw new Error('AI orchestration plan role_lane_count does not match lanes.');
     if (!Array.isArray(parsed.waves) || parsed.waves.length !== parsed.wave_count || parsed.wave_count !== 4) throw new Error('AI orchestration plan wave_count does not match waves.');
     const laneIds = new Set(parsed.lanes.map((lane) => lane?.id));
-    if (!laneIds.has('kimi_coding') || !laneIds.has('gpt55_architecture') || !laneIds.has('gpt55_review')) throw new Error('AI orchestration plan must include Kimi and GPT lane names.');
+    if (!laneIds.has('kimi_coding') || !laneIds.has('gpt55_architecture') || !laneIds.has('gpt55_review') || !laneIds.has('no_friction_advisor')) throw new Error('AI orchestration plan must include Advisor, Kimi, and GPT lane names.');
     const controlText = Array.isArray(parsed.non_delegable_controls) ? parsed.non_delegable_controls.join('\n') : '';
     if (!/Cloudflare token values/i.test(controlText) || !/human-controlled/i.test(controlText) || !/No AI lane may mark the goal complete/i.test(controlText)) throw new Error('AI orchestration plan must preserve non-delegable human control boundaries.');
     const claimBoundary = requireJsonField(
@@ -2903,6 +2935,7 @@ export async function runAiOrchestrationPlanGate() {
       source_status_board_generated_at: parsed.source_status_board_generated_at,
       role_lane_count: parsed.role_lane_count,
       wave_count: parsed.wave_count,
+      advisor_lane_present: laneIds.has('no_friction_advisor'),
       kimi_lane_present: laneIds.has('kimi_coding'),
       gpt_architecture_lane_present: laneIds.has('gpt55_architecture'),
       gpt_review_lane_present: laneIds.has('gpt55_review'),
@@ -5558,6 +5591,7 @@ export async function runReleaseAudit() {
   gates.push(await runCommandGate('npm-check', check.command, check.args, { label: check.label, summarize: summarizeCheck }));
   gates.push(await runCommandGate('npm-test', test.command, test.args, { label: test.label, timeoutMs: TEST_TIMEOUT_MS, summarize: summarizeTests, summarizeFailure: summarizeNpmTestFailure }));
   gates.push(await runCommandGate('npm-pack-dry-run', pack.command, pack.args, { label: pack.label, summarize: summarizePack }));
+  gates.push(await runCommandGate('local-pack-install-smoke', process.execPath, [LOCAL_PACK_INSTALL_SCRIPT], { label: 'node scripts/verify-local-pack-install.mjs', timeoutMs: TEST_TIMEOUT_MS, summarize: summarizeLocalPackInstall }));
   gates.push(await runDirectBinSmokes());
   gates.push(await runNativeHostInstallPlanGate());
   gates.push(await runLocalProvenanceGate());

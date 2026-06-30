@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.enigma.ai/context-passport-v1.schema.json",
+  "title": "Enigma Context Passport v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "passport_id",
+    "issued_at",
+    "subject_ref",
+    "query_commitment",
+    "selected_context_root",
+    "omitted_context_root",
+    "tombstone_context_root",
+    "selected_count",
+    "omitted_count",
+    "tombstone_count",
+    "capability_ids",
+    "policy_ids",
+    "proof_refs"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "enigma.context_passport.v1" },
+    "passport_id": { "$ref": "#/$defs/publicId" },
+    "issued_at": { "type": "string", "format": "date-time" },
+    "subject_ref": { "$ref": "#/$defs/publicRef" },
+    "query_commitment": { "$ref": "#/$defs/sha256Digest" },
+    "selected_context_root": { "$ref": "#/$defs/sha256Digest" },
+    "omitted_context_root": { "$ref": "#/$defs/sha256Digest" },
+    "tombstone_context_root": { "$ref": "#/$defs/sha256Digest" },
+    "selected_count": { "type": "integer", "minimum": 0 },
+    "omitted_count": { "type": "integer", "minimum": 0 },
+    "tombstone_count": { "type": "integer", "minimum": 0 },
+    "capability_ids": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/publicId" },
+      "uniqueItems": true
+    },
+    "policy_ids": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/publicId" },
+      "uniqueItems": true
+    },
+    "proof_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/publicRef" },
+      "uniqueItems": true
+    }
+  },
+  "$defs": {
+    "sha256Digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "publicId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$" },
+    "publicRef": { "type": "string", "pattern": "^(?![A-Za-z]:$)[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" }
+  }
+}

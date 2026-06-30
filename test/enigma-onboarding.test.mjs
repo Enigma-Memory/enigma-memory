@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { access, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { main } from '../apps/cli/bin/enigma.mjs';
@@ -89,10 +89,14 @@ test('setup default creates local Memory Passport artifacts without connector wr
     assert.equal(summary.context_item_count, 1);
     assert.ok(summary.next_commands.some((command) => command.startsWith('enigma search ')));
     assert.ok(summary.next_commands.some((command) => command.startsWith('enigma context ')));
+    assert.ok(summary.next_commands.some((command) => command.startsWith('enigma export ')));
     assert.ok(summary.next_commands.some((command) => command.startsWith('enigma verify ')));
     assert.ok(summary.next_commands.some((command) => command.startsWith('enigma connect generic-mcp ') && command.endsWith(' --dry-run')));
     assert.equal(summary.connectors.length, DEFAULT_SETUP_CLIENTS.length);
-    assert.equal(summary.one_command_install_connect.vscode_cline, 'npm install -g enigma-memory && enigma setup --client vscode-cline --write-connectors --overwrite');
+    assert.match(summary.one_command_install_connect.vscode_cline, /^npm install -g enigma-memory && enigma quickstart --bundle .+ && enigma connect vscode-cline .+ --dry-run$/);
+    assert.doesNotMatch(summary.one_command_install_connect.vscode_cline, /setup --client|--write-connectors|--overwrite/);
+    assert.match(summary.one_command_install_connect.claude_desktop, /enigma claude-mcpb package --plain$/);
+    assert.doesNotMatch(summary.one_command_install_connect.claude_desktop, /connect claude-desktop/);
     assert.equal(summary.connectors.every((connector) => connector.connect_plan.dry_run === true), true);
     assert.equal(summary.checks.npm.ok, true);
     assert.equal(summary.checks.vault_path.ok, true);
@@ -108,6 +112,28 @@ test('setup default creates local Memory Passport artifacts without connector wr
   }
 });
 
+test('root help starts with non-overwrite setup, Claude extension package, and dry-run connection preview', async () => {
+  const io = makeIo();
+  assert.equal(await main(['--help'], io.io), 0, io.stderr());
+  const usage = io.json();
+  const installCommands = Object.values(usage.install_options).join('\n');
+
+  assert.doesNotMatch(usage.human, /--overwrite/);
+  assert.match(usage.human, /enigma quickstart --bundle "\$HOME\/\.enigma\/bundle\.json"/);
+  assert.match(usage.human, /enigma claude-mcpb package --plain/);
+  assert.match(usage.human, /enigma connect cursor --bundle "\$HOME\/\.enigma\/bundle\.json" --dry-run/);
+  assert.doesNotMatch(installCommands, /--overwrite/);
+  assert.doesNotMatch(installCommands, /setup --client|--write-connectors/);
+  assert.match(installCommands, /enigma quickstart --bundle \.\/\.enigma\/bundle\.json/);
+  assert.match(installCommands, /enigma claude-mcpb package --plain/);
+  assert.match(installCommands, /enigma connect cursor --bundle \.\/\.enigma\/bundle\.json --dry-run/);
+  assert.doesNotMatch(installCommands, /connect claude-desktop/);
+  assert.match(JSON.stringify(usage.connector_options), /Memory Drive bundle/);
+  assert.match(JSON.stringify(usage.memory_drive_health.options), /Memory Drive bundle to inspect/);
+  assert.match(JSON.stringify(usage.import_options), /selected Memory Drive bundle/);
+  assert.doesNotMatch(JSON.stringify(usage), /vault bundle|Local Enigma vault|Vault write|Vault writes/);
+});
+
 test('setup fails closed when an artifact already exists', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'enigma-setup-existing-'));
   const bundlePath = join(dir, 'bundle.json');
@@ -120,7 +146,35 @@ test('setup fails closed when an artifact already exists', async () => {
   assert.equal(summary.error.code, 'CLI_ERROR');
   assert.match(summary.error.message, /already exists/);
   assert.equal(JSON.stringify(summary).includes(dir), false);
+
+  const plainIo = makeIo();
+  assert.equal(await main(['setup', '--bundle', bundlePath, '--out-dir', dir, '--plain'], plainIo.io), 2);
+  assert.match(plainIo.stdout(), /^Enigma setup\n/);
+  assert.match(plainIo.stdout(), /Status: Needs attention/);
+  assert.match(plainIo.stdout(), /Issue: Quickstart output already exists/);
+  assert.match(plainIo.stdout(), /Next: enigma setup --bundle <new-bundle-path> --out-dir <new-empty-out-dir>/);
+  assert.doesNotMatch(plainIo.stdout().split('\n').find((line) => line.startsWith('Next:')) ?? '', /--overwrite/);
+  assert.match(plainIo.stdout(), /Boundary: local Enigma error summary only/);
+  assert.doesNotMatch(plainIo.stdout(), /^\s*\{/);
+  assert.equal(plainIo.stdout().includes(dir), false);
   assert.equal(await readFile(bundlePath, 'utf8'), '{}\n');
+});
+
+test('setup explains colliding bundle and generated artifact paths', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-setup-collision-'));
+  const bundlePath = join(dir, 'context-pack.json');
+  const io = makeIo();
+
+  assert.equal(await main(['setup', '--bundle', bundlePath, '--out-dir', dir, '--plain'], io.io), 2);
+  const stdout = io.stdout();
+
+  assert.match(stdout, /^Enigma setup\n/);
+  assert.match(stdout, /Issue: Quickstart output paths overlap: bundle and context_pack resolve to the same file/);
+  assert.match(stdout, /Choose a bundle filename that is not context-pack\.json, export\.json, verify-report\.json/);
+  assert.match(stdout, /--bundle <out-dir>\/bundle\.json --out-dir <out-dir>/);
+  assert.match(stdout, /Next: enigma setup --bundle <bundle-path> --out-dir <out-dir>/);
+  assert.doesNotMatch(stdout, /--overwrite/);
+  assert.equal(stdout.includes(dir), false);
 });
 
 test('setup dry-run plans without writing local artifacts', async () => {
@@ -305,14 +359,34 @@ test('init dry-run prints a public-safe first-run plan without writing artifacts
   assert.equal(summary.out_dir, '<out-dir>');
   assert.equal(serialized.includes(dir), false);
   assert.ok(summary.next_commands[0].startsWith('enigma init --bundle "<bundle-path>" --out-dir "<out-dir>"'));
-  assert.ok(summary.next_commands[0].includes('--overwrite'));
+  assert.doesNotMatch(summary.next_commands[0], /--overwrite/);
   assert.ok(summary.next_commands.some((command) => command.startsWith('enigma remember ')));
+  assert.ok(summary.next_commands.some((command) => command === 'enigma import text --file ./memories.md --complete --plain'));
   assert.ok(summary.next_commands.some((command) => command.startsWith('enigma verify ')));
   assert.equal(summary.connectors.every((connector) => connector.connect_plan.dry_run === true), true);
   await assert.rejects(() => readFile(bundlePath, 'utf8'), /ENOENT/);
   await assert.rejects(() => readFile(join(dir, 'context-pack.json'), 'utf8'), /ENOENT/);
   await assert.rejects(() => readFile(join(dir, 'export.json'), 'utf8'), /ENOENT/);
   await assert.rejects(() => readFile(join(dir, 'verify-report.json'), 'utf8'), /ENOENT/);
+});
+
+test('init plain dry-run summarizes first run without JSON or local paths', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-init-plain-'));
+  const bundlePath = join(dir, 'bundle.json');
+  const io = makeIo();
+
+  assert.equal(await main(['init', '--bundle', bundlePath, '--out-dir', dir, '--dry-run', '--plain'], io.io), 0, io.stderr());
+  const stdout = io.stdout();
+
+  assert.match(stdout, /^Enigma init\n/);
+  assert.match(stdout, /Status: Ready/);
+  assert.match(stdout, /Memory Drive: <bundle-path>/);
+  assert.match(stdout, /Mode: dry run; no files were written\./);
+  assert.match(stdout, /Next: enigma init --bundle "<bundle-path>" --out-dir "<out-dir>"/);
+  assert.match(stdout, /Boundary: local Enigma setup only/);
+  assert.doesNotMatch(stdout, /^\s*\{/);
+  assert.equal(stdout.includes(dir), false);
+  assert.equal(stdout.includes(bundlePath), false);
 });
 
 test('init execute creates local artifacts without client config writes by default', async () => {
@@ -385,7 +459,7 @@ test('doctor reports first-run diagnostics without echoing local paths', async (
   process.env.npm_config_user_agent = 'npm/10.9.0 node/v24.0.0 win32 x64 workspaces/false';
   try {
     const io = makeIo();
-    assert.equal(await main(['doctor', '--bundle', bundlePath, '--client', 'generic-mcp', '--config', configPath], io.io), 0, io.stderr());
+    assert.equal(await main(['doctor', '--bundle', bundlePath, '--client', 'generic-mcp', '--config', configPath], io.io), 1);
     const stdout = io.stdout();
     const summary = io.json();
 
@@ -396,15 +470,394 @@ test('doctor reports first-run diagnostics without echoing local paths', async (
     assert.equal(summary.vault_path.path, '<bundle-path>');
     assert.equal(summary.vault_path.parent, '<bundle-dir>');
     assert.equal(summary.vault_path.writable, true);
+    assert.equal(summary.ok, false);
+    assert.equal(summary.setup_status.state, 'setup_needed');
+    assert.equal(summary.setup_status.setup_needed, true);
+    assert.equal(summary.setup_status.next_command, 'enigma quickstart --bundle "<bundle-path>"');
+    assert.match(summary.setup_status.message, /Run quickstart/);
+    assert.doesNotMatch(summary.setup_status.message, /writing config/);
+    assert.deepEqual(summary.setup_status.reasons, ['bundle_missing']);
+    assert.deepEqual(summary.bundle_initialized, {
+      ok: false,
+      bundle: '<bundle-path>',
+      target_exists: false,
+      schema: null,
+      reason: 'bundle_missing',
+      hint: 'Run enigma quickstart --bundle <bundle-path> before using doctor as the final green check.',
+    });
     assert.equal(summary.bundle_default_path.resolved, '<bundle-path>');
     assert.deepEqual(summary.connectors.clients.map((client) => client.config_path), ['[redacted:config_path]']);
-    assert.ok(summary.next_commands.some((command) => command.startsWith('enigma setup ')));
+    assert.ok(summary.next_commands.some((command) => command.startsWith('enigma quickstart ')));
     assert.ok(summary.next_commands.some((command) => command.startsWith('enigma connect generic-mcp ')));
+    assert.equal(summary.first_run_hint.bundle, '<bundle-path>');
+    assert.equal(summary.first_run_hint.command, 'enigma quickstart --bundle "<bundle-path>"');
+    assert.deepEqual(summary.first_run_hint.commands, [
+      'enigma quickstart --bundle "<bundle-path>"',
+      'enigma doctor --bundle "<bundle-path>" --client generic-mcp',
+      'enigma drive health --bundle "<bundle-path>"',
+    ]);
+    assert.deepEqual(summary.fresh_install_hint, summary.first_run_hint);
+    assert.equal(summary.next_commands[0], 'enigma quickstart --bundle "<bundle-path>"');
   } finally {
     if (previousUserAgent === undefined) {
       delete process.env.npm_config_user_agent;
     } else {
       process.env.npm_config_user_agent = previousUserAgent;
     }
+  }
+});
+
+test('doctor explains invalid bundle recovery without destructive default', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-doctor-invalid-bundle-'));
+  const bundlePath = join(dir, 'bundle.json');
+  try {
+    await writeFile(bundlePath, '{invalid json\n', 'utf8');
+    const io = makeIo();
+    assert.equal(await main(['doctor', '--bundle', bundlePath], io.io), 1);
+    const stdout = io.stdout();
+    const summary = io.json();
+
+    assert.equal(stdout.includes(dir), false);
+    assert.equal(summary.ok, false);
+    assert.equal(summary.setup_status.state, 'setup_needed');
+    assert.ok(summary.setup_status.reasons.includes('bundle_json_invalid'));
+    assert.equal(summary.setup_status.next_command, 'enigma quickstart --bundle "<new-bundle-path>" --out-dir "<new-empty-out-dir>"');
+    assert.equal(summary.bundle_initialized.reason, 'bundle_json_invalid');
+    assert.match(summary.bundle_initialized.hint, /enigma quickstart --bundle <new-bundle-path>/);
+    assert.match(summary.bundle_initialized.hint, /--overwrite only if you intentionally replace/);
+    assert.doesNotMatch(summary.bundle_initialized.hint, /setup with --overwrite|quickstart or setup with --overwrite/);
+    assert.equal(summary.first_run_hint.bundle, '<new-bundle-path>');
+    assert.equal(summary.first_run_hint.out_dir, '<new-empty-out-dir>');
+    assert.equal(summary.first_run_hint.recovery, 'fresh_bundle_non_destructive');
+    assert.equal(summary.first_run_hint.command, 'enigma quickstart --bundle "<new-bundle-path>" --out-dir "<new-empty-out-dir>"');
+    assert.deepEqual(summary.first_run_hint.commands, [
+      'enigma quickstart --bundle "<new-bundle-path>" --out-dir "<new-empty-out-dir>"',
+      'enigma doctor --bundle "<new-bundle-path>" --client generic-mcp',
+      'enigma drive health --bundle "<new-bundle-path>"',
+    ]);
+    assert.equal(summary.next_commands[0], 'enigma quickstart --bundle "<new-bundle-path>" --out-dir "<new-empty-out-dir>"');
+    assert.equal(summary.next_commands[1], 'enigma doctor --bundle "<new-bundle-path>" --client generic-mcp');
+    assert.equal(summary.next_commands[3], 'enigma status --bundle "<new-bundle-path>"');
+    assert.doesNotMatch(summary.next_commands.join('\n'), /--overwrite/);
+    const plainIo = makeIo();
+    assert.equal(await main(['doctor', '--bundle', bundlePath, '--plain'], plainIo.io), 1);
+    const plain = plainIo.stdout();
+    assert.match(plain, /not a valid Memory Drive bundle/);
+    assert.match(plain, /Run: enigma quickstart --bundle "<new-bundle-path>" --out-dir "<new-empty-out-dir>"/);
+    assert.match(plain, /Then: enigma doctor --bundle "<new-bundle-path>" --client generic-mcp/);
+    assert.equal(plain.includes(dir), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('support summary is public-safe on fresh install and initialized bundles', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-support-summary-'));
+  const bundlePath = join(dir, 'bundle.json');
+  const configPath = join(dir, 'client-config.json');
+  const outPath = join(dir, 'support-summary.json');
+  try {
+    const freshIo = makeIo();
+    assert.equal(await main(['support', 'summary', '--bundle', bundlePath, '--client', 'generic-mcp', '--config', configPath, '--now', '2026-06-28T14:40:00.000Z'], freshIo.io), 0, freshIo.stderr());
+    const freshStdout = freshIo.stdout();
+    const fresh = freshIo.json();
+
+    assert.equal(fresh.schema, 'enigma.support_summary.v1');
+    assert.equal(fresh.setup_status.state, 'setup_needed');
+    assert.equal(fresh.next_action.id, 'run_quickstart');
+    assert.equal(fresh.next_action.label, 'Create Memory Drive');
+    assert.equal(fresh.bundle, '<bundle-path>');
+    assert.equal(fresh.redaction.raw_memory_included, false);
+    assert.equal(fresh.redaction.local_paths_redacted, true);
+    assert.equal(fresh.privacy_scan.schema, 'enigma.support_privacy_scan.v1');
+    assert.equal(fresh.privacy_scan.status, 'pass');
+    assert.equal(fresh.privacy_scan.detected_private_field_count, 0);
+    assert.ok(fresh.privacy_scan.checked_categories.includes('storage_locations'));
+    assert.equal(fresh.claim_boundaries.provider_deletion_proof, false);
+    assert.equal(freshStdout.includes(dir), false);
+
+    const setupIo = makeIo();
+    assert.equal(await main(['quickstart', '--bundle', bundlePath, '--overwrite'], setupIo.io), 0, setupIo.stderr());
+
+    const readyIo = makeIo();
+    assert.equal(await main(['support', 'summary', '--bundle', bundlePath, '--client', 'generic-mcp', '--config', configPath, '--out', outPath, '--now', '2026-06-28T14:41:00.000Z'], readyIo.io), 0, readyIo.stderr());
+    const readyStdout = readyIo.stdout();
+    const ready = readyIo.json();
+    const written = JSON.parse(await readFile(outPath, 'utf8'));
+
+    assert.deepEqual(written, ready);
+    assert.equal(ready.schema, 'enigma.support_summary.v1');
+    assert.equal(ready.first_run_status.schema, 'enigma.first_run_status.v1');
+    assert.equal(ready.first_run_status.claim_boundaries.raw_memory_returned, false);
+    assert.equal(ready.diagnostics.bundle_initialized_ok, true);
+    assert.equal(ready.privacy_scan.schema, 'enigma.support_privacy_scan.v1');
+    assert.equal(ready.privacy_scan.public_safe_summary_only, true);
+    assert.equal(JSON.stringify(ready).includes('Enigma quickstart demo memory'), false);
+    assert.equal(readyStdout.includes(dir), false);
+    assert.equal(JSON.stringify(ready).includes(dir), false);
+
+    const plainIo = makeIo();
+    assert.equal(await main(['support', 'summary', '--bundle', bundlePath, '--client', 'generic-mcp', '--config', configPath, '--plain', '--now', '2026-06-28T14:42:00.000Z'], plainIo.io), 0, plainIo.stderr());
+    assert.match(plainIo.stdout(), /^Enigma support summary\n/);
+    assert.match(plainIo.stdout(), /Status: Ready/);
+    assert.match(plainIo.stdout(), /Support code: ref:support-summary:/);
+    assert.match(plainIo.stdout(), /Redacted: raw memory, prompts, transcripts, credentials, provider responses, local paths/);
+    assert.match(plainIo.stdout(), /Privacy scan: pass \(0 finding\(s\), 8 categories checked\)/);
+    assert.match(plainIo.stdout(), /Safe to share: support code, setup state, issue count, and next action only/);
+    assert.match(plainIo.stdout(), /Boundary: local Enigma support state only/);
+    assert.doesNotMatch(plainIo.stdout(), /^\s*\{/);
+    assert.equal(plainIo.stdout().includes(dir), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('doctor is green after bundle initialization when connector config is absent', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-doctor-initialized-'));
+  const bundlePath = join(dir, 'bundle.json');
+  const configPath = join(dir, 'missing-client-config.json');
+
+  const setupIo = makeIo();
+  assert.equal(await main(['setup', '--bundle', bundlePath, '--out-dir', dir, '--overwrite'], setupIo.io), 0, setupIo.stderr());
+
+  const io = makeIo();
+  assert.equal(await main(['doctor', '--bundle', bundlePath, '--client', 'generic-mcp', '--config', configPath], io.io), 0, io.stderr());
+  const stdout = io.stdout();
+  const summary = io.json();
+
+  assert.equal(stdout.includes(dir), false);
+  assert.equal(summary.ok, true);
+  assert.equal(summary.setup_status.state, 'ready');
+  assert.equal(summary.setup_status.setup_needed, false);
+  assert.equal(summary.setup_status.next_command, null);
+  assert.equal(summary.next_commands.some((command) => command.includes('quickstart')), false);
+  assert.equal(summary.next_commands[0], 'enigma drive health --bundle "<bundle-path>"');
+  assert.equal(summary.next_commands[1], 'enigma status --bundle "<bundle-path>"');
+  assert.ok(summary.next_commands.some((command) => command === 'enigma connect generic-mcp --bundle "<bundle-path>" --dry-run'));
+  assert.deepEqual(summary.bundle_initialized, {
+    ok: true,
+    bundle: '<bundle-path>',
+    target_exists: true,
+    schema: 'enigma.vault_bundle.v1',
+    reason: null,
+    hint: null,
+  });
+  assert.deepEqual(summary.connectors.clients.map((client) => client.config_path), ['[redacted:config_path]']);
+
+  const plainIo = makeIo();
+  assert.equal(await main(['doctor', '--bundle', bundlePath, '--client', 'generic-mcp', '--config', configPath, '--plain'], plainIo.io), 0, plainIo.stderr());
+  const readyPlain = plainIo.stdout();
+  assert.match(readyPlain, /Status: Ready/);
+  assert.doesNotMatch(readyPlain, /Run: enigma quickstart/);
+  assert.match(readyPlain, /Next: enigma drive health --bundle "<bundle-path>"/);
+  assert.match(readyPlain, /Next: enigma status --bundle "<bundle-path>"/);
+  assert.match(readyPlain, /Next: enigma connect generic-mcp --bundle "<bundle-path>" --dry-run/);
+  assert.doesNotMatch(readyPlain, /^\s*\{/);
+  assert.equal(readyPlain.includes(dir), false);
+});
+
+test('doctor explains connector bundle mismatch as first-run state without local paths', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-doctor-first-run-'));
+  const bundlePath = join(dir, 'bundle.json');
+  const configPath = join(dir, 'generic-mcp.json');
+  const staleBundlePath = join(dir, 'not-initialized', 'bundle.json');
+  await writeFile(configPath, `${JSON.stringify({
+    mcpServers: {
+      enigma: {
+        command: 'enigma-mcp',
+        args: [],
+        env: {
+          ENIGMA_BUNDLE: staleBundlePath,
+        },
+      },
+    },
+  }, null, 2)}\n`, 'utf8');
+
+  const io = makeIo();
+  assert.equal(await main(['doctor', '--bundle', bundlePath, '--client', 'generic-mcp', '--config', configPath], io.io), 1);
+  const stdout = io.stdout();
+  const summary = io.json();
+
+  assert.equal(stdout.includes(dir), false);
+  assert.equal(stdout.includes(staleBundlePath), false);
+  assert.equal(summary.ok, false);
+  assert.equal(summary.setup_status.state, 'setup_needed');
+  assert.equal(summary.setup_status.setup_needed, true);
+  assert.deepEqual(summary.setup_status.reasons, ['bundle_missing', 'connector_bundle_env_mismatch']);
+  assert.equal(summary.vault_path.path, '<bundle-path>');
+  assert.equal(summary.bundle_initialized.ok, false);
+  assert.equal(summary.bundle_initialized.reason, 'bundle_missing');
+  assert.deepEqual(summary.connectors.clients.map((client) => client.config_path), ['[redacted:config_path]']);
+  assert.deepEqual(summary.connectors.clients[0].repair_reasons, ['bundle_env_mismatch']);
+  assert.equal(summary.first_run_hint.bundle, '<bundle-path>');
+  assert.equal(summary.first_run_hint.command, 'enigma quickstart --bundle "<bundle-path>"');
+  assert.deepEqual(summary.first_run_hint.commands, [
+    'enigma quickstart --bundle "<bundle-path>"',
+    'enigma doctor --bundle "<bundle-path>" --client generic-mcp',
+    'enigma drive health --bundle "<bundle-path>"',
+  ]);
+  assert.equal(JSON.stringify(summary.first_run_hint).includes(dir), false);
+
+  const plainIo = makeIo();
+  assert.equal(await main(['doctor', '--bundle', bundlePath, '--client', 'generic-mcp', '--config', configPath, '--plain'], plainIo.io), 1);
+  assert.match(plainIo.stdout(), /AI app connection setting points at a missing or different bundle/);
+  assert.match(plainIo.stdout(), /preview or repair the app connection/);
+  assert.doesNotMatch(plainIo.stdout(), /MCP client config|local client config|JSON/i);
+  assert.equal(plainIo.stdout().includes(dir), false);
+});
+
+test('doctor plain output gives one readable next action without JSON or paths', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-doctor-plain-'));
+  const bundlePath = join(dir, 'bundle.json');
+  try {
+    const io = makeIo();
+    assert.equal(await main(['doctor', '--bundle', bundlePath, '--plain'], io.io), 1);
+    const stdout = io.stdout();
+
+    assert.match(stdout, /^Enigma doctor\n/);
+    assert.match(stdout, /Status: Needs attention/);
+    assert.match(stdout, /Setup: setup_needed/);
+    assert.match(stdout, /Why: (?:the target Enigma bundle does not exist yet|the Memory Drive is not ready)/);
+    assert.doesNotMatch(stdout, /MCP client config|local client config|JSON/i);
+    assert.match(stdout, /Run: enigma quickstart --bundle "<bundle-path>"/);
+    assert.match(stdout, /Boundary: local Enigma checks only/);
+    assert.doesNotMatch(stdout, /^\s*\{/);
+    assert.equal(stdout.includes(dir), false);
+    assert.equal(stdout.includes(bundlePath), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('setup plain output summarizes first run without JSON or local paths', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-setup-plain-'));
+  const bundlePath = join(dir, 'bundle.json');
+  const outDir = join(dir, 'out');
+  try {
+    const io = makeIo();
+    assert.equal(await main(['setup', '--bundle', bundlePath, '--out-dir', outDir, '--overwrite', '--plain'], io.io), 0, io.stderr());
+    const stdout = io.stdout();
+
+    assert.match(stdout, /^Enigma setup\n/);
+    assert.match(stdout, /Status: Ready/);
+    assert.match(stdout, /Memory Drive: <bundle-path>/);
+    assert.match(stdout, /Connectors: planned only/);
+    assert.match(stdout, /Next: enigma import text --file \.\/memories\.md --complete --plain/);
+    assert.doesNotMatch(stdout, /Next: enigma remember --bundle "<bundle-path>" --text-file \.\/memory\.txt/);
+    assert.match(stdout, /Boundary: local Enigma setup only/);
+    assert.doesNotMatch(stdout, /^\s*\{/);
+    assert.equal(stdout.includes(dir), false);
+    assert.equal(stdout.includes(bundlePath), false);
+    assert.equal(stdout.includes(outDir), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('quickstart plain output summarizes outputs without JSON or local paths', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-quickstart-plain-'));
+  const bundlePath = join(dir, 'bundle.json');
+  try {
+    const io = makeIo();
+    assert.equal(await main(['quickstart', '--bundle', bundlePath, '--out-dir', dir, '--overwrite', '--plain'], io.io), 0, io.stderr());
+    const stdout = io.stdout();
+
+    assert.match(stdout, /^Enigma quickstart\n/);
+    assert.match(stdout, /Status: Ready/);
+    assert.match(stdout, /Memory Drive: <bundle-path>/);
+    assert.match(stdout, /Receipts: \d+/);
+    assert.match(stdout, /Next: enigma verify --export <out-dir>\/export\.json/);
+    assert.match(stdout, /Boundary: local Enigma quickstart only/);
+    assert.doesNotMatch(stdout, /^\s*\{/);
+    assert.equal(stdout.includes(dir), false);
+    assert.equal(stdout.includes(bundlePath), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('install plain output summarizes snippets without JSON or local paths', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-install-plain-'));
+  const bundlePath = join(dir, 'bundle.json');
+  const outPath = join(dir, 'snippets.json');
+  try {
+    const io = makeIo();
+    assert.equal(await main(['install', '--bundle', bundlePath, '--client', 'claude-desktop', '--out', outPath, '--plain'], io.io), 0, io.stderr());
+    const stdout = io.stdout();
+
+    assert.match(stdout, /^Enigma install\n/);
+    assert.match(stdout, /Status: Ready/);
+    assert.match(stdout, /Memory Drive: <bundle-path>/);
+    assert.match(stdout, /Clients: 1/);
+    assert.match(stdout, /MCP command: enigma-mcp/);
+    assert.match(stdout, /Snippets: written to <out>/);
+    assert.match(stdout, /Next: enigma claude-mcpb package --plain/);
+    assert.match(stdout, /Boundary: local install snippet planning only/);
+    assert.doesNotMatch(stdout, /^\s*\{/);
+    assert.equal(stdout.includes(dir), false);
+    assert.equal(stdout.includes(bundlePath), false);
+    assert.equal(stdout.includes(outPath), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('status plain output reports counters without JSON or local paths', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-status-plain-'));
+  const bundlePath = join(dir, 'bundle.json');
+  const outDir = join(dir, 'out');
+  try {
+    const setupIo = makeIo();
+    assert.equal(await main(['setup', '--bundle', bundlePath, '--out-dir', outDir, '--overwrite'], setupIo.io), 0, setupIo.stderr());
+
+    const io = makeIo();
+    assert.equal(await main(['status', '--bundle', bundlePath, '--plain'], io.io), 0, io.stderr());
+    const stdout = io.stdout();
+
+    assert.match(stdout, /^Enigma status\n/);
+    assert.match(stdout, /Memory Drive: <bundle-path>/);
+    assert.match(stdout, /Active memories: \d+/);
+    assert.match(stdout, /Receipts: \d+/);
+    assert.match(stdout, /Setup: /);
+    assert.match(stdout, /Boundary: local Enigma counters and roots only/);
+    assert.doesNotMatch(stdout, /^\s*\{/);
+    assert.equal(stdout.includes(dir), false);
+
+    const jsonIo = makeIo();
+    assert.equal(await main(['status', '--bundle', bundlePath], jsonIo.io), 0, jsonIo.stderr());
+    const status = jsonIo.json();
+    assert.ok(status.next_recommended_commands.some((command) => command.startsWith('enigma connect <client> ') && command.endsWith(' --dry-run')));
+    assert.equal(status.bundle, '<bundle-path>');
+    assert.equal(status.connector_readiness.bundle, '<bundle-path>');
+    assert.equal(JSON.stringify(status).includes(dir), false);
+    assert.equal(stdout.includes(bundlePath), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('drive health plain output reports health without JSON or local paths', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-drive-health-plain-'));
+  const bundlePath = join(dir, 'bundle.json');
+  const outDir = join(dir, 'out');
+  try {
+    const setupIo = makeIo();
+    assert.equal(await main(['setup', '--bundle', bundlePath, '--out-dir', outDir, '--overwrite'], setupIo.io), 0, setupIo.stderr());
+
+    const io = makeIo();
+    assert.equal(await main(['drive', 'health', '--bundle', bundlePath, '--plain'], io.io), 0, io.stderr());
+    const stdout = io.stdout();
+
+    assert.match(stdout, /^Enigma drive health\n/);
+    assert.match(stdout, /Status: /);
+    assert.match(stdout, /Score: /);
+    assert.match(stdout, /Receipt coverage: /);
+    assert.match(stdout, /Proof network: /);
+    assert.match(stdout, /Boundary: local Memory Drive health only/);
+    assert.doesNotMatch(stdout, /^\s*\{/);
+    assert.equal(stdout.includes(dir), false);
+    assert.equal(stdout.includes(bundlePath), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
 });

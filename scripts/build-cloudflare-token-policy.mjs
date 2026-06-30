@@ -32,6 +32,7 @@ function parseArgs(argv) {
     projectName: 'enigma-memory',
     domain: 'enigmamemory.com',
     out: null,
+    plain: false,
   };
   for (let index = 0; index < argv.length;) {
     const token = argv[index];
@@ -47,13 +48,18 @@ function parseArgs(argv) {
     else if (token === '--project-name') out.projectName = readValue(token);
     else if (token === '--domain') out.domain = readValue(token);
     else if (token === '--out') out.out = readValue(token);
+    else if (token === '--plain' || token === '--text' || token === '--format=text' || (token === '--format' && argv[index + 1] === 'text')) {
+      out.plain = true;
+      if (token === '--format') index += 1;
+      index += 1;
+    }
     else throw new UsageError(`unknown option ${token}`);
   }
   return out;
 }
 
 function usage() {
-  return `Usage: node scripts/build-cloudflare-token-policy.mjs [options]\n\nOptions:\n  --mode <pages-deploy|pages-observe|domain-registrar|hosted-probe|all>  Default: pages-deploy.\n  --account-id <id>                                                     Account scope placeholder/default.\n  --project-name <name>                                                 Pages project. Default: enigma-memory.\n  --domain <host>                                                       Domain. Default: enigmamemory.com.\n  --out <file>                                                          Write JSON and print the same JSON.\n\nThis prints a public-safe API-token policy packet for the Cloudflare dashboard.\nIt lists intended permission groups and endpoints only; it never creates or prints a token.\n`;
+  return `Usage: node scripts/build-cloudflare-token-policy.mjs [options]\n\nOptions:\n  --mode <pages-deploy|pages-observe|domain-registrar|hosted-probe|all>  Default: pages-deploy.\n  --account-id <id>                                                     Account scope placeholder/default.\n  --project-name <name>                                                 Pages project. Default: enigma-memory.\n  --domain <host>                                                       Domain. Default: enigmamemory.com.\n  --out <file>                                                          Write JSON evidence.\n  --plain                                                               Print a human-readable token policy summary.\n\nThis prints a public-safe API-token policy packet for the Cloudflare dashboard.\nIt lists intended permission groups and endpoints only; it never prints token values.\n`;
 }
 
 function permission(id, product, permission_name, access, resource, reason) {
@@ -216,6 +222,25 @@ export function buildCloudflareTokenPolicy(input = {}) {
   };
 }
 
+export function renderCloudflareTokenPolicyPlain(policy) {
+  const lines = [
+    'Enigma Cloudflare token policy',
+    'Status: Ready',
+    `Mode: ${policy.mode ?? '<mode>'}`,
+    `Project: ${policy.target?.pages_project ?? '<project>'}`,
+    `Domain: ${policy.target?.domain ?? '<domain>'}`,
+    `Permission groups: ${Array.isArray(policy.permission_groups) ? policy.permission_groups.length : 0}`,
+    `Planned API calls: ${Array.isArray(policy.planned_api_calls) ? policy.planned_api_calls.length : 0}`,
+    `Token value printed: ${policy.mutation_boundaries?.token_value_printed ? 'yes' : 'no'}`,
+    `Personal contact printed: ${policy.mutation_boundaries?.personal_contact_printed ? 'yes' : 'no'}`,
+  ];
+  for (const permissionItem of (Array.isArray(policy.permission_groups) ? policy.permission_groups.slice(0, 6) : [])) lines.push(`Permission: ${permissionItem.permission_name} — ${permissionItem.access}`);
+  for (const command of (Array.isArray(policy.verification_commands) ? policy.verification_commands.slice(0, 5) : [])) lines.push(`Next: ${command}`);
+  lines.push('Boundary: public-safe Cloudflare token policy only; no API token, credentials, account ids, local paths, contact data, deploy, domain purchase, Worker deploy, raw memory, prompts, transcripts, provider responses, provider deletion, model behavior, hosted-service certification, compliance, benchmark superiority, token ROI, or provider invoice savings claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+
 export async function runCli(argv = process.argv.slice(2), options = {}) {
   const parsed = parseArgs(argv);
   if (parsed.help) return { text: usage() };
@@ -227,7 +252,7 @@ export async function runCli(argv = process.argv.slice(2), options = {}) {
     await mkdir(dirname(outPath), { recursive: true });
     await writeFile(outPath, json, 'utf8');
   }
-  return { json: packet };
+  return parsed.plain ? { text: renderCloudflareTokenPolicyPlain(packet), json: packet } : { json: packet };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

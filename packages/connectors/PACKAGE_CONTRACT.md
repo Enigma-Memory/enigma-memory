@@ -11,6 +11,9 @@ This package is part of Enigma, the provider-agnostic AI memory and proof layer.
 - `disconnectClient` removes only the Enigma server entry, leaves all other client configuration intact, backs up an existing changed file first, and supports `dryRun` planned writes.
 - `planConnectWizard` must expose a one-command install/connect string, a setup command, a direct connect command, and an MCP config preview for each supported client so onboarding does not require hand-editing JSON.
 - Connector receipts, plans, and demo artifacts must not contain raw memory plaintext.
-- Public exports are `supportedClients`, `getClientProfile`, `renderMcpConfig`, `connectClient`, `disconnectClient`, `detectClientConnector`, `detectConnectors`, `doctorConnectors`, `planConnectWizard`, `platformDefaultConfigPath`, and `runConnectorDemo`.
+- Public exports are `supportedClients`, `getClientProfile`, `renderMcpConfig`, `connectClient`, `disconnectClient`, `detectClientConnector`, `detectConnectors`, `doctorConnectors`, `planConnectWizard`, `platformDefaultConfigPath`, `runConnectorDemo`, `createClaudeDesktopMcpbManifest`, `createClaudeDesktopMcpbConnectionPlan`, and `createClaudeDesktopMcpbHealth`.
+- Claude `.mcpb` health must fail closed and include public-safe `primary_action` / `next_action_id` fields for every state; installed-but-untested is never connected or ready.
+- `createClaudeDesktopMcpbManifest()` must emit MCPB manifest `0.3` fields (`server.type: "node"`, `server.entry_point`, `server.mcp_config`, and `user_config`) without raw config bodies, absolute paths, secrets, provider responses, or memory content.
+- The deterministic Claude `.mcpb` package must include only an allowlisted minimal root `package.json` for Node module scope. It must not copy repo scripts, dependency lists, absolute paths, secrets, raw config bodies, provider responses, or memory content.
 
 Package-specific implementation details are governed by `research/handoff-enigma/09_BUILD_BACKLOG.md` and `research/handoff-enigma/12_KIMI_BUILD_BRIEF.md`.

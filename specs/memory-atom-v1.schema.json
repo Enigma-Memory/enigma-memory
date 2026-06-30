@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.enigma.ai/memory-atom-v1.schema.json",
+  "title": "Enigma Memory Atom v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "atom_id",
+    "atom_ref",
+    "atom_commitment",
+    "subject_ref",
+    "tenant_ref",
+    "encrypted_content_ref",
+    "content_commitment",
+    "encryption_envelope_ref",
+    "lifecycle_state",
+    "active_root",
+    "quarantine_root",
+    "tombstone_root",
+    "receipt_log_root",
+    "created_receipt_ref",
+    "latest_receipt_ref",
+    "created_at",
+    "updated_at",
+    "signer_ref",
+    "signature_ref"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "enigma.memory_atom.v1" },
+    "atom_id": { "$ref": "#/$defs/publicId" },
+    "atom_ref": { "$ref": "#/$defs/publicRef" },
+    "atom_commitment": { "$ref": "#/$defs/sha256Digest" },
+    "subject_ref": { "$ref": "#/$defs/publicRef" },
+    "tenant_ref": { "$ref": "#/$defs/publicRef" },
+    "encrypted_content_ref": { "$ref": "#/$defs/publicRef" },
+    "content_commitment": { "$ref": "#/$defs/sha256Digest" },
+    "encryption_envelope_ref": { "$ref": "#/$defs/publicRef" },
+    "lifecycle_state": {
+      "type": "string",
+      "enum": ["active", "quarantine", "tombstone"]
+    },
+    "active_root": { "$ref": "#/$defs/sha256Digest" },
+    "quarantine_root": { "$ref": "#/$defs/sha256Digest" },
+    "tombstone_root": { "$ref": "#/$defs/sha256Digest" },
+    "receipt_log_root": { "$ref": "#/$defs/sha256Digest" },
+    "created_receipt_ref": { "$ref": "#/$defs/publicRef" },
+    "latest_receipt_ref": { "$ref": "#/$defs/publicRef" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "signer_ref": { "$ref": "#/$defs/publicRef" },
+    "signature_ref": { "$ref": "#/$defs/publicRef" }
+  },
+  "$defs": {
+    "sha256Digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "publicId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$" },
+    "publicRef": { "type": "string", "pattern": "^(?![A-Za-z]:$)[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" }
+  }
+}
