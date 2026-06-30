@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { verifyPublicSafeArtifact } from '../packages/core/src/index.js';
 import { buildPublicBetaEvidenceManifest } from './build-public-beta-evidence-manifest.mjs';
 import { buildCleanMachineSmokePlan } from './run-clean-machine-smoke.mjs';
+import { SUPPORT_DRY_RUN_COLLECTION_GUIDANCE } from './build-support-dry-run-summary.mjs';
 import { REQUIRED_PUBLIC_BETA_VERSION } from './run-public-beta-qa-matrix.mjs';
 
 export const PUBLIC_BETA_EVIDENCE_TEMPLATES_SCHEMA = 'enigma.public_beta_evidence_templates.v1';
@@ -231,7 +232,8 @@ function buildSupportDryRunTemplate({ generatedAt, scenarioId, issueCode, preset
     bundle_privacy_check_status: 'blocked',
     support_owner_ref: 'ref:role:beta-support',
     replacement_command: supportDryRunReplacementCommand({ preset, outPath }),
-    support_artifact_note: 'Optional: add --support-artifact <redacted-support-artifact.json> only after the artifact passes public-safe review.',
+    collection_guidance: SUPPORT_DRY_RUN_COLLECTION_GUIDANCE,
+    support_artifact_note: 'Optional: add --support-artifact <redacted-support-artifact.json> only after the artifact passes public-safe review; the summary records its hash and allowlisted status fields only.',
     privacy_review: {
       status: 'blocked',
       reviewer_ref: 'ref:role:beta-support',
@@ -391,6 +393,7 @@ export async function buildPublicBetaEvidenceTemplates(options = {}, now = new D
       local_paths_included: false,
       raw_private_content_included: false,
     },
+    support_dry_run_collection_guidance: SUPPORT_DRY_RUN_COLLECTION_GUIDANCE,
     claim_boundary: templateBoundary(),
   };
   assertPublicSafe('public beta evidence template report', report);
@@ -405,6 +408,11 @@ export function renderPublicBetaEvidenceTemplatesPlain(report) {
   ];
   for (const file of Array.isArray(report.files) ? report.files : []) {
     lines.push(`Template: ${file.evidence_item_id} -> ${file.path}`);
+  }
+  if (report.support_dry_run_collection_guidance) {
+    lines.push(`Support dry-run triage values: ${report.support_dry_run_collection_guidance.triage_result_values.join(', ')}`);
+    lines.push(`Support dry-run privacy statuses: ${report.support_dry_run_collection_guidance.bundle_privacy_check_status_values.join(', ')}`);
+    lines.push(`Support dry-run collection steps: ${report.support_dry_run_collection_guidance.collection_steps.join(', ')}`);
   }
   for (const command of Array.isArray(report.next_commands) ? report.next_commands : []) {
     lines.push(`Next: ${command}`);

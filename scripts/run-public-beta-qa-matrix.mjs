@@ -234,6 +234,14 @@ const NEXT_ACTION_ORDER = Object.freeze([
   },
 ]);
 
+const CONSUMER_FRICTION_ACTION_IDS = Object.freeze([
+  'run_clean_machine_qa',
+  'record_support_dry_run',
+  'produce_signed_desktop_artifacts',
+  'produce_notarized_macos_artifacts',
+  'rehearse_update_rollback',
+]);
+
 function publicRelativeEvidenceTarget(value) {
   const raw = String(value ?? '').trim();
   if (!raw || isAbsolute(raw) || /^[A-Za-z]:[\\/]/u.test(raw)) return null;
@@ -327,6 +335,26 @@ export function buildRankedNextActions(blockers, evidenceTargets = {}) {
       };
     })
     .filter(Boolean);
+}
+
+function buildTopConsumerFriction(nextActions) {
+  const byId = new Map(nextActions.map((action) => [action.action_id, action]));
+  for (const actionId of CONSUMER_FRICTION_ACTION_IDS) {
+    const action = byId.get(actionId);
+    if (!action) continue;
+    return {
+      signal_id: 'top_consumer_friction',
+      consumer_rank: 1,
+      action_id: action.action_id,
+      blocker_id: action.blocker_id,
+      status: action.status,
+      summary: action.summary,
+      owner_ref: action.owner_ref,
+      scenario_ids: action.scenario_ids,
+      collect_next: action.collect_next,
+    };
+  }
+  return null;
 }
 
 function usage() {
@@ -1005,6 +1033,7 @@ export async function buildPublicBetaQaMatrix(options = {}) {
   const counts = statusCounts(scenarios);
   const blockers = collectBlockers(scenarios);
   const nextActions = buildRankedNextActions(blockers, inputs.evidenceTargets);
+  const consumerNextAction = buildTopConsumerFriction(nextActions);
   const readyForPublicBeta = scenarios.every((row) => row.status === 'pass');
   const ledgerSummary = summarizePublicLaunchEvidence(scenarios.map((row) => ledgerEntry(row, generatedAt)));
   const evidenceManifestRef = publicRelativeEvidenceTarget(options.evidenceManifest) ?? '.enigma/public-beta/evidence-manifest.json';
@@ -1024,6 +1053,7 @@ export async function buildPublicBetaQaMatrix(options = {}) {
     },
     blockers,
     next_actions: nextActions,
+    consumer_next_action: consumerNextAction,
     scenarios,
   };
   publicSafeAssert(report);
@@ -1044,6 +1074,10 @@ export function renderPublicBetaQaPlain(report) {
     `Missing: ${counts.missing ?? 0}`,
     `Fail: ${counts.fail ?? 0}`,
   ];
+  if (report.consumer_next_action) {
+    lines.push(`Top consumer blocker: ${report.consumer_next_action.action_id} — ${report.consumer_next_action.summary}`);
+    appendCollectNextLines(lines, 'Collect consumer', report.consumer_next_action);
+  }
   const actions = Array.isArray(report.next_actions) ? report.next_actions.slice(0, 5) : [];
   for (const action of actions) {
     lines.push(`Next: ${action.action_id} — ${action.summary}`);

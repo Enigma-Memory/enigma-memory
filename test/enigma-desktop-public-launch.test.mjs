@@ -88,6 +88,9 @@ test('desktop first-run defaults to Memory Drive home dashboard', async () => {
   assert.ok(model.dashboard.issue_codes.includes('MEMORY_DRIVE_MISSING'));
   assert.equal(dashboard.support_report_ready, false);
   assert.equal(dashboard.support_report_status, 'not-run');
+  assert.equal(model.dashboard.support_next_action.schema, 'enigma.desktop.support_next_action.v1');
+  assert.equal(model.dashboard.support_next_action.id, 'collect_support_report');
+  assert.equal(model.dashboard.support_next_action.state, 'report_needed');
   assert.equal(model.dashboard.memory_controller.schema, 'enigma.desktop.memory_controller_summary.v1');
   assert.equal(model.dashboard.memory_controller.memory_weather.label, 'Needs review');
   assert.equal(model.dashboard.memory_controller.app_permissions.label, 'No app has permission yet');
@@ -103,6 +106,11 @@ test('desktop first-run defaults to Memory Drive home dashboard', async () => {
   assert.equal(model.dashboard.import_sandbox.receipt_boundaries.provider_deletion_proof, false);
   assert.equal(model.screens.support.schema, 'enigma.desktop.support_report.v1');
   assert.equal(model.screens.support.primary_action.id, 'collect_support_report');
+  assert.equal(model.screens.support.support_next_action.schema, 'enigma.desktop.support_next_action.v1');
+  assert.equal(model.screens.support.support_next_action.id, 'collect_support_report');
+  assert.equal(model.screens.support.support_next_action.state, 'report_needed');
+  assert.equal(model.screens.support.support_next_action.claim_boundaries.raw_memory_returned, false);
+  assert.equal(model.screens.support.support_next_action.claim_boundaries.account_identifiers_returned, false);
   assert.equal(model.screens.support.privacy_boundaries.raw_memory_returned, false);
   assert.equal(model.screens.support.privacy_boundaries.local_paths_returned, false);
   assert.equal(model.screens.support.privacy_scan.schema, 'enigma.support_privacy_scan.v1');
@@ -121,11 +129,15 @@ test('static desktop shell mirrors Memory Controller, Import Sandbox, and Suppor
   assert.match(shell, /function selectImportSandboxSummary/);
   assert.match(shell, /function renderSupportReportModel/);
   assert.match(shell, /function supportReportClipboardText/);
+  assert.match(shell, /function supportReportCodeText/);
   assert.match(shell, /memory_controller: memoryController/);
   assert.match(shell, /import_sandbox: importSandbox/);
   assert.match(shell, /support: diagnostics/);
+  assert.match(shell, /support_next_action: supportReport\.support_next_action/);
   assert.match(shell, /support_report_ready: supportReportReady/);
   assert.match(homeBlock, /Support report/);
+  assert.match(homeBlock, /Support handoff/);
+  assert.match(homeBlock, /dashboard\.support_report_ready && supportNextAction/);
   assert.match(shell, /Support report/);
   assert.match(shell, /renderSupportScreen\(model\.screens\.support\)/);
   assert.match(homeBlock, /Memory Controller/);
@@ -136,8 +148,12 @@ test('static desktop shell mirrors Memory Controller, Import Sandbox, and Suppor
   assert.match(importSandboxBlock, /Provider-side proof/);
   assert.match(contract, /support_report_ready/);
   assert.match(contract, /support_report_status/);
+  assert.match(contract, /support_next_action/);
   assert.match(importSandboxBlock, /Model-state proof/);
   assert.match(supportBlock, /Copyable safe report/);
+  assert.match(supportBlock, /Next support step/);
+  assert.match(supportBlock, /Copyable support code/);
+  assert.match(shell, /copy_support_code/);
   assert.match(supportBlock, /Privacy boundaries/);
   assert.match(supportBlock, /No raw memory, prompts, transcripts, provider responses, credentials, tokens, private keys, account identifiers, customer identifiers, raw logs, complete settings, or local paths/);
   assert.match(shell, /The shell reports local setup only; provider logs and model behavior require provider evidence/);
@@ -231,6 +247,8 @@ test('desktop dashboard routes to support report before app connection', async (
   assert.equal(needsSupport.next_action.state, 'support_report_needed');
   assert.equal(needsSupport.next_action.primary_action.screen, 'support');
   assert.equal(needsSupport.next_action.reason, 'A safe support report is not ready yet.');
+  assert.equal(needsSupport.support_next_action.id, 'collect_support_report');
+  assert.equal(needsSupport.support_next_action.state, 'report_needed');
 
   state = desktopReducer(state, updateDesktopDiagnostics({
     status: 'ready',
@@ -243,6 +261,8 @@ test('desktop dashboard routes to support report before app connection', async (
   assert.equal(ready.support_report_ready, true);
   assert.equal(ready.support_report_status, 'ready');
   assert.equal(ready.next_action.id, 'connect_app');
+  assert.equal(ready.support_next_action.id, 'copy_support_code');
+  assert.equal(ready.support_next_action.state, 'handoff_ready');
   assertPublicSafe(needsSupport);
   assertPublicSafe(ready);
 });
@@ -316,6 +336,9 @@ test('desktop public dashboard omits raw memory, prompts, transcripts, tokens, p
   assert.equal(dashboard.offline_ready, true);
   assert.equal(dashboard.support_report_ready, true);
   assert.equal(dashboard.support_report_status, 'ready');
+  assert.equal(dashboard.support_next_action.schema, 'enigma.desktop.support_next_action.v1');
+  assert.equal(dashboard.support_next_action.id, 'copy_support_code');
+  assert.equal(dashboard.support_next_action.claim_boundaries.tokens_returned, false);
   assert.equal(dashboard.memory_controller.memory_weather.status, 'sunny');
   assert.equal(dashboard.memory_controller.app_permissions.status, 'missing');
   assert.equal(dashboard.memory_controller.recall_approval.summary, 'Not shared until you approve.');
@@ -327,6 +350,12 @@ test('desktop public dashboard omits raw memory, prompts, transcripts, tokens, p
   assert.match(model.screens.support.report_id, /^support_/);
   assert.deepEqual(model.screens.support.shareable_summary, ['Local service reachable']);
   assert.equal(model.screens.support.primary_action.id, 'copy_support_report');
+  assert.equal(model.screens.support.support_next_action.schema, 'enigma.desktop.support_next_action.v1');
+  assert.equal(model.screens.support.support_next_action.id, 'copy_support_code');
+  assert.equal(model.screens.support.support_next_action.state, 'handoff_ready');
+  assert.equal(model.screens.support.support_next_action.primary_action.id, 'copy_support_code');
+  assert.equal(model.screens.support.support_next_action.claim_boundaries.local_paths_returned, false);
+  assert.equal(model.screens.support.support_next_action.claim_boundaries.provider_responses_returned, false);
   assert.equal(model.screens.support.privacy_boundaries.provider_responses_returned, false);
   assert.equal(model.screens.support.privacy_scan.status, 'pass');
   assert.equal(model.screens.support.privacy_scan.detected_private_field_count, 0);

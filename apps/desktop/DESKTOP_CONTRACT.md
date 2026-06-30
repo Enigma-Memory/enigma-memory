@@ -7,7 +7,7 @@ This package is a dependency-free browser shell that can be wrapped later by Ele
 - `src/index.html` opens as a standalone static page with only local `src/styles.css`; it embeds dependency-free module logic so Chromium file loads are not blocked by external module-file policy.
 - `src/app.js` remains the ESM test and wrapper surface. It exports `createDesktopState`, `desktopReducer`, `renderDesktopModel`, `renderMemoryDriveDashboard`, `desktopActions`, and named action creators for MCP, vault, Memory Drive, service, health, proof activity, update, diagnostics, memory, verifier, client, import, and export flows.
 - First-run state defaults to the consumer `home` screen. Public copy says Memory Drive, connected apps, health/fix-it, proof activity, updates, diagnostics, and safe support report before advanced vault/MCP wording.
-- `renderMemoryDriveDashboard` is the public-safe dashboard contract. It exposes one `next_action`, `memory_drive_status`, `connected_app_count`, `proof_status`, `update_status`, `diagnostics_status`, `support_report_ready`, `support_report_status`, `offline_ready`, `issue_codes`, `memory_controller`, and `import_sandbox`.
+- `renderMemoryDriveDashboard` is the public-safe dashboard contract. It exposes one `next_action`, `memory_drive_status`, `connected_app_count`, `proof_status`, `update_status`, `diagnostics_status`, `support_report_ready`, `support_report_status`, `support_next_action`, `offline_ready`, `issue_codes`, `memory_controller`, and `import_sandbox`. The support report model exposes the same safe `support_next_action` plus copyable support-code text derived only from public-safe report metadata.
 - Dashboard, support report, diagnostics, proof, import receipt, release evidence, and screenshot surfaces must not contain raw memory bodies, prompts, transcripts, provider responses, local absolute paths, credentials, tokens, private keys, account identifiers, customer identifiers, or signing secrets.
 - Reducer state is local operational evidence only. UI state is never presented as cryptographic proof.
 - Receipt verifier output is structural evidence about supplied receipts. Offline receipt verification remains the proof path.
@@ -17,7 +17,7 @@ This package is a dependency-free browser shell that can be wrapped later by Ele
 
 ## Screens
 
-The static shell renders consumer home, Memory Controller, Import Sandbox, setup/fix-it, safe support report, advanced vault status, MCP server status, connected app buttons, import/export, receipt verifier output, delete-and-prove evidence, mesh status, and enterprise status.
+The static shell renders consumer home, Memory Controller, Import Sandbox, setup/fix-it, safe support report, support-code copy action, advanced vault status, MCP server status, connected app buttons, import/export, receipt verifier output, delete-and-prove evidence, mesh status, and enterprise status.
 
 ## Public-launch command contract
 

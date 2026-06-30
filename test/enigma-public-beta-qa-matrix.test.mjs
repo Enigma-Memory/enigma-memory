@@ -233,6 +233,7 @@ test('public beta advisor collect-next paths follow relative evidence manifest t
     assert.equal(matrix.next_actions.find((action) => action.action_id === 'publish_npm_0_1_19').collect_next.target_file, `${dir}/registry-install.json`);
     assert.equal(matrix.next_actions.find((action) => action.action_id === 'complete_signing_identities').collect_next.target_file, `${dir}/desktop-release-evidence.json`);
     assert.equal(matrix.next_actions.find((action) => action.action_id === 'record_support_dry_run').collect_next.target_file, `${dir}/support-dry-run-diagnostics.json`);
+    assert.equal(matrix.consumer_next_action.collect_next.target_file, `${dir}/clean-machine-smoke.json`);
     assert.deepEqual(matrix.next_actions.find((action) => action.action_id === 'record_support_dry_run').collect_next.target_files, [`${dir}/support-dry-run-diagnostics.json`, `${dir}/support-dry-run-crash.json`]);
     assert.deepEqual(matrix.next_actions.find((action) => action.action_id === 'record_support_dry_run').collect_next.collect_commands, [
       `npm run production:support-dry-run -- --preset diagnostics --triage-result <observed-result> --bundle-privacy-check-status <observed-status> --out ${dir}/support-dry-run-diagnostics.json`,
@@ -242,6 +243,7 @@ test('public beta advisor collect-next paths follow relative evidence manifest t
     assert.match(plain, new RegExp(`Collect next: publish_npm_0_1_19 .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/registry-install\\.json`));
     assert.match(plain, new RegExp(`Collect: npm run public-beta:evidence-manifest -- --out ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/evidence-manifest\\.json --plain`));
     assert.match(plain, new RegExp(`Collect internal: run_clean_machine_qa .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/clean-machine-smoke\\.json`));
+    assert.match(plain, new RegExp(`Collect consumer: run_clean_machine_qa .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/clean-machine-smoke\\.json`));
     assert.match(plain, new RegExp(`Collect internal: record_support_dry_run .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/support-dry-run-diagnostics\\.json`));
     assert.match(plain, new RegExp(`Collect internal: record_support_dry_run .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/support-dry-run-crash\\.json`));
     assert.ok(plain.includes(`Run: npm run production:support-dry-run -- --preset diagnostics --triage-result <observed-result> --bundle-privacy-check-status <observed-status> --out ${dir}/support-dry-run-diagnostics.json`));
@@ -261,6 +263,8 @@ test('public beta QA plain output is readable, bounded, and non-JSON', async () 
   assert.match(plain, /Ready for public beta: no/);
   assert.match(plain, /Blocked: /);
   assert.match(plain, /Pending: /);
+  assert.match(plain, /Top consumer blocker: run_clean_machine_qa — Run clean-machine Windows\/macOS install, first-run, connector, proof, offline, update, diagnostics, and uninstall QA\./);
+  assert.match(plain, /Collect consumer: run_clean_machine_qa — EV-P10-CLEAN-MACHINE-SMOKE into \.enigma\/public-beta\/clean-machine-smoke\.json/);
   assert.match(plain, /Collect: npm run public-beta:evidence-manifest -- --out \.enigma\/public-beta\/evidence-manifest\.json --plain/);
   assert.match(plain, /Review: npm run public-beta:advisor -- --evidence-manifest \.enigma\/public-beta\/evidence-manifest\.json/);
   assert.match(plain, /Collect next: approve_merge_release_pr — EV-P10-PRODUCTION-HANDOFF-PACKET into \.enigma\/public-beta\/production-handoff-packet\.json: release PR ref or URL, reviewer approval ref, merge ref, public-safe release packet approval ref, and approval date/);
@@ -636,6 +640,12 @@ test('public beta next actions are ranked and public-safe', async () => {
   assertPublicSafe(matrix.next_actions);
   const direct = buildRankedNextActions(matrix.blockers);
   assert.deepEqual(direct, matrix.next_actions);
+  assertPublicSafe(matrix.consumer_next_action);
+  assert.equal(matrix.consumer_next_action.signal_id, 'top_consumer_friction');
+  assert.equal(matrix.consumer_next_action.consumer_rank, 1);
+  assert.equal(matrix.consumer_next_action.action_id, 'run_clean_machine_qa');
+  assert.equal(matrix.consumer_next_action.blocker_id, 'BLOCKER-CLEAN-MACHINE-QA');
+  assert.equal(matrix.consumer_next_action.collect_next.target_file, '.enigma/public-beta/clean-machine-smoke.json');
   const firstAction = matrix.next_actions[0];
   assert.equal(firstAction.collect_next.evidence_item_id, 'EV-P10-PRODUCTION-HANDOFF-PACKET');
   assert.equal(firstAction.collect_next.target_file, '.enigma/public-beta/production-handoff-packet.json');
@@ -654,6 +664,31 @@ test('public beta next actions are ranked and public-safe', async () => {
     .filter((action) => action.owner_ref === 'ref:role:qa-owner' || action.owner_ref === 'ref:role:beta-support')
     .map((action) => action.action_id);
   assert.deepEqual(internalOwners, ['run_clean_machine_qa', 'record_support_dry_run']);
+});
+
+test('public beta consumer next action falls through after clean-machine evidence', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-public-beta-consumer-action-'));
+  try {
+    const cleanMachineSmoke = join(dir, 'clean-machine-smoke.json');
+    await writeFile(cleanMachineSmoke, `${JSON.stringify({
+      schema: 'enigma.clean_machine_smoke.v1',
+      app_version: '0.1.19',
+      summary: { healthy: true },
+    }, null, 2)}\n`, 'utf8');
+
+    const matrix = await buildPublicBetaQaMatrix({ cleanMachineSmoke });
+
+    assert.equal(matrix.consumer_next_action.action_id, 'record_support_dry_run');
+    assert.equal(matrix.consumer_next_action.consumer_rank, 1);
+    assert.equal(matrix.consumer_next_action.blocker_id, 'BLOCKER-SUPPORT-DRY-RUN');
+    assert.deepEqual(matrix.consumer_next_action.collect_next.target_files, [
+      '.enigma/public-beta/support-dry-run-diagnostics.json',
+      '.enigma/public-beta/support-dry-run-crash.json',
+    ]);
+    assertPublicSafe(matrix.consumer_next_action);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test('public beta QA matrix keeps public-safe packet blocker without explicit approval fields', () => {

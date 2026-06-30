@@ -253,6 +253,12 @@ export function buildCleanMachineSmokePlan(now = new Date()) {
         expected_evidence: 'The app opens and the clean-machine smoke command can inspect the app without printing local paths.',
       },
       {
+        step_id: 'first_run_default_setup',
+        title: 'Confirm first-run local setup path',
+        action: 'On first launch, use the default local setup path and continue past optional app-connection prompts without entering external account details.',
+        expected_evidence: 'The QA checklist records whether setup reaches Create Memory Drive using pass/fail notes only; do not attach screenshots or private evidence.',
+      },
+      {
         step_id: 'create_memory_drive',
         title: 'Create the Memory Drive',
         action: 'Click Create Memory Drive and keep the recommended local storage location.',

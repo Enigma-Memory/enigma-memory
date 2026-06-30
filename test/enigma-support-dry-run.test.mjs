@@ -11,6 +11,7 @@ import {
   parseSupportDryRunArgs,
   renderSupportDryRunPlain,
   readSupportArtifactSnapshot,
+  SUPPORT_DRY_RUN_COLLECTION_GUIDANCE,
   SUPPORT_DRY_RUN_PRESETS,
   SUPPORT_DRY_RUN_EVIDENCE_ITEM_ID,
   SUPPORT_DRY_RUN_SUMMARY_SCHEMA,
@@ -46,6 +47,10 @@ test('support dry-run summary is public-safe and claim-bounded', () => {
   assert.equal(summary.privacy_scan.status, 'pass');
   assert.equal(summary.privacy_scan.detected_private_field_count, 0);
   assert.ok(summary.privacy_scan.checked_categories.includes('memory_bodies'));
+  assert.deepEqual(summary.collection_guidance.triage_result_values, SUPPORT_DRY_RUN_COLLECTION_GUIDANCE.triage_result_values);
+  assert.deepEqual(summary.collection_guidance.bundle_privacy_check_status_values, SUPPORT_DRY_RUN_COLLECTION_GUIDANCE.bundle_privacy_check_status_values);
+  assert.deepEqual(summary.collection_guidance.collection_steps, SUPPORT_DRY_RUN_COLLECTION_GUIDANCE.collection_steps);
+  assert.equal(summary.collection_guidance.support_artifact_input, 'optional_redacted_allowlisted_json_snapshot_hash_only');
   assert.equal(summary.claim_boundaries.public_beta_ready, false);
   assert.equal(summary.claim_boundaries.production_ready, false);
   assert.equal(summary.claim_boundaries.provider_deletion_proof, false);
@@ -178,6 +183,10 @@ test('support dry-run plain output is readable and writes JSON evidence separate
   assert.match(stdout, /Bundle privacy check: pass/);
   assert.match(stdout, /Boundary: public-safe support dry-run evidence only/);
   assert.match(stdout, /Privacy scan: pass \(0 finding\(s\), 8 categories checked\)/);
+  assert.match(stdout, /Allowed triage values: resolved, needs_user_action, escalated, release_blocker, blocked/);
+  assert.match(stdout, /Allowed privacy statuses: pass, fail, blocked, not_applicable/);
+  assert.match(stdout, /Collection steps: run_selected_preset_with_observed_triage_result, record_bundle_privacy_check_status_from_redaction_review, attach_redacted_allowlisted_support_artifact_only_when_available, keep_private_material_out_of_public_artifact/);
+  assert.match(stdout, /Support artifact: none \(optional_redacted_allowlisted_json_snapshot_hash_only\)/);
   assert.doesNotMatch(stdout, /^\s*\{/);
   assert.equal(stdout.includes(dir), false);
   assert.equal(stdout.includes(out), false);
@@ -200,6 +209,8 @@ test('support dry-run plain renderer summarizes attached artifact by hash only',
 
   assert.match(plain, /^Enigma support dry-run\n/);
   assert.match(plain, /Support artifact: attached by hash/);
+  assert.match(plain, /Allowed privacy statuses: pass, fail, blocked, not_applicable/);
+  assert.match(plain, /Collection steps: run_selected_preset_with_observed_triage_result/);
   assert.doesNotMatch(plain, /memory_drive_status|service_running|C:\\Users|\/home\/|\/tmp\//i);
 });
 

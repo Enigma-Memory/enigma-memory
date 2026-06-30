@@ -399,6 +399,7 @@ export function renderMemoryDriveDashboard(state = createDesktopState()) {
     issue_codes: issueCodes,
     memory_controller: memoryController,
     import_sandbox: importSandbox,
+    support_next_action: supportReport.support_next_action,
     next_action: selectMemoryDriveNextAction({
       memoryDriveStatus,
       serviceStatus,
@@ -469,7 +470,34 @@ function renderSupportReportModel(diagnostics = {}) {
     },
     primary_action: ready
       ? { id: 'copy_support_report', label: 'Copy safe support report' }
-      : { id: 'collect_support_report', label: 'Collect support report' }
+      : { id: 'collect_support_report', label: 'Collect support report' },
+    support_next_action: ready
+      ? supportReportNextAction({ id: 'copy_support_code', label: 'Copy support code', reason: 'Share the short report ID when support only needs a handoff code.' }, 'handoff_ready')
+      : supportReportNextAction({ id: 'collect_support_report', label: 'Collect support report', reason: 'Run diagnostics before a support code exists.' }, 'report_needed')
+  };
+}
+
+function supportReportNextAction(action, state) {
+  return {
+    schema: 'enigma.desktop.support_next_action.v1',
+    state,
+    ...action,
+    primary_action: { id: action.id, label: action.label },
+    claim_boundaries: {
+      public_safe_status_only: true,
+      raw_memory_returned: false,
+      prompts_returned: false,
+      transcripts_returned: false,
+      provider_responses_returned: false,
+      local_paths_returned: false,
+      credentials_returned: false,
+      tokens_returned: false,
+      private_keys_returned: false,
+      account_identifiers_returned: false,
+      customer_identifiers_returned: false,
+      raw_logs_returned: false,
+      complete_settings_returned: false
+    }
   };
 }
 
@@ -1685,6 +1713,16 @@ function supportReportClipboardText(report = {}) {
   return lines.join('\n');
 }
 
+function supportReportCodeText(report = {}) {
+  return [
+    'Enigma support code',
+    `Report ID: ${safePublicString(report.report_id, 'not generated', 64)}`,
+    `Status: ${safePublicString(report.status, 'not-run', 32)}`,
+    `Checked: ${safePublicString(report.checked_at, 'not observed', 64)}`,
+    'Privacy: support code contains public-safe status only; no raw memory, prompts, transcripts, provider responses, credentials, tokens, private keys, account identifiers, customer identifiers, raw logs, complete settings, or local paths.'
+  ].join('\n');
+}
+
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
 }
@@ -1808,13 +1846,21 @@ function renderScreen(id, title, body) {
 function renderHomeScreen(screen) {
   const dashboard = screen.dashboard;
   const issues = dashboard.issue_codes.length ? dashboard.issue_codes.map((code) => `<li>${escapeHtml(code)}</li>`).join('') : '<li>No issues found.</li>';
+  const supportNextAction = dashboard.support_next_action;
+  const supportNextButton = dashboard.support_report_ready && supportNextAction && supportNextAction.id !== dashboard.next_action.id
+    ? `<button type="button" data-action="${escapeHtml(supportNextAction.id)}">${escapeHtml(supportNextAction.label)}</button>`
+    : '';
+  const supportNextNote = supportNextButton
+    ? `<p><strong>Support handoff:</strong> ${escapeHtml(supportNextAction.reason || '')}</p>`
+    : '';
   return renderScreen('home', screen.title, `
     <div class="two-column">
       <div class="panel status-panel">
         <span class="status-pill">${escapeHtml(dashboard.memory_drive_status)}</span>
         <h3>${escapeHtml(dashboard.next_action.label)}</h3>
         <p>${escapeHtml(dashboard.next_action.reason)}</p>
-        <button type="button" data-action="${escapeHtml(dashboard.next_action.id)}">${escapeHtml(dashboard.next_action.label)}</button>
+        <div class="button-row"><button type="button" data-action="${escapeHtml(dashboard.next_action.id)}">${escapeHtml(dashboard.next_action.label)}</button>${supportNextButton}</div>
+        ${supportNextNote}
       </div>
       <dl class="panel detail-list">
         ${renderMetric('Connected apps', dashboard.connected_app_count)}
@@ -1854,13 +1900,18 @@ function renderSupportScreen(screen) {
   const issues = screen.issue_codes.length ? screen.issue_codes.map((code) => `<li>${escapeHtml(code)}</li>`).join('') : '<li>No issue codes in the safe report.</li>';
   const summary = screen.shareable_summary.map((item) => `<li>${escapeHtml(item)}</li>`).join('');
   const boundaries = Object.entries(screen.privacy_boundaries).map(([key, value]) => `<li><strong>${escapeHtml(key.replace(/_/g, ' '))}</strong><span>${value === false ? 'never included' : 'review required'}</span></li>`).join('');
+  const supportNextAction = screen.support_next_action || screen.primary_action;
+  const supportNextButton = supportNextAction.id !== screen.primary_action.id
+    ? `<button type="button" data-action="${escapeHtml(supportNextAction.id)}">${escapeHtml(supportNextAction.label)}</button>`
+    : '';
   return renderScreen('support', screen.title, `
     <div class="two-column">
       <div class="panel status-panel">
         <span class="status-pill">${escapeHtml(screen.status)}</span>
         <h3>${escapeHtml(screen.primary_action.label)}</h3>
         <p>Share this report with support when asked. It is generated from public-safe status fields only.</p>
-        <button type="button" data-action="${escapeHtml(screen.primary_action.id)}">${escapeHtml(screen.primary_action.label)}</button>
+        <p><strong>Next support step:</strong> ${escapeHtml(supportNextAction.label)}. ${escapeHtml(supportNextAction.reason || '')}</p>
+        <div class="button-row"><button type="button" data-action="${escapeHtml(screen.primary_action.id)}">${escapeHtml(screen.primary_action.label)}</button>${supportNextButton}</div>
       </div>
       <dl class="panel detail-list">
         ${renderMetric('Report ready', screen.support_report_ready ? 'yes' : 'no')}
@@ -1875,7 +1926,8 @@ function renderSupportScreen(screen) {
     </div>
     <div class="panel"><h3>Privacy boundaries</h3><ul class="boundary-list">${boundaries}</ul></div>
     <p class="honesty-note">No raw memory, prompts, transcripts, provider responses, credentials, tokens, private keys, account identifiers, customer identifiers, raw logs, complete settings, or local paths are included.</p>
-    <label class="panel">Copyable safe report<textarea readonly>${escapeHtml(supportReportClipboardText(screen))}</textarea></label>`);
+    <label class="panel">Copyable safe report<textarea readonly>${escapeHtml(supportReportClipboardText(screen))}</textarea></label>
+    <label class="panel">Copyable support code<textarea readonly>${escapeHtml(supportReportCodeText(screen))}</textarea></label>`);
 }
 
 function renderVaultScreen(screen, state) {
@@ -2028,6 +2080,14 @@ function wireDesktopEvents(root, state, dispatch) {
           const report = renderSupportReportModel(state.desktopDiagnostics);
           if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
             navigator.clipboard.writeText(supportReportClipboardText(report)).catch(() => undefined);
+          }
+          dispatch(selectDesktopScreen('support'));
+          break;
+        }
+        case 'copy_support_code': {
+          const report = renderSupportReportModel(state.desktopDiagnostics);
+          if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+            navigator.clipboard.writeText(supportReportCodeText(report)).catch(() => undefined);
           }
           dispatch(selectDesktopScreen('support'));
           break;

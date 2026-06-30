@@ -42,6 +42,24 @@ const SUPPORT_DRY_RUN_SCENARIO_PRESETS = Object.freeze({
   'BETA-DIAG-001': 'diagnostics',
   'BETA-CRASH-001': 'crash',
 });
+const SUPPORT_DRY_RUN_TRIAGE_RESULT_VALUES = Object.freeze([...TRIAGE_RESULTS]);
+const SUPPORT_DRY_RUN_PRIVACY_STATUS_VALUES = Object.freeze([...PRIVACY_CHECK_STATUSES]);
+
+const SUPPORT_DRY_RUN_COLLECTION_STEPS = Object.freeze([
+  'run_selected_preset_with_observed_triage_result',
+  'record_bundle_privacy_check_status_from_redaction_review',
+  'attach_redacted_allowlisted_support_artifact_only_when_available',
+  'keep_private_material_out_of_public_artifact',
+]);
+
+export const SUPPORT_DRY_RUN_COLLECTION_GUIDANCE = Object.freeze({
+  triage_result_values: SUPPORT_DRY_RUN_TRIAGE_RESULT_VALUES,
+  bundle_privacy_check_status_values: SUPPORT_DRY_RUN_PRIVACY_STATUS_VALUES,
+  collection_steps: SUPPORT_DRY_RUN_COLLECTION_STEPS,
+  support_artifact_input: 'optional_redacted_allowlisted_json_snapshot_hash_only',
+  private_material_rule: 'omit_raw_logs_screenshots_dialogue_records_auth_material_account_identifiers_owner_names_local_absolute_paths_and_raw_support_artifacts',
+});
+
 
 function applySupportDryRunPreset(options) {
   const scenarioPreset = options.scenario_id ? SUPPORT_DRY_RUN_SCENARIO_PRESETS[options.scenario_id] : null;
@@ -65,6 +83,8 @@ function usage() {
        node scripts/build-support-dry-run-summary.mjs --scenario-id <id> --issue-code <code> --triage-result <result> --bundle-privacy-check-status <status> --support-owner-ref <ref:role:...> [--support-artifact <redacted-json>] [--out <path>] [--json|--plain]
 
 Builds a public-safe ${SUPPORT_DRY_RUN_SUMMARY_SCHEMA} artifact for the public beta support dry-run evidence item. Presets fill only scenario, issue, and support-owner defaults; they never set triage result or bundle privacy status. --out writes JSON evidence; --plain controls stdout only.
+Allowed triage-result values: ${SUPPORT_DRY_RUN_TRIAGE_RESULT_VALUES.join(', ')}
+Allowed bundle-privacy-check-status values: ${SUPPORT_DRY_RUN_PRIVACY_STATUS_VALUES.join(', ')}
 `;
 }
 
@@ -269,6 +289,7 @@ export function buildSupportDryRunSummary(options = {}) {
     triage_result: triageResult,
     bundle_privacy_check_status: bundlePrivacyCheckStatus,
     support_owner_ref: supportOwnerRef,
+    collection_guidance: SUPPORT_DRY_RUN_COLLECTION_GUIDANCE,
     privacy_review: {
       status: bundlePrivacyCheckStatus === 'pass' ? 'pass' : 'hold',
       raw_logs_included: false,
@@ -285,6 +306,7 @@ export function buildSupportDryRunSummary(options = {}) {
       'triage_result',
       'bundle_privacy_check_status',
       'support_owner_ref',
+      'collection_guidance',
       'privacy_scan',
     ],
     omitted_private_fields: [
@@ -317,6 +339,10 @@ export function buildSupportDryRunSummary(options = {}) {
   return summary;
 }
 
+function renderValueList(values) {
+  return Array.isArray(values) && values.length > 0 ? values.join(', ') : '<not-reported>';
+}
+
 export function renderSupportDryRunPlain(summary) {
   const lines = [
     'Enigma support dry-run',
@@ -326,8 +352,11 @@ export function renderSupportDryRunPlain(summary) {
     `Issue: ${summary.issue_code ?? '<issue-code>'}`,
     `Triage: ${summary.triage_result ?? '<triage-result>'}`,
     `Bundle privacy check: ${summary.bundle_privacy_check_status ?? '<status>'}`,
+    `Allowed triage values: ${renderValueList(summary.collection_guidance?.triage_result_values)}`,
+    `Allowed privacy statuses: ${renderValueList(summary.collection_guidance?.bundle_privacy_check_status_values)}`,
+    `Collection steps: ${renderValueList(summary.collection_guidance?.collection_steps)}`,
     `Support owner: ${summary.support_owner_ref ?? '<support-owner-ref>'}`,
-    `Support artifact: ${summary.support_artifact?.artifact_hash ? 'attached by hash' : 'none'}`,
+    `Support artifact: ${summary.support_artifact?.artifact_hash ? 'attached by hash' : 'none'} (${summary.collection_guidance?.support_artifact_input ?? 'redacted_snapshot_only'})`,
     `Privacy scan: ${summary.privacy_scan?.status ?? '<status>'} (${summary.privacy_scan?.detected_private_field_count ?? 0} finding(s), ${Array.isArray(summary.privacy_scan?.checked_categories) ? summary.privacy_scan.checked_categories.length : 0} categories checked)`,
   ];
   lines.push('Boundary: public-safe support dry-run evidence only; no raw logs, screenshots, transcripts, credentials, account identifiers, owner names, local paths, raw support artifacts, hosted service, provider deletion, model behavior, beta-ready, production-ready, compliance, benchmark superiority, or token ROI claims.');

@@ -38,6 +38,9 @@ test('public beta evidence templates are public-safe blockers, not fake evidence
     assert.match(plain, /templates only; no PR approval, merge, npm publish, signing, upload, network action/);
     assert.equal(report.next_commands.some((command) => command.includes('--preset diagnostics')), true);
     assert.equal(report.next_commands.some((command) => command.includes('--preset crash')), true);
+    assert.match(plain, /Support dry-run triage values: resolved, needs_user_action, escalated, release_blocker, blocked/);
+    assert.match(plain, /Support dry-run privacy statuses: pass, fail, blocked, not_applicable/);
+    assert.match(plain, /Support dry-run collection steps: run_selected_preset_with_observed_triage_result, record_bundle_privacy_check_status_from_redaction_review, attach_redacted_allowlisted_support_artifact_only_when_available, keep_private_material_out_of_public_artifact/);
     assert.doesNotMatch(plain, /C:\\Users|\/home\/|\/tmp\/|AppData\\Local/i);
 
     const manifest = JSON.parse(await readFile(join(outDir, 'evidence-manifest.json'), 'utf8'));
@@ -70,6 +73,16 @@ test('public beta evidence templates are public-safe blockers, not fake evidence
     assert.equal(diagnosticSupport.replacement_command.includes(`${outDir}/support-dry-run-diagnostics.json`), true);
     assert.doesNotMatch(diagnosticSupport.replacement_command, /--bundle-privacy-check-status pass|--triage-result resolved/);
     assert.match(diagnosticSupport.support_artifact_note, /public-safe review/);
+    assert.deepEqual(diagnosticSupport.collection_guidance.triage_result_values, ['resolved', 'needs_user_action', 'escalated', 'release_blocker', 'blocked']);
+    assert.deepEqual(diagnosticSupport.collection_guidance.bundle_privacy_check_status_values, ['pass', 'fail', 'blocked', 'not_applicable']);
+    assert.deepEqual(diagnosticSupport.collection_guidance.collection_steps, [
+      'run_selected_preset_with_observed_triage_result',
+      'record_bundle_privacy_check_status_from_redaction_review',
+      'attach_redacted_allowlisted_support_artifact_only_when_available',
+      'keep_private_material_out_of_public_artifact',
+    ]);
+    assert.equal(diagnosticSupport.collection_guidance.support_artifact_input, 'optional_redacted_allowlisted_json_snapshot_hash_only');
+    assert.match(diagnosticSupport.support_artifact_note, /hash and allowlisted status fields only/);
 
     const crashSupport = JSON.parse(await readFile(join(outDir, 'support-dry-run-crash.json'), 'utf8'));
     assert.match(crashSupport.replacement_command, /--preset crash/);

@@ -117,15 +117,19 @@ test('clean-machine smoke dry-run plan is public-safe and non-inspecting', () =>
   assert.match(plan.command, /run-clean-machine-smoke\.mjs --plain --out \.enigma\/public-beta\/clean-machine-smoke\.json/);
   assert.deepEqual(plan.steps.map((step) => step.step_id), [
     'install_desktop_app',
+    'first_run_default_setup',
     'create_memory_drive',
     'connect_or_skip_client',
     'run_health_check',
     'export_public_safe_report',
   ]);
   assert.match(plan.steps.find((step) => step.step_id === 'create_memory_drive')?.expected_evidence ?? '', /Memory Drive data check/);
+  assert.match(plan.steps.find((step) => step.step_id === 'first_run_default_setup')?.action ?? '', /default local setup path/);
+  assert.match(plan.steps.find((step) => step.step_id === 'first_run_default_setup')?.expected_evidence ?? '', /pass\/fail notes only/);
   assert.doesNotMatch(serialized, /local vault/i);
   assert.match(plain, /^Enigma clean-machine smoke plan\n/);
   assert.match(plain, /Step: install_desktop_app/);
+  assert.match(plain, /Step: first_run_default_setup/);
   assert.match(plain, /Boundary: plan only/);
   assert.doesNotMatch(plain, /^\s*\{/);
   assert.doesNotMatch(serialized, /C:\\Users\\|\/home\/|\/tmp\/|AppData\\Local/i);
