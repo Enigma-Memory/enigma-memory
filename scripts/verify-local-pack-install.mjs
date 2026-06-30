@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { execFile as execFileCallback } from 'node:child_process';
+import { execFile as execFileCallback, spawn } from 'node:child_process';
 import { access, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve, sep } from 'node:path';
@@ -114,6 +114,81 @@ async function installedEntrypoint(prefix, relativePath, args, summarize) {
   };
 }
 
+function parseJsonLines(output) {
+  return String(output)
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+}
+
+function responseById(responses, id) {
+  return responses.find((response) => response?.id === id);
+}
+
+async function installedMcpStdioSmoke(prefix, tempDir) {
+  const relativePath = 'packages/mcp-server/bin/enigma-mcp.mjs';
+  const entrypoint = join(prefix, 'node_modules', 'enigma-memory', relativePath);
+  await access(entrypoint);
+  const child = spawn(process.execPath, [entrypoint], {
+    cwd: prefix,
+    env: localOnlyEnv({ ENIGMA_BUNDLE: join(tempDir, 'mcp-bundle.json') }),
+    stdio: ['pipe', 'pipe', 'pipe'],
+    windowsHide: true,
+  });
+  let stdout = '';
+  let stderr = '';
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+  child.stdout.on('data', (chunk) => { stdout += chunk; });
+  child.stderr.on('data', (chunk) => { stderr += chunk; });
+  const requests = [
+    { jsonrpc: '2.0', id: 'initialize', method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'enigma-local-pack-install-smoke', version: '0' } } },
+    { jsonrpc: '2.0', id: 'tools', method: 'tools/list', params: {} },
+    { jsonrpc: '2.0', id: 'resources', method: 'resources/list', params: {} },
+    { jsonrpc: '2.0', id: 'prompts', method: 'prompts/list', params: {} },
+  ];
+  for (const request of requests) child.stdin.write(`${JSON.stringify(request)}\n`);
+  child.stdin.end();
+  const status = await new Promise((resolveClose, rejectClose) => {
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL');
+      rejectClose(new Error('Installed enigma-mcp stdio smoke timed out.'));
+    }, COMMAND_TIMEOUT_MS);
+    child.once('close', (code) => {
+      clearTimeout(timer);
+      resolveClose(code ?? 0);
+    });
+    child.once('error', (error) => {
+      clearTimeout(timer);
+      rejectClose(error);
+    });
+  });
+  assertNoSecretOutput(`${stdout}\n${stderr}`, relativePath);
+  if (status !== 0) throw new Error(`${relativePath} failed with status ${status}: ${redactLocalPath(stderr || stdout)}`);
+  const responses = parseJsonLines(stdout);
+  const initialize = responseById(responses, 'initialize');
+  const tools = responseById(responses, 'tools');
+  const resources = responseById(responses, 'resources');
+  const prompts = responseById(responses, 'prompts');
+  if (initialize?.result?.serverInfo?.name !== 'enigma-mcp-server') throw new Error('Installed enigma-mcp initialize response missing Enigma server info.');
+  const toolCount = Array.isArray(tools?.result?.tools) ? tools.result.tools.length : 0;
+  const resourceCount = Array.isArray(resources?.result?.resources) ? resources.result.resources.length : 0;
+  const promptCount = Array.isArray(prompts?.result?.prompts) ? prompts.result.prompts.length : 0;
+  if (toolCount <= 0 || resourceCount <= 0 || promptCount <= 0) throw new Error('Installed enigma-mcp stdio smoke returned empty capabilities.');
+  return {
+    entrypoint: relativePath,
+    status,
+    evidence: {
+      server: initialize.result.serverInfo.name,
+      protocolVersion: initialize.result.protocolVersion,
+      tool_count: toolCount,
+      resource_count: resourceCount,
+      prompt_count: promptCount,
+    },
+  };
+}
+
 export async function runLocalPackInstallSmoke(now = new Date()) {
   const tempDir = await mkdtemp(join(tmpdir(), 'enigma-local-pack-install-'));
   try {
@@ -140,6 +215,7 @@ export async function runLocalPackInstallSmoke(now = new Date()) {
     checks.push(await installedEntrypoint(prefix, 'apps/verifier/bin/enigma-verify.mjs', ['--help'], (stdout) => summarizeHelp(stdout, 'enigma-verify')));
     checks.push(await installedEntrypoint(prefix, 'apps/relay/bin/enigma-relay.mjs', ['--help'], (stdout) => summarizeCommandHelp(stdout, 'enigma-relay [demo|serve] [options]', ['demo', 'serve'])));
     checks.push(await installedEntrypoint(prefix, 'apps/gateway/bin/enigma-gateway.mjs', ['--help'], (stdout) => summarizeCommandHelp(stdout, 'enigma-gateway [demo|serve] [options]', ['demo', 'serve'])));
+    checks.push(await installedMcpStdioSmoke(prefix, tempDir));
     checks.push(await installedEntrypoint(prefix, 'apps/native-host/bin/enigma-native-host.mjs', ['--help'], (stdout) => summarizeHelp(stdout, 'enigma-native-host')));
 
     return {

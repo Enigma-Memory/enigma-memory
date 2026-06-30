@@ -25,11 +25,16 @@ test('local packed install smoke installs tarball into temp prefix only', async 
     'apps/verifier/bin/enigma-verify.mjs',
     'apps/relay/bin/enigma-relay.mjs',
     'apps/gateway/bin/enigma-gateway.mjs',
+    'packages/mcp-server/bin/enigma-mcp.mjs',
     'apps/native-host/bin/enigma-native-host.mjs',
   ]);
   assert.deepEqual(report.checks[3].evidence.commands, ['demo', 'serve']);
   assert.deepEqual(report.checks[4].evidence.commands, ['demo', 'serve']);
   assert.equal(report.checks[1].evidence.schema, 'enigma.test_drive.v1');
+  assert.equal(report.checks[5].evidence.server, 'enigma-mcp-server');
+  assert.equal(report.checks[5].evidence.tool_count > 0, true);
+  assert.equal(report.checks[5].evidence.resource_count > 0, true);
+  assert.equal(report.checks[5].evidence.prompt_count > 0, true);
   assert.equal(report.checks[1].evidence.writes_performed, false);
   assert.match(plain, /local temp-prefix install smoke only/);
   assert.doesNotMatch(serialized, /C:\\Users|[A-Za-z]:\\\\|AppData\\\\Local|file:\/\/\/|\/tmp\/enigma|\/home\/[^"',]+|npm_[A-Za-z0-9]{8,}|ghp_|sk-[A-Za-z0-9]{8,}/i);
