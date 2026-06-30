@@ -523,6 +523,7 @@ test('public beta QA matrix can consume support dry-run evidence per scenario', 
         bundle_privacy_check_status: 'pass',
         privacy_review: { status: 'pass' },
         triage_result: 'resolved',
+        support_owner_ref: 'ref:role:beta-support',
       },
       {
         schema: 'enigma.support_dry_run_summary.v1',
@@ -531,6 +532,7 @@ test('public beta QA matrix can consume support dry-run evidence per scenario', 
         bundle_privacy_check_status: 'pass',
         privacy_review: { status: 'pass' },
         triage_result: 'needs_user_action',
+        support_owner_ref: 'ref:role:beta-support',
       },
     ],
   });
@@ -546,6 +548,45 @@ test('public beta QA matrix can consume support dry-run evidence per scenario', 
   assert.equal(crash.blocker_refs.length, 0);
   assert.equal(crash.issue_codes.length, 0);
   assert.match(JSON.stringify(crash.evidence_refs), /ref:evidence:support-dry-run:BETA-CRASH-001/);
+});
+
+test('public beta QA matrix keeps template-only support evidence blocked', () => {
+  const scenarios = buildScenarioRows({
+    tauriConfig: { bundle: { active: true, targets: ['msi', 'nsis', 'dmg', 'app'] } },
+    wizardUi: 'Create my Memory Drive Find my apps Connect your AI apps Run health check Your Memory Drive is ready Proof activity Export bundle Crash reporting Repair connection Rollback',
+    helpUi: 'Proof artifacts can show hashes',
+    desktopIndex: './wizard.js',
+    serviceCommands: 'create_vault detect_clients connect_client get_health offline_ready repair_client rollback_client malformed backup',
+    diagnosticsCommands: 'FORBIDDEN_KEYS export_diagnostics approve redact_path',
+    crashCommands: 'init_panic_hook opt-in required pending-crash-reports',
+    updateCommands: '"offline"',
+    libCommands: 'commands::service::get_health',
+    desktopReleaseWorkflow: 'Sign update manifest',
+    npmPublishWorkflow: 'npm publish --access public --provenance',
+    packageVersion: '0.1.19',
+    cleanMachineSmoke: {
+      schema: 'enigma.clean_machine_smoke.v1',
+      app_version: '0.1.19',
+      summary: { healthy: true },
+    },
+    supportDryRunSummaries: [
+      {
+        schema: 'enigma.support_dry_run_summary.v1',
+        evidence_status: 'template_only',
+        evidence_item_id: 'EV-P10-SUPPORT-DRY-RUN-SUMMARY',
+        scenario_id: 'BETA-DIAG-001',
+        support_owner_ref: 'ref:role:beta-support',
+        bundle_privacy_check_status: 'pass',
+        privacy_review: { status: 'pass' },
+        triage_result: 'resolved',
+      },
+    ],
+  });
+
+  const diagnostics = scenarioById(scenarios, 'BETA-DIAG-001');
+  assert.equal(diagnostics.status, 'blocked');
+  assert.ok(diagnostics.blocker_refs.includes('BLOCKER-SUPPORT-DRY-RUN'));
+  assert.ok(diagnostics.issue_codes.includes('diagnostics-support-dry-run-missing'));
 });
 
 test('public beta QA matrix can consume registry install evidence without clearing release approval', () => {

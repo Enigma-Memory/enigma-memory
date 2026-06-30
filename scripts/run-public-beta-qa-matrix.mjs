@@ -19,6 +19,7 @@ export const REQUIRED_PUBLIC_BETA_VERSION = '0.1.19';
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const ROOT = resolve(dirname(SCRIPT_PATH), '..');
 const STATUS_VALUES = new Set(['pass', 'fail', 'blocked', 'missing', 'pending']);
+const SUPPORT_OWNER_REF_RE = /^ref:role:[A-Za-z0-9._~:@#?=&%+-]{1,96}$/u;
 
 const REFS = Object.freeze({
   packageVersion: 'ref:repo:package.json#version',
@@ -695,8 +696,10 @@ export function buildScenarioRows(inputs) {
   const cleanMachineBlockers = (...rest) => (cleanMachineEvidenceReady ? rest : [cleanMachine, ...rest]);
   const supportEvidenceReadyFor = (scenarioId) => (Array.isArray(inputs.supportDryRunSummaries) ? inputs.supportDryRunSummaries : [])
     .some((summary) => summary?.schema === 'enigma.support_dry_run_summary.v1'
+      && summary?.evidence_status !== 'template_only'
       && summary?.evidence_item_id === 'EV-P10-SUPPORT-DRY-RUN-SUMMARY'
       && summary?.scenario_id === scenarioId
+      && SUPPORT_OWNER_REF_RE.test(summary?.support_owner_ref ?? '')
       && summary?.bundle_privacy_check_status === 'pass'
       && summary?.privacy_review?.status === 'pass'
       && !['blocked', 'release_blocker'].includes(summary?.triage_result));
