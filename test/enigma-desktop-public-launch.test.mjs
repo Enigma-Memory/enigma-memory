@@ -876,6 +876,8 @@ test('public website explains consumer install path without unsupported claims',
   assert.match(productionReadinessStatus, /public beta and GA blockers/);
   assert.match(productionReadinessStatus, /9\/9 pass/);
   assert.match(productionReadinessStatus, /696\/696 pass/);
+  assert.match(productionReadinessStatus, /npm run public-beta:status/);
+  assert.match(qaSupportObservability, /npm run public-beta:status/);
   assert.match(installGuide, /when your platform is marked ready/);
   assert.match(macosInstall, /when signing is ready/);
   assert.match(windowsInstall, /when signing is ready/);

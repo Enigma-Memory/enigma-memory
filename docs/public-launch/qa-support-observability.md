@@ -24,7 +24,7 @@ Automated smoke should run on clean Windows and macOS runners or disposable VMs.
 
 ### Automated public beta QA matrix runner
 
-Run `npm run public-beta-qa` from the repository root to print the public-safe matrix report, or run `node scripts/run-public-beta-qa-matrix.mjs --json` directly; add `--out <relative-report-path>` to the direct node form to write the same JSON report. The runner lives at [`scripts/run-public-beta-qa-matrix.mjs`](../../scripts/run-public-beta-qa-matrix.mjs). The report schema is `enigma.public_beta_qa_matrix.v1`; evidence references must stay relative or opaque and must not include raw memory, prompts, transcripts, credentials, account IDs, customer identifiers, provider responses, signing secrets, private owner names, or local absolute paths.
+Run `npm run public-beta:status` from the repository root for the shortest public-safe HOLD/pass/blocker view. Run `npm run public-beta-qa` to print the public-safe matrix report, or run `node scripts/run-public-beta-qa-matrix.mjs --json` directly; add `--out <relative-report-path>` to the direct node form to write the same JSON report. The runner lives at [`scripts/run-public-beta-qa-matrix.mjs`](../../scripts/run-public-beta-qa-matrix.mjs). The report schema is `enigma.public_beta_qa_matrix.v1`; evidence references must stay relative or opaque and must not include raw memory, prompts, transcripts, credentials, account IDs, customer identifiers, provider responses, signing secrets, private owner names, or local absolute paths.
 
 Scenario status values are limited to `pass`, `fail`, `blocked`, `missing`, and `pending`:
 
