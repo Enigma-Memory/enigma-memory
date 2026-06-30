@@ -46,6 +46,7 @@ async function run(command, args, options = {}) {
       windowsHide: true,
       timeout: options.timeoutMs ?? COMMAND_TIMEOUT_MS,
       maxBuffer: 32 * 1024 * 1024,
+      shell: Boolean(options.shell),
     });
     return { ok: true, status: 0, stdout: result.stdout, stderr: result.stderr };
   } catch (error) {
@@ -109,6 +110,33 @@ async function installedEntrypoint(prefix, relativePath, args, summarize) {
   if (!result.ok) throw new Error(`${relativePath} failed with status ${result.status}: ${redactLocalPath(result.stderr || result.stdout)}`);
   return {
     entrypoint: relativePath,
+    status: result.status,
+    evidence: summarize(result.stdout),
+  };
+}
+
+function installedBinPath(prefix, binName) {
+  const command = process.platform === 'win32' ? `${binName}.cmd` : binName;
+  return join(prefix, 'node_modules', '.bin', command);
+}
+
+function windowsCommandQuote(value) {
+  const text = String(value);
+  if (!/[\s"&^<>|]/u.test(text)) return text;
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+async function installedBinShim(prefix, binName, args, summarize) {
+  const binPath = installedBinPath(prefix, binName);
+  await access(binPath);
+  const command = process.platform === 'win32' ? `${windowsCommandQuote(binPath)} ${args.map(windowsCommandQuote).join(' ')}`.trim() : binPath;
+  const result = process.platform === 'win32'
+    ? await run(command, [], { cwd: prefix, shell: true })
+    : await run(command, args, { cwd: prefix });
+  assertNoSecretOutput(`${result.stdout}\n${result.stderr}`, `bin:${binName}`);
+  if (!result.ok) throw new Error(`bin:${binName} failed with status ${result.status}: ${redactLocalPath(result.stderr || result.stdout)}`);
+  return {
+    bin: binName,
     status: result.status,
     evidence: summarize(result.stdout),
   };
@@ -218,6 +246,14 @@ export async function runLocalPackInstallSmoke(now = new Date()) {
     checks.push(await installedMcpStdioSmoke(prefix, tempDir));
     checks.push(await installedEntrypoint(prefix, 'apps/native-host/bin/enigma-native-host.mjs', ['--help'], (stdout) => summarizeHelp(stdout, 'enigma-native-host')));
 
+    const binShimChecks = [];
+    binShimChecks.push(await installedBinShim(prefix, 'enigma', ['--help'], (stdout) => summarizeHelp(stdout, 'enigma')));
+    binShimChecks.push(await installedBinShim(prefix, 'enigma', ['test-drive', '--dry-run'], summarizeTestDrive));
+    binShimChecks.push(await installedBinShim(prefix, 'enigma-verify', ['--help'], (stdout) => summarizeHelp(stdout, 'enigma-verify')));
+    binShimChecks.push(await installedBinShim(prefix, 'enigma-relay', ['--help'], (stdout) => summarizeCommandHelp(stdout, 'enigma-relay [demo|serve] [options]', ['demo', 'serve'])));
+    binShimChecks.push(await installedBinShim(prefix, 'enigma-gateway', ['--help'], (stdout) => summarizeCommandHelp(stdout, 'enigma-gateway [demo|serve] [options]', ['demo', 'serve'])));
+    binShimChecks.push(await installedBinShim(prefix, 'enigma-native-host', ['--help'], (stdout) => summarizeHelp(stdout, 'enigma-native-host')));
+
     return {
       schema: SCHEMA,
       generated_at: now.toISOString(),
@@ -236,6 +272,7 @@ export async function runLocalPackInstallSmoke(now = new Date()) {
         scripts_ignored: true,
       },
       checks,
+      bin_shim_checks: binShimChecks,
       safety: {
         temp_dir_removed: true,
         local_paths_included: false,
@@ -257,9 +294,13 @@ export function renderLocalPackInstallSmokePlain(report) {
     `Tarball: ${report.package?.tarball ?? '<unknown>'}`,
     `Install: ${report.install?.command ?? '<unknown>'}`,
     `Checks: ${Array.isArray(report.checks) ? report.checks.length : 0}`,
+    `Bin shims: ${Array.isArray(report.bin_shim_checks) ? report.bin_shim_checks.length : 0}`,
   ];
   for (const check of Array.isArray(report.checks) ? report.checks : []) {
     lines.push(`Check: ${check.entrypoint}`);
+  }
+  for (const check of Array.isArray(report.bin_shim_checks) ? report.bin_shim_checks : []) {
+    lines.push(`Bin shim: ${check.bin}`);
   }
   lines.push('Boundary: local temp-prefix install smoke only; no npm publish, token, global install, signing, hosted service, provider behavior, benchmark, token ROI, or compliance claim.');
   return `${lines.join('\n')}\n`;

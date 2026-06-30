@@ -329,12 +329,16 @@ function summarizeLocalPackInstall(stdout) {
   requireJsonField(json, ['install', 'npm_publish'], (value) => value === false, 'Local pack install smoke must not publish.');
   const checks = requireJsonField(json, ['checks'], Array.isArray, 'Local pack install smoke omitted checks.');
   if (checks.length < 3) throw new Error('Local pack install smoke did not run enough entrypoint checks.');
+  const binShimChecks = requireJsonField(json, ['bin_shim_checks'], Array.isArray, 'Local pack install smoke omitted bin shim checks.');
+  if (binShimChecks.length < 5) throw new Error('Local pack install smoke did not run enough installed bin shim checks.');
   return {
     schema: json.schema,
     tarball: json.package?.tarball ?? null,
     temp_prefix_install: json.install?.command === 'npm install --prefix <temp-prefix> --ignore-scripts <local-tarball>',
     check_count: checks.length,
     checked_entrypoints: checks.map((check) => check.entrypoint),
+    bin_shim_count: binShimChecks.length,
+    checked_bin_shims: binShimChecks.map((check) => check.bin),
   };
 }
 
