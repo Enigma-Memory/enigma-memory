@@ -17,7 +17,7 @@ test('public beta review parser defaults to one-command plain review', () => {
   assert.throws(() => parseArgs(['--out-dir']), /Missing value/);
 });
 
-test('public beta review writes generated support dry-run evidence and keeps external blockers explicit', async () => {
+test('public beta review writes generated support dry-run blockers and keeps external blockers explicit', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'enigma-public-beta-review-'));
   try {
     const result = await runPublicBetaReview({ outDir: dir });
@@ -30,7 +30,7 @@ test('public beta review writes generated support dry-run evidence and keeps ext
     assert.deepEqual(result.generated_evidence_items, ['EV-P10-SUPPORT-DRY-RUN-SUMMARY']);
     assert.equal(result.matrix.advisor_decision, 'hold');
     assert.equal(result.matrix.summary.ready_for_public_beta, false);
-    assert.equal(result.matrix.next_actions.some((action) => action.action_id === 'record_support_dry_run'), false);
+    assert.equal(result.matrix.next_actions.some((action) => action.action_id === 'record_support_dry_run'), true);
     assert.equal(result.safety.release_action_performed, false);
     assert.equal(result.safety.network_performed, false);
     assert.equal(result.safety.generated_support_dry_run_public_safe, true);
@@ -47,8 +47,14 @@ test('public beta review writes generated support dry-run evidence and keeps ext
     assert.equal(manifest.clean_machine_smoke_plan, '.enigma/public-beta/clean-machine-smoke-plan.json');
     assert.equal(diagnosticSupport.schema, 'enigma.support_dry_run_summary.v1');
     assert.equal(diagnosticSupport.scenario_id, 'BETA-DIAG-001');
+    assert.equal(diagnosticSupport.triage_result, 'blocked');
+    assert.equal(diagnosticSupport.bundle_privacy_check_status, 'blocked');
+    assert.equal(diagnosticSupport.privacy_review.status, 'hold');
     assert.equal(crashSupport.schema, 'enigma.support_dry_run_summary.v1');
     assert.equal(crashSupport.scenario_id, 'BETA-CRASH-001');
+    assert.equal(crashSupport.triage_result, 'blocked');
+    assert.equal(crashSupport.bundle_privacy_check_status, 'blocked');
+    assert.equal(crashSupport.privacy_review.status, 'hold');
     assert.equal(cleanMachinePlan.schema, 'enigma.clean_machine_smoke_plan.v1');
     assert.equal(cleanMachinePlan.safety.network_performed, false);
     assert.equal(cleanMachinePlan.safety.system_inspection_performed, false);
@@ -90,7 +96,7 @@ test('public beta review plain output is bounded and path-redacted', async () =>
     assert.match(stdout, /Generated support dry-runs: 2/);
     assert.match(stdout, /Generated clean-machine plan: 1/);
     assert.match(stdout, /Templates: npm run public-beta:evidence-templates -- --out-dir \.enigma\/public-beta --plain/);
-    assert.doesNotMatch(stdout, /record_support_dry_run/);
+    assert.match(stdout, /record_support_dry_run/);
     assert.match(stdout, /Boundary: one-command local review only/);
     assert.doesNotMatch(stdout, /^\s*\{/);
     assert.equal(stdout.includes(dir), false);
