@@ -79,6 +79,16 @@ function summarizeHelp(stdout, expected) {
   return { usage: json.usage };
 }
 
+function summarizeCommandHelp(stdout, expectedUsage, expectedCommands = []) {
+  const json = parseJsonPayload(stdout);
+  if (json.usage !== expectedUsage) throw new Error(`${expectedUsage} help did not include exact expected usage.`);
+  const commands = Array.isArray(json.commands) ? json.commands : [];
+  for (const command of expectedCommands) {
+    if (!commands.includes(command)) throw new Error(`${expectedUsage} help omitted command ${command}.`);
+  }
+  return { usage: json.usage, commands };
+}
+
 function summarizeTestDrive(stdout) {
   const json = parseJsonPayload(stdout);
   if (json.schema !== 'enigma.test_drive.v1') throw new Error('Installed enigma test-drive did not emit enigma.test_drive.v1.');
@@ -128,6 +138,9 @@ export async function runLocalPackInstallSmoke(now = new Date()) {
     checks.push(await installedEntrypoint(prefix, 'apps/cli/bin/enigma.mjs', ['--help'], (stdout) => summarizeHelp(stdout, 'enigma')));
     checks.push(await installedEntrypoint(prefix, 'apps/cli/bin/enigma.mjs', ['test-drive', '--dry-run'], summarizeTestDrive));
     checks.push(await installedEntrypoint(prefix, 'apps/verifier/bin/enigma-verify.mjs', ['--help'], (stdout) => summarizeHelp(stdout, 'enigma-verify')));
+    checks.push(await installedEntrypoint(prefix, 'apps/relay/bin/enigma-relay.mjs', ['--help'], (stdout) => summarizeCommandHelp(stdout, 'enigma-relay [demo|serve] [options]', ['demo', 'serve'])));
+    checks.push(await installedEntrypoint(prefix, 'apps/gateway/bin/enigma-gateway.mjs', ['--help'], (stdout) => summarizeCommandHelp(stdout, 'enigma-gateway [demo|serve] [options]', ['demo', 'serve'])));
+    checks.push(await installedEntrypoint(prefix, 'apps/native-host/bin/enigma-native-host.mjs', ['--help'], (stdout) => summarizeHelp(stdout, 'enigma-native-host')));
 
     return {
       schema: SCHEMA,

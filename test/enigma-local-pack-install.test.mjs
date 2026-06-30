@@ -23,7 +23,12 @@ test('local packed install smoke installs tarball into temp prefix only', async 
     'apps/cli/bin/enigma.mjs',
     'apps/cli/bin/enigma.mjs',
     'apps/verifier/bin/enigma-verify.mjs',
+    'apps/relay/bin/enigma-relay.mjs',
+    'apps/gateway/bin/enigma-gateway.mjs',
+    'apps/native-host/bin/enigma-native-host.mjs',
   ]);
+  assert.deepEqual(report.checks[3].evidence.commands, ['demo', 'serve']);
+  assert.deepEqual(report.checks[4].evidence.commands, ['demo', 'serve']);
   assert.equal(report.checks[1].evidence.schema, 'enigma.test_drive.v1');
   assert.equal(report.checks[1].evidence.writes_performed, false);
   assert.match(plain, /local temp-prefix install smoke only/);
