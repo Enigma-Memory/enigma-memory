@@ -33,7 +33,7 @@ test('public beta evidence templates are public-safe blockers, not fake evidence
     assert.equal(report.safety.template_only, true);
     assert.equal(report.safety.release_action_performed, false);
     assert.equal(report.safety.network_performed, false);
-    assert.equal(report.files.length, 5);
+    assert.equal(report.files.length, 8);
     assert.equal(report.files.every((file) => file.path.startsWith(`${outDir}/`)), true);
     assert.match(plain, /templates only; no PR approval, merge, npm publish, signing, upload, network action/);
     assert.doesNotMatch(plain, /C:\\Users|\/home\/|\/tmp\/|AppData\\Local/i);
@@ -41,9 +41,25 @@ test('public beta evidence templates are public-safe blockers, not fake evidence
     const manifest = JSON.parse(await readFile(join(outDir, 'evidence-manifest.json'), 'utf8'));
     assert.equal(manifest.schema, 'enigma.public_beta_evidence_manifest.v1');
     assert.equal(manifest.clean_machine_smoke, `${outDir}/clean-machine-smoke.json`);
+    assert.equal(manifest.clean_machine_smoke_plan, `${outDir}/clean-machine-smoke-plan.json`);
+    assert.deepEqual(manifest.support_dry_run, [
+      `${outDir}/support-dry-run-diagnostics.json`,
+      `${outDir}/support-dry-run-crash.json`,
+    ]);
     assert.equal(manifest.registry_install, `${outDir}/registry-install.json`);
     assert.equal(manifest.desktop_release_evidence, `${outDir}/desktop-release-evidence.json`);
     assert.equal(manifest.production_handoff_packet, `${outDir}/production-handoff-packet.json`);
+
+    const cleanMachinePlan = JSON.parse(await readFile(join(outDir, 'clean-machine-smoke-plan.json'), 'utf8'));
+    assert.equal(cleanMachinePlan.schema, 'enigma.clean_machine_smoke_plan.v1');
+    assert.equal(cleanMachinePlan.safety.system_inspection_performed, false);
+
+    const diagnosticSupport = JSON.parse(await readFile(join(outDir, 'support-dry-run-diagnostics.json'), 'utf8'));
+    assert.equal(diagnosticSupport.schema, 'enigma.support_dry_run_summary.v1');
+    assert.equal(diagnosticSupport.evidence_status, 'template_only');
+    assert.equal(diagnosticSupport.scenario_id, 'BETA-DIAG-001');
+    assert.equal(diagnosticSupport.triage_result, 'blocked');
+    assert.equal(diagnosticSupport.privacy_review.status, 'blocked');
 
     const registry = JSON.parse(await readFile(join(outDir, 'registry-install.json'), 'utf8'));
     assert.equal(registry.schema, 'enigma.registry_install_verifier.v1');
@@ -62,6 +78,7 @@ test('public beta evidence templates are public-safe blockers, not fake evidence
     assert.equal(advisor.advisor_decision, 'hold');
     assert.equal(advisor.summary.ready_for_public_beta, false);
     assert.equal(advisor.next_actions[0].action_id, 'approve_merge_release_pr');
+    assert.equal(advisor.next_actions.some((action) => action.action_id === 'record_support_dry_run'), true);
   } finally {
     await cleanup(outDir);
   }

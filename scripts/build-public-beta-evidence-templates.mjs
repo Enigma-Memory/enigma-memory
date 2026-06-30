@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { verifyPublicSafeArtifact } from '../packages/core/src/index.js';
 import { buildPublicBetaEvidenceManifest } from './build-public-beta-evidence-manifest.mjs';
+import { buildCleanMachineSmokePlan } from './run-clean-machine-smoke.mjs';
 import { REQUIRED_PUBLIC_BETA_VERSION } from './run-public-beta-qa-matrix.mjs';
 
 export const PUBLIC_BETA_EVIDENCE_TEMPLATES_SCHEMA = 'enigma.public_beta_evidence_templates.v1';
@@ -12,6 +13,9 @@ export const PUBLIC_BETA_EVIDENCE_TEMPLATES_SCHEMA = 'enigma.public_beta_evidenc
 const DEFAULT_OUT_DIR = '.enigma/public-beta';
 const TEMPLATE_FILES = Object.freeze({
   cleanMachineSmoke: 'clean-machine-smoke.json',
+  cleanMachineSmokePlan: 'clean-machine-smoke-plan.json',
+  supportDryRunDiagnostics: 'support-dry-run-diagnostics.json',
+  supportDryRunCrash: 'support-dry-run-crash.json',
   registryInstall: 'registry-install.json',
   desktopReleaseEvidence: 'desktop-release-evidence.json',
   productionHandoffPacket: 'production-handoff-packet.json',
@@ -19,7 +23,7 @@ const TEMPLATE_FILES = Object.freeze({
 });
 
 function usage() {
-  return `Usage: node scripts/build-public-beta-evidence-templates.mjs [--out-dir <relative-dir>] [--overwrite] [--plain|--json]\n\nWrites public-safe starter evidence files for npm run public-beta:review. Templates are blockers by design: they tell a release owner what to replace with real review, npm, signing, desktop, and clean-machine evidence without performing PR approval, merge, npm publish, signing, upload, or network actions.\n`;
+  return `Usage: node scripts/build-public-beta-evidence-templates.mjs [--out-dir <relative-dir>] [--overwrite] [--plain|--json]\n\nWrites public-safe starter evidence files for npm run public-beta:review. Templates are blockers by design: they tell a release owner what to replace with real review, npm, signing, desktop, clean-machine, and support dry-run evidence without performing PR approval, merge, npm publish, signing, upload, or network actions.\n`;
 }
 
 function readArg(argv, index, flag) {
@@ -187,6 +191,32 @@ function buildCleanMachineSmokeTemplate(generatedAt) {
   };
 }
 
+function buildSupportDryRunTemplate({ generatedAt, scenarioId, issueCode }) {
+  return {
+    schema: 'enigma.support_dry_run_summary.v1',
+    evidence_status: 'template_only',
+    evidence_item_id: 'EV-P10-SUPPORT-DRY-RUN-SUMMARY',
+    generated_at: generatedAt,
+    scenario_id: scenarioId,
+    issue_code: issueCode,
+    triage_result: 'blocked',
+    bundle_privacy_check_status: 'blocked',
+    support_owner_ref: 'ref:role:beta-support',
+    privacy_review: {
+      status: 'blocked',
+      reviewer_ref: 'ref:role:beta-support',
+      issue_codes: ['EVIDENCE-NEEDS-SUPPORT-RUN'],
+    },
+    claim_review: {
+      status: 'blocked',
+      reviewer_ref: 'ref:role:beta-support',
+      issue_codes: ['EVIDENCE-NEEDS-SUPPORT-RUN'],
+    },
+    support_artifact_snapshot: null,
+    claim_boundary: templateBoundary(),
+  };
+}
+
 function assertPublicSafe(name, artifact) {
   const safety = verifyPublicSafeArtifact(artifact);
   if (!safety.ok) throw new Error(`${name} template is not public-safe: ${safety.errors.join('; ')}`);
@@ -194,6 +224,9 @@ function assertPublicSafe(name, artifact) {
 
 function buildArtifacts(outDirLabel, generatedAt) {
   const cleanMachineSmoke = `${outDirLabel}/${TEMPLATE_FILES.cleanMachineSmoke}`;
+  const cleanMachineSmokePlan = `${outDirLabel}/${TEMPLATE_FILES.cleanMachineSmokePlan}`;
+  const supportDryRunDiagnostics = `${outDirLabel}/${TEMPLATE_FILES.supportDryRunDiagnostics}`;
+  const supportDryRunCrash = `${outDirLabel}/${TEMPLATE_FILES.supportDryRunCrash}`;
   const registryInstall = `${outDirLabel}/${TEMPLATE_FILES.registryInstall}`;
   const desktopReleaseEvidence = `${outDirLabel}/${TEMPLATE_FILES.desktopReleaseEvidence}`;
   const productionHandoffPacket = `${outDirLabel}/${TEMPLATE_FILES.productionHandoffPacket}`;
@@ -203,6 +236,29 @@ function buildArtifacts(outDirLabel, generatedAt) {
       evidence_item_id: 'EV-P10-CLEAN-MACHINE-SMOKE',
       path: cleanMachineSmoke,
       artifact: buildCleanMachineSmokeTemplate(generatedAt),
+    },
+    {
+      evidence_item_id: 'EV-P10-CLEAN-MACHINE-SMOKE-PLAN',
+      path: cleanMachineSmokePlan,
+      artifact: buildCleanMachineSmokePlan(new Date(generatedAt)),
+    },
+    {
+      evidence_item_id: 'EV-P10-SUPPORT-DRY-RUN-SUMMARY',
+      path: supportDryRunDiagnostics,
+      artifact: buildSupportDryRunTemplate({
+        generatedAt,
+        scenarioId: 'BETA-DIAG-001',
+        issueCode: 'DIAG-BUNDLE-PREVIEWED',
+      }),
+    },
+    {
+      evidence_item_id: 'EV-P10-SUPPORT-DRY-RUN-SUMMARY',
+      path: supportDryRunCrash,
+      artifact: buildSupportDryRunTemplate({
+        generatedAt,
+        scenarioId: 'BETA-CRASH-001',
+        issueCode: 'CRASH-REPORTING-MANUAL-EVIDENCE',
+      }),
     },
     {
       evidence_item_id: 'EV-P10-REGISTRY-INSTALL',
@@ -222,9 +278,11 @@ function buildArtifacts(outDirLabel, generatedAt) {
   ];
   const manifest = buildPublicBetaEvidenceManifest({
     cleanMachineSmoke,
+    cleanMachineSmokePlan,
     registryInstall,
     desktopReleaseEvidence,
     productionHandoffPacket,
+    supportDryRun: [supportDryRunDiagnostics, supportDryRunCrash],
   }, generatedAt);
   artifacts.push({
     evidence_item_id: 'EV-P10-PUBLIC-BETA-EVIDENCE-MANIFEST',
