@@ -95,6 +95,10 @@ function buildProductionHandoffTemplate(generatedAt) {
   };
 }
 
+function registryInstallEvidenceCommand() {
+  return `npm install --prefix <temp-prefix> enigma-memory@${REQUIRED_PUBLIC_BETA_VERSION}`;
+}
+
 function buildRegistryInstallTemplate(generatedAt) {
   return {
     schema: 'enigma.registry_install_verifier.v1',
@@ -110,7 +114,7 @@ function buildRegistryInstallTemplate(generatedAt) {
       registry_ref: 'TBD-public-registry-package-ref',
     },
     install: {
-      command: `npm install --prefix <temp-prefix> enigma-memory@${REQUIRED_PUBLIC_BETA_VERSION}`,
+      command: registryInstallEvidenceCommand(),
       result: 'pending',
       evidence_ref: 'TBD-public-install-result-ref',
     },
@@ -405,6 +409,11 @@ export async function buildPublicBetaEvidenceTemplates(options = {}, now = new D
       local_paths_included: false,
       raw_private_content_included: false,
     },
+    registry_install_guidance: {
+      when: 'after_public_npm_publish_evidence_exists',
+      command: registryInstallEvidenceCommand(),
+      evidence_template: `${outDir}/${TEMPLATE_FILES.registryInstall}`,
+    },
     support_dry_run_collection_guidance: SUPPORT_DRY_RUN_COLLECTION_GUIDANCE,
     claim_boundary: templateBoundary(),
   };
@@ -428,6 +437,10 @@ export function renderPublicBetaEvidenceTemplatesPlain(report) {
   }
   for (const command of Array.isArray(report.next_commands) ? report.next_commands : []) {
     lines.push(`Next: ${command}`);
+  }
+  if (report.registry_install_guidance) {
+    lines.push(`Registry install after npm publish: ${report.registry_install_guidance.command}`);
+    lines.push(`Registry install evidence template: ${report.registry_install_guidance.evidence_template}`);
   }
   lines.push('Boundary: templates only; no PR approval, merge, npm publish, signing, upload, network action, provider action, hosted service, benchmark, token ROI, or compliance claim.');
   return `${lines.join('\n')}\n`;
