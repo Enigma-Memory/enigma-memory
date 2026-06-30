@@ -35,7 +35,7 @@ Use npm only when you want the command-line engine instead of the desktop app.
 ### Requirements
 
 - Node.js `>=24`
-- A local filesystem path for the Enigma vault bundle
+- A local filesystem path for the Enigma Memory Drive bundle
 - No database, package registry account, provider credential, cloud credential, hosted Enigma account, or external account for the local test-drive or setup paths
 
 ### Install once, use everywhere
@@ -61,7 +61,7 @@ For the one-off npm path, run `npx --yes --package enigma-memory enigma quicksta
 
 `enigma drive health` reports a SMART-style memory-drive health packet — freshness, duplicate rate, tombstone backlog, stale derived artifacts, receipt coverage, and connector health — from local metadata only, with no network calls or private payloads.
 
-The local Enigma vault is the canonical memory passport. Provider-native memory is non-canonical cache only. Enigma proof covers Enigma-controlled vault state, receipts, checkpoints, committed roots, and exported bundle shape; it does not prove provider deletion, model forgetting, provider-native memory removal, hosted/BYOC availability, legal approval, ROI/savings, or compliance certification.
+The local Enigma Memory Drive is the canonical memory passport. Provider-native memory is non-canonical cache only. Enigma proof covers Enigma-controlled Memory Drive state, receipts, checkpoints, committed roots, and exported bundle shape; it does not prove provider deletion, model forgetting, provider-native memory removal, hosted/BYOC availability, legal approval, ROI/savings, or compliance certification.
 
 Optional public test drive without a global install:
 
@@ -84,9 +84,9 @@ npm run install:local
 npm run install:local -- --init-vault --bundle ./.enigma/bundle.json
 ```
 
-`install:local` is dry-run by default. It validates Node.js `>=24`, resolves the local bundle path, previews `npm install -g .`, and emits public-safe JSON without printing local absolute paths, credentials, account IDs, or memory plaintext. It does not mutate global npm state or create a vault unless you explicitly request execute mode.
+`install:local` is dry-run by default. It validates Node.js `>=24`, resolves the local bundle path, previews `npm install -g .`, and emits public-safe JSON without printing local absolute paths, credentials, account IDs, or memory plaintext. It does not mutate global npm state or create a Memory Drive unless you explicitly request execute mode.
 
-To perform the local global install from the checkout and initialize a local vault bundle:
+To perform the local global install from the checkout and initialize a local Memory Drive bundle:
 
 ```sh
 npm run install:local -- --execute --init-vault --bundle ./.enigma/bundle.json
@@ -441,7 +441,7 @@ The gateway evaluates Enigma enterprise policy and signs decisions. It does not 
 
 ## Docker relay/gateway path
 
-The source checkout includes a local demo `Dockerfile` and `docker-compose.yml`. They install from the local package source and do not bake vault bundles, private keys, deployment credentials, tenant credentials, or cloud secrets into the image.
+The source checkout includes a local demo `Dockerfile` and `docker-compose.yml`. They install from the local package source and do not bake Memory Drive bundles, private keys, deployment credentials, tenant credentials, or cloud secrets into the image.
 
 Build from the source checkout:
 
@@ -478,7 +478,7 @@ curl http://127.0.0.1:8787/health
 curl http://127.0.0.1:8797/health
 ```
 
-For production containers, replace in-memory state with durable storage, bind TLS at an ingress layer, mount secrets through your platform, and configure logging/metrics, backup/restore, and incident response. Do not bake vault bundles, private keys, or tenant credentials into images.
+For production containers, replace in-memory state with durable storage, bind TLS at an ingress layer, mount secrets through your platform, and configure logging/metrics, backup/restore, and incident response. Do not bake Memory Drive bundles, private keys, or tenant credentials into images.
 
 ## Static public-site preflight
 
