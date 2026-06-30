@@ -144,6 +144,18 @@ test('public beta evidence templates are public-safe blockers, not fake evidence
     assert.equal(handoff.public_safe_release_packet_approval.release_packet_ref, 'TBD-public-release-packet-ref');
     assert.equal(handoff.public_safe_release_packet_approval.claim_boundary_reviewer_ref, 'TBD-claim-boundary-reviewer-ref');
     assert.equal(handoff.public_safe_release_packet_approval.approval_ref, 'TBD-public-approval-ref');
+    assert.deepEqual(handoff.next_actions.map((action) => action.id), [
+      'record_release_pr_review',
+      'record_release_pr_merge',
+      'record_public_safe_release_packet_approval',
+    ]);
+    assert.deepEqual(handoff.next_actions.find((action) => action.id === 'record_public_safe_release_packet_approval').required_fields, [
+      'public_safe_release_packet_approval.status',
+      'public_safe_release_packet_approval.release_packet_ref',
+      'public_safe_release_packet_approval.claim_boundary_reviewer_ref',
+      'public_safe_release_packet_approval.approval_ref',
+      'public_safe_release_packet_approval.approved_at',
+    ]);
 
     const advisor = await buildPublicBetaQaMatrix({ evidenceManifest: report.evidence_manifest });
     assert.equal(advisor.advisor_decision, 'hold');

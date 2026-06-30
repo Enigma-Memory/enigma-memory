@@ -91,6 +91,29 @@ function buildProductionHandoffTemplate(generatedAt) {
     release_audit: { ok: false, evidence_ref: 'TBD-release-audit-ref' },
     operator_acceptance: { ok: false, evidence_ref: 'TBD-operator-acceptance-ref' },
     local_static_artifact_ready: false,
+    next_actions: [
+      {
+        id: 'record_release_pr_review',
+        collect: 'Public PR ref, reviewer approval ref, approval status approved.',
+        required_fields: ['release_pr.pr_ref', 'release_pr.reviewer_approval_ref', 'release_pr.approval_status'],
+      },
+      {
+        id: 'record_release_pr_merge',
+        collect: 'Public merge ref after branch protection and reviewer approval complete.',
+        required_fields: ['release_pr.merge_ref'],
+      },
+      {
+        id: 'record_public_safe_release_packet_approval',
+        collect: 'Release packet ref, claim-boundary reviewer ref, approval ref, approval status approved, and approval date.',
+        required_fields: [
+          'public_safe_release_packet_approval.status',
+          'public_safe_release_packet_approval.release_packet_ref',
+          'public_safe_release_packet_approval.claim_boundary_reviewer_ref',
+          'public_safe_release_packet_approval.approval_ref',
+          'public_safe_release_packet_approval.approved_at',
+        ],
+      },
+    ],
     claim_boundary: templateBoundary(),
   };
 }
