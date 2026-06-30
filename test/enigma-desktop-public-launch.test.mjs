@@ -404,6 +404,12 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(wizard, /Creating Memory Drive/);
   assert.match(wizard, /Checking Memory Drive/);
   assert.match(help, /Your Memory Drive/);
+  assert.match(wizard, /desktopShellUnavailable/);
+  assert.match(wizard, /Open Enigma Memory from the desktop app/);
+  assert.match(wizard, /No Memory Drive, client settings, prompts, transcripts, or local paths were read/);
+  assert.match(wizard, /window\.__ENIGMA_DESKTOP_DEMO__ === true/);
+  assert.match(wizard, /throw new Error\('desktop_shell_unavailable'\)/);
+  assert.doesNotMatch(wizard, /Falls back to mock responses|const isMock|mockInvoke|\[mock\]/);
   assert.match(help, /before any Memory Drive write/);
   assert.doesNotMatch(`${wizard}\n${help}`, /Private vault|private vault|your vault|local vault|vault stores|vault write|vault activity|Checking vault|Creating vault|Check your vault|Private vault created|Create vault/);
   assert.match(wizard, /WIZARD_STORAGE_KEY/);

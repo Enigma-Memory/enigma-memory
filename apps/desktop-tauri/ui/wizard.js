@@ -2,7 +2,7 @@
  * Enigma Memory desktop onboarding wizard and health dashboard.
  *
  * Runs inside the Tauri shell using `window.__TAURI__.core.invoke`.
- * Falls back to mock responses when opened directly in a browser for smoke tests.
+ * When opened outside Tauri, shows a fail-closed shell message unless explicit demo mode is requested.
  */
 
 import { renderHelpButton } from './help.js';
@@ -32,7 +32,9 @@ const CLIENT_COPY = {
 
 const tauri = window.__TAURI__;
 const invoke = tauri?.core?.invoke;
-const isMock = typeof invoke !== 'function';
+const hasTauriInvoke = typeof invoke === 'function';
+const demoMode = !hasTauriInvoke && (window.__ENIGMA_DESKTOP_DEMO__ === true || new URLSearchParams(window.location.search).has('demo'));
+const desktopShellUnavailable = !hasTauriInvoke && !demoMode;
 const WIZARD_STORAGE_KEY = 'enigma.desktop.first_run_resume.v1';
 const MAX_WIZARD_STEP = 6;
 
@@ -122,7 +124,7 @@ function persistWizardResumeState() {
   }
 }
 
-async function mockInvoke(cmd, args = {}) {
+async function demoInvoke(cmd, args = {}) {
   await new Promise((r) => setTimeout(r, 350));
   switch (cmd) {
     case 'create_vault':
@@ -462,7 +464,7 @@ async function mockInvoke(cmd, args = {}) {
     case 'stop_service':
       return { running: false, pid: 0, restarts: 0, uptime_secs: 0 };
     case 'get_service_logs':
-      return ['[mock] service started', '[mock] ready'];
+      return ['[demo] service started', '[demo] ready'];
     case 'create_memory_drive':
       return { ok: true, memory_drive_status: 'ready', health_status: 'healthy', offline_ready: serviceStatus?.running === true };
     case 'get_memory_drive_status':
@@ -482,8 +484,9 @@ async function mockInvoke(cmd, args = {}) {
 }
 
 async function call(cmd, args = {}) {
-  if (isMock) return mockInvoke(cmd, args);
-  return invoke(cmd, args);
+  if (hasTauriInvoke) return invoke(cmd, args);
+  if (demoMode) return demoInvoke(cmd, args);
+  throw new Error('desktop_shell_unavailable');
 }
 
 function escapeHtml(value) {
@@ -1244,9 +1247,22 @@ function renderDashboard() {
   `, 'memoryController');
 }
 
+function renderDesktopShellUnavailable() {
+  return `${renderHeader('welcome')}<main class="wizard-card">
+    <p class="eyebrow">Desktop shell required</p>
+    <h1>Open Enigma Memory from the desktop app.</h1>
+    <p>This web view needs the signed desktop shell before it can create a Memory Drive, scan apps, or run local diagnostics.</p>
+    <p class="note">No Memory Drive, client settings, prompts, transcripts, or local paths were read.</p>
+  </main>`;
+}
+
 function render() {
   const app = $('#app');
   if (!app) return;
+  if (desktopShellUnavailable) {
+    app.innerHTML = renderDesktopShellUnavailable();
+    return;
+  }
   let html = '';
   if (currentStep === 0) html = renderWelcome();
   else if (currentStep === 1) html = renderVault();
