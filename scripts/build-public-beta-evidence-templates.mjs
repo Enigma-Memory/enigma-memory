@@ -215,7 +215,11 @@ function buildCleanMachineSmokeTemplate(generatedAt) {
   };
 }
 
-function buildSupportDryRunTemplate({ generatedAt, scenarioId, issueCode }) {
+function supportDryRunReplacementCommand({ preset, outPath }) {
+  return `npm run production:support-dry-run -- --preset ${preset} --triage-result <observed-result> --bundle-privacy-check-status <observed-status> --out ${outPath}`;
+}
+
+function buildSupportDryRunTemplate({ generatedAt, scenarioId, issueCode, preset, outPath }) {
   return {
     schema: 'enigma.support_dry_run_summary.v1',
     evidence_status: 'template_only',
@@ -226,6 +230,8 @@ function buildSupportDryRunTemplate({ generatedAt, scenarioId, issueCode }) {
     triage_result: 'blocked',
     bundle_privacy_check_status: 'blocked',
     support_owner_ref: 'ref:role:beta-support',
+    replacement_command: supportDryRunReplacementCommand({ preset, outPath }),
+    support_artifact_note: 'Optional: add --support-artifact <redacted-support-artifact.json> only after the artifact passes public-safe review.',
     privacy_review: {
       status: 'blocked',
       reviewer_ref: 'ref:role:beta-support',
@@ -273,6 +279,8 @@ function buildArtifacts(outDirLabel, generatedAt) {
         generatedAt,
         scenarioId: 'BETA-DIAG-001',
         issueCode: 'DIAG-BUNDLE-PREVIEWED',
+        preset: 'diagnostics',
+        outPath: supportDryRunDiagnostics,
       }),
     },
     {
@@ -282,6 +290,8 @@ function buildArtifacts(outDirLabel, generatedAt) {
         generatedAt,
         scenarioId: 'BETA-CRASH-001',
         issueCode: 'CRASH-REPORTING-MANUAL-EVIDENCE',
+        preset: 'crash',
+        outPath: supportDryRunCrash,
       }),
     },
     {
@@ -335,6 +345,8 @@ export async function buildPublicBetaEvidenceTemplates(options = {}, now = new D
   for (const entry of artifacts) {
     await writeJsonFile(resolve(entry.path), entry.artifact, Boolean(options.overwrite));
   }
+  const supportDryRunDiagnostics = `${outDir}/${TEMPLATE_FILES.supportDryRunDiagnostics}`;
+  const supportDryRunCrash = `${outDir}/${TEMPLATE_FILES.supportDryRunCrash}`;
   const report = {
     schema: PUBLIC_BETA_EVIDENCE_TEMPLATES_SCHEMA,
     generated_at: generatedAt,
@@ -348,6 +360,8 @@ export async function buildPublicBetaEvidenceTemplates(options = {}, now = new D
     })),
     next_commands: [
       `npm run public-beta:advisor -- --evidence-manifest ${evidenceManifest}`,
+      supportDryRunReplacementCommand({ preset: 'diagnostics', outPath: supportDryRunDiagnostics }),
+      supportDryRunReplacementCommand({ preset: 'crash', outPath: supportDryRunCrash }),
       'Replace template files with real public-safe evidence as each action completes.',
     ],
     safety: {

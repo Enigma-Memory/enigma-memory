@@ -36,6 +36,8 @@ test('public beta evidence templates are public-safe blockers, not fake evidence
     assert.equal(report.files.length, 8);
     assert.equal(report.files.every((file) => file.path.startsWith(`${outDir}/`)), true);
     assert.match(plain, /templates only; no PR approval, merge, npm publish, signing, upload, network action/);
+    assert.equal(report.next_commands.some((command) => command.includes('--preset diagnostics')), true);
+    assert.equal(report.next_commands.some((command) => command.includes('--preset crash')), true);
     assert.doesNotMatch(plain, /C:\\Users|\/home\/|\/tmp\/|AppData\\Local/i);
 
     const manifest = JSON.parse(await readFile(join(outDir, 'evidence-manifest.json'), 'utf8'));
@@ -60,6 +62,16 @@ test('public beta evidence templates are public-safe blockers, not fake evidence
     assert.equal(diagnosticSupport.scenario_id, 'BETA-DIAG-001');
     assert.equal(diagnosticSupport.triage_result, 'blocked');
     assert.equal(diagnosticSupport.privacy_review.status, 'blocked');
+    assert.match(diagnosticSupport.replacement_command, /--preset diagnostics/);
+    assert.match(diagnosticSupport.replacement_command, /--triage-result <observed-result>/);
+    assert.match(diagnosticSupport.replacement_command, /--bundle-privacy-check-status <observed-status>/);
+    assert.equal(diagnosticSupport.replacement_command.includes(`${outDir}/support-dry-run-diagnostics.json`), true);
+    assert.doesNotMatch(diagnosticSupport.replacement_command, /--bundle-privacy-check-status pass|--triage-result resolved/);
+    assert.match(diagnosticSupport.support_artifact_note, /public-safe review/);
+
+    const crashSupport = JSON.parse(await readFile(join(outDir, 'support-dry-run-crash.json'), 'utf8'));
+    assert.match(crashSupport.replacement_command, /--preset crash/);
+    assert.equal(crashSupport.replacement_command.includes(`${outDir}/support-dry-run-crash.json`), true);
 
     const registry = JSON.parse(await readFile(join(outDir, 'registry-install.json'), 'utf8'));
     assert.equal(registry.schema, 'enigma.registry_install_verifier.v1');
@@ -106,6 +118,8 @@ test('public beta evidence template CLI is non-destructive by default', async ()
     });
     assert.equal(first.stderr, '');
     assert.match(first.stdout, /Enigma public beta evidence templates/);
+    assert.match(first.stdout, /--preset diagnostics/);
+    assert.match(first.stdout, /--preset crash/);
     assert.match(first.stdout, new RegExp(`Evidence manifest: ${outDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\/evidence-manifest\.json`));
     assert.doesNotMatch(first.stdout, /C:\\Users|\/home\/|\/tmp\/|AppData\\Local/i);
 
