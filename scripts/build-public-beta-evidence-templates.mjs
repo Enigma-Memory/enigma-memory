@@ -425,6 +425,18 @@ export async function buildPublicBetaEvidenceTemplates(options = {}, now = new D
         'update_rollback.status=pass with evidence_ref',
       ],
     },
+    production_handoff_guidance: {
+      evidence_template: `${outDir}/${TEMPLATE_FILES.productionHandoffPacket}`,
+      required_statuses: [
+        'release_pr.approval_status=approved with reviewer_approval_ref',
+        'release_pr.merge_ref is a public ref',
+        'public_safe_release_packet_approval.status=approved',
+        'public_safe_release_packet_approval.release_packet_ref is a public ref',
+        'public_safe_release_packet_approval.claim_boundary_reviewer_ref is a public ref',
+        'public_safe_release_packet_approval.approval_ref is a public ref',
+        'public_safe_release_packet_approval.approved_at=YYYY-MM-DD or ISO timestamp',
+      ],
+    },
     support_dry_run_collection_guidance: SUPPORT_DRY_RUN_COLLECTION_GUIDANCE,
     claim_boundary: templateBoundary(),
   };
@@ -456,6 +468,10 @@ export function renderPublicBetaEvidenceTemplatesPlain(report) {
   if (report.desktop_release_guidance) {
     lines.push(`Desktop release evidence template: ${report.desktop_release_guidance.evidence_template}`);
     lines.push(`Desktop release required statuses: ${report.desktop_release_guidance.required_statuses.join('; ')}`);
+  }
+  if (report.production_handoff_guidance) {
+    lines.push(`Production handoff evidence template: ${report.production_handoff_guidance.evidence_template}`);
+    lines.push(`Production handoff required statuses: ${report.production_handoff_guidance.required_statuses.join('; ')}`);
   }
   lines.push('Boundary: templates only; no PR approval, merge, npm publish, signing, upload, network action, provider action, hosted service, benchmark, token ROI, or compliance claim.');
   return `${lines.join('\n')}\n`;

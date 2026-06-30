@@ -49,6 +49,16 @@ test('public beta evidence templates are public-safe blockers, not fake evidence
       'manifest.signature.status=verified',
       'update_rollback.status=pass with evidence_ref',
     ]);
+    assert.equal(report.production_handoff_guidance.evidence_template, `${outDir}/production-handoff-packet.json`);
+    assert.deepEqual(report.production_handoff_guidance.required_statuses, [
+      'release_pr.approval_status=approved with reviewer_approval_ref',
+      'release_pr.merge_ref is a public ref',
+      'public_safe_release_packet_approval.status=approved',
+      'public_safe_release_packet_approval.release_packet_ref is a public ref',
+      'public_safe_release_packet_approval.claim_boundary_reviewer_ref is a public ref',
+      'public_safe_release_packet_approval.approval_ref is a public ref',
+      'public_safe_release_packet_approval.approved_at=YYYY-MM-DD or ISO timestamp',
+    ]);
     assert.equal(report.next_commands.some((command) => command.includes('--preset diagnostics')), true);
     assert.equal(report.next_commands.some((command) => command.includes('--preset crash')), true);
     assert.match(plain, /Support dry-run triage values: resolved, needs_user_action, escalated, release_blocker, blocked/);
@@ -60,6 +70,8 @@ test('public beta evidence templates are public-safe blockers, not fake evidence
     assert.match(plain, new RegExp(`Registry install evidence template: ${outDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/registry-install\\.json`));
     assert.match(plain, new RegExp(`Desktop release evidence template: ${outDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/desktop-release-evidence\\.json`));
     assert.match(plain, /Desktop release required statuses: windows\.signature\.status=verified with evidence_ref; macos\.signature\.status=verified with evidence_ref; macos\.notarization\.status=accepted with evidence_ref; macos\.stapling\.status=stapled with evidence_ref; manifest\.signature\.status=verified; update_rollback\.status=pass with evidence_ref/);
+    assert.match(plain, new RegExp(`Production handoff evidence template: ${outDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/production-handoff-packet\\.json`));
+    assert.match(plain, /Production handoff required statuses: release_pr\.approval_status=approved with reviewer_approval_ref; release_pr\.merge_ref is a public ref; public_safe_release_packet_approval\.status=approved/);
     assert.doesNotMatch(plain, /C:\\Users|\/home\/|\/tmp\/|AppData\\Local/i);
 
     const manifest = JSON.parse(await readFile(join(outDir, 'evidence-manifest.json'), 'utf8'));
@@ -158,6 +170,7 @@ test('public beta evidence template CLI is non-destructive by default', async ()
     assert.match(first.stdout, /production:clean-machine-smoke -- --plain/);
     assert.match(first.stdout, /Registry install after npm publish: npm install --prefix <temp-prefix> enigma-memory@0\.1\.19/);
     assert.match(first.stdout, /Desktop release required statuses: windows\.signature\.status=verified with evidence_ref/);
+    assert.match(first.stdout, /Production handoff required statuses: release_pr\.approval_status=approved with reviewer_approval_ref/);
     assert.match(first.stdout, new RegExp(`Evidence manifest: ${outDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\/evidence-manifest\.json`));
     assert.doesNotMatch(first.stdout, /C:\\Users|\/home\/|\/tmp\/|AppData\\Local/i);
 
