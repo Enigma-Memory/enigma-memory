@@ -1869,7 +1869,7 @@ function renderVaultScreen(screen, state) {
           ${renderMetric('Active root', screen.active_set_root || 'not observed')}
           ${renderMetric('Receipt log root', screen.receipt_log_root || 'not observed')}
         </dl>
-        <button type="button" data-action="create-vault">Create vault shell</button>
+        <button type="button" data-action="create-vault">Create Memory Drive shell</button>
       </div>
       <form class="panel" data-form="remember">
         <h3>Remember</h3>

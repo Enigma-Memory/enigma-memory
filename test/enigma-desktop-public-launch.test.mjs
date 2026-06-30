@@ -111,7 +111,7 @@ test('desktop first-run defaults to Memory Drive home dashboard', async () => {
 });
 
 test('static desktop shell mirrors Memory Controller, Import Sandbox, and Support Report cards', async () => {
-  const shell = await readDesktopShellFile('index.html');
+  const [shell, appSource] = await Promise.all([readDesktopShellFile('index.html'), readDesktopShellFile('app.js')]);
   const contract = await readDesktopContract();
   const homeBlock = shell.match(/function renderHomeScreen\(screen\) \{[\s\S]*?\n\}/)?.[0] || '';
   const importSandboxBlock = shell.match(/function renderImportSandboxHtml\(sandbox\) \{[\s\S]*?function renderScreen/s)?.[0] || '';
@@ -130,6 +130,8 @@ test('static desktop shell mirrors Memory Controller, Import Sandbox, and Suppor
   assert.match(shell, /renderSupportScreen\(model\.screens\.support\)/);
   assert.match(homeBlock, /Memory Controller/);
   assert.match(homeBlock, /Import Sandbox/);
+  assert.match(`${shell}\n${appSource}`, /Create Memory Drive shell/);
+  assert.doesNotMatch(`${shell}\n${appSource}`, /Create vault shell/);
   assert.match(homeBlock, /renderImportSandboxHtml\(dashboard\.import_sandbox\)/);
   assert.match(importSandboxBlock, /Provider-side proof/);
   assert.match(contract, /support_report_ready/);
