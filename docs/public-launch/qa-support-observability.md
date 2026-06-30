@@ -1,21 +1,21 @@
 # Public launch QA, support, and observability plan
 
-This plan defines the evidence Enigma Memory needs before a general-public desktop beta and before GA. It assumes the consumer default path becomes a signed desktop app with one-button setup, automatic local vault creation, client detection, fix-it actions, health dashboard, update/uninstall flows, and no required terminal, Node install, or JSON editing. The CLI remains the power-user engine behind the desktop surface.
+This plan defines the evidence Enigma Memory needs before a general-public desktop beta and before GA. It assumes the consumer default path becomes a signed desktop app with one-button setup, automatic Memory Drive creation, client detection, fix-it actions, health dashboard, update/uninstall flows, and no required terminal, Node install, or JSON editing. The CLI remains the power-user engine behind the desktop surface.
 
-Claim boundary: all checks prove Enigma-controlled local setup, local vault behavior, local connector configuration, local proof/receipt output, and public-safe support workflows only. They do not prove provider deletion, model forgetting, hosted SaaS readiness, BYOC readiness, compliance certification, legal conclusions, or benchmark superiority.
+Claim boundary: all checks prove Enigma-controlled local setup, Memory Drive behavior, local connector configuration, local proof/receipt output, and public-safe support workflows only. They do not prove provider deletion, model forgetting, hosted SaaS readiness, BYOC readiness, compliance certification, legal conclusions, or benchmark superiority.
 
 ## Deliverables
 
 | Deliverable | Public beta acceptance | GA acceptance |
 | --- | --- | --- |
 | Signed desktop installers | Windows artifact has `signature.status: verified` plus public evidence ref; macOS artifact has verified signature, accepted notarization, stapled ticket, and public evidence refs; both install without terminal steps and record observed trust-prompt state. | Windows and macOS distribution use the chosen production trust channel: Windows Store/MSIX or trusted signing path for SmartScreen reduction, and macOS Developer ID signing, notarization, and stapling for Gatekeeper. |
-| First-run wizard | Required setup is sequential and short: create local vault, detect supported clients, connect selected clients, then show health. Optional proof/CLI details stay hidden behind advanced controls. | Wizard handles every supported fresh-install and upgrade state, can resume after interruption, and never requires JSON editing. |
-| Local vault and health dashboard | App creates or detects a local vault automatically and shows health states with actionable fix-it buttons. | Health dashboard covers vault, connector, receipt/proof, update, offline, and recovery states with stable support codes. |
+| First-run wizard | Required setup is sequential and short: create Memory Drive, detect supported clients, connect selected clients, then show health. Optional proof/CLI details stay hidden behind advanced controls. | Wizard handles every supported fresh-install and upgrade state, can resume after interruption, and never requires JSON editing. |
+| Memory Drive and health dashboard | App creates or detects a Memory Drive automatically and shows health states with actionable fix-it buttons. | Health dashboard covers Memory Drive, connector, receipt/proof, update, offline, and recovery states with stable support codes. |
 | Client connect UX | Installed/config-present clients are detected; user can connect supported clients through the UI; missing clients are skipped with explanation. | Connect, repair, disconnect, and extension/package-assisted install paths are covered for supported clients, including Claude Desktop Extension / `.mcpb` packaging if adopted. |
 | Proof output UX | User can generate and inspect a proof/receipt summary that is public-safe and explains Enigma-controlled scope. | Proof export and verification UX is stable, supportable, and consistently labels scope limits. |
 | Crash/error reporting | Crash/error reporting is off by default and requires explicit opt-in before anything leaves the device. | Opt-in reporting has retention policy, visible controls, export/delete controls, and documented public-safe fields. |
 | Local diagnostic bundle | User can create a local-only bundle, inspect it before sharing, and remove sensitive fields automatically. | Support can triage most install/connect/update issues from the bundle without raw memory, prompts, transcripts, credentials, account IDs, customer identifiers, or local absolute paths. |
-| Rollback | Beta has a documented safe rollback path for app version and connector config changes. | GA rollback is tested across installer, update, config backup/restore, and vault schema compatibility boundaries. |
+| Rollback | Beta has a documented safe rollback path for app version and connector config changes. | GA rollback is tested across installer, update, config backup/restore, and Memory Drive schema compatibility boundaries. |
 | Support playbooks | Support has issue codes, triage decision trees, escalation rules, and privacy-safe response templates. | Support playbooks include SLAs for beta/GA channels, release-blocker criteria, and closure rules tied to reproducible fixes. |
 
 ## Automated smoke matrix
@@ -43,12 +43,12 @@ The matrix also emits `next_actions`: a ranked, public-safe release-owner queue 
 | Scenario | Windows beta | macOS beta | GA pass bar |
 | --- | --- | --- | --- |
 | Fresh install launches | Installer completes, app opens, trust prompts are understandable, no terminal required. | Installer completes, app opens, Gatekeeper/notarization path is acceptable for channel. | Passes on current and one previous supported OS release per platform. |
-| First run creates local vault | Wizard creates a local vault using default location abstraction, then lands on dashboard. | Same. | Idempotent rerun shows existing vault and does not duplicate setup. |
+| First run creates Memory Drive | Wizard creates a Memory Drive using default location abstraction, then lands on dashboard. | Same. | Idempotent rerun shows an existing Memory Drive and does not duplicate setup. |
 | Client detection | With no supported clients installed, app shows “no clients detected” and a non-blocking next step. With one supported client present, app detects it. | Same. | Detection never creates third-party config files just by scanning. |
 | Client connect | User approves one detected client; app writes or updates only the Enigma connector entry and reports restart instructions when needed. | Same. | Existing unrelated client settings are preserved; repeated connect is idempotent. |
 | Proof output | App generates a proof/receipt summary from local Enigma state and shows scope limits. | Same. | Output is verifiable offline and contains no raw memory, prompts, transcripts, credentials, account IDs, customer identifiers, or local absolute paths. |
-| Update | App detects an available test update, downloads only after user approval or configured auto-update consent, applies update, and preserves vault/connectors. | Same. | Failed update rolls back to prior app version without corrupting vault or client configs. |
-| Uninstall | Uninstaller removes app binaries and offers separate explicit choices for keeping or removing local vault and backups. | Same. | Default uninstall keeps user data; destructive removal requires clear confirmation. |
+| Update | App detects an available test update, downloads only after user approval or configured auto-update consent, applies update, and preserves Memory Drive/connectors. | Same. | Failed update rolls back to prior app version without corrupting Memory Drive or client configs. |
+| Uninstall | Uninstaller removes app binaries and offers separate explicit choices for keeping or removing Memory Drive data and backups. | Same. | Default uninstall keeps user data; destructive removal requires clear confirmation. |
 | Offline mode | App launches with network unavailable, shows local health, local search/context/proof surfaces that do not require network, and queues update checks. | Same. | No feature falsely reports hosted availability or provider-side guarantees while offline. |
 | Corrupted config recovery | App detects malformed Enigma app config or connector config, explains the issue, offers restore from backup or safe reset, and does not overwrite unrelated settings. | Same. | Recovery path preserves last known good backup and emits a support code. |
 | Crash restart | Forced app crash on startup or during wizard produces a local crash marker and next-launch recovery prompt. | Same. | No report is sent unless the user had explicitly opted in before the crash or approves sending after restart. |
@@ -60,9 +60,9 @@ Manual QA should cover real consumer machines in addition to automated runners. 
 
 | Platform | Install channel | Fresh install | Upgrade | Uninstall | Notes |
 | --- | --- | --- | --- | --- | --- |
-| Windows current supported release | Signed installer or Store/MSIX candidate | First run, local vault, client detection, connect, proof, offline. | Update from previous beta and previous GA candidate. | Keep-vault default and remove-vault explicit path. | Include SmartScreen/trust prompt observation without claiming it is eliminated unless distribution evidence proves it. |
+| Windows current supported release | Signed installer or Store/MSIX candidate | First run, Memory Drive, client detection, connect, proof, offline. | Update from previous beta and previous GA candidate. | Keep Memory Drive default and remove Memory Drive explicit path. | Include SmartScreen/trust prompt observation without claiming it is eliminated unless distribution evidence proves it. |
 | Windows previous supported release | Same channel | Same as above. | Same as above. | Same as above. | Include standard user account and admin-assisted install if channel requires elevation. |
-| macOS current supported release | Developer ID signed/notarized/stapled candidate or approved beta channel | First run, local vault, client detection, connect, proof, offline. | Update from previous beta and previous GA candidate. | Keep-vault default and remove-vault explicit path. | Confirm Gatekeeper messaging and app translocation behavior are acceptable. |
+| macOS current supported release | Developer ID signed/notarized/stapled candidate or approved beta channel | First run, Memory Drive, client detection, connect, proof, offline. | Update from previous beta and previous GA candidate. | Keep Memory Drive default and remove Memory Drive explicit path. | Confirm Gatekeeper messaging and app translocation behavior are acceptable. |
 | macOS previous supported release | Same channel | Same as above. | Same as above. | Same as above. | Include Intel or Apple Silicon coverage if both are supported. |
 
 Manual QA must include at least these real-world states before public beta:
@@ -71,13 +71,13 @@ Manual QA must include at least these real-world states before public beta:
 - One supported client installed with no existing MCP config.
 - One supported client installed with an existing unrelated MCP server entry.
 - Multiple supported clients installed.
-- Existing Enigma CLI/vault from power-user path.
+- Existing Enigma CLI/Memory Drive from power-user path.
 - Network unavailable during first run.
 - Network unavailable during update check.
 - App killed during wizard, update, proof generation, and diagnostic bundle generation.
 - Malformed Enigma app config.
 - Malformed third-party client config that Enigma is allowed to read but not silently repair without approval.
-- Insufficient permission to write the selected vault or client config location.
+- Insufficient permission to write the selected Memory Drive or client config location.
 
 ## Required scenario catalog
 
@@ -86,7 +86,7 @@ These are the minimum scenario IDs QA and support should use consistently in aut
 | ID | Scenario | Beta pass condition | GA pass condition |
 | --- | --- | --- | --- |
 | `BETA-INSTALL-001` | Fresh desktop install | App installs, opens, and reaches first-run without terminal, Node, or JSON editing on clean Windows and macOS beta targets. | Same on every supported OS/version/channel combination. |
-| `BETA-FIRST-001` | Fresh first run | Wizard creates/detects the local vault, detects clients, offers connect, then shows health. | Resume works after app restart, OS restart, and update interruption. |
+| `BETA-FIRST-001` | Fresh first run | Wizard creates/detects the Memory Drive, detects clients, offers connect, then shows health. | Resume works after app restart, OS restart, and update interruption. |
 | `BETA-CLIENT-CLAUDE-001` | Claude Desktop connect | User approves Claude connect; only the Enigma connector entry changes; unrelated settings are preserved and backup/rollback evidence exists when a config changes. | Connect, repair, disconnect, and reconnect are idempotent across supported Claude versions. |
 | `BETA-CLIENT-001` | No supported client installed | App reports no detected supported clients as a non-blocking state. | Same state has clear education and no false failure telemetry. |
 | `BETA-CLIENT-002` | One supported client installed | User approves connect; only the Enigma connector entry changes; backup is made if a config changes. | Connect, repair, disconnect, and reconnect are idempotent. |
@@ -99,10 +99,10 @@ These are the minimum scenario IDs QA and support should use consistently in aut
 | `BETA-CRASH-001` | Crash before opt-in | App records a local crash marker only; nothing is uploaded. | Restart recovery and one-time report approval work consistently. |
 | `BETA-SIGNING-WINDOWS-001` | Windows signing evidence | Selected Windows beta artifact has public-safe signing/distribution evidence and observed trust-prompt notes. | Windows stable channel evidence covers every supported version/architecture. |
 | `BETA-SIGNING-MACOS-001` | macOS signing/notarization evidence | Selected macOS beta artifact has Developer ID signing, notarization, stapling, and observed Gatekeeper evidence. | macOS stable channel evidence covers every supported version/architecture. |
-| `BETA-UPDATE-001` | Beta update/rollback evidence | Update verification rejects unsigned/wrong-channel/downgrade payloads and failed update leaves the app/vault recoverable. | Signature verification, failed-update rollback, and metadata kill switch are proven across supported channels. |
+| `BETA-UPDATE-001` | Beta update/rollback evidence | Update verification rejects unsigned/wrong-channel/downgrade payloads and failed update leaves the app/Memory Drive recoverable. | Signature verification, failed-update rollback, and metadata kill switch are proven across supported channels. |
 | `BETA-NPM-001` | npm package availability evidence | Public `0.1.19` package version required by the beta path is published and installable; local source version alone is not enough. | Registry evidence covers stable version and documented install path. |
 | `BETA-MERGE-001` | Release approval/merge evidence | Release PR approval, merge, reviewer approval, and public-safe evidence packet refs are recorded. | Final release approval covers GA artifacts, release notes, and claim-boundary review. |
-| `GA-UNINSTALL-001` | Default uninstall | App binaries are removed; user data is kept by default. | Reinstall detects kept vault and offers reconnect. |
+| `GA-UNINSTALL-001` | Default uninstall | App binaries are removed; user data is kept by default. | Reinstall detects kept Memory Drive and offers reconnect. |
 | `GA-UNINSTALL-002` | Explicit full removal | Destructive removal requires explicit confirmation and removes only Enigma-owned app data/connectors. | No app helper, updater, launch item, or Enigma connector remains unless the user chose to keep it. |
 | `GA-PRIVACY-001` | Telemetry controls | Telemetry/crash reporting can be enabled only by explicit opt-in and can be disabled. | View, export, delete, retention, and public-safe field allowlists are implemented and reviewed. |
 
@@ -120,12 +120,12 @@ These scripts are written as user actions, not terminal procedures. They are sui
 
 ### `BETA-FIRST-001` fresh first run
 
-1. On the first-run screen, choose the default local vault setup.
+1. On the first-run screen, choose the default Memory Drive setup.
 2. Continue through client detection.
 3. Connect one detected client if one exists; otherwise continue past the no-client state.
 4. Open the health dashboard.
 5. Close and reopen the app.
-6. Expected: the dashboard shows local vault health, connector state, and next recommended action; reopening does not restart or duplicate setup.
+6. Expected: the dashboard shows Memory Drive health, connector state, and next recommended action; reopening does not restart or duplicate setup.
 
 ### `BETA-CLIENT-CLAUDE-001` Claude Desktop connect
 
@@ -145,9 +145,9 @@ These scripts are written as user actions, not terminal procedures. They are sui
 ### `BETA-UPDATE-001` update and rollback evidence
 
 1. Install the previous supported beta build.
-2. Confirm the local vault and connector health are green or have known support codes.
+2. Confirm the Memory Drive and connector health are green or have known support codes.
 3. Apply the candidate update through the app UI.
-4. Relaunch the app and re-check vault, connector, proof, and diagnostics surfaces.
+4. Relaunch the app and re-check Memory Drive, connector, proof, and diagnostics surfaces.
 5. Repeat with a deliberately failed update package in the update test channel.
 6. Expected: successful update preserves state; failed update leaves the prior version launchable or enters a clear rollback path; signature failure blocks the update.
 
@@ -157,7 +157,7 @@ These scripts are written as user actions, not terminal procedures. They are sui
 2. Uninstall with the default keep-user-data choice.
 3. Reinstall the same or newer signed build.
 4. Launch Enigma Memory.
-5. Expected: app detects the kept local vault, offers reconnect if needed, and does not silently remove user data.
+5. Expected: app detects the kept Memory Drive, offers reconnect if needed, and does not silently remove user data.
 
 ### `BETA-OFFLINE-001` offline mode
 
@@ -190,7 +190,7 @@ Each scenario should have a stable support code, user-facing copy, expected reme
 Acceptance before beta:
 
 - User can complete setup from a fresh install without terminal, Node, or JSON editing.
-- Wizard shows only required steps first: local vault, client detection/connect, health.
+- Wizard shows only required steps first: Memory Drive, client detection/connect, health.
 - Optional advanced proof, CLI, and receipt details are discoverable but not blocking.
 - Closing and reopening the app resumes at the correct step.
 - Setup does not contact hosted Enigma services or providers unless the user chooses a feature that requires network and sees the reason.
@@ -240,27 +240,27 @@ Acceptance before beta:
 
 - Update check is visible and controllable.
 - No update telemetry is sent before opt-in beyond the minimum network request required to fetch public update metadata.
-- Update preserves local vault and connector settings.
+- Update preserves Memory Drive and connector settings.
 - Failed update leaves a launchable prior version or clear rollback instructions.
 
 GA must also pass:
 
 - Delta/full update failure modes are tested.
 - Update signing verification failure blocks install with a clear error.
-- Rollback compatibility is documented for vault schema and connector config changes.
+- Rollback compatibility is documented for Memory Drive schema and connector config changes.
 
 ### Uninstall
 
 Acceptance before beta:
 
 - Default uninstall removes app binaries only and keeps user data.
-- Removing local vault/backups is a separate explicit destructive choice.
+- Removing Memory Drive data/backups is a separate explicit destructive choice.
 - User sees what categories will be removed without exposing raw paths in public-facing copy.
 - Connector cleanup is optional and scoped only to Enigma-owned entries.
 
 GA must also pass:
 
-- Reinstall after uninstall detects kept vault and offers reconnect.
+- Reinstall after uninstall detects kept Memory Drive and offers reconnect.
 - Full removal leaves no Enigma launch agents, update helpers, or connector entries unless the user chose to keep them.
 
 ### Offline mode
@@ -268,7 +268,7 @@ GA must also pass:
 Acceptance before beta:
 
 - App launches offline.
-- Local vault health and local proof/receipt views work offline.
+- Memory Drive health and local proof/receipt views work offline.
 - Client connect actions that require only local writes remain available.
 - Update and external docs links show deferred/offline state.
 
@@ -307,7 +307,7 @@ Allowed report fields after opt-in:
 
 - App version, installer channel, OS family, OS major/minor bucket, CPU architecture bucket.
 - Scenario code, support code, error class, stack frame package/module names if scrubbed of local paths.
-- Feature area: install, first-run, vault, connector, proof, update, uninstall, offline, diagnostics.
+- Feature area: install, first-run, Memory Drive, connector, proof, update, uninstall, offline, diagnostics.
 - Redacted config shape: booleans, counts, version numbers, schema names, connector IDs, and validation error codes.
 - Crash timestamp rounded to a coarse bucket.
 
@@ -328,7 +328,7 @@ Diagnostic bundles are generated on demand and remain local unless the user expl
 Bundle contents allowed:
 
 - Manifest with app version, bundle schema version, creation timestamp bucket, and selected scenario/support codes.
-- Redacted health summary for vault, connector, proof, update, offline, and recovery states.
+- Redacted health summary for Memory Drive, connector, proof, update, offline, and recovery states.
 - Config validation results with field names and error codes, not values when values may contain private data.
 - Connector inventory with supported connector IDs, installed/config-present booleans, Enigma-entry-present booleans, and backup counts.
 - Proof/receipt metadata: schema version, event type labels, counts, verifier status, and hashes when they cannot reveal private content.
@@ -337,7 +337,7 @@ Bundle contents allowed:
 
 Bundle scrubber requirements:
 
-- Replace local absolute paths with stable labels such as `app_config`, `vault_root`, `client_config`, and `backup_ref`.
+- Replace local absolute paths with stable labels such as `app_config`, `memory_drive_root`, `client_config`, and `backup_ref`.
 - Drop raw file contents by default; include parsed validation summaries instead.
 - Refuse export if forbidden fields are detected.
 - Record scrubber version and forbidden-field scan result.
@@ -376,7 +376,7 @@ The public beta observability model is reliability-first and privacy-minimal. Th
 | Event family | Example event codes | Allowed dimensions | Forbidden dimensions |
 | --- | --- | --- | --- |
 | Install | `install_started`, `install_completed`, `install_failed` | Platform bucket, installer channel, app version, support code. | User path, machine name, account identity, installer log body. |
-| First run | `wizard_step_viewed`, `wizard_step_completed`, `wizard_failed` | Step code, app version, platform bucket, support code. | Vault path, memory content, pasted text, prompt text. |
+| First run | `wizard_step_viewed`, `wizard_step_completed`, `wizard_failed` | Step code, app version, platform bucket, support code. | Memory Drive path, memory content, pasted text, prompt text. |
 | Connector | `connector_detected`, `connector_connected`, `connector_failed` | Connector ID, detected/config-present booleans, validation code. | Client config body, local path, unrelated server names if user-defined. |
 | Proof | `proof_summary_created`, `proof_verify_failed` | Proof schema version, receipt count bucket, verifier status code. | Raw memory, context pack content, provider payload, proof private inputs. |
 | Update | `update_available`, `update_applied`, `update_rollback_used` | Current/target version, channel, signature status, support code. | Download URL with user-specific tokens, local cache path. |
@@ -417,11 +417,11 @@ Support codes should be stable, short, and safe to show in screenshots. Codes id
 | Prefix | Area | Examples |
 | --- | --- | --- |
 | `INST` | Installer and launch trust | Trust prompt blocked, insufficient permission, corrupted installer, first launch failed. |
-| `WIZ` | First-run wizard | Vault creation failed, resume failed, client scan failed, health step failed. |
+| `WIZ` | First-run wizard | Memory Drive creation failed, resume failed, client scan failed, health step failed. |
 | `CONN` | Client connectors | Client not detected, config malformed, write denied, backup restore failed. |
 | `PROOF` | Proof/receipt output | Summary failed, verifier failed, forbidden field detected, offline verify unavailable. |
 | `UPD` | Update | Metadata unavailable, signature failed, apply failed, rollback used. |
-| `UNINST` | Uninstall/reinstall | Keep-vault failed, explicit removal failed, reconnect after reinstall failed. |
+| `UNINST` | Uninstall/reinstall | Keep-Memory-Drive failed, explicit removal failed, reconnect after reinstall failed. |
 | `OFF` | Offline mode | Offline launch failed, deferred action retried without approval, local view unavailable. |
 | `DIAG` | Diagnostics | Bundle created, scrubber rejected, preview failed, user deleted bundle. |
 | `PRIV` | Privacy controls | Opt-in missing, disable/delete/export failed, forbidden field detected. |
@@ -450,7 +450,7 @@ Every support code needs a public-safe description, user-facing fix-it action, d
 
 - Identify wizard step code.
 - Ask whether the app was closed, machine restarted, or offline during setup.
-- Use diagnostic bundle state summary to determine vault-created, clients-detected, connectors-written, and health-complete booleans.
+- Use diagnostic bundle state summary to determine Memory-Drive-created, clients-detected, connectors-written, and health-complete booleans.
 - Escalate if restart/resume cannot recover without manual file editing.
 
 ### Playbook: client connect failed
@@ -461,7 +461,7 @@ Every support code needs a public-safe description, user-facing fix-it action, d
 
 ### Playbook: proof output confusing or missing
 
-- Confirm local vault health and proof/receipt status code.
+- Confirm Memory Drive health and proof/receipt status code.
 - Explain Enigma-controlled proof scope and explicitly avoid provider deletion/model forgetting claims.
 - Escalate if proof export includes forbidden data or fails offline verification.
 
@@ -469,13 +469,13 @@ Every support code needs a public-safe description, user-facing fix-it action, d
 
 - Identify current version, target version, update channel, signature status, and rollback status.
 - Prefer built-in rollback or reinstall over manual file edits.
-- Escalate if the app cannot relaunch, vault becomes unreadable, or connector configs are corrupted.
+- Escalate if the app cannot relaunch, Memory Drive becomes unreadable, or connector configs are corrupted.
 
 ### Playbook: uninstall/reinstall issue
 
-- Confirm whether user chose keep-vault or remove-vault.
+- Confirm whether user chose keep Memory Drive or remove Memory Drive.
 - Confirm whether connector cleanup was selected.
-- Reinstall should detect kept vault and offer reconnect.
+- Reinstall should detect kept Memory Drive and offer reconnect.
 - Escalate if default uninstall removes user data or leaves app background components running after full removal.
 
 ### Playbook: privacy concern
@@ -494,13 +494,13 @@ Required rollback coverage:
 - Update metadata kill switch for a bad release.
 - Connector config restore from Enigma-created backup.
 - Enigma app config restore from last known good snapshot.
-- Vault schema compatibility check before migration and a no-migration path when incompatible.
+- Memory Drive schema compatibility check before migration and a no-migration path when incompatible.
 - Diagnostic bundle capture before and after rollback, with the same redaction rules.
 
 Rollback release blockers:
 
 - App cannot launch after failed update and no supported rollback exists.
-- Vault migration is one-way without explicit compatibility plan.
+- Memory Drive migration is one-way without explicit compatibility plan.
 - Connector writes cannot be restored to pre-change state.
 - Rollback instructions require terminal use for ordinary consumers.
 - Rollback evidence includes private user data or local absolute paths.
@@ -510,7 +510,7 @@ Rollback release blockers:
 Block public beta if any of these are true:
 
 - Fresh install requires terminal, Node install, or JSON editing.
-- First-run cannot create or detect the local vault.
+- First-run cannot create or detect the Memory Drive.
 - Client connect can overwrite unrelated settings or lacks changed-write backup.
 - Diagnostic bundle can include raw memory, prompts, transcripts, credentials, tokens, account IDs, customer identifiers, or local absolute paths.
 - Crash/error reporting sends anything before explicit opt-in.
