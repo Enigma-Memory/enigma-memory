@@ -283,6 +283,19 @@ export function buildCleanMachineSmokePlan(now = new Date()) {
         expected_evidence: 'The report uses schema enigma.clean_machine_smoke.v1 and contains no raw memory, local paths, provider responses, credentials, screenshots, or account identifiers.',
       },
     ],
+    next_actions: [
+      {
+        id: 'review_manual_steps',
+        collect: 'Review every manual QA step before touching the machine under test.',
+        required_fields: ['steps[].step_id', 'steps[].action', 'steps[].expected_evidence'],
+      },
+      {
+        id: 'run_real_smoke_after_review',
+        collect: 'Run the real clean-machine smoke command only after the plan is accepted by the release owner.',
+        command: 'npm run production:clean-machine-smoke -- --plain --out .enigma/public-beta/clean-machine-smoke.json',
+        required_fields: ['summary.healthy', 'summary.status', 'scenarios[].status', 'safety.local_paths_included', 'safety.memory_text_included'],
+      },
+    ],
     safety: {
       dry_run: true,
       system_inspection_performed: false,
@@ -304,6 +317,10 @@ export function renderSmokePlanPlain(plan) {
     `Command: ${plan.command}`,
     `Steps: ${Array.isArray(plan.steps) ? plan.steps.length : 0}`,
   ];
+  for (const action of Array.isArray(plan.next_actions) ? plan.next_actions : []) {
+    lines.push(`Next action: ${action.id} — ${action.collect}`);
+    if (action.command) lines.push(`Next command: ${action.command}`);
+  }
   for (const step of Array.isArray(plan.steps) ? plan.steps : []) {
     lines.push(`Step: ${step.step_id} — ${step.title}`);
     lines.push(`Action: ${step.action}`);
