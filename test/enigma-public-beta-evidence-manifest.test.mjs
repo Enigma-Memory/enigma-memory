@@ -37,6 +37,8 @@ test('public beta evidence manifest defaults to relative public-safe artifact la
     ],
   );
   assert.equal(manifest.evidence_collection[4].target_file, '.enigma/public-beta/production-handoff-packet.json');
+  assert.match(manifest.evidence_collection[3].collect, /signature\.status verified/);
+  assert.match(manifest.evidence_collection[3].collect, /update_rollback pass/);
   assert.equal(manifest.safety.embeds_artifact_contents, false);
   assert.equal(manifest.safety.performs_release_action, false);
   assert.match(manifest.claim_boundary, /does not prove artifacts exist/);
@@ -77,7 +79,7 @@ test('public beta evidence manifest CLI writes JSON and plain output without loc
     assert.match(stdout, /Clean-machine smoke plan: \.enigma\/public-beta\/clean-machine-smoke-plan\.json/);
     assert.match(stdout, /Status: Path manifest ready; evidence still must be collected/);
     assert.match(stdout, /Collect next: EV-P10-CLEAN-MACHINE-SMOKE into \.enigma\/public-beta\/clean-machine-smoke\.json: clean-machine smoke JSON after fresh install, first-run, connector, proof, offline, diagnostics, and uninstall checks/);
-    assert.match(stdout, /Collect next: EV-P10-PRODUCTION-HANDOFF-PACKET into \.enigma\/public-beta\/production-handoff-packet\.json: release PR ref or URL, reviewer approval ref, merge ref, public-safe release packet approval, and handoff status/);
+    assert.match(stdout, /Collect next: EV-P10-PRODUCTION-HANDOFF-PACKET into \.enigma\/public-beta\/production-handoff-packet\.json: release PR ref or URL, reviewer approval ref, merge ref, public-safe release packet approval ref, approval date, and handoff status/);
     assert.match(stdout, /Boundary: path-only manifest/);
     assert.doesNotMatch(stdout, /^\s*\{/);
     assert.equal(stdout.includes(dir), false);

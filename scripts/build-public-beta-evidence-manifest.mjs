@@ -114,13 +114,13 @@ function buildEvidenceCollection({ cleanMachineSmoke, supportDryRun, registryIns
       evidence_item_id: 'EV-P10-DESKTOP-RELEASE-EVIDENCE',
       manifest_field: 'desktop_release_evidence',
       target_file: desktopReleaseEvidence,
-      collect: 'signed desktop artifact refs, public checksums, signature or notarization results, update rehearsal, and download refs',
+      collect: 'desktop evidence with Windows signature.status verified + evidence_ref, macOS signature.status verified, notarization accepted, stapling stapled, update_rollback pass, public checksums, and download refs',
     },
     {
       evidence_item_id: 'EV-P10-PRODUCTION-HANDOFF-PACKET',
       manifest_field: 'production_handoff_packet',
       target_file: productionHandoffPacket,
-      collect: 'release PR ref or URL, reviewer approval ref, merge ref, public-safe release packet approval, and handoff status',
+      collect: 'release PR ref or URL, reviewer approval ref, merge ref, public-safe release packet approval ref, approval date, and handoff status',
     },
   ];
 }

@@ -43,10 +43,20 @@ function assertPublicSafe(value) {
   assert.doesNotMatch(text, POSIX_ABSOLUTE_RE, 'output contains an absolute POSIX local path');
 }
 
-test('parseArgs recognizes installer, manifest, artifacts-dir, and dry-run flags', () => {
+test('parseArgs recognizes installer, verification, manifest, artifacts-dir, and dry-run flags', () => {
   const args = parseArgs([
     '--windows-installer', 'dist/app.exe',
+    '--windows-signature-status', 'verified',
+    '--windows-signature-ref', 'ref:evidence:windows-signature',
     '--macos-installer', 'dist/app.dmg',
+    '--macos-signature-status', 'verified',
+    '--macos-signature-ref', 'ref:evidence:macos-signature',
+    '--macos-notarization-status', 'accepted',
+    '--macos-notarization-ref', 'ref:evidence:macos-notarization',
+    '--macos-stapling-status', 'stapled',
+    '--macos-stapling-ref', 'ref:evidence:macos-stapling',
+    '--update-rollback-status', 'pass',
+    '--update-rollback-ref', 'ref:evidence:update-rollback',
     '--manifest', 'dist/manifest.json',
     '--manifest-sig', 'dist/manifest.json.sig',
     '--artifacts-dir', 'dist/artifacts',
@@ -56,7 +66,17 @@ test('parseArgs recognizes installer, manifest, artifacts-dir, and dry-run flags
     '--plain',
   ]);
   assert.equal(args.windowsInstaller, 'dist/app.exe');
+  assert.equal(args.windowsSignatureStatus, 'verified');
+  assert.equal(args.windowsSignatureRef, 'ref:evidence:windows-signature');
   assert.equal(args.macosInstaller, 'dist/app.dmg');
+  assert.equal(args.macosSignatureStatus, 'verified');
+  assert.equal(args.macosSignatureRef, 'ref:evidence:macos-signature');
+  assert.equal(args.macosNotarizationStatus, 'accepted');
+  assert.equal(args.macosNotarizationRef, 'ref:evidence:macos-notarization');
+  assert.equal(args.macosStaplingStatus, 'stapled');
+  assert.equal(args.macosStaplingRef, 'ref:evidence:macos-stapling');
+  assert.equal(args.updateRollbackStatus, 'pass');
+  assert.equal(args.updateRollbackRef, 'ref:evidence:update-rollback');
   assert.equal(args.manifest, 'dist/manifest.json');
   assert.equal(args.manifestSig, 'dist/manifest.json.sig');
   assert.equal(args.artifactsDir, 'dist/artifacts');
@@ -78,6 +98,9 @@ test('buildDesktopReleaseEvidence dry-run emits valid public-safe JSON without a
   assert.equal(record.installers[1].platform, 'macos');
   assert.equal(record.installers[0].present, false);
   assert.equal(record.installers[1].present, false);
+  assert.equal(record.installers[1].notarization.status, 'not_observed');
+  assert.equal(record.installers[1].stapling.status, 'not_observed');
+  assert.equal(record.update_rollback.status, 'not_run');
   assert.ok(record.blockers.length > 0, 'blockers should list missing artifacts');
   assert.ok(record.next_steps.length > 0, 'next steps should guide artifact provision');
   assert.ok(['pending_azure_setup', 'ci_identity_references_present'].includes(record.signing_evidence.windows.status));
@@ -154,7 +177,7 @@ test('buildDesktopReleaseEvidence blocks release when Tauri updater public key i
   });
 });
 
-test('buildDesktopReleaseEvidence records SHA-256 checksums and signature status for signed installers', async () => {
+test('buildDesktopReleaseEvidence records SHA-256 checksums while keeping unverified artifacts blocked', async () => {
   await withTempDirAsync(async (dir) => {
     const windowsInstaller = join(dir, 'Enigma-Setup.exe');
     const macosInstaller = join(dir, 'Enigma-1.0.0.dmg');
@@ -185,18 +208,83 @@ test('buildDesktopReleaseEvidence records SHA-256 checksums and signature status
     assert.equal(record.installers[1].sha256, createHash('sha256').update(Buffer.from('macos installer bytes', 'utf8')).digest('hex'));
     assert.equal(record.installers[1].signature.status, 'file_present_unverified');
     assert.equal(record.installers[1].signature.method, 'Apple Developer ID + Notary');
+    assert.equal(record.installers[1].notarization.status, 'not_observed');
+    assert.equal(record.installers[1].stapling.status, 'not_observed');
 
     assert.equal(record.manifest.version, '1.0.0');
     assert.equal(record.manifest.sha256, createHash('sha256').update(manifestText, 'utf8').digest('hex'));
     assert.equal(record.manifest.signature.status, 'verified');
     assert.equal(record.manifest.signature.signature_file_present, true);
+    assert.equal(record.update_rollback.status, 'not_run');
     assert.ok(record.artifact_count >= 3);
+    assert.ok(record.blockers.some((blocker) => blocker.includes('Windows installer signature has not been verified')));
+    assert.ok(record.blockers.some((blocker) => blocker.includes('macOS notarization acceptance has not been evidenced')));
+    assert.ok(record.blockers.some((blocker) => blocker.includes('rollback rehearsal have not passed')));
 
     assertPublicSafe(record);
     assert.equal(record.installers[0].path, 'Enigma-Setup.exe');
     assert.equal(record.installers[1].path, 'Enigma-1.0.0.dmg');
     assert.equal(record.manifest.path, 'manifest.json');
     assert.equal(record.manifest.signature.signature_file, 'manifest.json.sig');
+  });
+});
+
+test('buildDesktopReleaseEvidence clears release blockers only with verified public refs', async () => {
+  await withTempDirAsync(async (dir) => {
+    const previousEnv = { ...process.env };
+    process.env.AZURE_CODESIGN_ACCOUNT_NAME = 'enigma-test-account';
+    process.env.AZURE_CODESIGN_CERT_PROFILE_NAME = 'enigma-test-profile';
+    process.env.AZURE_CODESIGN_ENDPOINT = 'https://eus.codesigning.azure.net';
+    process.env.APPLE_TEAM_ID = 'TEAM123456';
+    try {
+      const windowsInstaller = join(dir, 'Enigma-Setup.exe');
+      const macosInstaller = join(dir, 'Enigma-1.0.0.dmg');
+      const manifestPath = join(dir, 'manifest.json');
+      const tauriConfigPath = join(dir, 'tauri.conf.json');
+      writeFileSync(windowsInstaller, Buffer.from('windows installer bytes', 'utf8'));
+      writeFileSync(macosInstaller, Buffer.from('macos installer bytes', 'utf8'));
+      writeFileSync(manifestPath, JSON.stringify({ version: '1.0.0', platforms: { 'darwin-x86_64': { signature: 'abc' } } }, null, 2));
+      writeFileSync(tauriConfigPath, JSON.stringify({ plugins: { updater: { active: true, endpoints: ['https://updates.example/enigma.json'], pubkey: 'dGVzdC11cGRhdGVyLXB1YmxpYy1rZXk=' } } }, null, 2));
+
+      const { privateKey } = generateKeyPairSync('ed25519');
+      const sigRecord = signManifest(manifestPath, privateKey);
+      writeFileSync(`${manifestPath}.sig`, JSON.stringify(sigRecord, null, 2));
+
+      const record = buildDesktopReleaseEvidence({
+        windowsInstaller,
+        windowsSignatureStatus: 'verified',
+        windowsSignatureRef: 'ref:evidence:windows-signature',
+        macosInstaller,
+        macosSignatureStatus: 'verified',
+        macosSignatureRef: 'ref:evidence:macos-signature',
+        macosNotarizationStatus: 'accepted',
+        macosNotarizationRef: 'ref:evidence:macos-notarization',
+        macosStaplingStatus: 'stapled',
+        macosStaplingRef: 'ref:evidence:macos-stapling',
+        updateRollbackStatus: 'pass',
+        updateRollbackRef: 'ref:evidence:update-rollback',
+        manifest: manifestPath,
+        tauriConfigPath,
+        artifactsDir: dir,
+        version: '0.1.19',
+      });
+
+      assert.deepEqual(record.blockers, []);
+      assert.equal(record.installers[0].signature.status, 'verified');
+      assert.equal(record.installers[0].signature.evidence_ref, 'ref:evidence:windows-signature');
+      assert.equal(record.installers[1].signature.status, 'verified');
+      assert.equal(record.installers[1].notarization.status, 'accepted');
+      assert.equal(record.installers[1].stapling.status, 'stapled');
+      assert.equal(record.update_rollback.status, 'pass');
+      assert.equal(record.update_rollback.evidence_ref, 'ref:evidence:update-rollback');
+      assert.ok(record.next_steps.some((step) => step.includes('proceed to release audit')));
+      assertPublicSafe(record);
+    } finally {
+      Object.assign(process.env, previousEnv);
+      for (const key of ['AZURE_CODESIGN_ACCOUNT_NAME', 'AZURE_CODESIGN_CERT_PROFILE_NAME', 'AZURE_CODESIGN_ENDPOINT', 'APPLE_TEAM_ID']) {
+        if (!(key in previousEnv)) delete process.env[key];
+      }
+    }
   });
 });
 
@@ -238,6 +326,8 @@ test('buildDesktopReleaseEvidence records signing identity presence from env var
 
       assert.equal(record.installers[0].signature.configured, true);
       assert.equal(record.installers[1].signature.configured, true);
+      assert.ok(record.blockers.some((blocker) => blocker.includes('signature has not been verified')));
+      assert.ok(record.blockers.some((blocker) => blocker.includes('rollback rehearsal have not passed')));
 
       const serialized = JSON.stringify(record);
       assert.doesNotMatch(serialized, /enigma-test-account/);
@@ -271,6 +361,7 @@ test('buildDesktopReleaseEvidence records missing entries when artifacts are abs
   assert.ok(record.blockers.some((b) => b.includes('Windows installer')));
   assert.ok(record.blockers.some((b) => b.includes('macOS installer')));
   assert.ok(record.blockers.some((b) => b.includes('updater manifest')));
+  assert.equal(record.update_rollback.status, 'not_run');
   assertPublicSafe(record);
 });
 
@@ -342,6 +433,7 @@ test('runReleaseEvidenceDesktop supports plain human output without writing evid
     assert.match(captured, /^Enigma desktop release evidence\n/);
     assert.match(captured, /Status: Needs attention/);
     assert.match(captured, /Blockers: /);
+    assert.match(captured, /Update rollback: not_run/);
     assert.match(captured, /Boundary: public desktop release evidence only/);
     assert.doesNotMatch(captured, /^\s*\{/);
     assert.equal(captured.includes(dir), false);
@@ -357,6 +449,7 @@ test('renderDesktopReleaseEvidencePlain summarizes release evidence without priv
   assert.match(plain, /^Enigma desktop release evidence\n/);
   assert.match(plain, /Version: 0\.1\.19/);
   assert.match(plain, /Evidence written: no/);
+  assert.match(plain, /Update rollback: not_run/);
   assert.match(plain, /Boundary: public desktop release evidence only/);
   assert.doesNotMatch(plain, /C:\\Users\\|\/home\/|\/tmp\/|api[_-]?key|password/i);
 });

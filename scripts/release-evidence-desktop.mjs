@@ -25,22 +25,32 @@ function usage() {
   return `Usage: node scripts/release-evidence-desktop.mjs [options]
 
 Options:
-  --windows-installer <path>   Path to the signed Windows installer (.exe/.msix).
-  --macos-installer <path>     Path to the signed/notarized macOS installer (.dmg/.pkg).
-  --manifest <path>            Path to the Tauri updater manifest (manifest.json).
-  --manifest-sig <path>        Path to the detached manifest signature file.
-                               Defaults to <manifest>.sig.
-  --artifacts-dir <dir>        Directory with additional release artifacts to hash.
-  --out <path>                 Output path for the evidence JSON (default: dist/desktop-release-evidence.json).
-  --write                      Persist the evidence file (default is dry-run).
-  --plain                     Print a human-readable, path-redacted summary.
-  --dry-run                    Print the full public-safe evidence packet to stdout.
-  --help, -h                   Show this help.
+  --windows-installer <path>          Path to the signed Windows installer (.exe/.msix).
+  --windows-signature-status <status> Public verification status: file_present_unverified or verified.
+  --windows-signature-ref <ref>       Public ref/URL for Windows signature verification evidence.
+  --macos-installer <path>            Path to the signed/notarized macOS installer (.dmg/.pkg).
+  --macos-signature-status <status>   Public verification status: file_present_unverified or verified.
+  --macos-signature-ref <ref>         Public ref/URL for macOS signature verification evidence.
+  --macos-notarization-status <status> Public notarization status: not_observed, accepted, or rejected.
+  --macos-notarization-ref <ref>      Public ref/URL for macOS notarization evidence.
+  --macos-stapling-status <status>    Public stapling status: not_observed, stapled, or failed.
+  --macos-stapling-ref <ref>          Public ref/URL for macOS stapling evidence.
+  --update-rollback-status <status>   Public update rollback rehearsal status: not_run, pass, or fail.
+  --update-rollback-ref <ref>         Public ref/URL for update rollback rehearsal evidence.
+  --manifest <path>                   Path to the Tauri updater manifest (manifest.json).
+  --manifest-sig <path>               Path to the detached manifest signature file.
+                                      Defaults to <manifest>.sig.
+  --artifacts-dir <dir>               Directory with additional release artifacts to hash.
+  --out <path>                        Output path for the evidence JSON (default: dist/desktop-release-evidence.json).
+  --write                             Persist the evidence file (default is dry-run).
+  --plain                             Print a human-readable, path-redacted summary.
+  --dry-run                           Print the full public-safe evidence packet to stdout.
+  --help, -h                          Show this help.
 
 Generates a public-safe desktop release evidence packet. Dry-run is the default;
-use --write to persist the evidence file. When no signed installers are present,
-the packet records missing entries so the script can run before real release
-artifacts exist.
+use --write to persist the evidence file. When no verified signed installers are
+present, the packet records blockers so templates cannot masquerade as release
+evidence.
 `;
 }
 
@@ -53,7 +63,17 @@ function readArg(argv, index, flag) {
 
 export function parseArgs(argv = process.argv.slice(2)) {
   let windowsInstaller = null;
+  let windowsSignatureStatus = null;
+  let windowsSignatureRef = null;
   let macosInstaller = null;
+  let macosSignatureStatus = null;
+  let macosSignatureRef = null;
+  let macosNotarizationStatus = null;
+  let macosNotarizationRef = null;
+  let macosStaplingStatus = null;
+  let macosStaplingRef = null;
+  let updateRollbackStatus = null;
+  let updateRollbackRef = null;
   let manifest = null;
   let manifestSig = null;
   let artifactsDir = null;
@@ -66,8 +86,38 @@ export function parseArgs(argv = process.argv.slice(2)) {
     if (arg === '--windows-installer') {
       windowsInstaller = readArg(argv, i + 1, '--windows-installer');
       i += 1;
+    } else if (arg === '--windows-signature-status') {
+      windowsSignatureStatus = readArg(argv, i + 1, '--windows-signature-status');
+      i += 1;
+    } else if (arg === '--windows-signature-ref') {
+      windowsSignatureRef = readArg(argv, i + 1, '--windows-signature-ref');
+      i += 1;
     } else if (arg === '--macos-installer') {
       macosInstaller = readArg(argv, i + 1, '--macos-installer');
+      i += 1;
+    } else if (arg === '--macos-signature-status') {
+      macosSignatureStatus = readArg(argv, i + 1, '--macos-signature-status');
+      i += 1;
+    } else if (arg === '--macos-signature-ref') {
+      macosSignatureRef = readArg(argv, i + 1, '--macos-signature-ref');
+      i += 1;
+    } else if (arg === '--macos-notarization-status') {
+      macosNotarizationStatus = readArg(argv, i + 1, '--macos-notarization-status');
+      i += 1;
+    } else if (arg === '--macos-notarization-ref') {
+      macosNotarizationRef = readArg(argv, i + 1, '--macos-notarization-ref');
+      i += 1;
+    } else if (arg === '--macos-stapling-status') {
+      macosStaplingStatus = readArg(argv, i + 1, '--macos-stapling-status');
+      i += 1;
+    } else if (arg === '--macos-stapling-ref') {
+      macosStaplingRef = readArg(argv, i + 1, '--macos-stapling-ref');
+      i += 1;
+    } else if (arg === '--update-rollback-status') {
+      updateRollbackStatus = readArg(argv, i + 1, '--update-rollback-status');
+      i += 1;
+    } else if (arg === '--update-rollback-ref') {
+      updateRollbackRef = readArg(argv, i + 1, '--update-rollback-ref');
       i += 1;
     } else if (arg === '--manifest') {
       manifest = readArg(argv, i + 1, '--manifest');
@@ -97,7 +147,17 @@ export function parseArgs(argv = process.argv.slice(2)) {
   }
   return {
     windowsInstaller,
+    windowsSignatureStatus,
+    windowsSignatureRef,
     macosInstaller,
+    macosSignatureStatus,
+    macosSignatureRef,
+    macosNotarizationStatus,
+    macosNotarizationRef,
+    macosStaplingStatus,
+    macosStaplingRef,
+    updateRollbackStatus,
+    updateRollbackRef,
     manifest,
     manifestSig,
     plain,
@@ -119,6 +179,40 @@ function assertPublicSafe(value, label) {
   if (CONTROL_RE.test(text)) {
     throw new Error(`${label} contains control characters`);
   }
+}
+
+const PUBLIC_REF_RE = /^(ref:[A-Za-z0-9._:/#-]+|https:\/\/[^\s]+)$/u;
+const SIGNATURE_STATUSES = new Set(['file_present_unverified', 'verified']);
+const MACOS_NOTARIZATION_STATUSES = new Set(['not_observed', 'accepted', 'rejected']);
+const MACOS_STAPLING_STATUSES = new Set(['not_observed', 'stapled', 'failed']);
+const UPDATE_ROLLBACK_STATUSES = new Set(['not_run', 'pass', 'fail']);
+
+function readStatus(value, allowed, fallback, label) {
+  if (value === null || value === undefined || value === '') return fallback;
+  const status = String(value).trim();
+  if (!allowed.has(status)) {
+    throw new Error(`${label} must be one of: ${[...allowed].join(', ')}`);
+  }
+  return status;
+}
+
+function publicEvidenceRef(value, label) {
+  if (value === null || value === undefined || value === '') return null;
+  const ref = String(value).trim();
+  assertPublicSafe(ref, label);
+  if (!PUBLIC_REF_RE.test(ref)) {
+    throw new Error(`${label} must be a public ref: ref:* or https://...`);
+  }
+  return ref;
+}
+
+function evidenceStatus(status, evidenceRef, readyStatus, label) {
+  const ref = publicEvidenceRef(evidenceRef, `${label} evidence ref`);
+  return {
+    status,
+    evidence_ref: ref,
+    evidence_ref_required: status === readyStatus && ref === null,
+  };
 }
 
 function sha256File(full) {
@@ -304,13 +398,20 @@ function signingEvidence(options = {}) {
   };
 }
 
-function recordInstaller(platform, filePath) {
+function recordInstaller(platform, filePath, options = {}) {
   const method = platform === 'windows' ? 'Azure Artifact Signing' : 'Apple Developer ID + Notary';
   const configured = platform === 'windows'
     ? typeof process.env.AZURE_CODESIGN_ACCOUNT_NAME === 'string' && process.env.AZURE_CODESIGN_ACCOUNT_NAME.length > 0
       && typeof process.env.AZURE_CODESIGN_CERT_PROFILE_NAME === 'string' && process.env.AZURE_CODESIGN_CERT_PROFILE_NAME.length > 0
       && typeof process.env.AZURE_CODESIGN_ENDPOINT === 'string' && process.env.AZURE_CODESIGN_ENDPOINT.length > 0
     : typeof process.env.APPLE_TEAM_ID === 'string' && process.env.APPLE_TEAM_ID.length > 0;
+  const missingSignature = { status: 'missing_artifact', method, configured, evidence_ref: null, evidence_ref_required: false };
+  const macosIncomplete = platform === 'macos'
+    ? {
+        notarization: evidenceStatus('not_observed', null, 'accepted', 'macOS notarization'),
+        stapling: evidenceStatus('not_observed', null, 'stapled', 'macOS stapling'),
+      }
+    : {};
   if (!filePath) {
     return {
       platform,
@@ -318,7 +419,8 @@ function recordInstaller(platform, filePath) {
       path: null,
       sha256: null,
       bytes: null,
-      signature: { status: 'missing_artifact', method, configured },
+      signature: missingSignature,
+      ...macosIncomplete,
     };
   }
   const full = path.resolve(filePath);
@@ -329,7 +431,8 @@ function recordInstaller(platform, filePath) {
       path: publicArtifactPath(full),
       sha256: null,
       bytes: null,
-      signature: { status: 'missing_artifact', method, configured },
+      signature: missingSignature,
+      ...macosIncomplete,
     };
   }
   const stat = fs.lstatSync(full);
@@ -340,20 +443,56 @@ function recordInstaller(platform, filePath) {
       path: publicArtifactPath(full),
       sha256: null,
       bytes: null,
-      signature: { status: 'not_a_file', method, configured },
+      signature: { status: 'not_a_file', method, configured, evidence_ref: null, evidence_ref_required: false },
+      ...macosIncomplete,
     };
   }
-  return {
+  const signatureStatus = readStatus(
+    platform === 'windows' ? options.windowsSignatureStatus : options.macosSignatureStatus,
+    SIGNATURE_STATUSES,
+    'file_present_unverified',
+    `${platform} signature status`,
+  );
+  const signatureRef = platform === 'windows' ? options.windowsSignatureRef : options.macosSignatureRef;
+  const installer = {
     platform,
     present: true,
     path: publicArtifactPath(full),
     sha256: sha256File(full),
     bytes: stat.size,
-    signature: { status: 'file_present_unverified', method, configured },
+    signature: {
+      ...evidenceStatus(signatureStatus, signatureRef, 'verified', `${platform} signature`),
+      method,
+      configured,
+    },
   };
+  if (platform === 'macos') {
+    installer.notarization = evidenceStatus(
+      readStatus(options.macosNotarizationStatus, MACOS_NOTARIZATION_STATUSES, 'not_observed', 'macOS notarization status'),
+      options.macosNotarizationRef,
+      'accepted',
+      'macOS notarization',
+    );
+    installer.stapling = evidenceStatus(
+      readStatus(options.macosStaplingStatus, MACOS_STAPLING_STATUSES, 'not_observed', 'macOS stapling status'),
+      options.macosStaplingRef,
+      'stapled',
+      'macOS stapling',
+    );
+  }
+  return installer;
 }
 
-function deriveBlockersAndNextSteps({ manifest, manifestSignature, windows, macos, signing }) {
+function updateRollbackEvidence(options = {}) {
+  return evidenceStatus(
+    readStatus(options.updateRollbackStatus, UPDATE_ROLLBACK_STATUSES, 'not_run', 'update rollback status'),
+    options.updateRollbackRef,
+    'pass',
+    'update rollback',
+  );
+}
+
+function deriveBlockersAndNextSteps({ manifest, manifestSignature, windows, macos, signing, updateRollback }) {
   const blockers = [];
   const nextSteps = [];
 
@@ -371,17 +510,49 @@ function deriveBlockersAndNextSteps({ manifest, manifestSignature, windows, maco
   if (!windows.present) {
     blockers.push('No Windows installer (.exe/.msix) artifact found or provided.');
     nextSteps.push('Build the Windows installer and pass --windows-installer <path>.');
-  } else if (!signing.windows.configured) {
-    blockers.push('Windows installer is present but CI evidence does not show Azure Artifact Signing identity references.');
-    nextSteps.push('Complete Azure Artifact Signing/Public Trust setup in CI secrets, then provide the signed Windows release artifact.');
+  } else {
+    if (!signing.windows.configured) {
+      blockers.push('Windows installer is present but CI evidence does not show Azure Artifact Signing identity references.');
+      nextSteps.push('Complete Azure Artifact Signing/Public Trust setup in CI secrets, then provide the signed Windows release artifact.');
+    }
+    if (windows.signature?.status !== 'verified') {
+      blockers.push('Windows installer signature has not been verified from public-safe release evidence.');
+      nextSteps.push('Verify the Windows installer signature in CI and pass --windows-signature-status verified with --windows-signature-ref <ref>.');
+    } else if (windows.signature.evidence_ref_required) {
+      blockers.push('Windows installer signature is marked verified but has no public-safe evidence ref.');
+      nextSteps.push('Attach a public-safe Windows signature verification ref with --windows-signature-ref <ref>.');
+    }
   }
 
   if (!macos.present) {
     blockers.push('No macOS installer (.dmg/.pkg) artifact found or provided.');
     nextSteps.push('Build the macOS installer and pass --macos-installer <path>.');
-  } else if (!signing.macos.configured) {
-    blockers.push('macOS installer is present but CI evidence does not show an Apple Developer ID Team ID reference.');
-    nextSteps.push('Store Apple signing credentials in CI secrets, then provide the signed and notarized macOS release artifact.');
+  } else {
+    if (!signing.macos.configured) {
+      blockers.push('macOS installer is present but CI evidence does not show an Apple Developer ID Team ID reference.');
+      nextSteps.push('Store Apple signing credentials in CI secrets, then provide the signed and notarized macOS release artifact.');
+    }
+    if (macos.signature?.status !== 'verified') {
+      blockers.push('macOS installer signature has not been verified from public-safe release evidence.');
+      nextSteps.push('Verify the macOS installer signature and pass --macos-signature-status verified with --macos-signature-ref <ref>.');
+    } else if (macos.signature.evidence_ref_required) {
+      blockers.push('macOS installer signature is marked verified but has no public-safe evidence ref.');
+      nextSteps.push('Attach a public-safe macOS signature verification ref with --macos-signature-ref <ref>.');
+    }
+    if (macos.notarization?.status !== 'accepted') {
+      blockers.push('macOS notarization acceptance has not been evidenced.');
+      nextSteps.push('Run Apple notarization verification and pass --macos-notarization-status accepted with --macos-notarization-ref <ref>.');
+    } else if (macos.notarization.evidence_ref_required) {
+      blockers.push('macOS notarization is marked accepted but has no public-safe evidence ref.');
+      nextSteps.push('Attach a public-safe notarization evidence ref with --macos-notarization-ref <ref>.');
+    }
+    if (macos.stapling?.status !== 'stapled') {
+      blockers.push('macOS stapling has not been evidenced.');
+      nextSteps.push('Verify the notarization ticket is stapled and pass --macos-stapling-status stapled with --macos-stapling-ref <ref>.');
+    } else if (macos.stapling.evidence_ref_required) {
+      blockers.push('macOS stapling is marked stapled but has no public-safe evidence ref.');
+      nextSteps.push('Attach a public-safe stapling evidence ref with --macos-stapling-ref <ref>.');
+    }
   }
 
   if (!manifest) {
@@ -395,8 +566,16 @@ function deriveBlockersAndNextSteps({ manifest, manifestSignature, windows, maco
     nextSteps.push('Regenerate the manifest signature with the matching Ed25519 key.');
   }
 
+  if (updateRollback.status !== 'pass') {
+    blockers.push('Signed update verification and rollback rehearsal have not passed.');
+    nextSteps.push('Run the beta-channel update/rollback rehearsal and pass --update-rollback-status pass with --update-rollback-ref <ref>.');
+  } else if (updateRollback.evidence_ref_required) {
+    blockers.push('Update rollback rehearsal is marked pass but has no public-safe evidence ref.');
+    nextSteps.push('Attach a public-safe update rollback rehearsal ref with --update-rollback-ref <ref>.');
+  }
+
   if (blockers.length === 0) {
-    nextSteps.push('All required signed artifacts and manifest evidence are present; proceed to release audit.');
+    nextSteps.push('All required signed artifacts, notarization/stapling, rollback, and manifest evidence are present; proceed to release audit.');
   }
 
   return { blockers, nextSteps };
@@ -419,10 +598,11 @@ export function buildDesktopReleaseEvidence(options = {}) {
   const artifacts = collectArtifacts(options.artifactsDir || 'dist/desktop-artifacts');
   const manifest = readManifest(options.manifest);
   const manifestSignature = readManifestSignature(options.manifest, options.manifestSig);
-  const windows = recordInstaller('windows', options.windowsInstaller);
-  const macos = recordInstaller('macos', options.macosInstaller);
+  const windows = recordInstaller('windows', options.windowsInstaller, options);
+  const macos = recordInstaller('macos', options.macosInstaller, options);
   const signing = signingEvidence(options);
-  const { blockers, nextSteps } = deriveBlockersAndNextSteps({ manifest, manifestSignature, windows, macos, signing });
+  const updateRollback = updateRollbackEvidence(options);
+  const { blockers, nextSteps } = deriveBlockersAndNextSteps({ manifest, manifestSignature, windows, macos, signing, updateRollback });
   const evidenceId = randomBytes(16).toString('hex');
 
   const record = {
@@ -433,6 +613,7 @@ export function buildDesktopReleaseEvidence(options = {}) {
     claim_boundary: 'Public desktop release evidence only. No signing keys, certificates, account IDs, raw memory, or local paths.',
     manifest: manifest ? { ...manifest, signature: manifestSignature } : null,
     installers: [windows, macos],
+    update_rollback: updateRollback,
     artifacts,
     artifact_count: artifacts.length,
     signing_evidence: signing,
@@ -442,7 +623,7 @@ export function buildDesktopReleaseEvidence(options = {}) {
     notes: [
       'This packet is produced by scripts/release-evidence-desktop.mjs and is safe for public release.',
       'Real signing secrets are intentionally omitted; CI release jobs inject private keys and certificates as secrets.',
-      'Installer signature verification is pending platform-specific signature tooling in CI.',
+      'Installer signature, macOS notarization/stapling, and update rollback fields remain blockers until replaced with real public-safe verification evidence.',
     ],
   };
 
@@ -460,6 +641,7 @@ export function renderDesktopReleaseEvidencePlain(record, wrote = false) {
     `Artifacts: ${record.artifact_count ?? 0}`,
     `Installers present: ${installerCount}`,
     `Updater manifest: ${record.manifest ? 'present' : 'missing'}`,
+    `Update rollback: ${record.update_rollback?.status ?? 'not_run'}`,
     `Blockers: ${blockers.length}`,
     `Evidence written: ${wrote ? 'yes' : 'no'}`,
   ];
@@ -490,6 +672,7 @@ export async function runReleaseEvidenceDesktop(argv = process.argv.slice(2)) {
     installers: record.installers,
     signing_evidence: record.signing_evidence,
     blockers: record.blockers,
+    update_rollback: record.update_rollback,
     next_steps: record.next_steps,
     out: outRel,
     wrote: args.write,

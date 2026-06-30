@@ -73,6 +73,19 @@ test('public beta evidence templates are public-safe blockers, not fake evidence
     assert.equal(desktop.schema, 'enigma.desktop_release_evidence.v1');
     assert.equal(desktop.blockers.includes('windows-signed-desktop-artifact-missing'), true);
     assert.equal(desktop.installers.some((installer) => installer.platform === 'windows' && installer.present === false), true);
+    assert.equal(desktop.installers.find((installer) => installer.platform === 'windows').signature.status, 'file_present_unverified');
+    assert.equal(desktop.installers.find((installer) => installer.platform === 'windows').signature.evidence_ref_required, true);
+    assert.equal(desktop.installers.find((installer) => installer.platform === 'macos').signature.status, 'file_present_unverified');
+    assert.equal(desktop.installers.find((installer) => installer.platform === 'macos').notarization.status, 'not_observed');
+    assert.equal(desktop.installers.find((installer) => installer.platform === 'macos').stapling.status, 'not_observed');
+    assert.equal(desktop.update_rollback.status, 'not_run');
+    assert.equal(desktop.update_rollback.evidence_ref_required, true);
+
+    const handoff = JSON.parse(await readFile(join(outDir, 'production-handoff-packet.json'), 'utf8'));
+    assert.equal(handoff.public_safe_release_packet_approval.status, 'pending');
+    assert.equal(handoff.public_safe_release_packet_approval.release_packet_ref, 'TBD-public-release-packet-ref');
+    assert.equal(handoff.public_safe_release_packet_approval.claim_boundary_reviewer_ref, 'TBD-claim-boundary-reviewer-ref');
+    assert.equal(handoff.public_safe_release_packet_approval.approval_ref, 'TBD-public-approval-ref');
 
     const advisor = await buildPublicBetaQaMatrix({ evidenceManifest: report.evidence_manifest });
     assert.equal(advisor.advisor_decision, 'hold');

@@ -87,10 +87,11 @@
 |---|---|---|
 | PR #60 review/merge | `main` cannot receive the public-ready branch until review-required branch protection is satisfied. | PR #60 is open with `reviewDecision: REVIEW_REQUIRED`; a reviewer with merge rights must approve and merge. |
 | Publish `enigma-memory@0.1.19` | Public beta matrix requires `0.1.19`; source package is prepared at `0.1.19`, but registry publication evidence is still absent. | Publish only after PR #60 is merged and the release owner approves the package contents. |
-| Signed Windows installer / MSIX | Public launch definition of done requires signed distribution. | Upgrade or switch Azure to an Artifact Signing-eligible paid subscription. Portal creation for `Azure subscription 1` was rejected as free/trial/sponsored before account creation, identity validation, or Public Trust profile setup could proceed. |
-| Signed/macOS notarized app | Gatekeeper will block unsigned apps. | Enroll in Apple Developer Program; see `docs/public-launch/code-signing-setup.md` for fast-track steps and timeline. |
+| Verified signed Windows installer / MSIX | Public launch definition of done requires signed distribution plus public-safe signature verification evidence. | Upgrade or switch Azure to an Artifact Signing-eligible paid subscription. Portal creation for `Azure subscription 1` was rejected as free/trial/sponsored before account creation, identity validation, Public Trust profile setup, artifact signing, or public verification could proceed. |
+| Verified signed, notarized, and stapled macOS app | Gatekeeper will block unsigned or unnotarized apps, and public beta evidence now requires signature verification, notarization acceptance, and stapling evidence refs. | Enroll in Apple Developer Program; see `docs/public-launch/code-signing-setup.md` for fast-track steps and timeline. |
+| Signed update rollback rehearsal | Public beta requires update signature verification plus rollback rehearsal evidence before the update scenario can pass. | Run the beta-channel update/rollback rehearsal and record `update_rollback.status: pass` with a public-safe evidence ref in `desktop-release-evidence.json`. |
 | Clean-machine Windows/macOS beta evidence | Public beta requires observed install, first run, connector, proof, diagnostics, offline, update-check, and uninstall paths without developer tools. | Run the public beta QA matrix on clean Windows/macOS profiles with signed artifacts once signing is available. |
-| Public-safe release packet approval | Public beta requires an approved packet with release/support/signing owners and evidence refs. | Generate/review the release packet after signing and clean-machine evidence exist. |
+| Public-safe release packet approval | Public beta requires an approved packet with release/support/signing owners, release packet ref, claim-boundary reviewer ref, approval ref, and approval date. | Generate/review the release packet after signing, rollback, and clean-machine evidence exist. |
 
 ---
 
@@ -103,12 +104,12 @@
 - `node --test test/enigma-metering.test.mjs` at repo root: **6/6 pass**.
 - `node --test test/enigma-settlement.test.mjs` at repo root: **7/7 pass**.
 - `node --test test/enigma-chain-cli.test.mjs` at repo root: **8/8 pass**.
-- `node --test test/enigma-public-beta-qa-matrix.test.mjs` at repo root: **17/17 pass**.
+- `node --test test/enigma-public-beta-qa-matrix.test.mjs` at repo root: **23/23 pass**.
 - `node --test test/enigma-public-beta-evidence-manifest.test.mjs` at repo root: **3/3 pass**.
-- `node --test test/enigma-public-beta-review.test.mjs` at repo root: **4/4 pass**.
+- `node --test test/enigma-public-beta-review.test.mjs` at repo root: **5/5 pass**.
 - `node --test test/enigma-clean-machine-smoke.test.mjs` at repo root: **5/5 pass**.
 - `node --test test/enigma-support-dry-run.test.mjs` at repo root: **9/9 pass**.
-- `node --test test/enigma-release-evidence-desktop.test.mjs` at repo root: **13/13 pass**.
+- `node --test test/enigma-release-evidence-desktop.test.mjs` at repo root: **14/14 pass**.
 - `node --test test/enigma-production-unblocker.test.mjs` at repo root: **7/7 pass**.
 - `node --test test/enigma-registry-install.test.mjs` at repo root: **6/6 pass**.
 - `node --test test/enigma-production-status-board.test.mjs` at repo root: **10/10 pass**.
@@ -136,7 +137,7 @@
 - `npm run production:site -- --site website` at repo root: **pass**.
 - `npm run check` at repo root: **pass**.
 - `npm run secret-scan` at repo root: **pass**.
-- `npm test` at repo root: **691/691 pass**.
+- `npm test` at repo root: **696/696 pass**.
 - `npm pack --dry-run` at repo root: **pass** (`enigma-memory-0.1.19.tgz` dry-run output).
 - `npm run package:install-smoke` at repo root: **pass**; locally packs `enigma-memory-0.1.19.tgz`, installs it into a temporary npm prefix with `--ignore-scripts --omit=optional --offline`, verifies selected installed entrypoints, npm bin shims, installed MCP stdio, and 22 public package export specifiers, then removes the temp directory without publishing or using npm tokens.
 - `npm run release:audit` at repo root: **pass**; required gates include `npm-check`, `npm-test`, `npm-pack-dry-run`, `local-pack-install-smoke` with bin/export coverage, direct bin smoke, review packet, MCP stdio smoke, and production manifest validators.
@@ -149,11 +150,12 @@
 
 1. Get PR #60 reviewed and merged into `main`.
 2. Publish `enigma-memory@0.1.19` from the merged release commit.
-3. Complete external signing prerequisites (Apple Developer, Microsoft signing identity).
-4. Run end-to-end smoke-test matrix on clean Windows/macOS VMs with the signed artifacts.
-5. Generate and approve the public-safe release packet.
-6. Start external security audit.
-7. Configure any mainnet custody/deployment only after release-owner approval; local desktop beta does not require hosted SaaS claims.
+3. Complete external signing prerequisites (Apple Developer, Microsoft signing identity) and record verified Windows signature, macOS signature, notarization, and stapling evidence refs.
+4. Run beta-channel update signature verification and rollback rehearsal, then record `update_rollback.status: pass` with an evidence ref.
+5. Run end-to-end smoke-test matrix on clean Windows/macOS VMs with the signed artifacts.
+6. Generate and approve the public-safe release packet.
+7. Start external security audit.
+8. Configure any mainnet custody/deployment only after release-owner approval; local desktop beta does not require hosted SaaS claims.
 
 ---
 

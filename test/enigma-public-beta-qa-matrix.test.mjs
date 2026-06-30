@@ -253,7 +253,7 @@ test('public beta QA plain output is readable, bounded, and non-JSON', async () 
   assert.match(plain, /Pending: /);
   assert.match(plain, /Collect: npm run public-beta:evidence-manifest -- --out \.enigma\/public-beta\/evidence-manifest\.json --plain/);
   assert.match(plain, /Review: npm run public-beta:advisor -- --evidence-manifest \.enigma\/public-beta\/evidence-manifest\.json/);
-  assert.match(plain, /Collect next: approve_merge_release_pr — EV-P10-PRODUCTION-HANDOFF-PACKET into \.enigma\/public-beta\/production-handoff-packet\.json: release PR ref or URL, reviewer approval ref, merge ref, and public-safe handoff approval status/);
+  assert.match(plain, /Collect next: approve_merge_release_pr — EV-P10-PRODUCTION-HANDOFF-PACKET into \.enigma\/public-beta\/production-handoff-packet\.json: release PR ref or URL, reviewer approval ref, merge ref, public-safe release packet approval ref, and approval date/);
   assert.match(plain, /Collect next: publish_npm_0_1_19 — EV-P10-REGISTRY-INSTALL into \.enigma\/public-beta\/registry-install\.json: npm package version, registry package ref, install command used, and public-safe install result/);
   assert.match(plain, /Patchable evidence:/);
   assert.match(plain, /Evidence: record_support_dry_run — EV-P10-SUPPORT-DRY-RUN-SUMMARY/);
@@ -419,6 +419,37 @@ test('public beta QA matrix does not treat present installers as signed evidence
   assert.doesNotMatch(JSON.stringify(windows.evidence_refs), /ref:evidence:desktop-release/);
 });
 
+test('public beta QA matrix requires public evidence refs for verified desktop artifacts', () => {
+  const scenarios = buildScenarioRows({
+    tauriConfig: { bundle: { active: true, targets: ['msi', 'nsis', 'dmg', 'app'] } },
+    desktopReleaseWorkflow: 'Sign update manifest',
+    updateSignerScript: 'present',
+    updateCommands: '"offline"',
+    cleanMachineSmoke: {
+      schema: 'enigma.clean_machine_smoke.v1',
+      app_version: '0.1.19',
+      summary: { healthy: true },
+    },
+    desktopReleaseEvidence: {
+      schema: 'enigma.desktop_release_evidence.v1',
+      release_version: '0.1.19',
+      blockers: [],
+      manifest: { signature: { status: 'verified' } },
+      update_rollback: { status: 'pass' },
+      installers: [
+        { platform: 'windows', present: true, signature: { status: 'verified' } },
+        { platform: 'macos', present: true, signature: { status: 'verified' }, notarization: { status: 'accepted' }, stapling: { status: 'stapled' } },
+      ],
+    },
+  });
+
+  for (const id of ['BETA-INSTALL-001', 'BETA-SIGNING-WINDOWS-001', 'BETA-SIGNING-MACOS-001', 'BETA-UPDATE-001']) {
+    const row = scenarioById(scenarios, id);
+    assert.notEqual(row.status, 'pass', id);
+    assert.doesNotMatch(JSON.stringify(row.evidence_refs), /ref:evidence:desktop-release/);
+  }
+});
+
 test('public beta QA matrix can consume signed desktop release evidence without clearing review gates', () => {
   const scenarios = buildScenarioRows({
     tauriConfig: { bundle: { active: true, targets: ['msi', 'nsis', 'dmg', 'app'] } },
@@ -437,10 +468,10 @@ test('public beta QA matrix can consume signed desktop release evidence without 
       manifest: {
         signature: { status: 'verified' },
       },
-      update_rollback: { status: 'pass' },
+      update_rollback: { status: 'pass', evidence_ref: 'ref:evidence:update-rollback' },
       installers: [
-        { platform: 'windows', present: true, signature: { status: 'verified' } },
-        { platform: 'macos', present: true, signature: { status: 'verified' }, notarization: { status: 'accepted' }, stapling: { status: 'stapled' } },
+        { platform: 'windows', present: true, signature: { status: 'verified', evidence_ref: 'ref:evidence:windows-signature' } },
+        { platform: 'macos', present: true, signature: { status: 'verified', evidence_ref: 'ref:evidence:macos-signature' }, notarization: { status: 'accepted', evidence_ref: 'ref:evidence:macos-notarization' }, stapling: { status: 'stapled', evidence_ref: 'ref:evidence:macos-stapling' } },
       ],
     },
   });

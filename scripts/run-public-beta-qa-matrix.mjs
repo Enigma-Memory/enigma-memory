@@ -127,7 +127,7 @@ const NEXT_ACTION_ORDER = Object.freeze([
       evidence_item_id: 'EV-P10-PRODUCTION-HANDOFF-PACKET',
       manifest_field: 'production_handoff_packet',
       target_file: '.enigma/public-beta/production-handoff-packet.json',
-      collect: 'release PR ref or URL, reviewer approval ref, merge ref, and public-safe handoff approval status',
+      collect: 'release PR ref or URL, reviewer approval ref, merge ref, public-safe release packet approval ref, and approval date',
     },
   },
   {
@@ -175,7 +175,7 @@ const NEXT_ACTION_ORDER = Object.freeze([
       evidence_item_id: 'EV-P10-WINDOWS-SIGNED-DESKTOP-ARTIFACT',
       manifest_field: 'desktop_release_evidence',
       target_file: '.enigma/public-beta/desktop-release-evidence.json',
-      collect: 'Windows artifact filename, version, public checksum, signature verification result, and download ref',
+      collect: 'Windows artifact filename, version, public checksum, signature.status verified, signature evidence_ref, and download ref',
     },
   },
   {
@@ -187,7 +187,7 @@ const NEXT_ACTION_ORDER = Object.freeze([
       evidence_item_id: 'EV-P10-MACOS-NOTARIZED-DESKTOP-ARTIFACT',
       manifest_field: 'desktop_release_evidence',
       target_file: '.enigma/public-beta/desktop-release-evidence.json',
-      collect: 'macOS artifact filename, version, public checksum, notarization result, stapling result, and download ref',
+      collect: 'macOS artifact filename, version, public checksum, signature.status verified, signature evidence_ref, notarization accepted ref, stapling ref, and download ref',
     },
   },
   {
@@ -199,7 +199,7 @@ const NEXT_ACTION_ORDER = Object.freeze([
       evidence_item_id: 'EV-P10-UPDATE-ROLLBACK-REHEARSAL',
       manifest_field: 'desktop_release_evidence',
       target_file: '.enigma/public-beta/desktop-release-evidence.json',
-      collect: 'signed update verification result, rollback rehearsal result, updater manifest ref, and operator approval ref',
+      collect: 'signed update verification result, update_rollback.status pass, rollback evidence_ref, updater manifest ref, and operator approval ref',
     },
   },
   {
@@ -620,6 +620,10 @@ function publicSafeReleasePacketApprovalReady(packet) {
     && /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z)?$/u.test(approval.approved_at);
 }
 
+function hasPublicEvidenceRef(value) {
+  return isPublicEvidenceRef(value?.evidence_ref);
+}
+
 export function buildScenarioRows(inputs) {
   const tauriTargets = inputs.tauriConfig?.bundle?.targets ?? [];
   const hasDesktopBundle = inputs.tauriConfig?.bundle?.active === true
@@ -716,13 +720,18 @@ export function buildScenarioRows(inputs) {
     : [];
   const windowsInstallerReady = desktopInstallers.some((installer) => installer?.platform === 'windows'
     && installer?.present === true
-    && installer?.signature?.status === 'verified');
+    && installer?.signature?.status === 'verified'
+    && hasPublicEvidenceRef(installer.signature));
   const macosInstallerReady = desktopInstallers.some((installer) => installer?.platform === 'macos'
     && installer?.present === true
     && installer?.signature?.status === 'verified'
+    && hasPublicEvidenceRef(installer.signature)
     && installer?.notarization?.status === 'accepted'
-    && installer?.stapling?.status === 'stapled');
-  const updateRollbackReady = inputs.desktopReleaseEvidence?.update_rollback?.status === 'pass';
+    && hasPublicEvidenceRef(installer.notarization)
+    && installer?.stapling?.status === 'stapled'
+    && hasPublicEvidenceRef(installer.stapling));
+  const updateRollbackReady = inputs.desktopReleaseEvidence?.update_rollback?.status === 'pass'
+    && hasPublicEvidenceRef(inputs.desktopReleaseEvidence.update_rollback);
   const desktopReleaseEvidenceReady = inputs.desktopReleaseEvidence?.schema === 'enigma.desktop_release_evidence.v1'
     && inputs.desktopReleaseEvidence?.release_version === REQUIRED_PUBLIC_BETA_VERSION
     && Array.isArray(inputs.desktopReleaseEvidence?.blockers)

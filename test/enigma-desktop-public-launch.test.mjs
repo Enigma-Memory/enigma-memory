@@ -627,7 +627,7 @@ test('public website explains consumer install path without unsupported claims',
   assert.doesNotMatch(codeSigningSetup, /prevent SmartScreen warnings/);
   assert.match(productionReadinessStatus, /public beta and GA blockers/);
   assert.match(productionReadinessStatus, /9\/9 pass/);
-  assert.match(productionReadinessStatus, /691\/691 pass/);
+  assert.match(productionReadinessStatus, /696\/696 pass/);
   assert.match(installGuide, /when your platform is marked ready/);
   assert.match(macosInstall, /when signing is ready/);
   assert.match(windowsInstall, /when signing is ready/);
