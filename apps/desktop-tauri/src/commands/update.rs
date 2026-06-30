@@ -43,10 +43,20 @@ pub async fn check_update(state: tauri::State<'_, AppState>) -> Result<Value, St
     let manifest_channel = manifest.get("channel").and_then(|v| v.as_str());
 
     let signature_present = manifest.get("signature").is_some();
+    let payload_url_present = manifest
+        .get("url")
+        .or_else(|| manifest.get("download_url"))
+        .is_some();
+    let payload_hash_present = manifest
+        .get("sha256")
+        .or_else(|| manifest.get("payload_sha256"))
+        .is_some();
+    let payload_ready = payload_url_present && payload_hash_present;
     let status = update_status(
         current_version,
         &available_version,
         signature_present,
+        payload_ready,
         manifest_channel,
         &state.config.release_channel,
     );
@@ -61,6 +71,8 @@ pub async fn check_update(state: tauri::State<'_, AppState>) -> Result<Value, St
         "requires_signed_manifest": requires_signed_manifest,
         "manifest_channel": manifest_channel.unwrap_or("unspecified"),
         "expected_channel": state.config.release_channel,
+        "payload_url_present": payload_url_present,
+        "payload_hash_present": payload_hash_present,
         "notes": manifest.get("notes").and_then(|v| v.as_str()).unwrap_or("")
     }))
 }
@@ -69,6 +81,7 @@ fn update_status(
     current: &str,
     available: &str,
     signature_present: bool,
+    payload_ready: bool,
     manifest_channel: Option<&str>,
     expected_channel: &str,
 ) -> &'static str {
@@ -78,8 +91,9 @@ fn update_status(
     match compare_versions(current, available) {
         Some(Ordering::Equal) => "current",
         Some(Ordering::Greater) => "blocked_downgrade",
-        Some(Ordering::Less) if signature_present => "available",
-        Some(Ordering::Less) => "blocked_unsigned",
+        Some(Ordering::Less) if !signature_present => "blocked_unsigned",
+        Some(Ordering::Less) if !payload_ready => "blocked_incomplete",
+        Some(Ordering::Less) => "available",
         None => "blocked_version",
     }
 }
@@ -117,27 +131,31 @@ mod tests {
     fn update_status_requires_safe_manifest_progression() {
         assert_eq!(
             "current",
-            update_status("0.1.18", "0.1.18", false, None, "stable")
+            update_status("0.1.18", "0.1.18", false, false, None, "stable")
         );
         assert_eq!(
             "available",
-            update_status("0.1.18", "0.1.19", true, Some("stable"), "stable")
+            update_status("0.1.18", "0.1.19", true, true, Some("stable"), "stable")
         );
         assert_eq!(
             "blocked_unsigned",
-            update_status("0.1.18", "0.1.19", false, None, "stable")
+            update_status("0.1.18", "0.1.19", false, true, None, "stable")
+        );
+        assert_eq!(
+            "blocked_incomplete",
+            update_status("0.1.18", "0.1.19", true, false, None, "stable")
         );
         assert_eq!(
             "blocked_downgrade",
-            update_status("0.1.19", "0.1.18", true, None, "stable")
+            update_status("0.1.19", "0.1.18", true, true, None, "stable")
         );
         assert_eq!(
             "blocked_channel",
-            update_status("0.1.19", "0.1.20", true, Some("beta"), "stable")
+            update_status("0.1.19", "0.1.20", true, true, Some("beta"), "stable")
         );
         assert_eq!(
             "blocked_version",
-            update_status("0.1.19", "not-a-version", true, None, "stable")
+            update_status("0.1.19", "not-a-version", true, true, None, "stable")
         );
     }
 }
