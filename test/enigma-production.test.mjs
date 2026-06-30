@@ -1560,6 +1560,7 @@ test('preflight release audit wiring is local-only and documented', async () => 
   assert.equal(pkg.scripts?.['production:cloudflare-credentials'], `node ${CLOUDFLARE_CREDENTIALS_SCRIPT}`);
   assert.equal(packageFilesCover(pkg, CLOUDFLARE_CREDENTIALS_SCRIPT), true, 'Cloudflare credentials validator must be included in the package file list');
   assert.equal(pkg.scripts?.['public-beta-qa'], `node ${PUBLIC_BETA_QA_MATRIX_SCRIPT} --json`);
+  assert.equal(pkg.scripts?.['public-beta:status'], `node scripts/run-public-beta-review.mjs --plain`);
   assert.equal(packageFilesCover(pkg, PUBLIC_BETA_QA_MATRIX_SCRIPT), true, 'public beta QA matrix script must be included in the package file list');
   assert.equal(pkg.scripts?.['clean-machine-smoke'], `node ${CLEAN_MACHINE_SMOKE_SCRIPT} --json`);
   assert.equal(pkg.scripts?.['production:clean-machine-smoke'], `node ${CLEAN_MACHINE_SMOKE_SCRIPT}`);

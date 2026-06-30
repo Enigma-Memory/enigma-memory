@@ -150,6 +150,7 @@ test('public beta QA npm scripts expose JSON and Advisor runners', async () => {
   const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
   assert.equal(packageJson.scripts['public-beta-qa'], 'node scripts/run-public-beta-qa-matrix.mjs --json');
   assert.equal(packageJson.scripts['public-beta:advisor'], 'node scripts/run-public-beta-qa-matrix.mjs --plain');
+  assert.equal(packageJson.scripts['public-beta:status'], 'node scripts/run-public-beta-review.mjs --plain');
 });
 
 test('public beta QA runner accepts explicit plain output mode', () => {

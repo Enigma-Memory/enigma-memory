@@ -261,6 +261,7 @@
     "package:install-smoke": "node scripts/verify-local-pack-install.mjs",
     "public-beta:advisor": "node scripts/run-public-beta-qa-matrix.mjs --plain",
     "public-beta:review": "node scripts/run-public-beta-review.mjs",
+    "public-beta:status": "node scripts/run-public-beta-review.mjs --plain",
     "production:legal": "node scripts/validate-legal-compliance-approval.mjs",
     "production:monitoring": "node scripts/validate-monitoring-alerting.mjs",
     "production:network": "node scripts/validate-network-access-policy.mjs",
