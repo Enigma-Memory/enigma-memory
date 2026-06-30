@@ -2916,7 +2916,7 @@ export async function runAiOrchestrationPlanGate() {
     if (!Array.isArray(parsed.lanes) || parsed.lanes.length !== parsed.role_lane_count || parsed.role_lane_count < 5) throw new Error('AI orchestration plan role_lane_count does not match lanes.');
     if (!Array.isArray(parsed.waves) || parsed.waves.length !== parsed.wave_count || parsed.wave_count !== 4) throw new Error('AI orchestration plan wave_count does not match waves.');
     const laneIds = new Set(parsed.lanes.map((lane) => lane?.id));
-    if (!laneIds.has('kimi_coding') || !laneIds.has('gpt55_architecture') || !laneIds.has('gpt55_review')) throw new Error('AI orchestration plan must include Kimi and GPT lane names.');
+    if (!laneIds.has('kimi_coding') || !laneIds.has('gpt55_architecture') || !laneIds.has('gpt55_review') || !laneIds.has('no_friction_advisor')) throw new Error('AI orchestration plan must include Advisor, Kimi, and GPT lane names.');
     const controlText = Array.isArray(parsed.non_delegable_controls) ? parsed.non_delegable_controls.join('\n') : '';
     if (!/Cloudflare token values/i.test(controlText) || !/human-controlled/i.test(controlText) || !/No AI lane may mark the goal complete/i.test(controlText)) throw new Error('AI orchestration plan must preserve non-delegable human control boundaries.');
     const claimBoundary = requireJsonField(
@@ -2935,6 +2935,7 @@ export async function runAiOrchestrationPlanGate() {
       source_status_board_generated_at: parsed.source_status_board_generated_at,
       role_lane_count: parsed.role_lane_count,
       wave_count: parsed.wave_count,
+      advisor_lane_present: laneIds.has('no_friction_advisor'),
       kimi_lane_present: laneIds.has('kimi_coding'),
       gpt_architecture_lane_present: laneIds.has('gpt55_architecture'),
       gpt_review_lane_present: laneIds.has('gpt55_review'),

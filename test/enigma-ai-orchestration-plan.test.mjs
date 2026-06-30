@@ -54,7 +54,7 @@ test('AI orchestration plan maps current blockers to role lanes and waves', () =
   assert.equal(plan.launch_ready, false);
   assert.equal(plan.source_status_next_phase_id, 'cloudflare_credentials');
   assert.equal(plan.source_status_fresh_input_evidence, true);
-  assert.equal(plan.role_lane_count, 5);
+  assert.equal(plan.role_lane_count, 6);
   assert.equal(plan.wave_count, 4);
   assert.equal(plan.next_phase_details.missing_ref_count, 25);
   assert.deepEqual(plan.next_phase_details.missing_refs, ['backend_host', 'relay_deployment', 'gateway_deployment']);
@@ -62,9 +62,12 @@ test('AI orchestration plan maps current blockers to role lanes and waves', () =
   const lanes = new Map(plan.lanes.map((lane) => [lane.id, lane]));
   assert.equal(lanes.get('gpt55_architecture').model, 'GPT-5.5');
   assert.equal(lanes.get('kimi_coding').model, 'Kimi coding agent');
+  assert.equal(lanes.get('no_friction_advisor').model, 'Advisor');
+  assert.ok(lanes.get('gpt55_architecture').waits_for.includes('no_friction_advisor'));
+  assert.match(lanes.get('no_friction_advisor').commands.join('\n'), /public-beta:review/);
   assert.ok(lanes.get('kimi_coding').waits_for.includes('human_operator_credentials'));
   assert.match(lanes.get('human_operator_credentials').commands.join('\n'), /production:cloudflare-credentials/);
-  assert.match(plan.waves.map((wave) => wave.id).join('\n'), /wave_4_final_release/);
+  assert.match(plan.waves.map((wave) => wave.id).join('\n'), /wave_2_advisor_architecture_and_coding/);
   assert.match(plan.non_delegable_controls.join('\n'), /Cloudflare token values/);
   assert.doesNotMatch(JSON.stringify(plan), /Bearer\s+[A-Za-z0-9._~+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|sk-[A-Za-z0-9_-]{16,}/i);
 });
@@ -76,9 +79,10 @@ test('AI orchestration plan plain output is Workflowz-readable and claim-bounded
   assert.match(plain, /^Enigma AI orchestration plan\n/);
   assert.match(plain, /Status: blocked/);
   assert.match(plain, /Launch ready: no/);
-  assert.match(plain, /Role lanes: 5/);
+  assert.match(plain, /Role lanes: 6/);
   assert.match(plain, /Wave: wave_1_external_access/);
   assert.match(plain, /Lane: human_operator_credentials/);
+  assert.match(plain, /Lane: no_friction_advisor/);
   assert.match(plain, /Boundary: public-safe orchestration summary only/);
   assert.doesNotMatch(plain, /^\s*\{/);
   assert.doesNotMatch(plain, /Bearer\s+[A-Za-z0-9._~+/=-]{12,}|C:\\Users\\|\/home\/|raw_memory|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/i);
@@ -119,7 +123,7 @@ test('AI orchestration plan CLI writes blocked public-safe JSON with exit 1', as
     },
   );
   const written = JSON.parse(await readFile(paths.out, 'utf8'));
-  assert.equal(written.role_lane_count, 5);
+  assert.equal(written.role_lane_count, 6);
 });
 
 test('AI orchestration plan CLI writes JSON evidence while printing plain output', async () => {
@@ -149,5 +153,5 @@ test('AI orchestration plan CLI writes JSON evidence while printing plain output
   );
   const written = JSON.parse(await readFile(paths.out, 'utf8'));
   assert.equal(written.schema, AI_ORCHESTRATION_PLAN_SCHEMA);
-  assert.equal(written.role_lane_count, 5);
+  assert.equal(written.role_lane_count, 6);
 });

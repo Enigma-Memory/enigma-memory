@@ -1643,6 +1643,8 @@ test('preflight release audit wiring is local-only and documented', async () => 
   assert.match(auditSource, /source_status_fresh_input_evidence/, 'AI orchestration plan gate must validate source status freshness');
   assert.match(auditSource, /kimi_coding/, 'AI orchestration plan gate must validate Kimi lane names');
   assert.match(auditSource, /gpt55_architecture/, 'AI orchestration plan gate must validate GPT lane names');
+  assert.match(auditSource, /no_friction_advisor/, 'AI orchestration plan gate must validate Advisor lane names');
+  assert.match(auditSource, /advisor_lane_present/, 'AI orchestration plan gate must report Advisor lane evidence');
   assert.match(auditSource, /non_delegable_controls/, 'AI orchestration plan gate must validate non-delegable controls');
   assert.match(auditSource, /AI orchestration plan must emit claim_boundary strings/, 'AI orchestration plan gate must validate claim boundaries');
   assert.match(auditSource, /tempPathNeedles/, 'AI orchestration plan gate must check for temporary fixture path leaks');
