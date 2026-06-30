@@ -888,7 +888,7 @@ function verifyReceiptState(state, action) {
 }
 
 function connectClientState(state, action) {
-  if (state.mcp.status !== 'running') return withNotice(state, 'Start MCP before connecting a client.');
+  if (state.mcp.status !== 'running') return withNotice(state, 'Start the local connector service before connecting an app.');
   const input = action.client ?? {};
   const template = CLIENT_TEMPLATES.find((item) => item.id === input.id || item.name === input.name);
   const id = cleanString(input.id) || template?.id || `client_${localFingerprint(cleanString(input.name) || `client-${state.clients.length + 1}`).slice(0, 12)}`;
@@ -1972,12 +1972,12 @@ function renderMcpScreen(screen) {
       <div class="panel status-panel">
         <span class="status-pill">${escapeHtml(screen.status)}</span>
         <h3>${escapeHtml(screen.honest_status)}</h3>
-        <p>MCP state here is a local control-plane claim. Server receipts and logs are the evidence.</p>
-        <div class="button-row"><button type="button" data-action="start-mcp">Start MCP</button><button type="button" data-action="stop-mcp">Stop MCP</button></div>
+        <p>This local connector service lets approved AI apps talk to Enigma on this device. Receipts and logs are the evidence.</p>
+        <div class="button-row"><button type="button" data-action="start-mcp">Start local service</button><button type="button" data-action="stop-mcp">Stop local service</button></div>
       </div>
       <dl class="panel detail-list">
-        ${renderMetric('Endpoint', screen.endpoint)}
-        ${renderMetric('Transport', screen.transport)}
+        ${renderMetric('Local endpoint', screen.endpoint)}
+        ${renderMetric('Connection mode', screen.transport)}
         ${renderMetric('Port', screen.port || 'n/a')}
         ${renderMetric('Connected clients', screen.client_count)}
       </dl>
@@ -1986,7 +1986,7 @@ function renderMcpScreen(screen) {
 
 function renderClientsScreen(screen) {
   const buttons = screen.templates.map((client) => `<button type="button" data-connect-client="${escapeHtml(client.id)}" ${client.connected ? 'disabled' : ''}>${client.connected ? 'Connected' : 'Connect'} ${escapeHtml(client.name)}</button>`).join('');
-  const rows = screen.connected.length ? screen.connected.map((client) => `<li><strong>${escapeHtml(client.name)}</strong><span>${escapeHtml(client.status)} via ${escapeHtml(client.endpoint)}</span></li>`).join('') : '<li class="empty-row">No clients connected.</li>';
+  const rows = screen.connected.length ? screen.connected.map((client) => `<li><strong>${escapeHtml(client.name)}</strong><span>${escapeHtml(client.status)} using local connector service</span></li>`).join('') : '<li class="empty-row">No clients connected.</li>';
   const bridgeStatus = screen.browser_bridge_status.map((item) => `<li><span>${escapeHtml(item)}</span></li>`).join('');
   return renderScreen('clients', screen.title, `<div class="panel"><div class="button-grid">${buttons}</div></div><div class="panel"><h3>Browser bridge boundaries</h3><ul class="boundary-list">${bridgeStatus}</ul></div><ul class="connection-list">${rows}</ul>`);
 }

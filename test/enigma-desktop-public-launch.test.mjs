@@ -159,6 +159,11 @@ test('static desktop shell mirrors Memory Controller, Import Sandbox, and Suppor
   assert.match(supportBlock, /Copyable support code/);
   assert.match(shell, /copy_support_code/);
   assert.match(supportBlock, /Privacy boundaries/);
+  assert.match(shell, /Start local service/);
+  assert.match(shell, /Stop local service/);
+  assert.match(shell, /Connection mode/);
+  assert.match(shell, /using local connector service/);
+  assert.doesNotMatch(shell, /Start MCP|Stop MCP|MCP state here/);
   assert.match(supportBlock, /No raw memory, prompts, transcripts, provider responses, credentials, tokens, private keys, account identifiers, customer identifiers, raw logs, complete settings, or local paths/);
   assert.match(shell, /The shell reports local setup only; provider logs and model behavior require provider evidence/);
   assert.doesNotMatch(homeBlock, /provider deletion|model forgetting|provider-native memory control/i);
