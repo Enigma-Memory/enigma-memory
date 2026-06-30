@@ -236,6 +236,8 @@ test('public beta advisor collect-next paths follow relative evidence manifest t
     assert.match(plain, new RegExp(`Collect next: approve_merge_release_pr .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/production-handoff-packet\\.json`));
     assert.match(plain, new RegExp(`Collect next: publish_npm_0_1_19 .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/registry-install\\.json`));
     assert.match(plain, new RegExp(`Collect: npm run public-beta:evidence-manifest -- --out ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/evidence-manifest\\.json --plain`));
+    assert.match(plain, new RegExp(`Collect internal: run_clean_machine_qa .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/clean-machine-smoke\\.json`));
+    assert.match(plain, new RegExp(`Collect internal: record_support_dry_run .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/support-dry-run-diagnostics\\.json`));
     assert.match(plain, new RegExp(`Review: npm run public-beta:advisor -- --evidence-manifest ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/evidence-manifest\\.json`));
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -255,6 +257,11 @@ test('public beta QA plain output is readable, bounded, and non-JSON', async () 
   assert.match(plain, /Review: npm run public-beta:advisor -- --evidence-manifest \.enigma\/public-beta\/evidence-manifest\.json/);
   assert.match(plain, /Collect next: approve_merge_release_pr — EV-P10-PRODUCTION-HANDOFF-PACKET into \.enigma\/public-beta\/production-handoff-packet\.json: release PR ref or URL, reviewer approval ref, merge ref, public-safe release packet approval ref, and approval date/);
   assert.match(plain, /Collect next: publish_npm_0_1_19 — EV-P10-REGISTRY-INSTALL into \.enigma\/public-beta\/registry-install\.json: npm package version, registry package ref, install command used, and public-safe install result/);
+  assert.match(plain, /Internal QA\/support evidence to collect now:/);
+  assert.match(plain, /Internal: run_clean_machine_qa/);
+  assert.match(plain, /Collect internal: run_clean_machine_qa — EV-P10-CLEAN-MACHINE-SMOKE into \.enigma\/public-beta\/clean-machine-smoke\.json/);
+  assert.match(plain, /Internal: record_support_dry_run/);
+  assert.match(plain, /Collect internal: record_support_dry_run — EV-P10-SUPPORT-DRY-RUN-SUMMARY into \.enigma\/public-beta\/support-dry-run/);
   assert.match(plain, /Patchable evidence:/);
   assert.match(plain, /Evidence: record_support_dry_run — EV-P10-SUPPORT-DRY-RUN-SUMMARY/);
   assert.match(plain, /public-safe support dry-run summary/);
@@ -584,6 +591,10 @@ test('public beta next actions are ranked and public-safe', async () => {
   assert.equal(matrix.next_actions.some((action) => action.action_id === 'record_support_dry_run'), true);
   const supportAction = matrix.next_actions.find((action) => action.action_id === 'record_support_dry_run');
   assert.equal(supportAction.missing_evidence_items[0].evidence_item_id, 'EV-P10-SUPPORT-DRY-RUN-SUMMARY');
+  const internalOwners = matrix.next_actions
+    .filter((action) => action.owner_ref === 'ref:role:qa-owner' || action.owner_ref === 'ref:role:beta-support')
+    .map((action) => action.action_id);
+  assert.deepEqual(internalOwners, ['run_clean_machine_qa', 'record_support_dry_run']);
 });
 
 test('public beta QA matrix keeps public-safe packet blocker without explicit approval fields', () => {

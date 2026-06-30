@@ -95,6 +95,8 @@ test('setup default creates local Memory Passport artifacts without connector wr
     assert.equal(summary.connectors.length, DEFAULT_SETUP_CLIENTS.length);
     assert.match(summary.one_command_install_connect.vscode_cline, /^npm install -g enigma-memory && enigma quickstart --bundle .+ && enigma connect vscode-cline .+ --dry-run$/);
     assert.doesNotMatch(summary.one_command_install_connect.vscode_cline, /setup --client|--write-connectors|--overwrite/);
+    assert.match(summary.one_command_install_connect.claude_desktop, /enigma claude-mcpb package --plain$/);
+    assert.doesNotMatch(summary.one_command_install_connect.claude_desktop, /connect claude-desktop/);
     assert.equal(summary.connectors.every((connector) => connector.connect_plan.dry_run === true), true);
     assert.equal(summary.checks.npm.ok, true);
     assert.equal(summary.checks.vault_path.ok, true);
@@ -110,7 +112,7 @@ test('setup default creates local Memory Passport artifacts without connector wr
   }
 });
 
-test('root help starts with non-overwrite setup and dry-run connection preview', async () => {
+test('root help starts with non-overwrite setup, Claude extension package, and dry-run connection preview', async () => {
   const io = makeIo();
   assert.equal(await main(['--help'], io.io), 0, io.stderr());
   const usage = io.json();
@@ -118,11 +120,14 @@ test('root help starts with non-overwrite setup and dry-run connection preview',
 
   assert.doesNotMatch(usage.human, /--overwrite/);
   assert.match(usage.human, /enigma quickstart --bundle "\$HOME\/\.enigma\/bundle\.json"/);
-  assert.match(usage.human, /enigma connect claude-desktop --bundle "\$HOME\/\.enigma\/bundle\.json" --dry-run/);
+  assert.match(usage.human, /enigma claude-mcpb package --plain/);
+  assert.match(usage.human, /enigma connect cursor --bundle "\$HOME\/\.enigma\/bundle\.json" --dry-run/);
   assert.doesNotMatch(installCommands, /--overwrite/);
   assert.doesNotMatch(installCommands, /setup --client|--write-connectors/);
   assert.match(installCommands, /enigma quickstart --bundle \.\/\.enigma\/bundle\.json/);
-  assert.match(installCommands, /enigma connect claude-desktop --bundle \.\/\.enigma\/bundle\.json --dry-run/);
+  assert.match(installCommands, /enigma claude-mcpb package --plain/);
+  assert.match(installCommands, /enigma connect cursor --bundle \.\/\.enigma\/bundle\.json --dry-run/);
+  assert.doesNotMatch(installCommands, /connect claude-desktop/);
 });
 
 test('setup fails closed when an artifact already exists', async () => {
@@ -738,7 +743,7 @@ test('install plain output summarizes snippets without JSON or local paths', asy
     assert.match(stdout, /Clients: 1/);
     assert.match(stdout, /MCP command: enigma-mcp/);
     assert.match(stdout, /Snippets: written to <out>/);
-    assert.match(stdout, /Next: enigma connect claude-desktop --bundle <bundle-path> --dry-run/);
+    assert.match(stdout, /Next: enigma claude-mcpb package --plain/);
     assert.match(stdout, /Boundary: local install snippet planning only/);
     assert.doesNotMatch(stdout, /^\s*\{/);
     assert.equal(stdout.includes(dir), false);

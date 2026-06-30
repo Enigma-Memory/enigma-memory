@@ -79,6 +79,8 @@ test('public beta review aligns template and advisor commands with relative out-
     assert.match(plain, new RegExp(`Review: npm run public-beta:advisor -- --evidence-manifest ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/evidence-manifest\\.json`));
     assert.match(plain, new RegExp(`Collect next: approve_merge_release_pr .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/production-handoff-packet\\.json`));
     assert.match(plain, new RegExp(`Collect next: publish_npm_0_1_19 .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/registry-install\\.json`));
+    assert.match(plain, new RegExp(`Collect internal: run_clean_machine_qa .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/clean-machine-smoke\\.json`));
+    assert.match(plain, new RegExp(`Collect internal: record_support_dry_run .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/support-dry-run-diagnostics\\.json`));
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -97,6 +99,8 @@ test('public beta review plain output is bounded and path-redacted', async () =>
     assert.match(stdout, /Generated clean-machine plan: 1/);
     assert.match(stdout, /Templates: npm run public-beta:evidence-templates -- --out-dir \.enigma\/public-beta --plain/);
     assert.match(stdout, /record_support_dry_run/);
+    assert.match(stdout, /Internal QA\/support evidence to collect now:/);
+    assert.match(stdout, /run_clean_machine_qa/);
     assert.match(stdout, /Boundary: one-command local review only/);
     assert.doesNotMatch(stdout, /^\s*\{/);
     assert.equal(stdout.includes(dir), false);

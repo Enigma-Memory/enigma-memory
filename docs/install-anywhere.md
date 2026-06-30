@@ -44,13 +44,13 @@ npm install -g enigma-memory
 enigma quickstart --bundle ./.enigma/bundle.json
 enigma doctor --bundle ./.enigma/bundle.json
 enigma drive health --bundle ./.enigma/bundle.json
-enigma connect claude-desktop --bundle ./.enigma/bundle.json --dry-run
+enigma claude-mcpb package --plain
 enigma status --bundle ./.enigma/bundle.json
 ```
 
-`enigma quickstart` is the credential-free first run that creates the local `.enigma` workspace, bundle, and proof artifacts. Connector writes stay behind explicit `enigma connect <client> --dry-run` preview and a separate intentional connect command. These commands emit deterministic, public-safe JSON or plain text without printing raw memory plaintext, and they run on Windows PowerShell via the `enigma.cmd` shim the npm global install adds.
+`enigma quickstart` is the credential-free first run that creates the local `.enigma` workspace, bundle, and proof artifacts. Claude Desktop should use the `.mcpb` extension package handoff first; Enigma does not write Claude settings for that path. Other connector writes stay behind explicit `enigma connect <client> --dry-run` preview and a separate intentional connect command. These commands emit deterministic, public-safe JSON or plain text without printing raw memory plaintext, and they run on Windows PowerShell via the `enigma.cmd` shim the npm global install adds.
 
-Run quickstart before treating `enigma doctor` as a fully green install check. Doctor checks Node/package state, local paths, schemas, MCP command naming, and connector configs. On a fresh install it can return `ok:false` when an existing MCP client config points at a bundle that has not been initialized yet, or at a different bundle than the one you are checking. That is expected first-run state, not a package install failure. In JSON output, `setup_status.state:"setup_needed"` means run the included `setup_status.next_command`; `setup_status.state:"attention_needed"` means a real install/config issue still needs repair. The shortest safe path is `enigma quickstart --bundle ./.enigma/bundle.json`, then `enigma connect <client> --bundle ./.enigma/bundle.json --dry-run` before approving a connector write.
+Run quickstart before treating `enigma doctor` as a fully green install check. Doctor checks Node/package state, local paths, schemas, MCP command naming, and connector configs. On a fresh install it can return `ok:false` when an existing MCP client config points at a bundle that has not been initialized yet, or at a different bundle than the one you are checking. That is expected first-run state, not a package install failure. In JSON output, `setup_status.state:"setup_needed"` means run the included `setup_status.next_command`; `setup_status.state:"attention_needed"` means a real install/config issue still needs repair. The shortest safe path is `enigma quickstart --bundle ./.enigma/bundle.json`, then `enigma claude-mcpb package --plain` for Claude Desktop or `enigma connect cursor --bundle ./.enigma/bundle.json --dry-run` for a config-preview client.
 
 `enigma status` is the one-screen local setup view after a bundle exists. Read `first_run_status.primary_action` for the next consumer-safe step, and use the lanes to check Memory Drive, Import Sandbox, memory inventory, proof activity, and diagnostics without raw memory text.
 `enigma next --plain` is safe to run before or after setup. If no bundle exists, it prints a human-readable `run_quickstart` action instead of a stack trace; after setup, it mirrors `first_run_status`. Omit `--plain` when automation needs JSON.
@@ -217,19 +217,20 @@ MCP resource and prompt:
 
 Use `docs/client-connectors.md` from a source checkout for Claude Desktop, Cursor, Kimi Code, VS Code/Cline, Roo Code, OpenCode, and generic MCP JSON. Connector entries default to command `enigma-mcp` and env key `ENIGMA_BUNDLE`.
 
-Npm-first connector flow — preview one intended client before writing:
+Npm-first connector flow:
 
 ```sh
 npm install -g enigma-memory
 enigma quickstart --bundle ./.enigma/bundle.json
-enigma connect claude-desktop --bundle ./.enigma/bundle.json --dry-run
+enigma claude-mcpb package --plain
+enigma connect cursor --bundle ./.enigma/bundle.json --dry-run
 ```
 
-To connect a client, review the dry-run output first and then repeat the same `enigma connect <client> --bundle ./.enigma/bundle.json` command without `--dry-run`. To inspect every installed/config-present client without writing, use `enigma status --bundle ./.enigma/bundle.json` or the desktop app's connection preview cards instead of an auto-connect overwrite command.
+For Claude Desktop, install the generated `.mcpb` extension in Claude Settings → Extensions. For Cursor and other compatible clients, review the dry-run output first and then repeat the same `enigma connect <client> --bundle ./.enigma/bundle.json` command without `--dry-run`. To inspect every installed/config-present client without writing, use `enigma status --bundle ./.enigma/bundle.json` or the desktop app's connection preview cards instead of an auto-connect overwrite command.
 
-Copy-paste MCP snippets:
+Advanced MCP snippets:
 
-Claude Desktop:
+Claude Desktop fallback, advanced only:
 
 ```json
 {

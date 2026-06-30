@@ -591,13 +591,26 @@ function connectCommandFor(clientId, platform, { dryRun = false } = {}) {
   return `enigma connect ${clientId} --bundle "${publicBundlePlaceholder(platform)}"${suffix}`;
 }
 
+function claudeMcpbPackageCommand() {
+  return 'enigma claude-mcpb package --plain';
+}
+
+function preferredConnectCommandFor(clientId, platform) {
+  return clientId === 'claude-desktop' ? claudeMcpbPackageCommand() : previewConnectCommandFor(clientId, platform);
+}
+
+function setupPreferredConnectCommandFor(clientId, platform) {
+  return `enigma quickstart --bundle "${publicBundlePlaceholder(platform)}" && ${preferredConnectCommandFor(clientId, platform)}`;
+}
+
+function installPreferredConnectCommandFor(clientId, platform) {
+  return `npm install -g enigma-memory && ${setupPreferredConnectCommandFor(clientId, platform)}`;
+}
+
 function previewConnectCommandFor(clientId, platform) {
   return connectCommandFor(clientId, platform, { dryRun: true });
 }
 
-function installPreviewConnectCommandFor(clientId, platform) {
-  return `npm install -g enigma-memory && enigma quickstart --bundle "${publicBundlePlaceholder(platform)}" && ${previewConnectCommandFor(clientId, platform)}`;
-}
 
 
 function wizardStepsForClient(clientId, platform) {
@@ -619,6 +632,40 @@ function wizardStepsForClient(clientId, platform) {
       ],
       writes: 'local_enigma_bundle',
     },
+  ];
+  if (clientId === 'claude-desktop') {
+    steps.push(
+      {
+        order: 3,
+        id: 'package_claude_mcpb',
+        title: 'Build the Claude Desktop Extension package.',
+        command: claudeMcpbPackageCommand(),
+        writes: 'local_mcpb_package',
+      },
+      {
+        order: 4,
+        id: 'install_claude_mcpb',
+        title: 'Open Claude Desktop Settings → Extensions and drag in the Enigma .mcpb package.',
+        writes: false,
+      },
+      {
+        order: 5,
+        id: 'test_claude_mcpb',
+        title: 'Restart Claude Desktop and test the Enigma extension before real work.',
+        writes: false,
+      },
+      {
+        order: 6,
+        id: 'advanced_config_fallback',
+        title: 'Only if support asks: preview manual Claude settings.',
+        command: previewConnectCommandFor(clientId, platform),
+        writes: false,
+        advanced_only: true,
+      },
+    );
+    return steps;
+  }
+  steps.push(
     {
       order: 3,
       id: 'doctor_client',
@@ -639,7 +686,7 @@ function wizardStepsForClient(clientId, platform) {
       title: 'Restart or reload the client so it re-reads MCP settings.',
       writes: false,
     },
-  ];
+  );
   if (clientId === 'kimi-code') {
     steps.splice(4, 0, {
       order: 5,
@@ -669,10 +716,12 @@ export function planConnectWizard(clientIdOrOptions = {}, maybeOptions = {}) {
       display_name: CLIENT_DEFINITIONS[clientId].display_name,
       default_config_path: publicDefaultConfigPath(clientId, platform),
       steps: wizardStepsForClient(clientId, platform),
-      one_command_install_connect: installPreviewConnectCommandFor(clientId, platform),
-      setup_connect_command: `enigma quickstart --bundle "${publicBundlePlaceholder(platform)}" && ${previewConnectCommandFor(clientId, platform)}`,
-      connect_command: previewConnectCommandFor(clientId, platform),
-      mcp_config_preview: renderMcpConfig(clientId, { platform, bundlePath: publicBundlePlaceholder(platform) }),
+      one_command_install_connect: installPreferredConnectCommandFor(clientId, platform),
+      setup_connect_command: setupPreferredConnectCommandFor(clientId, platform),
+      connect_command: preferredConnectCommandFor(clientId, platform),
+      advanced_fallback_connect_command: clientId === 'claude-desktop' ? previewConnectCommandFor(clientId, platform) : null,
+      mcp_config_preview: clientId === 'claude-desktop' ? null : renderMcpConfig(clientId, { platform, bundlePath: publicBundlePlaceholder(platform) }),
+      mcpb_connection_plan: clientId === 'claude-desktop' ? createClaudeDesktopMcpbConnectionPlan({ platform }) : null,
     })),
   };
 }
@@ -706,7 +755,7 @@ export function createClaudeDesktopMcpbManifest(options = {}) {
       entry_point: 'packages/mcp-server/bin/enigma-mcp.mjs',
       mcp_config: {
         command: 'node',
-        args: ['packages/mcp-server/bin/enigma-mcp.mjs'],
+        args: ['${__dirname}/packages/mcp-server/bin/enigma-mcp.mjs'],
         env: {
           ENIGMA_BUNDLE: '${user_config.enigma_bundle}',
         },
@@ -716,10 +765,17 @@ export function createClaudeDesktopMcpbManifest(options = {}) {
       enigma_bundle: {
         type: 'file',
         title: 'Enigma Memory bundle',
-        description: 'Select the local Enigma Memory bundle that Claude may use through this extension.',
+        description: 'Select the Memory Drive file created by Enigma. Claude stores this choice in its extension settings and passes it only to the local Enigma bridge.',
         required: true,
       },
     },
+    repository: {
+      type: 'git',
+      url: 'https://github.com/Enigma-Memory/enigma-memory',
+    },
+    documentation: 'https://github.com/Enigma-Memory/enigma-memory/tree/main/docs',
+    support: 'https://github.com/Enigma-Memory/enigma-memory/issues',
+    keywords: ['memory', 'mcp', 'claude-desktop', 'local-first'],
     environment_names: [...CLAUDE_DESKTOP_MCPB_ENVIRONMENT_NAMES],
     supported_platforms: [...SUPPORTED_PLATFORMS],
     compatibility: {

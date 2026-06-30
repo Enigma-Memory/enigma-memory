@@ -214,7 +214,16 @@ Default config paths:
 - macOS: `$HOME/.cursor/mcp.json`
 - Linux: `$HOME/.cursor/mcp.json`
 
-Manual entry:
+Preview-first CLI:
+
+```sh
+enigma connect cursor --bundle ./.enigma/bundle.json --dry-run
+enigma connect cursor --bundle ./.enigma/bundle.json
+```
+
+Restart Cursor or reload the window after changing the config.
+
+Advanced manual entry:
 
 ```json
 {
@@ -230,14 +239,6 @@ Manual entry:
 }
 ```
 
-CLI:
-
-```sh
-enigma connect cursor --dry-run
-enigma connect cursor
-```
-
-Restart Cursor or reload the window after changing the config.
 
 ## Kimi Code
 

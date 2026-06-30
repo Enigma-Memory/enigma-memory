@@ -1167,12 +1167,22 @@ function publicSetupError(error, rawDisplays, publicDisplays) {
   return new Error(message);
 }
 
+function claudeMcpbNextCommand() {
+  return 'enigma claude-mcpb package --plain';
+}
+
+function nextClientPreviewCommand(clientId, bundleArg) {
+  return clientId === 'claude-desktop'
+    ? claudeMcpbNextCommand()
+    : `enigma connect ${clientId} ${bundleArg} --dry-run`;
+}
+
 function oneCommandInstallConnect(bundleDisplay = DEFAULT_BUNDLE, outDirDisplay = dirname(bundleDisplay)) {
   const bundleArg = `--bundle ${commandPath(bundleDisplay)}`;
   const quickstartParts = ['npm install -g enigma-memory && enigma quickstart', bundleArg];
   if (outDirDisplay !== dirname(bundleDisplay)) quickstartParts.push(`--out-dir ${commandPath(outDirDisplay)}`);
   const base = quickstartParts.join(' ');
-  const preview = (clientId) => `${base} && enigma connect ${clientId} ${bundleArg} --dry-run`;
+  const preview = (clientId) => `${base} && ${nextClientPreviewCommand(clientId, bundleArg)}`;
   return {
     installed_clients: `${base} && enigma doctor ${bundleArg}`,
     claude_desktop: preview('claude-desktop'),
@@ -1194,7 +1204,7 @@ function setupNextCommands(bundleInput, exportDisplay, clients, writeConnectors)
     `enigma export --bundle ${bundle} --out ${commandPath(exportDisplay)}`,
     `enigma verify --export ${commandPath(exportDisplay)}`,
   ];
-  if (!writeConnectors) commands.push(`enigma connect ${primaryClient} --bundle ${bundle} --dry-run`);
+  if (!writeConnectors) commands.push(nextClientPreviewCommand(primaryClient, `--bundle ${bundle}`));
   return commands;
 }
 
@@ -1221,7 +1231,7 @@ function doctorNextCommands(bundleDisplay, client) {
     `enigma doctor --bundle ${bundle} --client ${clientId}`,
     `enigma drive health --bundle ${bundle}`,
     `enigma status --bundle ${bundle}`,
-    `enigma connect ${clientId} --bundle ${bundle} --dry-run`,
+    nextClientPreviewCommand(clientId, `--bundle ${bundle}`),
   ];
 }
 
@@ -1548,7 +1558,8 @@ export async function quickstartCommand(flags, io) {
     verify_ok: artifacts.verifyReport.ok === true,
     next_commands: [
       `enigma verify --export ${displays.export}`,
-      `enigma connect generic-mcp --bundle ${displays.bundle} --dry-run`,
+      claudeMcpbNextCommand(),
+      `enigma connect cursor --bundle ${displays.bundle} --dry-run`,
     ],
     claim_boundaries: {
       local_only: true,
@@ -2366,7 +2377,7 @@ function renderInstallPlain(summary) {
     `MCP command: ${summary.mcp_command ?? 'enigma-mcp'}`,
   ];
   if (summary.out) lines.push('Snippets: written to <out>');
-  lines.push(`Next: enigma connect ${firstClient} --bundle <bundle-path> --dry-run`);
+  lines.push(firstClient === 'claude-desktop' ? 'Next: enigma claude-mcpb package --plain' : `Next: enigma connect ${firstClient} --bundle <bundle-path> --dry-run`);
   lines.push('Boundary: local install snippet planning only; no raw memory, local paths, provider launch, provider deletion, model behavior, hosted service, or signing claims.');
   return `${lines.join('\n')}\n`;
 }
@@ -2953,7 +2964,8 @@ function testDriveNextCommands(bundleDisplay, crossModelReportDisplay) {
     `enigma drive health --bundle ${quotedBundle}`,
     `enigma search --bundle ${quotedBundle} --query "local proof bundle"`,
     `enigma demo cross-model --bundle ${quotedBundle} --out ${quotedReport}`,
-    `enigma connect claude-desktop --bundle ${quotedBundle} --dry-run`,
+    claudeMcpbNextCommand(),
+    `enigma connect cursor --bundle ${quotedBundle} --dry-run`,
   ];
 }
 
@@ -4616,7 +4628,8 @@ Quick start:
   npm install -g enigma-memory
   enigma quickstart --bundle "$HOME/.enigma/bundle.json"
   enigma doctor --bundle "$HOME/.enigma/bundle.json"
-  enigma connect claude-desktop --bundle "$HOME/.enigma/bundle.json" --dry-run
+  enigma claude-mcpb package --plain
+  enigma connect cursor --bundle "$HOME/.enigma/bundle.json" --dry-run
   echo "Your memory text" > memory.txt
   enigma remember --bundle "$HOME/.enigma/bundle.json" --text-file memory.txt
   enigma search  --bundle "$HOME/.enigma/bundle.json" --query "your topic"
@@ -4815,7 +4828,7 @@ function usage() {
     },
     install_options: {
       'one-command installed clients': 'npm install -g enigma-memory && enigma quickstart --bundle ./.enigma/bundle.json && enigma doctor --bundle ./.enigma/bundle.json',
-      'one-command Claude Desktop preview': 'npm install -g enigma-memory && enigma quickstart --bundle ./.enigma/bundle.json && enigma connect claude-desktop --bundle ./.enigma/bundle.json --dry-run',
+      'one-command Claude Desktop extension package': 'npm install -g enigma-memory && enigma quickstart --bundle ./.enigma/bundle.json && enigma claude-mcpb package --plain',
       'one-command Cursor preview': 'npm install -g enigma-memory && enigma quickstart --bundle ./.enigma/bundle.json && enigma connect cursor --bundle ./.enigma/bundle.json --dry-run',
       'one-command Kimi Code preview': 'npm install -g enigma-memory && enigma quickstart --bundle ./.enigma/bundle.json && enigma connect kimi-code --bundle ./.enigma/bundle.json --dry-run',
       'one-command VS Code Cline preview': 'npm install -g enigma-memory && enigma quickstart --bundle ./.enigma/bundle.json && enigma connect vscode-cline --bundle ./.enigma/bundle.json --dry-run',

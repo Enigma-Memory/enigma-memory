@@ -95,11 +95,11 @@ export function createClaudeMcpbInstallHandoff() {
   const copyableSteps = [
     {
       id: 'open_mcpb',
-      instruction: 'Open Claude Desktop and choose the option to install an MCPB extension package.',
+      instruction: 'Open Claude Desktop, then open Settings → Extensions.',
     },
     {
       id: 'select_bundle',
-      instruction: 'Select the Enigma .mcpb bundle shown as <mcpb-output> in this report.',
+      instruction: 'Drag the Enigma .mcpb bundle shown as <mcpb-output> into Extensions, or choose Install/Browse and select it.',
     },
     {
       id: 'restart_claude',

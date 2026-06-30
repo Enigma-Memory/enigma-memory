@@ -11,7 +11,7 @@ npm install -g enigma-memory
 enigma quickstart --bundle ./.enigma/bundle.json
 enigma doctor --bundle ./.enigma/bundle.json
 enigma drive health --bundle ./.enigma/bundle.json
-enigma connect claude-desktop --bundle ./.enigma/bundle.json --dry-run
+enigma claude-mcpb package --plain
 enigma status --bundle ./.enigma/bundle.json
 enigma remember --bundle ./.enigma/bundle.json --text-file ./memory.txt
 enigma search --bundle ./.enigma/bundle.json --query "project context"
@@ -20,7 +20,7 @@ enigma export --bundle ./.enigma/bundle.json --out ./.enigma/export.json
 enigma verify --export ./.enigma/export.json
 ```
 
-`enigma quickstart` creates the local `.enigma` workspace, bundle, and proof artifacts with no provider or cloud credentials. Connector writes stay behind explicit `enigma connect <client> --dry-run` preview and a separate intentional connect command. `enigma drive health` reports a SMART-style memory-drive health packet (freshness, duplicate rate, tombstone backlog, stale derived artifacts, receipt coverage, connector health) from local metadata only; it is part of the Memory Drive surface in this release, and `enigma status` plus `enigma doctor` cover local passport counts, roots, and connector readiness in every build. Neither quickstart nor connector dry-run contacts providers, creates hosted accounts, syncs cloud state, or proves provider deletion/model forgetting.
+`enigma quickstart` creates the local `.enigma` workspace, bundle, and proof artifacts with no provider or cloud credentials. Claude Desktop uses the `.mcpb` extension handoff first; Cursor and other config-based connector writes stay behind explicit `enigma connect <client> --dry-run` preview and a separate intentional connect command. `enigma drive health` reports a SMART-style memory-drive health packet (freshness, duplicate rate, tombstone backlog, stale derived artifacts, receipt coverage, connector health) from local metadata only; it is part of the Memory Drive surface in this release, and `enigma status` plus `enigma doctor` cover local passport counts, roots, and connector readiness in every build. Neither quickstart nor connector dry-run contacts providers, creates hosted accounts, syncs cloud state, or proves provider deletion/model forgetting.
 
 Optional public test-drive loop:
 
@@ -121,9 +121,9 @@ This path is intentionally copyable: npm install, run a local test drive, genera
 
 ## MCP client loop
 
-The same installed package can be used by Claude Desktop, Cursor, Kimi Code, or any generic MCP client. The smooth path is one local quickstart plus a dry-run connector preview: `enigma quickstart --bundle ./.enigma/bundle.json`, then `enigma connect claude-desktop --bundle ./.enigma/bundle.json --dry-run` or the matching client id. Remove `--dry-run` only when you explicitly want Enigma to write that client config. Manual snippets remain useful when a client needs a copied entry; replace the bundle path with the local path from your quickstart output, and restart the client.
+The same installed package can be used by Claude Desktop, Cursor, Kimi Code, or any generic MCP client. The smooth Claude path is one local quickstart plus the extension package: `enigma quickstart --bundle ./.enigma/bundle.json`, then `enigma claude-mcpb package --plain`. Cursor is the first config-preview example: `enigma connect cursor --bundle ./.enigma/bundle.json --dry-run`. Remove `--dry-run` only when you explicitly want Enigma to write that client config. Manual snippets remain useful when a client needs a copied entry; replace the bundle path with the local path from your quickstart output, and restart the client.
 
-Claude Desktop:
+Claude Desktop fallback, advanced only:
 
 ```json
 {

@@ -54,10 +54,10 @@ enigma next --plain --bundle "$ENIGMA_BUNDLE_FILE"
 enigma quickstart --bundle "$ENIGMA_BUNDLE_FILE"
 enigma doctor --bundle "$ENIGMA_BUNDLE_FILE"
 enigma drive health --bundle "$ENIGMA_BUNDLE_FILE"
-enigma connect claude-desktop --bundle "$ENIGMA_BUNDLE_FILE" --dry-run
+enigma claude-mcpb package --plain
 enigma status --bundle "$ENIGMA_BUNDLE_FILE"
 ```
-`enigma next --plain` is the simplest first command: it prints one human-readable next step without requiring an existing bundle. `enigma quickstart` creates the local bundle; connector writes stay behind explicit `enigma connect <client> --dry-run` preview and a separate intentional connect command. `enigma status` includes `first_run_status`: one public-safe setup state, one primary action, and lanes for Memory Drive, Import Sandbox, memory inventory, proof activity, and diagnostics.
+`enigma next --plain` is the simplest first command: it prints one human-readable next step without requiring an existing bundle. `enigma quickstart` creates the local bundle; Claude Desktop uses the `.mcpb` extension package handoff by default, while other connector writes stay behind explicit `enigma connect <client> --dry-run` preview and a separate intentional connect command. `enigma status` includes `first_run_status`: one public-safe setup state, one primary action, and lanes for Memory Drive, Import Sandbox, memory inventory, proof activity, and diagnostics.
 If `doctor` is red on a fresh install, read `setup_status.state`: `setup_needed` means run the included `setup_status.next_command`; `attention_needed` means a real local install/config issue remains.
 For support, use `enigma support summary --bundle "$ENIGMA_BUNDLE_FILE"` and share only that redacted JSON unless support explicitly asks for a private local artifact.
 
@@ -69,15 +69,15 @@ enigma import text --file ./memories.md --complete
 
 This prints a public-safe preview/receipt only, including duplicate groups/counts. Raw notes stay local and nothing is written to the vault unless an explicit import path is approved; approved `--write-vault` imports return a sanitized batch receipt with write refs and receipt hashes. To undo a local import, keep the private raw report written with `--out` and run `enigma import rollback --file <raw-report.json> --bundle <bundle.json>`.
 
-Preview a single client before writing:
+Connect Claude first with the extension package, or preview another client before writing:
 
 ```sh
-enigma connect claude-desktop --dry-run
+enigma claude-mcpb package --plain
 enigma connect cursor --dry-run
 enigma connect kimi-code --dry-run
 ```
 
-Remove `--dry-run` once the preview looks correct.
+For non-Claude clients, remove `--dry-run` once the preview looks correct. Claude's `.mcpb` handoff does not write Claude settings from Enigma.
 
 ### MCP server
 
@@ -136,10 +136,15 @@ Supported connector profiles are:
 - `opencode`
 - `generic-mcp`
 
-The one-command path above already connects every installed/config-present client. To connect or preview a single client instead:
+Claude Desktop should use the extension package first:
 
 ```sh
-enigma connect claude-desktop --dry-run
+enigma claude-mcpb package --plain
+```
+
+For Cursor, Kimi Code, and advanced compatible clients, preview one client before writing:
+
+```sh
 enigma connect cursor --dry-run
 enigma connect kimi-code --dry-run
 enigma connect generic-mcp --dry-run

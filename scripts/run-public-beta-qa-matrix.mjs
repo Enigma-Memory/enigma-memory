@@ -999,6 +999,17 @@ export function renderPublicBetaQaPlain(report) {
       lines.push(`Collect next: ${action.action_id} — ${action.collect_next.evidence_item_id} into ${action.collect_next.target_file}: ${action.collect_next.collect}`);
     }
   }
+  const internalEvidenceActions = (Array.isArray(report.next_actions) ? report.next_actions : [])
+    .filter((action) => action.owner_ref === 'ref:role:qa-owner' || action.owner_ref === 'ref:role:beta-support');
+  if (internalEvidenceActions.length > 0) {
+    lines.push('Internal QA/support evidence to collect now:');
+    for (const action of internalEvidenceActions) {
+      lines.push(`Internal: ${action.action_id} — ${action.summary}`);
+      if (action.collect_next?.target_file && action.collect_next?.collect) {
+        lines.push(`Collect internal: ${action.action_id} — ${action.collect_next.evidence_item_id} into ${action.collect_next.target_file}: ${action.collect_next.collect}`);
+      }
+    }
+  }
   const patchableEvidence = (Array.isArray(report.next_actions) ? report.next_actions : [])
     .flatMap((action) => (Array.isArray(action.missing_evidence_items) ? action.missing_evidence_items : [])
       .map((item) => ({ action, item })));

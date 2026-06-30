@@ -185,7 +185,8 @@ Published-package quickstart:
 npm install -g enigma-memory
 enigma quickstart --bundle ./.enigma/bundle.json
 enigma doctor --bundle ./.enigma/bundle.json
-enigma connect claude-desktop --bundle ./.enigma/bundle.json --dry-run
+enigma claude-mcpb package --plain
+enigma connect cursor --bundle ./.enigma/bundle.json --dry-run
 enigma demo cross-model
 enigma-relay demo
 enigma-gateway demo

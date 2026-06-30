@@ -38,7 +38,7 @@ Before enabling live monitoring, analytics, or token rotation, use [`live-endpoi
 - [ ] Public install command is `npm install -g enigma-memory`; one-off quickstart command is `npx --yes --package enigma-memory enigma quickstart --bundle ./.enigma/bundle.json`.
 - [ ] Published npm package is visible as `enigma-memory` before public npm-install claims are made.
 - [ ] Registry verification script is present and run as `npm run registry:verify -- --execute` before public npm-install claims; keep its evidence bounded to registry installability only.
-- [ ] Published-package quickstart smoke uses `npm install -g enigma-memory`, `enigma quickstart --bundle ./.enigma/bundle.json`, `enigma doctor --bundle ./.enigma/bundle.json`, `enigma connect claude-desktop --bundle ./.enigma/bundle.json --dry-run`, `enigma-relay demo`, and `enigma-gateway demo` in that order.
+- [ ] Published-package quickstart smoke uses `npm install -g enigma-memory`, `enigma quickstart --bundle ./.enigma/bundle.json`, `enigma doctor --bundle ./.enigma/bundle.json`, `enigma claude-mcpb package --plain`, `enigma connect cursor --bundle ./.enigma/bundle.json --dry-run`, `enigma-relay demo`, and `enigma-gateway demo` in that order.
 - [ ] Quickstart output is described as a local vault bundle, context pack, export proof bundle, and verify report; that evidence is local Enigma-controlled proof only, not provider deletion, model forgetting, hosted/BYOC readiness, legal approval, or compliance certification.
 - [ ] `docs/npm-publishing.md` is followed before any future npm publication attempt, including package preflight, `npm pack --dry-run`, npm trusted publishing setup for `.github/workflows/npm-publish.yml`, `npm-publish` environment approval, no long-lived npm publish token secrets, provenance/SBOM boundaries, and rollback/deprecation notes.
 - [ ] No new npm automation token or long-lived npm publish token is created for publication; any exposed publish token has been manually revoked in npm and replaced by trusted publishing.
@@ -131,7 +131,8 @@ npm run registry:verify -- --execute
 npm install -g enigma-memory
 enigma quickstart --bundle ./.enigma/bundle.json
 enigma doctor --bundle ./.enigma/bundle.json
-enigma connect claude-desktop --bundle ./.enigma/bundle.json --dry-run
+enigma claude-mcpb package --plain
+enigma connect cursor --bundle ./.enigma/bundle.json --dry-run
 enigma-relay demo
 enigma-gateway demo
 printf '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"manual\",\"version\":\"0\"}}}\\n' | ENIGMA_BUNDLE=\"$PWD/.enigma/bundle.json\" enigma-mcp
@@ -213,7 +214,7 @@ printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion
 
 enigma doctor
 enigma install --bundle "$HOME/.enigma/bundle.json"
-enigma connect claude-desktop --bundle "$HOME/.enigma/bundle.json"
+enigma claude-mcpb package --plain
 enigma connect cursor --bundle "$HOME/.enigma/bundle.json"
 enigma connect kimi-code --bundle "$HOME/.enigma/bundle.json" --mcp-command "/absolute/path/to/enigma-mcp"
 enigma connect vscode-cline --bundle "$HOME/.enigma/bundle.json"

@@ -73,11 +73,11 @@ Run MCP over stdio:
 ENIGMA_BUNDLE="$HOME/.enigma/bundle.json" enigma-mcp
 ```
 
-Connect clients with a bundle path:
+Connect Claude with the extension package first; use config-writing commands for other clients:
 
 ```sh
 enigma doctor
-enigma connect claude-desktop --bundle "$HOME/.enigma/bundle.json"
+enigma claude-mcpb package --plain
 enigma connect kimi-code --bundle "$HOME/.enigma/bundle.json" --mcp-command "/absolute/path/to/enigma-mcp"
 ```
 

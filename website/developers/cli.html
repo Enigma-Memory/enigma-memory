@@ -43,10 +43,10 @@
     <section class="content-section" aria-labelledby="install-heading">
       <h2 id="install-heading">Install with npm</h2>
       <div class="terminal"><code>npm install -g enigma-memory</code></div>
-      <p>Initialize a local vault, verify it, then preview client changes before writing anything:</p>
-      <div class="terminal"><code>enigma quickstart --bundle ./.enigma/bundle.json<br>enigma doctor --bundle ./.enigma/bundle.json<br>enigma drive health --bundle ./.enigma/bundle.json<br>enigma connect claude-desktop --bundle ./.enigma/bundle.json --dry-run</code></div>
-      <p>After reviewing a dry-run, connect one intended client at a time:</p>
-      <div class="terminal"><code>enigma connect claude-desktop --bundle ./.enigma/bundle.json<br>enigma connect cursor --bundle ./.enigma/bundle.json --dry-run<br>enigma connect kimi-code --bundle ./.enigma/bundle.json --dry-run</code></div>
+      <p>Initialize a local Memory Drive, verify it, then package Claude as an extension or preview another client before writing anything:</p>
+      <div class="terminal"><code>enigma quickstart --bundle ./.enigma/bundle.json<br>enigma doctor --bundle ./.enigma/bundle.json<br>enigma drive health --bundle ./.enigma/bundle.json<br>enigma claude-mcpb package --plain<br>enigma connect cursor --bundle ./.enigma/bundle.json --dry-run</code></div>
+      <p>Claude Desktop uses the `.mcpb` handoff first; Cursor and other config-based clients stay behind a dry-run preview before writing.</p>
+      <div class="terminal"><code>enigma connect cursor --bundle ./.enigma/bundle.json --dry-run<br>enigma connect kimi-code --bundle ./.enigma/bundle.json --dry-run</code></div>
     </section>
 
     <section class="content-section" aria-labelledby="mcp-heading">

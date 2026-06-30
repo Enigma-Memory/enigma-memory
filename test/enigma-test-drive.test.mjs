@@ -42,7 +42,8 @@ function expectedNextCommands(bundle, crossModelReport) {
     `enigma drive health --bundle ${quoted(bundle)}`,
     `enigma search --bundle ${quoted(bundle)} --query "local proof bundle"`,
     `enigma demo cross-model --bundle ${quoted(bundle)} --out ${quoted(crossModelReport)}`,
-    `enigma connect claude-desktop --bundle ${quoted(bundle)} --dry-run`,
+    'enigma claude-mcpb package --plain',
+    `enigma connect cursor --bundle ${quoted(bundle)} --dry-run`,
   ];
 }
 
@@ -84,7 +85,7 @@ test('test-drive dry-run writes nothing and reports public tester commands', asy
   assert.deepEqual(json.next_commands, expectedNextCommands(json.bundle, json.files.find((file) => file.role === 'cross_model_report').path));
   assert.equal(json.next_commands.every((command) => command.startsWith('enigma ')), true);
   assert.equal(json.next_commands.some((command) => /setup --overwrite/.test(command)), false);
-  assert.equal(json.next_commands.some((command) => /connect claude-desktop .* --dry-run/.test(command)), true);
+  assert.equal(json.next_commands.some((command) => /claude-mcpb package --plain/.test(command)), true);
   assert.equal(await pathExists(outDir), false);
   assertPublicSafe(stdout, ['private test-drive canary']);
 });

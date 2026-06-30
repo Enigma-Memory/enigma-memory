@@ -209,6 +209,23 @@ test('connector detection and wizard planner cover all supported clients with pu
   assert.equal(plan.writes_performed, false);
   for (const client of plan.clients) {
     assert.equal(client.steps[0].command, 'npm install -g enigma-memory');
+    if (client.client_id === 'claude-desktop') {
+      assert.deepEqual(client.steps.map((step) => step.id), [
+        'install_package',
+        'create_local_bundle',
+        'package_claude_mcpb',
+        'install_claude_mcpb',
+        'test_claude_mcpb',
+        'advanced_config_fallback',
+      ]);
+      assert.equal(client.connect_command, 'enigma claude-mcpb package --plain');
+      assert.match(client.one_command_install_connect, /enigma claude-mcpb package --plain/);
+      assert.doesNotMatch(client.one_command_install_connect, /connect claude-desktop/);
+      assert.equal(client.mcp_config_preview, null);
+      assert.equal(client.mcpb_connection_plan.preferred_path, 'mcpb_extension');
+      assert.equal(client.advanced_fallback_connect_command, 'enigma connect claude-desktop --bundle "$HOME/.enigma/bundle.json" --dry-run');
+      continue;
+    }
     assert.equal(client.steps[2].command, `enigma doctor --client ${client.client_id}`);
     assert.match(client.steps.find((step) => step.id === 'connect_client').command, new RegExp(`enigma connect ${client.client_id} .* --dry-run`));
     assert.match(client.steps.find((step) => step.id === 'connect_client').title, /Preview the app connection/);

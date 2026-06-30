@@ -65,10 +65,15 @@ test('Claude Desktop mcpb manifest is public-safe command metadata only', () => 
   assert.equal(manifest.server.type, 'node');
   assert.equal(manifest.server.entry_point, 'packages/mcp-server/bin/enigma-mcp.mjs');
   assert.equal(manifest.server.mcp_config.command, 'node');
-  assert.deepEqual(manifest.server.mcp_config.args, ['packages/mcp-server/bin/enigma-mcp.mjs']);
+  assert.deepEqual(manifest.server.mcp_config.args, ['${__dirname}/packages/mcp-server/bin/enigma-mcp.mjs']);
   assert.equal(manifest.server.mcp_config.env.ENIGMA_BUNDLE, '${user_config.enigma_bundle}');
   assert.equal(manifest.user_config.enigma_bundle.type, 'file');
   assert.equal(manifest.user_config.enigma_bundle.required, true);
+  assert.match(manifest.user_config.enigma_bundle.description, /Memory Drive/);
+  assert.equal(manifest.repository.url, 'https://github.com/Enigma-Memory/enigma-memory');
+  assert.match(manifest.documentation, /Enigma-Memory\/enigma-memory/);
+  assert.match(manifest.support, /issues/);
+  assert.ok(manifest.keywords.includes('local-first'));
   assert.deepEqual(manifest.environment_names, ['ENIGMA_BUNDLE']);
   assert.equal(manifest.spec_reference.package_shape, 'zip_with_manifest_json');
   assert.equal(manifest.runtime_package_scope.package_json_included, true);
@@ -115,9 +120,12 @@ test('Claude Desktop mcpb connection plan orders states and keeps manual JSON ad
 test('Claude Desktop mcpb plan keeps connector wizard preview-first', () => {
   const wizard = planConnectWizard('claude-desktop', { platform: 'linux' }).clients[0];
 
-  assert.equal(wizard.connect_command, 'enigma connect claude-desktop --bundle "$HOME/.enigma/bundle.json" --dry-run');
-  assert.doesNotMatch(wizard.one_command_install_connect, /setup --client|--write-connectors|--overwrite/);
-  assert.equal(wizard.mcp_config_preview.mcpServers.enigma.command, 'enigma-mcp');
+  assert.equal(wizard.connect_command, 'enigma claude-mcpb package --plain');
+  assert.match(wizard.one_command_install_connect, /enigma claude-mcpb package --plain/);
+  assert.doesNotMatch(wizard.one_command_install_connect, /setup --client|--write-connectors|--overwrite|connect claude-desktop/);
+  assert.equal(wizard.mcp_config_preview, null);
+  assert.equal(wizard.mcpb_connection_plan.preferred_path, 'mcpb_extension');
+  assert.equal(wizard.advanced_fallback_connect_command, 'enigma connect claude-desktop --bundle "$HOME/.enigma/bundle.json" --dry-run');
 });
 
 test('Claude connector docs prefer mcpb before config fallback', async () => {
@@ -234,6 +242,8 @@ test('Claude Desktop mcpb package builder writes deterministic public-safe artif
   });
   assert.deepEqual(createClaudeMcpbInstallHandoff().boundaries, report.install_handoff.boundaries);
   assert.match(report.install_handoff.copyable_text, /1\. \[open_mcpb\]/);
+  assert.match(report.install_handoff.copyable_text, /Settings → Extensions/);
+  assert.match(report.install_handoff.copyable_text, /Drag the Enigma \.mcpb bundle/);
   assert.ok(report.install_handoff.copyable_text.indexOf('[open_mcpb]') < report.install_handoff.copyable_text.indexOf('[select_bundle]'));
   assert.ok(report.install_handoff.copyable_text.indexOf('[select_bundle]') < report.install_handoff.copyable_text.indexOf('[restart_claude]'));
   assert.ok(report.install_handoff.copyable_text.indexOf('[restart_claude]') < report.install_handoff.copyable_text.indexOf('[test_connection]'));
@@ -308,8 +318,8 @@ test('Claude MCPB package is available through the Enigma CLI', async () => {
   assert.match(plain, /\[select_bundle\]/);
   assert.match(plain, /\[restart_claude\]/);
   assert.match(plain, /\[test_connection\]/);
-  assert.ok(plain.indexOf('Open Claude Desktop') < plain.indexOf('Select the Enigma .mcpb bundle'));
-  assert.ok(plain.indexOf('Select the Enigma .mcpb bundle') < plain.indexOf('Restart Claude Desktop'));
+  assert.ok(plain.indexOf('Open Claude Desktop') < plain.indexOf('Drag the Enigma .mcpb bundle'));
+  assert.ok(plain.indexOf('Drag the Enigma .mcpb bundle') < plain.indexOf('Restart Claude Desktop'));
   assert.ok(plain.indexOf('Restart Claude Desktop') < plain.indexOf('test the Enigma MCP connection'));
   assert.match(plain, /Install performed: no/);
   assert.match(plain, /Automatic config write: no/);
