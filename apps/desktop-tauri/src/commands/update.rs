@@ -42,15 +42,9 @@ pub async fn check_update(state: tauri::State<'_, AppState>) -> Result<Value, St
         .to_string();
     let manifest_channel = manifest.get("channel").and_then(|v| v.as_str());
 
-    let signature_present = manifest.get("signature").is_some();
-    let payload_url_present = manifest
-        .get("url")
-        .or_else(|| manifest.get("download_url"))
-        .is_some();
-    let payload_hash_present = manifest
-        .get("sha256")
-        .or_else(|| manifest.get("payload_sha256"))
-        .is_some();
+    let signature_present = signed_manifest_signature_present(&manifest);
+    let payload_url_present = payload_url_present(&manifest);
+    let payload_hash_present = payload_hash_present(&manifest);
     let payload_ready = payload_url_present && payload_hash_present;
     let status = update_status(
         current_version,
@@ -98,6 +92,32 @@ fn update_status(
     }
 }
 
+fn signed_manifest_signature_present(manifest: &Value) -> bool {
+    manifest
+        .get("signature")
+        .and_then(Value::as_str)
+        .is_some_and(|signature| !signature.trim().is_empty())
+}
+
+fn payload_url_present(manifest: &Value) -> bool {
+    manifest_string(manifest, "url", "download_url").is_some_and(|url| !url.trim().is_empty())
+}
+
+fn payload_hash_present(manifest: &Value) -> bool {
+    manifest_string(manifest, "sha256", "payload_sha256").is_some_and(is_sha256_hex)
+}
+
+fn manifest_string<'a>(manifest: &'a Value, primary: &str, fallback: &str) -> Option<&'a str> {
+    manifest
+        .get(primary)
+        .or_else(|| manifest.get(fallback))
+        .and_then(Value::as_str)
+}
+
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == 64 && value.as_bytes().iter().all(|byte| byte.is_ascii_hexdigit())
+}
+
 fn compare_versions(current: &str, available: &str) -> Option<Ordering> {
     let current = parse_version(current)?;
     let available = parse_version(available)?;
@@ -125,7 +145,9 @@ fn parse_version(value: &str) -> Option<Vec<u64>> {
 
 #[cfg(test)]
 mod tests {
-    use super::update_status;
+    use super::{
+        payload_hash_present, payload_url_present, signed_manifest_signature_present, update_status,
+    };
 
     #[test]
     fn update_status_requires_safe_manifest_progression() {
@@ -157,5 +179,43 @@ mod tests {
             "blocked_version",
             update_status("0.1.19", "not-a-version", true, true, None, "stable")
         );
+    }
+
+    #[test]
+    fn update_manifest_metadata_must_be_public_safe_strings() {
+        let complete = serde_json::json!({
+            "signature": "signed-manifest",
+            "url": "https://downloads.enigmamemory.com/enigma.msi",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        });
+        assert!(signed_manifest_signature_present(&complete));
+        assert!(payload_url_present(&complete));
+        assert!(payload_hash_present(&complete));
+
+        let fallback = serde_json::json!({
+            "signature": "signed-manifest",
+            "download_url": "https://downloads.enigmamemory.com/enigma.msi",
+            "payload_sha256": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+        });
+        assert!(payload_url_present(&fallback));
+        assert!(payload_hash_present(&fallback));
+
+        let malformed = serde_json::json!({
+            "signature": "",
+            "url": " ",
+            "sha256": "not-a-sha256"
+        });
+        assert!(!signed_manifest_signature_present(&malformed));
+        assert!(!payload_url_present(&malformed));
+        assert!(!payload_hash_present(&malformed));
+
+        let wrong_types = serde_json::json!({
+            "signature": true,
+            "url": null,
+            "sha256": 42
+        });
+        assert!(!signed_manifest_signature_present(&wrong_types));
+        assert!(!payload_url_present(&wrong_types));
+        assert!(!payload_hash_present(&wrong_types));
     }
 }
