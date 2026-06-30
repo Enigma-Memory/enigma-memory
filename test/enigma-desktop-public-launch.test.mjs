@@ -83,6 +83,8 @@ test('desktop first-run defaults to Memory Drive home dashboard', async () => {
   assert.equal(model.dashboard.next_action.claim_boundaries.local_paths_returned, false);
   assert.equal(dashboard.memory_drive_status, 'missing');
   assert.ok(model.dashboard.issue_codes.includes('MEMORY_DRIVE_MISSING'));
+  assert.equal(dashboard.support_report_ready, false);
+  assert.equal(dashboard.support_report_status, 'not-run');
   assert.equal(model.dashboard.memory_controller.schema, 'enigma.desktop.memory_controller_summary.v1');
   assert.equal(model.dashboard.memory_controller.memory_weather.label, 'Needs review');
   assert.equal(model.dashboard.memory_controller.app_permissions.label, 'No app has permission yet');
@@ -118,6 +120,8 @@ test('static desktop shell mirrors Memory Controller, Import Sandbox, and Suppor
   assert.match(shell, /memory_controller: memoryController/);
   assert.match(shell, /import_sandbox: importSandbox/);
   assert.match(shell, /support: diagnostics/);
+  assert.match(shell, /support_report_ready: supportReportReady/);
+  assert.match(homeBlock, /Support report/);
   assert.match(shell, /Support report/);
   assert.match(shell, /renderSupportScreen\(model\.screens\.support\)/);
   assert.match(homeBlock, /Memory Controller/);
@@ -197,6 +201,45 @@ test('desktop dashboard exposes one primary fix-it action', async () => {
   assertPublicSafe(dashboard);
 });
 
+test('desktop dashboard routes to support report before app connection', async () => {
+  const {
+    createDesktopState,
+    desktopReducer,
+    createMemoryDrive,
+    updateDesktopService,
+    updateDesktopHealth,
+    updateDesktopDiagnostics,
+    renderMemoryDriveDashboard,
+  } = await importDesktop();
+
+  let state = desktopReducer(createDesktopState(), createMemoryDrive({ now: '2026-06-28T00:04:00.000Z' }));
+  state = desktopReducer(state, updateDesktopService({ status: 'running', issue_codes: [] }, { now: '2026-06-28T00:05:00.000Z' }));
+  state = desktopReducer(state, updateDesktopHealth({ status: 'healthy', issue_codes: [] }, { now: '2026-06-28T00:06:00.000Z' }));
+
+  const needsSupport = renderMemoryDriveDashboard(state);
+  assert.equal(needsSupport.offline_ready, true);
+  assert.equal(needsSupport.support_report_ready, false);
+  assert.equal(needsSupport.next_action.id, 'collect_support_report');
+  assert.equal(needsSupport.next_action.state, 'support_report_needed');
+  assert.equal(needsSupport.next_action.primary_action.screen, 'support');
+  assert.equal(needsSupport.next_action.reason, 'A safe support report is not ready yet.');
+
+  state = desktopReducer(state, updateDesktopDiagnostics({
+    status: 'ready',
+    support_report_ready: true,
+    safe_summary: ['Local service reachable'],
+    issue_codes: [],
+  }, { now: '2026-06-28T00:07:00.000Z' }));
+
+  const ready = renderMemoryDriveDashboard(state);
+  assert.equal(ready.support_report_ready, true);
+  assert.equal(ready.support_report_status, 'ready');
+  assert.equal(ready.next_action.id, 'connect_app');
+  assertPublicSafe(needsSupport);
+  assertPublicSafe(ready);
+});
+
+
 test('desktop public dashboard omits raw memory, prompts, transcripts, tokens, paths, and provider responses', async () => {
   const {
     createDesktopState,
@@ -235,6 +278,8 @@ test('desktop public dashboard omits raw memory, prompts, transcripts, tokens, p
   const dashboard = renderMemoryDriveDashboard(state);
   assert.equal(model.dashboard.schema, 'enigma.desktop.memory_drive_dashboard.v1');
   assert.equal(dashboard.offline_ready, true);
+  assert.equal(dashboard.support_report_ready, true);
+  assert.equal(dashboard.support_report_status, 'ready');
   assert.equal(dashboard.memory_controller.memory_weather.status, 'sunny');
   assert.equal(dashboard.memory_controller.app_permissions.status, 'missing');
   assert.equal(dashboard.memory_controller.recall_approval.summary, 'Not shared until you approve.');

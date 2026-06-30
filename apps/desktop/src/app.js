@@ -328,6 +328,8 @@ export function renderMemoryDriveDashboard(state = createDesktopState()) {
   const proofStatus = normalizePublicStatus(state.proofActivity?.status || state.verifier?.status, ['idle', 'checking', 'checked', 'error', 'needs-review'], 'idle');
   const updateStatus = normalizePublicStatus(state.desktopUpdate?.status, ['unknown', 'checking', 'current', 'available', 'installing', 'ready', 'error'], 'unknown');
   const diagnosticsStatus = normalizePublicStatus(state.desktopDiagnostics?.status, ['not-run', 'running', 'ready', 'needs-review', 'error'], 'not-run');
+  const supportReport = renderSupportReportModel(state.desktopDiagnostics);
+  const supportReportReady = supportReport.support_report_ready;
   const offlineReady = memoryDriveStatus === 'ready' && serviceStatus === 'running' && healthStatus === 'healthy';
   const memoryController = selectMemoryControllerSummary({
     connectedAppCount,
@@ -346,6 +348,8 @@ export function renderMemoryDriveDashboard(state = createDesktopState()) {
     proof_status: proofStatus,
     update_status: updateStatus,
     diagnostics_status: diagnosticsStatus,
+    support_report_ready: supportReportReady,
+    support_report_status: supportReport.status,
     offline_ready: offlineReady,
     issue_codes: issueCodes,
     memory_controller: memoryController,
@@ -357,6 +361,7 @@ export function renderMemoryDriveDashboard(state = createDesktopState()) {
       proofStatus,
       updateStatus,
       diagnosticsStatus,
+      supportReportReady,
       connectedAppCount,
       issueCodes
     })
@@ -1543,6 +1548,9 @@ function selectMemoryDriveNextAction(input) {
   if (input.diagnosticsStatus === 'needs-review' || input.diagnosticsStatus === 'error') {
     return desktopNextAction({ id: 'open_diagnostics', label: 'Open safe support report', screen: 'support', reason: 'Diagnostics need review before sharing support metadata.' }, 'diagnostics_review');
   }
+  if (input.diagnosticsStatus === 'not-run' || input.supportReportReady !== true) {
+    return desktopNextAction({ id: 'collect_support_report', label: 'Collect support report', screen: 'support', reason: 'A safe support report is not ready yet.' }, 'support_report_needed');
+  }
   if (input.proofStatus === 'error' || input.proofStatus === 'needs-review') {
     return desktopNextAction({ id: 'review_proof', label: 'Review proof activity', screen: 'verifier', reason: 'Proof activity needs local review.' }, 'proof_review');
   }
@@ -1786,6 +1794,7 @@ function renderHomeScreen(screen) {
         ${renderMetric('Proof activity', dashboard.proof_status)}
         ${renderMetric('Updates', dashboard.update_status)}
         ${renderMetric('Diagnostics', dashboard.diagnostics_status)}
+        ${renderMetric('Support report', dashboard.support_report_ready ? 'ready' : 'not ready')}
         ${renderMetric('Offline ready', dashboard.offline_ready ? 'yes' : 'no')}
       </dl>
     </div>
