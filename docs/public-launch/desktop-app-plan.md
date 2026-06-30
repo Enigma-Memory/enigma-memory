@@ -321,7 +321,7 @@ Dependencies:
 Deliverables:
 
 - Tauri desktop app with welcome, setup wizard, dashboard, settings, update, diagnostics, and CLI handoff screens.
-- Typed command bridge stubs wired to real local engine adapters as they become available.
+- Typed command bridge adapters for real local engine operations, with explicit demo mode only for local UI development.
 - Public-safe error model and redaction helpers.
 
 Acceptance:

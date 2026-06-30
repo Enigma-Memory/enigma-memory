@@ -409,7 +409,7 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
   assert.match(wizard, /No Memory Drive, client settings, prompts, transcripts, or local paths were read/);
   assert.match(wizard, /window\.__ENIGMA_DESKTOP_DEMO__ === true/);
   assert.match(wizard, /throw new Error\('desktop_shell_unavailable'\)/);
-  assert.doesNotMatch(wizard, /Falls back to mock responses|const isMock|mockInvoke|\[mock\]/);
+  assert.doesNotMatch(wizard, /mock/i);
   assert.match(help, /before any Memory Drive write/);
   assert.doesNotMatch(`${wizard}\n${help}`, /Private vault|private vault|your vault|local vault|vault stores|vault write|vault activity|Checking vault|Creating vault|Check your vault|Private vault created|Create vault/);
   assert.match(wizard, /WIZARD_STORAGE_KEY/);
@@ -716,6 +716,7 @@ test('public website explains consumer install path without unsupported claims',
     securityAuditRfp,
   ].join('\n');
   assert.match(publicLaunchPlanningDocs, /Memory Drive/);
+  assert.doesNotMatch(publicLaunchPlanningDocs, /mock update UI|command bridge stubs/i);
   assert.doesNotMatch(publicLaunchPlanningDocs, /local vault|vault bundle|Create local vault|Repair vault|keep-vault|remove-vault|kept vault|vault_root|canonical vault|Enigma-controlled local vault|First-run.*vault|Health dashboard.*vault|local vault recovery|vault status|vault health|vault setup|vault warning|selected vault|current vault|missing vault|vault manager|Private vault|Create private vault|your vault|repair vault|private vault|Vault ready|Vault needs|vault reachable|vault paths|user vault/i);
   assert.match(setup, /Enigma shows what it will change before you approve/);
   assert.match(setup, /Memory Drive dashboard/);

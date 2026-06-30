@@ -380,7 +380,7 @@ async function demoInvoke(cmd, args = {}) {
       return {
         ok: true,
         schema: 'enigma.support_summary.v1',
-        support_code: 'ref:support-summary:mock',
+        support_code: 'ref:support-summary:demo',
         setup_status: { state: 'ready', reasons: [] },
         next_action: { id: 'open_status', label: 'Open status' },
         diagnostics: {
