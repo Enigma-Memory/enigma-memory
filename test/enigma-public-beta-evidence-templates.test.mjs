@@ -138,6 +138,17 @@ test('public beta evidence templates are public-safe blockers, not fake evidence
     assert.equal(desktop.installers.find((installer) => installer.platform === 'macos').stapling.status, 'not_observed');
     assert.equal(desktop.update_rollback.status, 'not_run');
     assert.equal(desktop.update_rollback.evidence_ref_required, true);
+    assert.deepEqual(desktop.next_actions.map((action) => action.id), [
+      'record_signing_identity_custody',
+      'record_windows_signed_artifact',
+      'record_macos_signed_notarized_artifact',
+      'record_update_manifest_signature',
+      'record_update_rollback_rehearsal',
+    ]);
+    assert.deepEqual(desktop.next_actions.find((action) => action.id === 'record_update_rollback_rehearsal').required_fields, [
+      'update_rollback.status',
+      'update_rollback.evidence_ref',
+    ]);
 
     const handoff = JSON.parse(await readFile(join(outDir, 'production-handoff-packet.json'), 'utf8'));
     assert.equal(handoff.public_safe_release_packet_approval.status, 'pending');

@@ -208,6 +208,33 @@ function buildDesktopReleaseTemplate(generatedAt) {
       evidence_ref: 'TBD-rollback-rehearsal-ref',
       evidence_ref_required: true,
     },
+    next_actions: [
+      {
+        id: 'record_signing_identity_custody',
+        collect: 'Apple and Microsoft signing identity readiness plus custody approval public ref.',
+        required_fields: ['signing_identities.apple_status', 'signing_identities.microsoft_status', 'signing_identities.custody_approval_ref'],
+      },
+      {
+        id: 'record_windows_signed_artifact',
+        collect: 'Windows installer filename, public SHA-256, verified signature status, signature evidence ref, and download ref.',
+        required_fields: ['installers[windows].present', 'installers[windows].artifact_name', 'installers[windows].sha256', 'installers[windows].signature.status', 'installers[windows].signature.evidence_ref', 'installers[windows].download_ref'],
+      },
+      {
+        id: 'record_macos_signed_notarized_artifact',
+        collect: 'macOS installer filename, public SHA-256, verified signature, accepted notarization, stapling evidence, and download ref.',
+        required_fields: ['installers[macos].present', 'installers[macos].artifact_name', 'installers[macos].sha256', 'installers[macos].signature.status', 'installers[macos].notarization.status', 'installers[macos].stapling.status', 'installers[macos].download_ref'],
+      },
+      {
+        id: 'record_update_manifest_signature',
+        collect: 'Updater manifest signature verification evidence.',
+        required_fields: ['manifest.signature.status', 'manifest.signature.evidence_ref'],
+      },
+      {
+        id: 'record_update_rollback_rehearsal',
+        collect: 'Signed update rollback rehearsal status and public evidence ref.',
+        required_fields: ['update_rollback.status', 'update_rollback.evidence_ref'],
+      },
+    ],
     claim_boundary: templateBoundary(),
   };
 }
