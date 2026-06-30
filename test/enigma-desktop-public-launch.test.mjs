@@ -519,7 +519,7 @@ test('desktop Tauri dashboard exposes Memory Controller and Import Sandbox consu
 });
 
 test('public website explains consumer install path without unsupported claims', async () => {
-  const [home, download, setup, vaultNotReady, websiteStyles, help, launchStatus, installGuide, macosInstall, windowsInstall, connectApps, claudeConnect, cursorConnect, otherClients, troubleshooting, clientNotDetected, removalGuide, faq, developerCli, readme, installAnywhere, clientConnectors, developerEcosystem, publicApiReference, onboardingUx] = await Promise.all([
+  const [home, download, setup, vaultNotReady, websiteStyles, help, launchStatus, installGuide, macosInstall, windowsInstall, connectApps, claudeConnect, cursorConnect, otherClients, troubleshooting, clientNotDetected, removalGuide, faq, developerCli, readme, installAnywhere, clientConnectors, developerEcosystem, publicApiReference, onboardingUx, qaSmokeScenarios, codeSigningSetup, productionReadinessStatus] = await Promise.all([
     readWebsiteFile('index.html'),
     readWebsiteFile('download.html'),
     readWebsiteFile('setup.html'),
@@ -545,6 +545,9 @@ test('public website explains consumer install path without unsupported claims',
     readFile(new URL('../docs/developer-ecosystem.md', import.meta.url), 'utf8'),
     readFile(new URL('../docs/public-api-reference.md', import.meta.url), 'utf8'),
     readFile(new URL('../docs/public-launch/consumer-onboarding-ux.md', import.meta.url), 'utf8'),
+    readFile(new URL('../docs/public-launch/qa-smoke-scenarios.md', import.meta.url), 'utf8'),
+    readFile(new URL('../docs/public-launch/code-signing-setup.md', import.meta.url), 'utf8'),
+    readFile(new URL('../docs/public-launch/production-readiness-status.md', import.meta.url), 'utf8'),
   ]);
   const publicProofDocs = (await Promise.all([
     readFile(new URL('../docs/demo-proof-network.md', import.meta.url), 'utf8'),
@@ -616,6 +619,15 @@ test('public website explains consumer install path without unsupported claims',
   assert.match(launchStatus, /Windows trusted installer/);
   assert.match(launchStatus, /General consumer download/);
   assert.doesNotMatch(launchStatus, /Azure|Artifact Signing|free\/trial\/sponsored|eligible paid subscription|Public Trust|repository custody path/i);
+  for (const scenarioId of ['BETA-CLIENT-CLAUDE-001', 'BETA-SIGNING-WINDOWS-001', 'BETA-SIGNING-MACOS-001', 'BETA-UPDATE-001', 'BETA-NPM-001', 'BETA-MERGE-001']) {
+    assert.match(qaSmokeScenarios, new RegExp(scenarioId));
+  }
+  assert.doesNotMatch(qaSmokeScenarios, /GA-UPDATE-001/);
+  assert.match(codeSigningSetup, /do not by themselves prove that SmartScreen/);
+  assert.doesNotMatch(codeSigningSetup, /prevent SmartScreen warnings/);
+  assert.match(productionReadinessStatus, /public beta and GA blockers/);
+  assert.match(productionReadinessStatus, /9\/9 pass/);
+  assert.match(productionReadinessStatus, /691\/691 pass/);
   assert.match(installGuide, /when your platform is marked ready/);
   assert.match(macosInstall, /when signing is ready/);
   assert.match(windowsInstall, /when signing is ready/);

@@ -27,6 +27,13 @@ These scenarios prove Enigma-controlled local setup, local vault behavior, local
 - [ ] macOS beta: Wizard creates/detects the local vault, detects clients, offers connect, then shows health.
 - [ ] GA: Resume works after app restart, OS restart, and update interruption.
 
+
+### `BETA-CLIENT-CLAUDE-001` Claude Desktop connect path
+
+- [ ] Windows beta: Claude Desktop extension package path is primary; Enigma does not write Claude settings for the extension handoff.
+- [ ] macOS beta: Claude Desktop extension package path is primary; Enigma does not write Claude settings for the extension handoff.
+- [ ] GA: Connect, test, repair, disconnect, and reconnect remain idempotent across supported Claude Desktop versions.
+
 ### `BETA-CLIENT-001` No client installed
 
 - [ ] Windows beta: App reports no detected supported clients as a non-blocking state.
@@ -81,11 +88,35 @@ These scenarios prove Enigma-controlled local setup, local vault behavior, local
 - [ ] macOS beta: App records a local crash marker only; nothing is uploaded.
 - [ ] GA: Restart recovery and one-time report approval work consistently.
 
-### `GA-UPDATE-001` Successful update
+### `BETA-SIGNING-WINDOWS-001` Windows signing evidence
 
-- [ ] Windows GA: Update preserves vault, app config, and connector settings.
-- [ ] macOS GA: Update preserves vault, app config, and connector settings.
+- [ ] Windows beta: Selected beta artifact has public-safe signing/distribution evidence and observed Windows trust-prompt notes.
+- [ ] Windows beta: Evidence records whether SmartScreen or publisher prompts were observed; a certificate alone is not treated as proof of zero prompts.
+- [ ] GA: Windows stable channel evidence covers every supported version/architecture.
+
+### `BETA-SIGNING-MACOS-001` macOS signing and notarization evidence
+
+- [ ] macOS beta: Selected beta artifact has Developer ID signing, notarization, stapling, and observed Gatekeeper evidence.
+- [ ] macOS beta: Evidence records the exact Gatekeeper prompt state on first launch.
+- [ ] GA: macOS stable channel evidence covers every supported version/architecture.
+
+### `BETA-UPDATE-001` Beta update and rollback evidence
+
+- [ ] Windows beta: Update verification rejects unsigned, wrong-channel, and downgrade payloads while preserving vault and connector settings.
+- [ ] macOS beta: Update verification rejects unsigned, wrong-channel, and downgrade payloads while preserving vault and connector settings.
 - [ ] GA: Signature verification, failed-update rollback, and metadata kill switch are proven.
+
+### `BETA-NPM-001` npm package availability evidence
+
+- [ ] Beta: Public `enigma-memory@0.1.19` is published and installable from npm; local source version alone is not enough.
+- [ ] Beta: Fresh install smoke confirms CLI bins, MCP stdio, and public package exports from the published package.
+- [ ] GA: Registry evidence covers stable version and documented install path.
+
+### `BETA-MERGE-001` Release approval and merge evidence
+
+- [ ] Beta: PR approval, merge, reviewer approval, and public-safe evidence packet refs are recorded.
+- [ ] Beta: Direct pushes to protected `main` remain blocked; release evidence points to the reviewed merge path.
+- [ ] GA: Final release approval covers GA artifacts, release notes, and claim-boundary review.
 
 ### `GA-UNINSTALL-001` Default uninstall
 

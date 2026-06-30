@@ -19,7 +19,7 @@
 - Six-step wizard: Welcome, Create private vault, Find apps, Connect apps, Health check, Ready; the wizard now resumes from public-safe local UI state after close/reopen without storing import text, raw memory, local paths, logs, or config bodies.
 - Tauri commands wired to bundled Enigma engine sidecar via `ServiceHandle`: spawns engine process, captures stdout/stderr, bounded restart on crash, clean shutdown.
 - Health dashboard normalizes CLI health into consumer states, avoids duplicate vault creation, and requires service-running plus healthy Memory Drive before showing offline-ready.
-- First-run health check now starts the bundled local engine before showing the Ready screen, then refreshes health so Ready is not shown while the dashboard still needs "Start engine."
+- First-run health check now starts the bundled local engine before showing the Ready screen, refreshes health, and the Ready screen is not resumed from stored UI state until the current Memory Drive health plus local engine checks pass.
 - Memory Controller dashboard cards show consent/review/private-bubble states without approving recall on review alone.
 - Import Sandbox supports local text/Markdown paste, preview counts and duplicate groups, explicit approve only when the preview decision is `ready_for_import`, local vault write, batch receipt, and latest-import rollback; raw text and raw report paths are not printed in the UI result.
 - Proof Activity summary shows local receipt counts, Memory Drive roots, verifier/evidence status, claim boundaries including provider non-use non-claims, and explicit public-safe export without raw memory, prompts, transcripts, provider responses, or paths.
@@ -81,7 +81,7 @@
 
 ---
 
-## What is NOT yet built (blockers for GA)
+## What is NOT yet built (public beta and GA blockers)
 
 | Item | Why it matters | Owner / path to close |
 |---|---|---|
@@ -99,7 +99,7 @@
 - `node --check apps/cli/bin/enigma.mjs` at repo root: **pass**.
 - `node --test test/enigma-context-proof-cli.test.mjs` at repo root: **6/6 pass**.
 - `node --test test/enigma-claude-mcpb-contract.test.mjs` at repo root: **6/6 pass**.
-- `node --test test/enigma-production.test.mjs` at repo root: **38/38 pass**.
+- `node --test test/enigma-production.test.mjs` at repo root: **40/40 pass**.
 - `node --test test/enigma-metering.test.mjs` at repo root: **6/6 pass**.
 - `node --test test/enigma-settlement.test.mjs` at repo root: **7/7 pass**.
 - `node --test test/enigma-chain-cli.test.mjs` at repo root: **8/8 pass**.
@@ -130,16 +130,16 @@
 - `node --test test/enigma-onboarding.test.mjs` at repo root: **23/23 pass**.
 - `node --test test/enigma-test-drive.test.mjs` at repo root: **4/4 pass**.
 - `node --test test/enigma-search-status.test.mjs` at repo root: **10/10 pass**.
-- `node --test test/enigma-desktop-public-launch.test.mjs` at repo root: **8/8 pass**.
+- `node --test test/enigma-desktop-public-launch.test.mjs` at repo root: **9/9 pass**.
 - `npm run public-beta:advisor` at repo root: **pass**; Advisor decision remains **HOLD** with evidence-manifest collection guidance.
 - `npm run public-beta:review` at repo root: **pass**; writes public-safe evidence manifest, generated support dry-run summaries, clean-machine smoke plan, and QA matrix artifacts while Advisor decision remains **HOLD** and prints the evidence-template starter command.
 - `npm run production:site -- --site website` at repo root: **pass**.
 - `npm run check` at repo root: **pass**.
 - `npm run secret-scan` at repo root: **pass**.
-- `npm test` at repo root: **690/690 pass**.
+- `npm test` at repo root: **691/691 pass**.
 - `npm pack --dry-run` at repo root: **pass** (`enigma-memory-0.1.19.tgz` dry-run output).
-- `npm run package:install-smoke` at repo root: **pass**; locally packs `enigma-memory-0.1.19.tgz`, installs it into a temporary npm prefix with scripts ignored, runs selected installed entrypoints plus npm bin shims, and removes the temp directory without publishing or using npm tokens.
-- `npm run release:audit` at repo root: **pass**; required gates include `npm-check`, `npm-test`, `npm-pack-dry-run`, `local-pack-install-smoke`, direct bin smoke, review packet, MCP stdio smoke, and production manifest validators.
+- `npm run package:install-smoke` at repo root: **pass**; locally packs `enigma-memory-0.1.19.tgz`, installs it into a temporary npm prefix with `--ignore-scripts --omit=optional --offline`, verifies selected installed entrypoints, npm bin shims, installed MCP stdio, and 22 public package export specifiers, then removes the temp directory without publishing or using npm tokens.
+- `npm run release:audit` at repo root: **pass**; required gates include `npm-check`, `npm-test`, `npm-pack-dry-run`, `local-pack-install-smoke` with bin/export coverage, direct bin smoke, review packet, MCP stdio smoke, and production manifest validators.
 - `npm run public-beta-qa` at repo root: **hold**, `20 blocked / 1 pending / 0 missing`, required public beta version `0.1.19`.
 - Hosted PR checks must still pass after each pushed branch commit; local gates do not replace PR approval/merge or signing evidence.
 

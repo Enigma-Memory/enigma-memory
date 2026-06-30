@@ -8,7 +8,7 @@ This guide lists the two external signing paths required for a frictionless publ
 
 ## Windows — Azure Artifact Signing (formerly Trusted Signing)
 
-**Why:** Public Trust certificates from Azure prevent SmartScreen warnings and do not require buying a hardware token. Certificates are short-lived (3 days) but signatures remain valid.
+**Why:** Public Trust certificates from Azure give Windows a verifiable publisher identity and are expected to reduce install friction, but they do not by themselves prove that SmartScreen or other trust prompts will never appear. Record the observed prompt state for each signed beta artifact. Certificates are short-lived (3 days) but signatures remain valid.
 
 **Prerequisites:**
 - Paid Azure subscription (free/trial/sponsored subscriptions are not supported).
