@@ -21,6 +21,11 @@ const REQUIRED_SCENARIO_IDS = [
   'BETA-CONFIG-002',
   'BETA-DIAG-001',
   'BETA-CRASH-001',
+  'BETA-SIGNING-WINDOWS-001',
+  'BETA-SIGNING-MACOS-001',
+  'BETA-UPDATE-001',
+  'BETA-NPM-001',
+  'BETA-MERGE-001',
   'EV-P9-WINDOWS-SIGNING-OBSERVED',
   'EV-P9-MACOS-NOTARIZED-STAPLED',
   'EV-P9-UPDATE-ROLLBACK',
@@ -510,12 +515,14 @@ test('public beta next actions are ranked and public-safe', async () => {
   assert.equal(firstAction.collect_next.evidence_item_id, 'EV-P10-PRODUCTION-HANDOFF-PACKET');
   assert.equal(firstAction.collect_next.target_file, '.enigma/public-beta/production-handoff-packet.json');
   assert.match(firstAction.collect_next.collect, /release PR ref or URL/);
+  const packetAction = matrix.next_actions.find((action) => action.action_id === 'approve_public_safe_release_packet');
+  assert.match(packetAction.collect_next.collect, /approval ref/);
   assert.equal(matrix.next_actions.some((action) => action.action_id === 'record_support_dry_run'), true);
   const supportAction = matrix.next_actions.find((action) => action.action_id === 'record_support_dry_run');
   assert.equal(supportAction.missing_evidence_items[0].evidence_item_id, 'EV-P10-SUPPORT-DRY-RUN-SUMMARY');
 });
 
-test('public beta QA matrix can consume production handoff packet without clearing PR approval', () => {
+test('public beta QA matrix keeps public-safe packet blocker without explicit approval fields', () => {
   const scenarios = buildScenarioRows({
     productionHandoffPacket: {
       schema: 'enigma.production_handoff_packet.v1',
@@ -524,6 +531,32 @@ test('public beta QA matrix can consume production handoff packet without cleari
       blockers: [],
       operator_acceptance: { ok: true },
       release_audit: { ok: true },
+    },
+  });
+
+  const merge = scenarioById(scenarios, 'BETA-MERGE-001');
+  assert.equal(merge.status, 'blocked');
+  assert.equal(merge.blocker_refs.includes('BLOCKER-PR-APPROVAL-MERGE-REVIEWER-APPROVAL'), true);
+  assert.equal(merge.blocker_refs.includes('BLOCKER-PUBLIC-SAFE-RELEASE-PACKET'), true);
+  assert.equal(merge.issue_codes.includes('public-safe-release-packet-approval-missing'), true);
+});
+
+test('public beta QA matrix can consume approved production handoff packet without clearing PR approval', () => {
+  const scenarios = buildScenarioRows({
+    productionHandoffPacket: {
+      schema: 'enigma.production_handoff_packet.v1',
+      go_live_ready: true,
+      local_static_artifact_ready: true,
+      blockers: [],
+      operator_acceptance: { ok: true },
+      release_audit: { ok: true },
+      public_safe_release_packet_approval: {
+        status: 'approved',
+        release_packet_ref: 'ref:evidence:public-safe-release-packet',
+        claim_boundary_reviewer_ref: 'ref:review:claim-boundary',
+        approval_ref: 'ref:approval:public-beta-release',
+        approved_at: '2026-06-28',
+      },
     },
   });
 

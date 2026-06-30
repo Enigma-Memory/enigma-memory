@@ -139,7 +139,7 @@ const NEXT_ACTION_ORDER = Object.freeze([
       evidence_item_id: 'EV-P10-PUBLIC-SAFE-RELEASE-PACKET-APPROVAL',
       manifest_field: 'production_handoff_packet',
       target_file: '.enigma/public-beta/production-handoff-packet.json',
-      collect: 'release-packet ref, claim-boundary reviewer ref, approval status, and date',
+      collect: 'release-packet ref, claim-boundary reviewer ref, approval ref, approval status, and date',
     },
   },
   {
@@ -606,6 +606,20 @@ export async function inspectPublicBetaQaInputs(options = {}) {
   };
 }
 
+function isPublicEvidenceRef(value) {
+  return typeof value === 'string' && /^(ref:[A-Za-z0-9._:/#-]+|https:\/\/[^\s]+)$/u.test(value);
+}
+
+function publicSafeReleasePacketApprovalReady(packet) {
+  const approval = packet?.public_safe_release_packet_approval;
+  return approval?.status === 'approved'
+    && isPublicEvidenceRef(approval.release_packet_ref)
+    && isPublicEvidenceRef(approval.claim_boundary_reviewer_ref)
+    && isPublicEvidenceRef(approval.approval_ref)
+    && typeof approval.approved_at === 'string'
+    && /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z)?$/u.test(approval.approved_at);
+}
+
 export function buildScenarioRows(inputs) {
   const tauriTargets = inputs.tauriConfig?.bundle?.targets ?? [];
   const hasDesktopBundle = inputs.tauriConfig?.bundle?.active === true
@@ -713,7 +727,8 @@ export function buildScenarioRows(inputs) {
     && inputs.productionHandoffPacket.blockers.length === 0
     && inputs.productionHandoffPacket?.release_audit?.ok === true
     && inputs.productionHandoffPacket?.operator_acceptance?.ok === true
-    && inputs.productionHandoffPacket?.local_static_artifact_ready === true;
+    && inputs.productionHandoffPacket?.local_static_artifact_ready === true
+    && publicSafeReleasePacketApprovalReady(inputs.productionHandoffPacket);
   const productionHandoffRefs = productionHandoffPacketReady ? ['ref:evidence:production-handoff-packet'] : [];
   const releasePacketBlockers = productionHandoffPacketReady ? [releaseApproval] : [releaseApproval, publicSafePacket];
   const releasePacketIssues = productionHandoffPacketReady ? ['release-approval-evidence-missing', 'reviewer-approval-evidence-missing'] : ['release-approval-evidence-missing', 'reviewer-approval-evidence-missing', 'public-safe-release-packet-approval-missing'];
