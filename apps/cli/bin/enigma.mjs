@@ -1226,12 +1226,17 @@ function initNextCommands({ dryRun, bundleDisplay, outDirDisplay, exportDisplay,
   return commands;
 }
 
-function doctorNextCommands(bundleDisplay, client, setupState = 'setup_needed') {
+function doctorNeedsFreshBundlePath(checks) {
+  const reason = checks?.bundle_initialized?.reason;
+  return reason === 'bundle_json_invalid' || reason === 'bundle_schema_mismatch';
+}
+
+function doctorNextCommands(firstRunHint, bundleDisplay, client, setupState = 'setup_needed') {
   const clientId = client ?? DEFAULT_SETUP_CLIENTS[0];
-  const bundle = commandPath(bundleDisplay);
+  const bundle = commandPath(setupState === 'setup_needed' ? firstRunHint.bundle : bundleDisplay);
   if (setupState === 'setup_needed') {
     return [
-      `enigma quickstart --bundle ${bundle}`,
+      firstRunHint.command,
       `enigma doctor --bundle ${bundle} --client ${clientId}`,
       `enigma drive health --bundle ${bundle}`,
       `enigma status --bundle ${bundle}`,
@@ -1245,14 +1250,21 @@ function doctorNextCommands(bundleDisplay, client, setupState = 'setup_needed') 
   ];
 }
 
-function doctorFirstRunHint(_bundleDisplay, client) {
+function doctorFirstRunHint(_bundleDisplay, client, checks = null) {
   const clientId = client ?? DEFAULT_SETUP_CLIENTS[0];
-  const bundle = commandPath('<bundle-path>');
+  const freshBundlePath = doctorNeedsFreshBundlePath(checks);
+  const bundleLabel = freshBundlePath ? '<new-bundle-path>' : '<bundle-path>';
+  const bundle = commandPath(bundleLabel);
+  const outDir = commandPath('<new-empty-out-dir>');
+  const command = freshBundlePath
+    ? `enigma quickstart --bundle ${bundle} --out-dir ${outDir}`
+    : `enigma quickstart --bundle ${bundle}`;
   return {
-    bundle: '<bundle-path>',
-    command: `enigma quickstart --bundle ${bundle}`,
+    bundle: bundleLabel,
+    ...(freshBundlePath ? { out_dir: '<new-empty-out-dir>', recovery: 'fresh_bundle_non_destructive' } : {}),
+    command,
     commands: [
-      `enigma quickstart --bundle ${bundle}`,
+      command,
       `enigma doctor --bundle ${bundle} --client ${clientId}`,
       `enigma drive health --bundle ${bundle}`,
     ],
@@ -2735,9 +2747,13 @@ function doctorSetupExplanation(summary) {
   const connectorReasons = (Array.isArray(summary.connectors?.clients) ? summary.connectors.clients : [])
     .flatMap((client) => Array.isArray(client.repair_reasons) ? client.repair_reasons : []);
   for (const reason of connectorReasons) reasons.add(`connector_${reason}`);
+  if (reasons.has('bundle_json_invalid') || reasons.has('bundle_schema_mismatch')) {
+    return 'Why: the target Enigma bundle exists but is not a valid Memory Drive bundle. Create a fresh Memory Drive at a new path; use --overwrite only if you intentionally replace the existing local bundle.';
+  }
   if (reasons.has('connector_bundle_env_missing') || reasons.has('connector_bundle_env_mismatch')) {
     return 'Why: the Memory Drive is not ready and an AI app connection setting points at a missing or different bundle. Create this Memory Drive, then preview or repair the app connection.';
   }
+
   if (reasons.has('bundle_missing')) {
     return 'Why: the target Enigma bundle does not exist yet. Run quickstart for this bundle, then rerun doctor.';
   }
@@ -3371,7 +3387,7 @@ export async function doctorCommand(flags, io) {
   };
   const ok = Object.values(checks).every((check) => check.ok !== false);
   const doctorClient = String(selectedClient && selectedClient !== true ? selectedClient : 'generic-mcp');
-  const firstRunHint = doctorFirstRunHint(checks.vault_path.path, doctorClient);
+  const firstRunHint = doctorFirstRunHint(checks.vault_path.path, doctorClient, checks);
   const setupStatus = doctorSetupStatus(checks, firstRunHint);
   const summary = {
     ok,
@@ -3388,7 +3404,7 @@ export async function doctorCommand(flags, io) {
     setup_status: setupStatus,
     first_run_hint: firstRunHint,
     fresh_install_hint: firstRunHint,
-    next_commands: doctorNextCommands(checks.vault_path.path, doctorClient, setupStatus.state),
+    next_commands: doctorNextCommands(firstRunHint, checks.vault_path.path, doctorClient, setupStatus.state),
     checks,
   };
   printDoctorSummary(summary, flags, io);

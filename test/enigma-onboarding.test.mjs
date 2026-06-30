@@ -517,11 +517,31 @@ test('doctor explains invalid bundle recovery without destructive default', asyn
     assert.equal(summary.ok, false);
     assert.equal(summary.setup_status.state, 'setup_needed');
     assert.ok(summary.setup_status.reasons.includes('bundle_json_invalid'));
+    assert.equal(summary.setup_status.next_command, 'enigma quickstart --bundle "<new-bundle-path>" --out-dir "<new-empty-out-dir>"');
     assert.equal(summary.bundle_initialized.reason, 'bundle_json_invalid');
     assert.match(summary.bundle_initialized.hint, /enigma quickstart --bundle <new-bundle-path>/);
     assert.match(summary.bundle_initialized.hint, /--overwrite only if you intentionally replace/);
     assert.doesNotMatch(summary.bundle_initialized.hint, /setup with --overwrite|quickstart or setup with --overwrite/);
-    assert.equal(summary.next_commands[0], 'enigma quickstart --bundle "<bundle-path>"');
+    assert.equal(summary.first_run_hint.bundle, '<new-bundle-path>');
+    assert.equal(summary.first_run_hint.out_dir, '<new-empty-out-dir>');
+    assert.equal(summary.first_run_hint.recovery, 'fresh_bundle_non_destructive');
+    assert.equal(summary.first_run_hint.command, 'enigma quickstart --bundle "<new-bundle-path>" --out-dir "<new-empty-out-dir>"');
+    assert.deepEqual(summary.first_run_hint.commands, [
+      'enigma quickstart --bundle "<new-bundle-path>" --out-dir "<new-empty-out-dir>"',
+      'enigma doctor --bundle "<new-bundle-path>" --client generic-mcp',
+      'enigma drive health --bundle "<new-bundle-path>"',
+    ]);
+    assert.equal(summary.next_commands[0], 'enigma quickstart --bundle "<new-bundle-path>" --out-dir "<new-empty-out-dir>"');
+    assert.equal(summary.next_commands[1], 'enigma doctor --bundle "<new-bundle-path>" --client generic-mcp');
+    assert.equal(summary.next_commands[3], 'enigma status --bundle "<new-bundle-path>"');
+    assert.doesNotMatch(summary.next_commands.join('\n'), /--overwrite/);
+    const plainIo = makeIo();
+    assert.equal(await main(['doctor', '--bundle', bundlePath, '--plain'], plainIo.io), 1);
+    const plain = plainIo.stdout();
+    assert.match(plain, /not a valid Memory Drive bundle/);
+    assert.match(plain, /Run: enigma quickstart --bundle "<new-bundle-path>" --out-dir "<new-empty-out-dir>"/);
+    assert.match(plain, /Then: enigma doctor --bundle "<new-bundle-path>" --client generic-mcp/);
+    assert.equal(plain.includes(dir), false);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
