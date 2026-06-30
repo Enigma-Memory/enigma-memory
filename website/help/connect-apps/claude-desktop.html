@@ -25,7 +25,7 @@
     <section class="hero">
       <span class="eyebrow">Connect apps</span>
       <h1>Connect Claude Desktop to Enigma Memory.</h1>
-      <p>The Enigma desktop app detects Claude Desktop, previews the settings change, and applies it only after you approve it.</p>
+      <p>The Enigma desktop app prepares the Claude Desktop Extension (.mcpb). Claude installs it from Settings → Extensions; Enigma does not write Claude settings for this extension handoff.</p>
     </section>
 
     <section class="content-section" aria-labelledby="steps-heading">
@@ -33,30 +33,37 @@
       <ol>
         <li>Make sure Claude Desktop is installed and has been opened at least once.</li>
         <li>Open Enigma Memory and run the setup wizard, or open the Connections screen.</li>
-        <li>When Claude Desktop appears in the detected apps list, click <strong>Connect</strong>.</li>
-        <li>Review the preview of the settings change, then approve it.</li>
-        <li>Restart Claude Desktop if Enigma asks you to.</li>
+        <li>Choose Claude Desktop, then create the Claude Desktop Extension package.</li>
+        <li>Open Claude Desktop Settings → Extensions and drag the Enigma .mcpb package in, or choose Install/Browse and select it.</li>
+        <li>When Claude asks for configuration, choose your local Memory Drive file.</li>
+        <li>Restart Claude Desktop after approving the extension install.</li>
+        <li>Test the connection with the read-only Enigma tool <code>enigma_support_summary</code> or <code>enigma_next_action</code>.</li>
       </ol>
 
       <div class="boundary-callout">
-        <strong>Boundary note:</strong> Enigma connectors can only configure Claude Desktop to start Enigma's local helper. They cannot make Anthropic delete logs or force a model to forget.
+        <strong>Boundary note:</strong> Enigma's Claude extension starts Enigma's local helper from Claude Desktop. It does not write Claude settings in this extension flow, delete Anthropic logs, or force a model to forget.
       </div>
     </section>
 
     <section class="content-section" aria-labelledby="extension-heading">
       <h2 id="extension-heading">Claude Desktop Extension</h2>
-      <p>When the Enigma Desktop Extension (.mcpb) is available, it is the easiest Claude path. Enigma will offer it before falling back to advanced manual settings.</p>
+      <p>The .mcpb extension is the first supported Claude path. Use advanced manual settings only when support asks for a dry-run fallback.</p>
     </section>
 
     <section class="content-section" aria-labelledby="trouble-heading">
-      <h2 id="trouble-heading">If Claude Desktop is not detected</h2>
-      <p>Try these steps:</p>
+      <h2 id="trouble-heading">If Claude Desktop cannot see Enigma</h2>
+      <p>Try these no-write repair steps first:</p>
       <ul>
-        <li>Confirm Claude Desktop is installed and was opened at least once.</li>
-        <li>Click <strong>Refresh detection</strong> in Enigma.</li>
-        <li>Restart Claude Desktop, then refresh detection again.</li>
+        <li>Enable or reinstall Enigma Memory in Claude Desktop Settings → Extensions.</li>
+        <li>Reselect your local Memory Drive file if Claude asks for it again.</li>
+        <li>Fully quit and reopen Claude Desktop, then run <code>enigma_support_summary</code> or <code>enigma_next_action</code> again.</li>
       </ul>
-      <p>If it still is not detected, see <a href="../troubleshooting/client-not-detected.html">AI app not detected</a>.</p>
+      <p>Use <code>enigma connect claude-desktop --dry-run</code> only as an advanced fallback when support asks. If Claude Desktop itself is not detected, see <a href="../troubleshooting/client-not-detected.html">AI app not detected</a>.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="disconnect-heading">
+      <h2 id="disconnect-heading">Disconnect Claude Desktop</h2>
+      <p>Remove or disable Enigma Memory in Claude Desktop Settings → Extensions. This stops Claude from starting Enigma's local helper; it does not delete your Memory Drive.</p>
     </section>
 
     <section class="content-section">

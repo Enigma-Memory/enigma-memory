@@ -129,10 +129,11 @@ test('Claude Desktop mcpb plan keeps connector wizard preview-first', () => {
 });
 
 test('Claude connector docs prefer mcpb before config fallback', async () => {
-  const [connectorDocs, browserReadme, nativeHostReadme] = await Promise.all([
+  const [connectorDocs, browserReadme, nativeHostReadme, publicClaudeHelp] = await Promise.all([
     readFile(new URL('../docs/client-connectors.md', import.meta.url), 'utf8'),
     readFile(new URL('../apps/browser-extension/README.md', import.meta.url), 'utf8'),
     readFile(new URL('../apps/native-host/README.md', import.meta.url), 'utf8'),
+    readFile(new URL('../website/help/connect-apps/claude-desktop.html', import.meta.url), 'utf8'),
   ]);
 
   assert.match(connectorDocs, /For Claude Desktop, the first supported path is the `\.mcpb` extension package/);
@@ -144,6 +145,13 @@ test('Claude connector docs prefer mcpb before config fallback', async () => {
   assert.match(nativeHostReadme, /For Claude Desktop, prefer the Enigma `\.mcpb` extension package/);
   assert.match(nativeHostReadme, /Enigma does not write Claude settings for this extension handoff/);
   assert.doesNotMatch(nativeHostReadme, /enigma connect claude-desktop/);
+  assert.match(publicClaudeHelp, /Claude Desktop Extension \(\.mcpb\)/);
+  assert.match(publicClaudeHelp, /Settings → Extensions/);
+  assert.match(publicClaudeHelp, /Enigma does not write Claude settings for this extension handoff/);
+  assert.match(publicClaudeHelp, /enigma_support_summary/);
+  assert.match(publicClaudeHelp, /enigma_next_action/);
+  assert.match(publicClaudeHelp, /enigma connect claude-desktop --dry-run/);
+  assert.doesNotMatch(publicClaudeHelp, /previews the settings change|click <strong>Connect<\/strong>|approve it\./);
 });
 
 test('Claude Desktop mcpb health fails closed until test evidence exists', () => {

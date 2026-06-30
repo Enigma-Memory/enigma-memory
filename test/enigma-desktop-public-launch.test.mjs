@@ -684,6 +684,13 @@ test('public website explains consumer install path without unsupported claims',
   assert.match(clientNotDetected, /If an installed app is missing/);
   assert.match(connectApps, /local helper/);
   assert.match(claudeConnect, /advanced manual settings/);
+  assert.match(claudeConnect, /Claude Desktop Extension \(\.mcpb\)/);
+  assert.match(claudeConnect, /Settings → Extensions/);
+  assert.match(claudeConnect, /Enigma does not write Claude settings for this extension handoff/);
+  assert.match(claudeConnect, /enigma_support_summary/);
+  assert.match(claudeConnect, /enigma_next_action/);
+  assert.match(claudeConnect, /Disconnect Claude Desktop/);
+  assert.doesNotMatch(claudeConnect, /previews the settings change|click <strong>Connect<\/strong>|Review the preview of the settings change/);
   assert.match(cursorConnect, /connection change in plain language/);
   assert.match(otherClients, /advanced compatible apps/);
   assert.match(troubleshooting, /settings area/);
