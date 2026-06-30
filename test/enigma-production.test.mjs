@@ -1562,6 +1562,7 @@ test('preflight release audit wiring is local-only and documented', async () => 
   assert.equal(pkg.scripts?.['public-beta-qa'], `node ${PUBLIC_BETA_QA_MATRIX_SCRIPT} --json`);
   assert.equal(packageFilesCover(pkg, PUBLIC_BETA_QA_MATRIX_SCRIPT), true, 'public beta QA matrix script must be included in the package file list');
   assert.equal(pkg.scripts?.['clean-machine-smoke'], `node ${CLEAN_MACHINE_SMOKE_SCRIPT} --json`);
+  assert.equal(pkg.scripts?.['production:clean-machine-smoke'], `node ${CLEAN_MACHINE_SMOKE_SCRIPT}`);
   assert.equal(packageFilesCover(pkg, CLEAN_MACHINE_SMOKE_SCRIPT), true, 'clean-machine smoke script must be included in the package file list');
   assert.equal(pkg.scripts?.['production:support-dry-run'], `node ${SUPPORT_DRY_RUN_SCRIPT}`);
   assert.equal(packageFilesCover(pkg, SUPPORT_DRY_RUN_SCRIPT), true, 'support dry-run script must be included in the package file list');

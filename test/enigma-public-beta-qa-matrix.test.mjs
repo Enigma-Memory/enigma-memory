@@ -234,6 +234,9 @@ test('public beta advisor collect-next paths follow relative evidence manifest t
     assert.equal(matrix.next_actions.find((action) => action.action_id === 'complete_signing_identities').collect_next.target_file, `${dir}/desktop-release-evidence.json`);
     assert.equal(matrix.next_actions.find((action) => action.action_id === 'record_support_dry_run').collect_next.target_file, `${dir}/support-dry-run-diagnostics.json`);
     assert.equal(matrix.consumer_next_action.collect_next.target_file, `${dir}/clean-machine-smoke.json`);
+    assert.deepEqual(matrix.consumer_next_action.collect_next.collect_commands, [
+      `npm run production:clean-machine-smoke -- --plain --out ${dir}/clean-machine-smoke.json`,
+    ]);
     assert.deepEqual(matrix.next_actions.find((action) => action.action_id === 'record_support_dry_run').collect_next.target_files, [`${dir}/support-dry-run-diagnostics.json`, `${dir}/support-dry-run-crash.json`]);
     assert.deepEqual(matrix.next_actions.find((action) => action.action_id === 'record_support_dry_run').collect_next.collect_commands, [
       `npm run production:support-dry-run -- --preset diagnostics --triage-result <observed-result> --bundle-privacy-check-status <observed-status> --out ${dir}/support-dry-run-diagnostics.json`,
@@ -244,6 +247,7 @@ test('public beta advisor collect-next paths follow relative evidence manifest t
     assert.match(plain, new RegExp(`Collect: npm run public-beta:evidence-manifest -- --out ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/evidence-manifest\\.json --plain`));
     assert.match(plain, new RegExp(`Collect internal: run_clean_machine_qa .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/clean-machine-smoke\\.json`));
     assert.match(plain, new RegExp(`Collect consumer: run_clean_machine_qa .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/clean-machine-smoke\\.json`));
+    assert.ok(plain.includes(`Run: npm run production:clean-machine-smoke -- --plain --out ${dir}/clean-machine-smoke.json`));
     assert.match(plain, new RegExp(`Collect internal: record_support_dry_run .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/support-dry-run-diagnostics\\.json`));
     assert.match(plain, new RegExp(`Collect internal: record_support_dry_run .* into ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/support-dry-run-crash\\.json`));
     assert.ok(plain.includes(`Run: npm run production:support-dry-run -- --preset diagnostics --triage-result <observed-result> --bundle-privacy-check-status <observed-status> --out ${dir}/support-dry-run-diagnostics.json`));

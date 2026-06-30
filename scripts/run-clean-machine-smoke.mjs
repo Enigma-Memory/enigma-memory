@@ -244,7 +244,7 @@ export function buildCleanMachineSmokePlan(now = new Date()) {
   const plan = {
     schema: CLEAN_MACHINE_SMOKE_PLAN_SCHEMA,
     generated_at: now.toISOString(),
-    command: 'node scripts/run-clean-machine-smoke.mjs --plain --out .enigma/public-beta/clean-machine-smoke.json',
+    command: 'npm run production:clean-machine-smoke -- --plain --out .enigma/public-beta/clean-machine-smoke.json',
     steps: [
       {
         step_id: 'install_desktop_app',

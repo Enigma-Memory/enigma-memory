@@ -255,6 +255,7 @@
     "production:whitepaper": "node scripts/validate-whitepaper-claims.mjs",
     "production:sla": "node scripts/validate-support-sla.mjs",
     "production:support-dry-run": "node scripts/build-support-dry-run-summary.mjs",
+    "production:clean-machine-smoke": "node scripts/run-clean-machine-smoke.mjs",
     "public-beta:evidence-manifest": "node scripts/build-public-beta-evidence-manifest.mjs",
     "public-beta:evidence-templates": "node scripts/build-public-beta-evidence-templates.mjs",
     "package:install-smoke": "node scripts/verify-local-pack-install.mjs",

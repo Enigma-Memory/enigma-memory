@@ -266,6 +266,11 @@ function supportDryRunCollectCommand(targetFile) {
     ? `npm run production:support-dry-run -- --preset ${preset} --triage-result <observed-result> --bundle-privacy-check-status <observed-status> --out ${safeTarget}`
     : null;
 }
+function cleanMachineCollectCommand(targetFile) {
+  const safeTarget = publicRelativeEvidenceTarget(targetFile);
+  return safeTarget ? `npm run production:clean-machine-smoke -- --plain --out ${safeTarget}` : null;
+}
+
 function appendSupportDryRunCommandGuidance(lines) {
   lines.push(`Allowed observed-result: ${SUPPORT_DRY_RUN_COLLECTION_GUIDANCE.triage_result_values.join(', ')}`);
   lines.push(`Allowed observed-status: ${SUPPORT_DRY_RUN_COLLECTION_GUIDANCE.bundle_privacy_check_status_values.join(', ')}`);
@@ -273,8 +278,9 @@ function appendSupportDryRunCommandGuidance(lines) {
 
 
 function collectCommandsForTargets(collectNext, targetFiles) {
-  if (collectNext?.manifest_field !== 'support_dry_run') return [];
-  return targetFiles.map((targetFile) => supportDryRunCollectCommand(targetFile));
+  if (collectNext?.manifest_field === 'support_dry_run') return targetFiles.map((targetFile) => supportDryRunCollectCommand(targetFile));
+  if (collectNext?.manifest_field === 'clean_machine_smoke') return targetFiles.map((targetFile) => cleanMachineCollectCommand(targetFile));
+  return [];
 }
 
 

@@ -114,7 +114,7 @@ test('clean-machine smoke dry-run plan is public-safe and non-inspecting', () =>
   assert.equal(plan.safety.system_inspection_performed, false);
   assert.equal(plan.safety.network_performed, false);
   assert.equal(plan.safety.release_action_performed, false);
-  assert.match(plan.command, /run-clean-machine-smoke\.mjs --plain --out \.enigma\/public-beta\/clean-machine-smoke\.json/);
+  assert.match(plan.command, /npm run production:clean-machine-smoke -- --plain --out \.enigma\/public-beta\/clean-machine-smoke\.json/);
   assert.deepEqual(plan.steps.map((step) => step.step_id), [
     'install_desktop_app',
     'first_run_default_setup',
