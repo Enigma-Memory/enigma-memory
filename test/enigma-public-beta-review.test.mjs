@@ -148,6 +148,40 @@ test('public beta review preserves existing support dry-run evidence files', asy
   }
 });
 
+test('public beta review refreshes stale generated support placeholders only', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-public-beta-review-refresh-'));
+  try {
+    const diagnosticPath = join(dir, 'support-dry-run-diagnostics.json');
+    const staleGeneratedPlaceholder = {
+      schema: 'enigma.support_dry_run_summary.v1',
+      evidence_item_id: 'EV-P10-SUPPORT-DRY-RUN-SUMMARY',
+      generated_at: '2026-06-28T12:00:00.000Z',
+      scenario_id: 'BETA-DIAG-001',
+      issue_code: 'DIAG-BUNDLE-PREVIEWED',
+      triage_result: 'blocked',
+      bundle_privacy_check_status: 'blocked',
+      support_owner_ref: 'ref:role:beta-support',
+      privacy_review: { status: 'hold' },
+    };
+    await writeFile(diagnosticPath, `${JSON.stringify(staleGeneratedPlaceholder, null, 2)}\n`, 'utf8');
+
+    const result = await runPublicBetaReview({ outDir: dir });
+    const refreshed = JSON.parse(await readFile(diagnosticPath, 'utf8'));
+    const plain = renderPublicBetaReviewPlain(result);
+
+    assert.equal(result.generated_evidence_files, 1);
+    assert.equal(result.refreshed_evidence_files, 1);
+    assert.equal(result.preserved_evidence_files, 0);
+    assert.equal(refreshed.privacy_scan.schema, 'enigma.support_privacy_scan.v1');
+    assert.equal(refreshed.privacy_scan.status, 'hold');
+    assert.equal(refreshed.privacy_scan.detected_private_field_count, 0);
+    assert.match(plain, /Refreshed stale generated support placeholders: 1/);
+    assert.equal(plain.includes(dir), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('public beta review uses only existing evidence files from manifest', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'enigma-public-beta-review-'));
   try {

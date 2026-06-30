@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { access, mkdir, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -76,6 +76,27 @@ async function exists(path) {
   }
 }
 
+async function readJsonOrNull(path) {
+  try {
+    return JSON.parse(await readFile(resolve(path), 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function isRefreshableGeneratedSupportPlaceholder(existing, spec) {
+  return existing?.schema === 'enigma.support_dry_run_summary.v1'
+    && existing?.evidence_item_id === 'EV-P10-SUPPORT-DRY-RUN-SUMMARY'
+    && existing?.scenario_id === spec.scenario_id
+    && existing?.issue_code === spec.issue_code
+    && existing?.triage_result === 'blocked'
+    && existing?.bundle_privacy_check_status === 'blocked'
+    && existing?.support_owner_ref === spec.support_owner_ref
+    && existing?.support_artifact === undefined
+    && existing?.support_artifact_snapshot === undefined
+    && existing?.privacy_scan?.schema !== 'enigma.support_privacy_scan.v1';
+}
+
 function isRepositoryRelativePath(value) {
   const normalized = String(value ?? '').replace(/\\/g, '/');
   return normalized.length > 0
@@ -101,7 +122,7 @@ function generatedSupportDryRunPaths(outDir) {
 }
 
 async function writeGeneratedSupportDryRunSummaries(paths) {
-  const counts = { written: 0, preserved: 0 };
+  const counts = { written: 0, preserved: 0, refreshed: 0 };
   for (let index = 0; index < GENERATED_SUPPORT_DRY_RUNS.length; index += 1) {
     const spec = GENERATED_SUPPORT_DRY_RUNS[index];
     const out = paths[index];
@@ -112,6 +133,12 @@ async function writeGeneratedSupportDryRunSummaries(paths) {
       counts.written += 1;
     } catch (error) {
       if (error?.code !== 'EEXIST') throw error;
+      const existing = await readJsonOrNull(out);
+      if (isRefreshableGeneratedSupportPlaceholder(existing, spec)) {
+        await writeFile(resolve(out), `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
+        counts.refreshed += 1;
+        continue;
+      }
       counts.preserved += 1;
     }
   }
@@ -140,6 +167,7 @@ export function renderPublicBetaReviewPlain(result) {
     `QA matrix: written to ${result.paths.matrix}`,
     `Evidence files used: ${result.evidence_files_used}`,
     `Generated support dry-runs: ${result.generated_evidence_files ?? 0}`,
+    ...(result.refreshed_evidence_files ? [`Refreshed stale generated support placeholders: ${result.refreshed_evidence_files}`] : []),
     ...(result.preserved_evidence_files ? [`Preserved existing support evidence files: ${result.preserved_evidence_files}`] : []),
     `Generated clean-machine plan: ${result.generated_plan_files ?? 0}`,
     `Templates: ${result.template_command ?? 'npm run public-beta:evidence-templates -- --out-dir .enigma/public-beta --plain'}`,
@@ -201,6 +229,7 @@ export async function runPublicBetaReview(options = {}) {
     evidence_files_used: evidenceFilesUsed,
     generated_evidence_files: supportDryRunWrites.written,
     preserved_evidence_files: supportDryRunWrites.preserved,
+    refreshed_evidence_files: supportDryRunWrites.refreshed,
     generated_plan_files: 1,
     generated_evidence_items: ['EV-P10-SUPPORT-DRY-RUN-SUMMARY'],
     template_command: `npm run public-beta:evidence-templates -- --out-dir ${repositoryRelativeOutDir ? normalizedOutDir : DEFAULT_OUT_DIR} --plain`,
