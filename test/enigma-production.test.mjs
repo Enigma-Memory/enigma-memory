@@ -2052,21 +2052,27 @@ test('doctor returns ok and install creates bundle and MCP config', async () => 
 });
 
 test('doctor fails closed when a required package bin is missing', async () => {
-  const original = await readFile(PACKAGE_JSON_URL, 'utf8');
-  try {
-    const broken = JSON.parse(original);
+  await withTempDir('enigma-production-missing-bin-', async (dir) => {
+    const original = JSON.parse(await readFile(PACKAGE_JSON_URL, 'utf8'));
+    const broken = { ...original, bin: { ...original.bin } };
     delete broken.bin['enigma-relay'];
-    await writeFile(PACKAGE_JSON_URL, `${JSON.stringify(broken, null, 2)}\n`, 'utf8');
+    const packagePath = join(dir, 'package.json');
+    await writeFile(packagePath, `${JSON.stringify(broken, null, 2)}\n`, 'utf8');
 
-    const { main } = await import('../apps/cli/bin/enigma.mjs');
-    const doctor = makeIo();
-    assert.equal(await main(['doctor'], doctor.io), 1, doctor.stderr());
-    const result = doctor.json();
-    assert.equal(result.ok, false);
-    assert.deepEqual(result.package_bins.missing, ['enigma-relay']);
-  } finally {
-    await writeFile(PACKAGE_JSON_URL, original, 'utf8');
-  }
+    const previousPackageJsonPath = process.env.ENIGMA_PACKAGE_JSON_PATH;
+    process.env.ENIGMA_PACKAGE_JSON_PATH = packagePath;
+    try {
+      const { main } = await import(`${CLI_BIN_URL.href}?missingBin=${Date.now()}`);
+      const doctor = makeIo();
+      assert.equal(await main(['doctor'], doctor.io), 1, doctor.stderr());
+      const result = doctor.json();
+      assert.equal(result.ok, false);
+      assert.deepEqual(result.package_bins.missing, ['enigma-relay']);
+    } finally {
+      if (previousPackageJsonPath === undefined) delete process.env.ENIGMA_PACKAGE_JSON_PATH;
+      else process.env.ENIGMA_PACKAGE_JSON_PATH = previousPackageJsonPath;
+    }
+  });
 });
 
 test('package check catches missing bins, unsafe bins, and packaged review docs', async () => {

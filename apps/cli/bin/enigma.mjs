@@ -629,7 +629,8 @@ function demoBundleRef(bundleWasSupplied) {
 }
 
 async function readPackageJson() {
-  return readJson(PACKAGE_JSON_URL);
+  const overridePath = process.env.ENIGMA_PACKAGE_JSON_PATH;
+  return readJson(overridePath ? resolve(String(overridePath)) : PACKAGE_JSON_URL);
 }
 
 function packageFileUrl(path) {
