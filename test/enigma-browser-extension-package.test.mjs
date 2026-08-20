@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import {
   BROWSER_EXTENSION_PACKAGE_SCHEMA,
   buildBrowserExtensionPackage,
+  renderBrowserExtensionPackagePlain,
   runPackageBrowserExtension,
   validateBrowserExtensionPackage,
 } from '../scripts/package-browser-extension.mjs';
@@ -111,6 +112,14 @@ test('browser extension package output and zip checksum are deterministic', asyn
   assert.equal(packageA.package.zip_path, '<zip-output>');
   assert.equal(packageA.package.zip_sha256, packageB.package.zip_sha256);
   assert.deepEqual(await readFile(zipA), await readFile(zipB));
+
+  const plainResult = await runPackageBrowserExtension(['--extension-dir', dir, '--zip', join(outDir, 'plain.zip'), '--plain']);
+  const plain = renderBrowserExtensionPackagePlain(plainResult);
+  assert.match(plain, /^Enigma browser extension package\n/);
+  assert.match(plain, /Status: Ready/);
+  assert.match(plain, /ZIP: written/);
+  assert.match(plain, /Boundary: local package validation only/);
+  assert.doesNotMatch(plain, new RegExp(dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.deepEqual(packageA.package.deterministic_order, [
     'manifest.json',
     'src/background.js',
@@ -119,7 +128,7 @@ test('browser extension package output and zip checksum are deterministic', asyn
   ]);
 });
 
-test('browser and native-host docs show one-command MCP setup before manual JSON fallback', async () => {
+test('browser and native-host docs show dry-run MCP setup before manual JSON fallback', async () => {
   const docs = await Promise.all([
     readFile(new URL('../apps/browser-extension/README.md', import.meta.url), 'utf8'),
     readFile(new URL('../apps/native-host/README.md', import.meta.url), 'utf8'),
@@ -128,11 +137,16 @@ test('browser and native-host docs show one-command MCP setup before manual JSON
   ]);
   const mcpContract = await readFile(new URL('../packages/mcp-server/PACKAGE_CONTRACT.md', import.meta.url), 'utf8');
   for (const doc of docs) {
-    assert.match(doc, /npm install -g enigma-memory && enigma setup --client claude-desktop --write-connectors --overwrite/);
-    assert.match(doc, /npm install -g enigma-memory && enigma setup --client cursor --write-connectors --overwrite/);
-    assert.match(doc, /npm install -g enigma-memory && enigma setup --client kimi-code --write-connectors --overwrite/);
-    assert.match(doc, /npm install -g enigma-memory && enigma setup --client vscode-cline --write-connectors --overwrite/);
-    assert.match(doc, /npm install -g enigma-memory && enigma setup --client auto --connect-installed --overwrite/);
+    assert.match(doc, /npm install -g enigma-memory/);
+    assert.match(doc, /enigma quickstart --bundle \.\/\.enigma\/bundle\.json/);
+    assert.match(doc, /enigma claude-mcpb package --mcpb \.\/\.enigma\/claude\/enigma-memory\.mcpb/);
+    assert.match(doc, /enigma connect cursor --bundle \.\/\.enigma\/bundle\.json --dry-run/);
+    assert.match(doc, /enigma connect kimi-code --bundle \.\/\.enigma\/bundle\.json --dry-run/);
+    assert.match(doc, /enigma connect vscode-cline --bundle \.\/\.enigma\/bundle\.json --dry-run/);
+    assert.doesNotMatch(doc, /enigma connect claude-desktop/);
+    assert.doesNotMatch(doc, /setup --client .*--overwrite/);
+    assert.doesNotMatch(doc, /connect-installed --overwrite/);
   }
-  assert.match(mcpContract, /npm install -g enigma-memory && enigma setup --client <id> --write-connectors --overwrite/);
+  assert.match(mcpContract, /enigma connect <id> --bundle \.\/\.enigma\/bundle\.json --dry-run/);
+  assert.doesNotMatch(mcpContract, /setup --client <id> --write-connectors --overwrite/);
 });

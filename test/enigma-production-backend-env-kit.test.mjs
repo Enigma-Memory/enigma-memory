@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { buildProductionBackendEnvKit, PRODUCTION_BACKEND_ENV_KIT_SCHEMA, HOSTED_BACKEND_REF_MAP_SCHEMA } from '../scripts/build-production-backend-env-kit.mjs';
+import { buildProductionBackendEnvKit, PRODUCTION_BACKEND_ENV_KIT_SCHEMA, HOSTED_BACKEND_REF_MAP_SCHEMA, renderProductionBackendEnvKitPlain } from '../scripts/build-production-backend-env-kit.mjs';
 import { createRelayState, handleRelayRequest } from '../apps/relay/src/server.mjs';
 import { createGatewayState, handleGatewayRequest } from '../apps/gateway/src/server.mjs';
 
@@ -170,6 +170,43 @@ test('production backend env kit writes blocked public-safe templates', async ()
     const allGeneratedText = [run.stdout, relay, gateway, JSON.stringify(refMap), JSON.stringify(placeholderManifest), summaryText].join('\n');
     assert.doesNotMatch(summaryText, /token|account|personal|secret/iu);
     assertNoCredentialMaterial(allGeneratedText, outDir);
+  } finally {
+    await rm(outDir, { recursive: true, force: true });
+  }
+});
+
+test('production backend env kit plain output is readable and claim-bounded', async () => {
+  const outDir = await mkdtemp(join(tmpdir(), 'enigma-backend-env-kit-plain-'));
+  try {
+    const run = spawnSync(process.execPath, [
+      SCRIPT,
+      '--out-dir', outDir,
+      '--domain', 'example.invalid',
+      '--tenant', 'tenant-alpha',
+      '--environment', 'production',
+      '--plain',
+    ], {
+      cwd: PROJECT_ROOT,
+      encoding: 'utf8',
+      windowsHide: true,
+    });
+
+    assert.equal(run.status, 0, run.stderr);
+    assert.equal(run.stderr, '');
+    assert.match(run.stdout, /^Enigma production backend env kit\n/);
+    assert.match(run.stdout, /Status: Needs attention/);
+    assert.match(run.stdout, /Launch ready: no/);
+    assert.match(run.stdout, /Output written: yes/);
+    assert.match(run.stdout, /File role: relay operator-env template/);
+    assert.match(run.stdout, /Boundary: public-safe backend env template kit only/);
+    assert.doesNotMatch(run.stdout, /^\s*\{/);
+    assertNoCredentialMaterial(run.stdout, outDir);
+
+    const summary = JSON.parse(await readGenerated(outDir, 'PRODUCTION_BACKEND_ENV_KIT_SUMMARY.json'));
+    const rendered = renderProductionBackendEnvKitPlain(summary);
+    assert.match(rendered, /^Enigma production backend env kit\n/);
+    assert.match(rendered, /Output written: no/);
+    assert.doesNotMatch(rendered, /^\s*\{/);
   } finally {
     await rm(outDir, { recursive: true, force: true });
   }

@@ -13,7 +13,7 @@ import {
 } from '../packages/hosted-cloud/src/index.js';
 
 export const HOSTED_API_KEY_LIFECYCLE_PACKET_SCHEMA = HOSTED_CLOUD_API_KEY_LIFECYCLE_PACKET_SCHEMA;
-export const HOSTED_API_KEY_LIFECYCLE_RELEASE_TARGET = '0.1.18';
+export const HOSTED_API_KEY_LIFECYCLE_RELEASE_TARGET = '0.1.19';
 
 const PROVIDED = 'provided';
 const BLOCKED = 'blocked_external_dependency';

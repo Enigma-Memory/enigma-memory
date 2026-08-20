@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.enigma.ai/lifecycle-receipt-log-v1.schema.json",
+  "title": "Enigma Lifecycle Receipt Log v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "log_id",
+    "log_ref",
+    "subject_ref",
+    "tenant_ref",
+    "epoch",
+    "previous_log_root",
+    "receipt_refs",
+    "active_root",
+    "quarantine_root",
+    "tombstone_root",
+    "receipt_log_root",
+    "issued_at",
+    "signer_ref",
+    "signature_ref"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "enigma.lifecycle_receipt_log.v1" },
+    "log_id": { "$ref": "#/$defs/publicId" },
+    "log_ref": { "$ref": "#/$defs/publicRef" },
+    "subject_ref": { "$ref": "#/$defs/publicRef" },
+    "tenant_ref": { "$ref": "#/$defs/publicRef" },
+    "epoch": { "type": "integer", "minimum": 0 },
+    "previous_log_root": { "$ref": "#/$defs/sha256Digest" },
+    "receipt_refs": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/orderedReceiptRef" }
+    },
+    "active_root": { "$ref": "#/$defs/sha256Digest" },
+    "quarantine_root": { "$ref": "#/$defs/sha256Digest" },
+    "tombstone_root": { "$ref": "#/$defs/sha256Digest" },
+    "receipt_log_root": { "$ref": "#/$defs/sha256Digest" },
+    "issued_at": { "type": "string", "format": "date-time" },
+    "signer_ref": { "$ref": "#/$defs/publicRef" },
+    "signature_ref": { "$ref": "#/$defs/publicRef" }
+  },
+  "$defs": {
+    "sha256Digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "genesisOrSha256Digest": { "type": "string", "pattern": "^(sha256:[a-f0-9]{64}|GENESIS)$" },
+    "publicId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$" },
+    "publicRef": { "type": "string", "pattern": "^(?![A-Za-z]:$)[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "orderedReceiptRef": {
+      "type": "object",
+      "required": ["sequence", "receipt_ref", "receipt_hash", "previous_receipt_hash", "lifecycle_state"],
+      "additionalProperties": false,
+      "properties": {
+        "sequence": { "type": "integer", "minimum": 0 },
+        "receipt_ref": { "$ref": "#/$defs/publicRef" },
+        "receipt_hash": { "$ref": "#/$defs/sha256Digest" },
+        "previous_receipt_hash": { "$ref": "#/$defs/genesisOrSha256Digest" },
+        "lifecycle_state": {
+          "type": "string",
+          "enum": ["active", "quarantine", "tombstone"]
+        }
+      }
+    }
+  }
+}

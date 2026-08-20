@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.enigma.ai/evidence-packet-v1.schema.json",
+  "title": "Enigma Evidence Packet v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "packet_id",
+    "generated_at",
+    "packet_root",
+    "issuer_ref",
+    "subject_refs",
+    "claim_ids",
+    "evidence_refs",
+    "artifact_refs",
+    "trust_card_refs",
+    "posture_summaries",
+    "roots",
+    "signatures",
+    "boundary"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "enigma.evidence_packet.v1" },
+    "packet_id": { "$ref": "#/$defs/publicId" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "packet_root": { "$ref": "#/$defs/sha256Digest" },
+    "issuer_ref": { "$ref": "#/$defs/publicRef" },
+    "subject_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/publicRef" },
+      "uniqueItems": true
+    },
+    "claim_ids": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/claimId" },
+      "uniqueItems": true
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/publicRef" },
+      "uniqueItems": true
+    },
+    "artifact_refs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/artifactRef" }
+    },
+    "trust_card_refs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/publicRef" },
+      "uniqueItems": true
+    },
+    "posture_summaries": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/postureSummary" }
+    },
+    "roots": { "$ref": "#/$defs/evidenceRoots" },
+    "signatures": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/signatureRef" }
+    },
+    "boundary": { "$ref": "#/$defs/evidenceBoundary" }
+  },
+  "$defs": {
+    "sha256Digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "publicId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._:-]{7,127}$" },
+    "publicRef": { "type": "string", "pattern": "^ref:[A-Za-z0-9][A-Za-z0-9._~:@#?=&%+-]{0,255}$" },
+    "claimId": { "type": "string", "pattern": "^claim:[a-z0-9][a-z0-9._:-]{2,127}$" },
+    "schemaId": { "type": "string", "pattern": "^enigma\\.[a-z0-9_]+\\.v1$" },
+    "signerRef": { "type": "string", "pattern": "^signer:[A-Za-z0-9][A-Za-z0-9._~:@#?=&%+-]{0,191}$" },
+    "signaturePublicRef": { "type": "string", "pattern": "^sigref:[A-Za-z0-9][A-Za-z0-9._~:@#?=&%+-]{0,191}$" },
+    "postureSummary": {
+      "type": "object",
+      "required": ["subject_type", "subject_ref", "posture", "claim_ids", "evidence_refs", "boundary"],
+      "additionalProperties": false,
+      "properties": {
+        "subject_type": { "type": "string", "enum": ["connector", "package"] },
+        "subject_ref": { "$ref": "#/$defs/publicRef" },
+        "posture": { "type": "string", "enum": ["unknown", "reviewed", "trusted", "quarantined", "blocked"] },
+        "claim_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/claimId" },
+          "uniqueItems": true
+        },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/publicRef" },
+          "uniqueItems": true
+        },
+        "boundary": { "$ref": "#/$defs/evidenceBoundary" }
+      }
+    },
+    "artifactRef": {
+      "type": "object",
+      "required": ["schema_id", "artifact_ref", "artifact_hash", "root", "claim_ids"],
+      "additionalProperties": false,
+      "properties": {
+        "schema_id": { "$ref": "#/$defs/schemaId" },
+        "artifact_ref": { "$ref": "#/$defs/publicRef" },
+        "artifact_hash": { "$ref": "#/$defs/sha256Digest" },
+        "root": { "$ref": "#/$defs/sha256Digest" },
+        "claim_ids": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/claimId" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "evidenceRoots": {
+      "type": "object",
+      "required": ["claim_root", "evidence_ref_root", "artifact_root", "receipt_chain_root"],
+      "additionalProperties": false,
+      "properties": {
+        "claim_root": { "$ref": "#/$defs/sha256Digest" },
+        "evidence_ref_root": { "$ref": "#/$defs/sha256Digest" },
+        "artifact_root": { "$ref": "#/$defs/sha256Digest" },
+        "receipt_chain_root": { "$ref": "#/$defs/sha256Digest" }
+      }
+    },
+    "signatureRef": {
+      "type": "object",
+      "required": ["signer_ref", "signature_ref", "signature_hash", "alg"],
+      "additionalProperties": false,
+      "properties": {
+        "signer_ref": { "$ref": "#/$defs/signerRef" },
+        "signature_ref": { "$ref": "#/$defs/signaturePublicRef" },
+        "signature_hash": { "$ref": "#/$defs/sha256Digest" },
+        "alg": { "type": "string", "enum": ["Ed25519", "ECDSA-P256-SHA256"] }
+      }
+    },
+    "evidenceBoundary": {
+      "type": "object",
+      "required": [
+        "public_payload_only",
+        "raw_evidence_included",
+        "raw_memory_included",
+        "raw_prompt_included",
+        "raw_transcript_included",
+        "raw_embedding_included",
+        "provider_response_included",
+        "private_key_included",
+        "token_included",
+        "credential_included",
+        "local_path_included",
+        "provider_deletion_claim",
+        "model_forgetting_claim",
+        "hosted_saas_ready_claim",
+        "compliance_certification_claim",
+        "benchmark_superiority_claim"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "public_payload_only": { "const": true },
+        "raw_evidence_included": { "const": false },
+        "raw_memory_included": { "const": false },
+        "raw_prompt_included": { "const": false },
+        "raw_transcript_included": { "const": false },
+        "raw_embedding_included": { "const": false },
+        "provider_response_included": { "const": false },
+        "private_key_included": { "const": false },
+        "token_included": { "const": false },
+        "credential_included": { "const": false },
+        "local_path_included": { "const": false },
+        "provider_deletion_claim": { "const": false },
+        "model_forgetting_claim": { "const": false },
+        "hosted_saas_ready_claim": { "const": false },
+        "compliance_certification_claim": { "const": false },
+        "benchmark_superiority_claim": { "const": false }
+      }
+    }
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.enigma.ai/antigen-envelope-v1.schema.json",
+  "title": "Enigma Antigen Envelope v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "envelope_id",
+    "created_at",
+    "content_commitment",
+    "source_refs",
+    "detector_refs",
+    "risk_labels",
+    "commitment_roots",
+    "public_payload_only",
+    "payload_included"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "enigma.antigen_envelope.v1" },
+    "envelope_id": { "$ref": "#/$defs/publicId" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "content_commitment": {
+      "type": "object",
+      "required": ["hash", "byte_count", "canonicalization"],
+      "additionalProperties": false,
+      "properties": {
+        "hash": { "$ref": "#/$defs/sha256Digest" },
+        "byte_count": { "type": "integer", "minimum": 0 },
+        "canonicalization": { "type": "string", "enum": ["json-c14n-sha256", "bytes-sha256", "utf8-nfc-sha256"] }
+      }
+    },
+    "source_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/publicRef" },
+      "uniqueItems": true
+    },
+    "detector_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/publicRef" },
+      "uniqueItems": true
+    },
+    "risk_labels": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/riskLabel" },
+      "uniqueItems": true
+    },
+    "commitment_roots": {
+      "type": "object",
+      "required": ["antigen_root", "source_root", "detector_root"],
+      "additionalProperties": false,
+      "properties": {
+        "antigen_root": { "$ref": "#/$defs/sha256Digest" },
+        "source_root": { "$ref": "#/$defs/sha256Digest" },
+        "detector_root": { "$ref": "#/$defs/sha256Digest" }
+      }
+    },
+    "public_payload_only": { "const": true },
+    "payload_included": { "const": false }
+  },
+  "$defs": {
+    "sha256Digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "publicId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._:-]{7,127}$" },
+    "publicRef": { "type": "string", "pattern": "^ref:[A-Za-z0-9][A-Za-z0-9._~:@#?=&%+-]{0,255}$" },
+    "riskLabel": {
+      "type": "string",
+      "enum": [
+        "benign",
+        "untrusted_origin",
+        "prompt_injection",
+        "data_exfiltration",
+        "secret_material",
+        "memory_poisoning",
+        "policy_violation",
+        "unknown"
+      ]
+    }
+  }
+}

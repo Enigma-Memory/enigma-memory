@@ -15,7 +15,7 @@ import {
 } from '../scripts/validate-operator-acceptance.mjs';
 import { buildProductionReadinessManifest } from '../scripts/build-production-readiness-manifest.mjs';
 import { buildOperatorAcceptancePacket } from '../scripts/build-operator-acceptance-packet.mjs';
-import { buildOperatorEvidenceStarter, OPERATOR_EVIDENCE_FILL_PLAN_SCHEMA, OPERATOR_EVIDENCE_STARTER_SCHEMA, OPERATOR_HOSTED_REF_CATALOG_SCHEMA, OPERATOR_HOSTED_REF_WORKSTREAMS_SCHEMA } from '../scripts/build-operator-evidence-starter.mjs';
+import { buildOperatorEvidenceStarter, OPERATOR_EVIDENCE_FILL_PLAN_SCHEMA, OPERATOR_EVIDENCE_STARTER_SCHEMA, OPERATOR_HOSTED_REF_CATALOG_SCHEMA, OPERATOR_HOSTED_REF_WORKSTREAMS_SCHEMA, renderOperatorEvidenceStarterPlain } from '../scripts/build-operator-evidence-starter.mjs';
 import { buildProductionStorageMigrationArtifact } from '../scripts/build-production-storage-migration.mjs';
 import { validateProductionManifestFiles } from '../scripts/validate-production-manifests.mjs';
 import { HOSTED_BACKEND_LIVE_EVIDENCE_SCHEMA, REQUIRED_REF_KEYS, validateHostedBackendLiveEvidence } from '../scripts/validate-hosted-backend-live.mjs';
@@ -434,6 +434,24 @@ test('operator evidence starter emits public-safe fillable operator bundle', asy
   assert.equal(starter.acceptance_fill_plan.hosted_ref_catalog.required_ref_count, starter.counts.hosted_ref_count);
 });
 
+test('operator evidence starter plain output is readable and claim-bounded', async () => {
+  const starter = await buildOperatorEvidenceStarter({
+    argv: ['--domain', 'enigmamemory.com', '--project-name', 'enigma-memory', '--tenant', 'tenant-fixture'],
+    generated_at: '2026-06-24T00:00:00.000Z',
+  });
+  const plain = renderOperatorEvidenceStarterPlain(starter);
+
+  assert.match(plain, /^Enigma operator evidence starter\n/);
+  assert.match(plain, /Status: blocked_until_operator_evidence/);
+  assert.match(plain, /Hosted refs: 25/);
+  assert.match(plain, /Evidence items: /);
+  assert.match(plain, /Output written: no/);
+  assert.match(plain, /Next: fill owner-approval-refs\.template\.json/);
+  assert.match(plain, /Boundary: public-safe operator evidence starter only/);
+  assert.doesNotMatch(plain, /^\s*\{/);
+  assert.doesNotMatch(plain, /Bearer|PRIVATE KEY|sk-|raw_memory|C:\\Users\\|\/home\/|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/i);
+});
+
 test('operator evidence starter refs feed hosted live collector without hand-authored schema JSON', async () => {
   const starter = await buildOperatorEvidenceStarter({ domain: 'enigmamemory.com', tenant: 'enigma-memory', environment: 'production', projectName: 'enigma-memory' });
   const refs = Object.fromEntries(Object.keys(starter.hosted_required_refs).map((key) => [key, `${key}#operator-filled-evidence`]));
@@ -486,6 +504,24 @@ test('operator evidence starter CLI writes redacted bundle summary', async () =>
   assert.equal(summary.file_count, 11);
   assert.ok(summary.generated_files.includes('hosted-backend-live.template.json'));
   assert.equal(summary.generated_files.length, summary.file_count);
+
+  const plainRun = await execFileAsync(process.execPath, [
+    'scripts/build-operator-evidence-starter.mjs',
+    '--out-dir',
+    join(dir, 'plain-starter'),
+    '--domain',
+    'enigmamemory.com',
+    '--tenant',
+    'tenant-fixture',
+    '--plain',
+  ], { cwd: process.cwd(), timeout: 10000, windowsHide: true });
+  assert.equal(plainRun.stderr, '');
+  assert.match(plainRun.stdout, /^Enigma operator evidence starter\n/);
+  assert.match(plainRun.stdout, /Output written: yes/);
+  assert.match(plainRun.stdout, /File: hosted-backend-live\.template\.json/);
+  assert.match(plainRun.stdout, /Boundary: public-safe operator evidence starter only/);
+  assert.doesNotMatch(plainRun.stdout, /^\s*\{/);
+  assert.equal(plainRun.stdout.includes(dir), false);
   const starter = JSON.parse(await readFile(join(outDir, 'OPERATOR_EVIDENCE_STARTER.json'), 'utf8'));
   const refs = JSON.parse(await readFile(join(outDir, 'hosted-refs.template.json'), 'utf8'));
   const commands = JSON.parse(await readFile(join(outDir, 'commands.json'), 'utf8'));

@@ -69,6 +69,31 @@ const plan = createMemoryOptimizationPlan({
 const receipt = createMemoryAccessReceipt({ item: plan.items[0], plan });
 ```
 
+The optimizer also creates deterministic local visual context carriers using the bundled public-domain X11 `6x10` bitmap font:
+
+```js
+import {
+  createVisualContextCarrier,
+  verifyVisualContextCarrier,
+  visualContextCarrierManifest,
+} from 'enigma-memory/optimizer';
+import { renderContextPackForModel } from 'enigma-memory/passport';
+
+const carrier = createVisualContextCarrier({
+  text: renderContextPackForModel(pack),
+  line_repeat: 2,
+  palette: 'row6',
+  max_pages: 16,
+});
+const manifest = visualContextCarrierManifest(carrier);
+const checkedCarrier = verifyVisualContextCarrier(carrier, {
+  source_text: renderContextPackForModel(pack),
+});
+const firstPng = carrier.pages[0].png;
+```
+
+`page.png` buffers and `carrier.encoded_text` are deliberately non-enumerable, so JSON serialization yields a plaintext-free manifest rather than embedding private context. The PNG itself remains plaintext-equivalent and private. The manifest records source/image hashes, deterministic layout, explicit claim boundaries, and an image-token estimate only when the caller supplies `pixels_per_token`. It does not guarantee OCR/model recall, provider billing, output/reasoning savings, or resilience to provider downscaling. Benchmark each exact model and client image path before enabling this carrier.
+
 ### `enigma-memory/connectors`
 
 The connectors module renders and manages local MCP client config for supported clients. It uses the `enigma-mcp` command and an `ENIGMA_BUNDLE` environment variable.
@@ -82,14 +107,26 @@ const report = await doctorConnectors({ clientId: 'generic-mcp' });
 
 ### `enigma-memory/mcp-server`
 
-The MCP server module exposes descriptors, handlers, JSON-RPC handling, and a stdio server for local MCP clients.
+The MCP server module exposes full/core descriptors, handlers, JSON-RPC handling, and a stdio server for local MCP clients. `startStdioServer()` defaults to the flat `core` profile; select `full` only for advanced controller/settlement workflows.
 
 ```js
-import { toolDescriptors, handlers, handleJsonRpcRequest, startStdioServer } from 'enigma-memory/mcp-server';
+import {
+  coreToolDescriptors,
+  toolDescriptorsForProfile,
+  handleJsonRpcRequest,
+  startStdioServer,
+} from 'enigma-memory/mcp-server';
 
-const initTool = toolDescriptors.find((tool) => tool.name === 'enigma_init');
-const reply = await handleJsonRpcRequest({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
+const coreTools = toolDescriptorsForProfile('core');
+const reply = await handleJsonRpcRequest(
+  { jsonrpc: '2.0', id: 1, method: 'tools/list' },
+  { toolProfile: 'core' },
+);
 ```
+
+`enigma_visual_context` is the flat-primitive MCP surface for image carriers. It returns a manifest text block plus one or more MCP `image/png` blocks. It has no nested object or array arguments.
+
+`createMcpToolProtocolAudit()` reports root parameter count, nesting, arrays, unions, approximate schema tokens, and a non-guaranteed complexity grade for every supplied descriptor set. The CLI defaults to `enigma mcp audit --profile core`; use `--profile full` to inspect the advanced catalog. Enigma validates parsed JSON-RPC calls and rejects tools hidden by the active profile or unknown arguments; repairing a provider's raw model-output tool dialect belongs to the client harness before MCP dispatch.
 
 ### `enigma-memory/relay`
 

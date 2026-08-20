@@ -60,7 +60,7 @@ The install promise:
 
 ```bash
 npx --yes --package enigma-memory enigma install
-npx --yes --package enigma-memory enigma connect claude-desktop
+npx --yes --package enigma-memory enigma claude-mcpb package --plain
 npx --yes --package enigma-memory enigma connect cursor
 npx --yes --package enigma-memory enigma connect kimi-code
 ```

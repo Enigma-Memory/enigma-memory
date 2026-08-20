@@ -24,6 +24,16 @@ async function runCli(argv) {
   return { code, ...captured.output() };
 }
 
+async function runCliText(argv) {
+  let stdout = '';
+  let stderr = '';
+  const code = await main(argv, {
+    stdout: { write: (chunk) => { stdout += chunk; } },
+    stderr: { write: (chunk) => { stderr += chunk; } },
+  });
+  return { code, stdout, stderr };
+}
+
 async function withBundle(build) {
   const dir = await mkdtemp(join(tmpdir(), 'enigma-search-status-'));
   try {
@@ -69,9 +79,151 @@ test('search ranks relevant active memories and redacts plaintext by default', a
       assert.match(json.results[0].memory_ref, /^enigma:\/\/memory\//);
       assert.ok(json.results[0].access_receipt_ref || json.results[0].access_receipt_id);
       assert.doesNotMatch(stdout, /deployment phoenix region fixture plaintext canary|breakfast oatmeal fixture plaintext canary/);
+
+      const plain = await runCliText(['search', '--bundle', bundlePath, '--query', 'deployment phoenix region', '--limit', '2', '--plain']);
+      assert.equal(plain.code, 0);
+      assert.match(plain.stdout, /^Enigma search\n/);
+      assert.match(plain.stdout, /Results: 1/);
+      assert.match(plain.stdout, /Plaintext: redacted/);
+      assert.match(plain.stdout, /Boundary: local Enigma search only/);
+      assert.doesNotMatch(plain.stdout, /^\s*\{/);
+      assert.doesNotMatch(plain.stdout, /deployment phoenix region fixture plaintext canary|breakfast oatmeal fixture plaintext canary/);
+      assert.equal(plain.stdout.includes(bundlePath), false);
     },
   };
 }));
+
+test('memory lifecycle plain output is readable, persistent, and redacted', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-memory-lifecycle-plain-'));
+  try {
+    const bundlePath = join(dir, 'bundle.json');
+    const init = await runCli(['init', '--bundle', bundlePath, '--subject', 'subject-lifecycle-plain']);
+    assert.equal(init.code, 0);
+
+    const remembered = await runCliText([
+      'remember',
+      '--bundle', bundlePath,
+      '--text', 'remember lifecycle private canary',
+      '--plain',
+    ]);
+    assert.equal(remembered.code, 0);
+    assert.match(remembered.stdout, /^Enigma remember\n/);
+    assert.match(remembered.stdout, /Status: Ready/);
+    assert.match(remembered.stdout, /Memory: enigma:\/\/memory\//);
+    assert.match(remembered.stdout, /Receipt: /);
+    assert.match(remembered.stdout, /Next: enigma search --bundle <bundle-path> --query <text>/);
+    assert.match(remembered.stdout, /Boundary: local Enigma memory lifecycle only/);
+    assert.doesNotMatch(remembered.stdout, /^\s*\{/);
+    assert.doesNotMatch(remembered.stdout, /remember lifecycle private canary/);
+    assert.equal(remembered.stdout.includes(dir), false);
+
+    const rememberedAddr = remembered.stdout.match(/Memory: enigma:\/\/memory\/(\S+)/)?.[1];
+    assert.equal(typeof rememberedAddr, 'string');
+
+
+    const recalledJson = await runCli([
+      'recall',
+      '--bundle', bundlePath,
+      '--id', rememberedAddr,
+    ]);
+    assert.equal(recalledJson.code, 0);
+    assert.equal(recalledJson.json.ok, true);
+    assert.equal(recalledJson.json.schema, 'enigma.memory_recall.v1');
+    assert.equal(recalledJson.json.memory_addr, rememberedAddr);
+    assert.equal(recalledJson.json.content_redacted, true);
+    assert.equal(Object.hasOwn(recalledJson.json, 'content'), false);
+    assert.match(recalledJson.json.memory_ref, /^enigma:\/\/memory\//);
+    assert.match(recalledJson.json.access_receipt_ref.access_receipt_ref, /^enigma:\/\/memory-access\//);
+    assert.doesNotMatch(recalledJson.stdout, /remember lifecycle private canary/);
+
+    const recalledPlain = await runCliText([
+      'recall',
+      '--bundle', bundlePath,
+      '--id', rememberedAddr,
+      '--plain',
+    ]);
+    assert.equal(recalledPlain.code, 0);
+    assert.match(recalledPlain.stdout, /^Enigma recall\n/);
+    assert.match(recalledPlain.stdout, /Plaintext: redacted/);
+    assert.match(recalledPlain.stdout, /Next: enigma context --bundle <bundle-path> --query <text>/);
+    assert.match(recalledPlain.stdout, /Boundary: local Enigma recall only/);
+    assert.doesNotMatch(recalledPlain.stdout, /^\s*\{/);
+    assert.doesNotMatch(recalledPlain.stdout, /remember lifecycle private canary/);
+    assert.equal(recalledPlain.stdout.includes(dir), false);
+
+    const recalledContent = await runCli([
+      'recall',
+      '--bundle', bundlePath,
+      '--id', rememberedAddr,
+      '--include-content',
+    ]);
+    assert.equal(recalledContent.code, 0);
+    assert.equal(recalledContent.json.content_redacted, false);
+    assert.equal(recalledContent.json.content, 'remember lifecycle private canary');
+    assert.match(recalledContent.json.claim_boundary, /--include-content was explicit/);
+    const updated = await runCliText([
+      'update',
+      '--bundle', bundlePath,
+      '--id', rememberedAddr,
+      '--text', 'updated lifecycle private canary',
+      '--plain',
+    ]);
+    assert.equal(updated.code, 0);
+    assert.match(updated.stdout, /^Enigma update\n/);
+    assert.match(updated.stdout, /Previous: enigma:\/\/memory\//);
+    assert.match(updated.stdout, /Next: enigma context --bundle <bundle-path> --query <text>/);
+    assert.doesNotMatch(updated.stdout, /remember lifecycle private canary|updated lifecycle private canary/);
+    assert.equal(updated.stdout.includes(dir), false);
+
+    const updatedAddr = updated.stdout.match(/Memory: enigma:\/\/memory\/(\S+)/)?.[1];
+    assert.equal(typeof updatedAddr, 'string');
+
+    const deleted = await runCliText([
+      'delete',
+      '--bundle', bundlePath,
+      '--id', updatedAddr,
+      '--reason', 'lifecycle-plain-test',
+      '--format', 'text',
+    ]);
+    assert.equal(deleted.code, 0);
+    assert.match(deleted.stdout, /^Enigma delete\n/);
+    assert.match(deleted.stdout, /Next: enigma drive health --bundle <bundle-path>/);
+    assert.match(deleted.stdout, /Boundary: local Enigma memory lifecycle only/);
+    assert.doesNotMatch(deleted.stdout, /remember lifecycle private canary|updated lifecycle private canary/);
+    assert.equal(deleted.stdout.includes(dir), false);
+
+    const exportPath = join(dir, 'export.json');
+    const exported = await runCliText([
+      'export',
+      '--bundle', bundlePath,
+      '--out', exportPath,
+      '--plain',
+    ]);
+    assert.equal(exported.code, 0);
+    assert.match(exported.stdout, /^Enigma export\n/);
+    assert.match(exported.stdout, /Status: Ready/);
+    assert.match(exported.stdout, /Receipts: /);
+    assert.match(exported.stdout, /Export: <export-file>/);
+    assert.match(exported.stdout, /Boundary: local Enigma export only/);
+    assert.doesNotMatch(exported.stdout, /remember lifecycle private canary|updated lifecycle private canary/);
+    assert.equal(exported.stdout.includes(dir), false);
+
+    const verified = await runCliText([
+      'verify',
+      '--export', exportPath,
+      '--plain',
+    ]);
+    assert.equal(verified.code, 0);
+    assert.match(verified.stdout, /^Enigma verify\n/);
+    assert.match(verified.stdout, /Status: Ready/);
+    assert.match(verified.stdout, /Errors: 0/);
+    assert.match(verified.stdout, /Boundary: local offline receipt verification only/);
+    assert.doesNotMatch(verified.stdout, /remember lifecycle private canary|updated lifecycle private canary/);
+    assert.equal(verified.stdout.includes(dir), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
 
 test('search includes plaintext only with explicit include-content opt-in', async () => withBundle(async (vault) => {
   remember({
@@ -111,9 +263,116 @@ test('status reports passport counts and roots without raw memory', async () => 
       assert.match(json.active_set_root, /^sha256:[a-f0-9]{64}$/);
       assert.match(json.receipt_log_root, /^sha256:[a-f0-9]{64}$/);
       assert.equal(json.connector_readiness.ready, true);
+      assert.equal(json.bundle, '<bundle-path>');
+      assert.equal(json.connector_readiness.bundle, '<bundle-path>');
+      assert.equal(json.first_run_status.schema, 'enigma.first_run_status.v1');
+      assert.equal(json.first_run_status.state, 'ready_for_app_connection');
+      assert.equal(json.first_run_status.primary_action.id, 'connect_ai_app');
+      assert.equal(json.first_run_status.primary_action.command, 'enigma connect <client> --bundle "<bundle-path>" --dry-run');
+      assert.equal(json.first_run_status.lanes.import_sandbox.status, 'ready');
+      assert.equal(json.first_run_status.claim_boundaries.raw_memory_returned, false);
+      assert.equal(JSON.stringify(json.first_run_status).includes(bundlePath), false);
+      assert.equal(JSON.stringify(json).includes(bundlePath), false);
       assert.ok(json.next_recommended_commands.some((command) => command.includes('enigma search')));
       assert.doesNotMatch(stdout, /active status fixture plaintext canary|removed status fixture plaintext canary/);
       assert.equal(active.memory_addr.length > 0, true);
+    },
+  };
+}));
+
+test('status first-run summary points empty vaults to import sandbox', async () => withBundle(async () => ({
+  test: async (bundlePath) => {
+    const { code, json, stdout } = await runCli(['status', '--bundle', bundlePath]);
+    assert.equal(code, 0);
+    assert.equal(json.first_run_status.state, 'needs_first_memory');
+    assert.equal(json.first_run_status.primary_action.id, 'preview_first_import');
+    assert.equal(json.first_run_status.lanes.memory_inventory.status, 'empty');
+    assert.equal(json.first_run_status.primary_action.command, 'enigma import text --file ./memories.md --complete --plain');
+    assert.equal(json.next_recommended_commands[0], 'enigma import text --file ./memories.md --complete --plain');
+    assert.equal(JSON.stringify(json.first_run_status).includes(bundlePath), false);
+    assert.doesNotMatch(stdout, /plaintext canary/);
+  },
+})));
+
+test('next gives setup action without requiring an existing bundle', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-next-missing-'));
+  try {
+    const missing = join(dir, 'missing-bundle.json');
+    const { code, json, stdout } = await runCli(['next', '--bundle', missing]);
+    assert.equal(code, 0);
+    assert.equal(json.schema, 'enigma.next_action.v1');
+    assert.equal(json.state, 'setup_needed');
+    assert.equal(json.primary_action.id, 'run_quickstart');
+    assert.equal(json.follow_up.id, 'run_status_after_setup');
+    assert.equal(stdout.includes(dir), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('next gives non-destructive writable bundle action when path is invalid', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-next-invalid-path-'));
+  try {
+    const fileParent = join(dir, 'not-a-directory');
+    await writeFile(fileParent, 'not a directory\n', 'utf8');
+    const bundlePath = join(fileParent, 'bundle.json');
+    const { code, json, stdout } = await runCli(['next', '--bundle', bundlePath]);
+    assert.equal(code, 0);
+    assert.equal(json.schema, 'enigma.next_action.v1');
+    assert.equal(json.state, 'attention_needed');
+    assert.equal(json.primary_action.id, 'choose_writable_bundle');
+    assert.equal(json.primary_action.command, 'enigma quickstart --bundle <writable-bundle-path>');
+    assert.doesNotMatch(json.primary_action.command, /--overwrite/);
+    assert.equal(stdout.includes(dir), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('next plain output is readable and path-redacted before setup', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-next-plain-missing-'));
+  try {
+    const missing = join(dir, 'missing-bundle.json');
+    const { code, stdout } = await runCliText(['next', '--plain', '--bundle', missing]);
+    assert.equal(code, 0);
+    assert.match(stdout, /Enigma next/);
+    assert.match(stdout, /Status: Create Memory Drive/);
+    assert.match(stdout, /Run: enigma quickstart --bundle "<bundle-path>" --plain/);
+    assert.doesNotMatch(stdout, /^\s*\{/);
+    assert.equal(stdout.includes(dir), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('next uses first-run status when the bundle exists', async () => withBundle(async (vault) => {
+  remember({ vault, text: 'next command private canary', now: '2026-06-25T00:00:04.000Z' });
+  return {
+    test: async (bundlePath) => {
+      const { code, json, stdout } = await runCli(['next', '--bundle', bundlePath]);
+      assert.equal(code, 0);
+      assert.equal(json.schema, 'enigma.next_action.v1');
+      assert.equal(json.state, 'ready_for_app_connection');
+      assert.equal(json.primary_action.id, 'connect_ai_app');
+      assert.equal(json.primary_action.command, 'enigma connect <client> --bundle "<bundle-path>" --dry-run');
+      assert.equal(json.lanes.import_sandbox.status, 'ready');
+      assert.equal(stdout.includes('next command private canary'), false);
+      assert.equal(stdout.includes(bundlePath), false);
+    },
+  };
+}));
+
+test('next plain output summarizes populated setup without raw memory', async () => withBundle(async (vault) => {
+  remember({ vault, text: 'plain next private canary', now: '2026-06-25T00:00:05.000Z' });
+  return {
+    test: async (bundlePath) => {
+      const { code, stdout } = await runCliText(['next', '--format', 'text', '--bundle', bundlePath]);
+      assert.equal(code, 0);
+      assert.match(stdout, /Status: Preview AI app connection/);
+      assert.match(stdout, /memory drive: Memory Drive exists/);
+      assert.match(stdout, /import sandbox: Import Sandbox ready/);
+      assert.equal(stdout.includes('plain next private canary'), false);
+      assert.equal(stdout.includes(bundlePath), false);
     },
   };
 }));

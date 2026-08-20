@@ -33,9 +33,10 @@ enigma chain submit-solana \
   --keypair ./operator-devnet-keypair.json
 ```
 
-Network submission is opt-in only. Execute mode requires an explicit Solana cluster and Solana CLI-style 64-byte secret-key JSON keypair, lazily loads `@solana/web3.js`, and submits one Memo-program transaction containing only the compact `memo_ref` JSON:
+Network submission is opt-in only. The default public Enigma install omits Solana client dependencies so local memory, MCP, visual carriers, and offline verification stay dependency-free. Execute mode requires an explicit installation of `@solana/web3.js`, an approved Solana cluster, and a Solana CLI-style 64-byte secret-key JSON keypair. It submits one Memo-program transaction containing only the compact `memo_ref` JSON:
 
 ```sh
+npm install @solana/web3.js
 enigma chain submit-solana \
   --file ./proof-artifacts/anchor-batch.json \
   --cluster devnet \

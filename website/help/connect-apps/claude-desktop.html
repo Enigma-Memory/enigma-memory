@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Connect Enigma Memory to Claude Desktop.">
+  <title>Connect Claude Desktop to Enigma Memory</title>
+  <link rel="stylesheet" href="../../styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="site-logo" href="../../index.html">Enigma Memory</a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="../../download.html">Download</a>
+        <a href="../../setup.html">How it works</a>
+        <a href="../../privacy.html">Privacy</a>
+        <a href="../index.html">Help</a>
+        <a href="../../faq.html">FAQ</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <span class="eyebrow">Connect apps</span>
+      <h1>Connect Claude Desktop to Enigma Memory.</h1>
+      <p>The Enigma desktop app prepares the Claude Desktop Extension (.mcpb). Claude installs it from Settings → Extensions; Enigma does not write Claude settings for this extension handoff.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="steps-heading">
+      <h2 id="steps-heading">Connect Claude Desktop</h2>
+      <ol>
+        <li>Make sure Claude Desktop is installed and has been opened at least once.</li>
+        <li>Open Enigma Memory and run the setup wizard, or open the Connections screen.</li>
+        <li>Choose Claude Desktop, then create the Claude Desktop Extension package.</li>
+        <li>Open Claude Desktop Settings → Extensions and drag the Enigma .mcpb package in, or choose Install/Browse and select it.</li>
+        <li>When Claude asks for configuration, choose your local Memory Drive file.</li>
+        <li>Restart Claude Desktop after approving the extension install.</li>
+        <li>Test the connection with the read-only Enigma tool <code>enigma_support_summary</code> or <code>enigma_next_action</code>.</li>
+      </ol>
+
+      <div class="boundary-callout">
+        <strong>Boundary note:</strong> Enigma's Claude extension starts Enigma's local helper from Claude Desktop. It does not write Claude settings in this extension flow, delete Anthropic logs, or force a model to forget.
+      </div>
+    </section>
+
+    <section class="content-section" aria-labelledby="extension-heading">
+      <h2 id="extension-heading">Claude Desktop Extension</h2>
+      <p>The .mcpb extension is the first supported Claude path. Use advanced manual settings only when support asks for a dry-run fallback.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="trouble-heading">
+      <h2 id="trouble-heading">If Claude Desktop cannot see Enigma</h2>
+      <p>Try these no-write repair steps first:</p>
+      <ul>
+        <li>Enable or reinstall Enigma Memory in Claude Desktop Settings → Extensions.</li>
+        <li>Reselect your local Memory Drive file if Claude asks for it again.</li>
+        <li>Fully quit and reopen Claude Desktop, then run <code>enigma_support_summary</code> or <code>enigma_next_action</code> again.</li>
+      </ul>
+      <p>Use <code>enigma connect claude-desktop --dry-run</code> only as an advanced fallback when support asks. If Claude Desktop itself is not detected, see <a href="../troubleshooting/client-not-detected.html">AI app not detected</a>.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="disconnect-heading">
+      <h2 id="disconnect-heading">Disconnect Claude Desktop</h2>
+      <p>Remove or disable Enigma Memory in Claude Desktop Settings → Extensions. This stops Claude from starting Enigma's local helper; it does not delete your Memory Drive.</p>
+    </section>
+
+    <section class="content-section">
+      <details>
+        <summary>Advanced manual connection</summary>
+        <p>Manual app settings are for developers and troubleshooting only. If the desktop app cannot detect or connect Claude Desktop, see the <a href="../../developers/cli.html">CLI appendix</a> for manual snippets and connector commands.</p>
+      </details>
+    </section>
+    <section class="content-section">
+      <p><a href="../index.html">Back to help hub</a></p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer__inner">
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="../../download.html">Download</a></li>
+          <li><a href="../../setup.html">How it works</a></li>
+          <li><a href="../../privacy.html">Privacy</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Support</h4>
+        <ul>
+          <li><a href="../index.html">Help hub</a></li>
+          <li><a href="../install.html">Install guide</a></li>
+          <li><a href="../connect-apps.html">Connect apps</a></li>
+          <li><a href="../troubleshooting.html">Troubleshooting</a></li>
+          <li><a href="../support-safe-sharing.html">Safe support sharing</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Developers</h4>
+        <ul>
+          <li><a href="../../developers/cli.html">CLI appendix</a></li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

@@ -30,9 +30,9 @@ Conformant integrations must expose or document these commands in a way a review
 ### Baseline local memory commands
 
 ```sh
-enigma test-drive --overwrite
-enigma setup --overwrite
-enigma doctor
+enigma test-drive --dry-run
+enigma quickstart --bundle ./.enigma/bundle.json
+enigma doctor --bundle ./.enigma/bundle.json
 enigma remember --text-file ./public-safe-memory.txt
 enigma search --query "public-safe query"
 enigma context --query "public-safe query" --optimize
@@ -50,10 +50,10 @@ Requirements:
 ### Connector commands
 
 ```sh
-enigma setup --client auto --overwrite
-enigma setup --connect-installed --overwrite
-enigma connect <connector-id> --dry-run
-enigma connect <connector-id>
+enigma quickstart --bundle ./.enigma/bundle.json
+enigma doctor --bundle ./.enigma/bundle.json
+enigma connect <connector-id> --bundle ./.enigma/bundle.json --dry-run
+enigma connect <connector-id> --bundle ./.enigma/bundle.json
 ```
 
 Requirements:

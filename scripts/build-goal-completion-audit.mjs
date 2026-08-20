@@ -83,6 +83,7 @@ function parseArgs(argv) {
     infrastructureReadiness: null,
     releaseAudit: null,
     workerInspect: null,
+    plain: false,
   };
   for (let index = 0; index < argv.length;) {
     const token = argv[index];
@@ -106,13 +107,18 @@ function parseArgs(argv) {
     else if (token === '--release-audit' || token === '--releaseAudit') out.releaseAudit = readValue(token);
     else if (token === '--worker-inspect' || token === '--workerInspect') out.workerInspect = readValue(token);
     else if (token === '--out') out.out = readValue(token);
+    else if (token === '--plain' || token === '--text' || token === '--format=text' || (token === '--format' && argv[index + 1] === 'text')) {
+      out.plain = true;
+      if (token === '--format') index += 1;
+      index += 1;
+    }
     else throw new UsageError(`unknown option ${token}`);
   }
   return out;
 }
 
 function usage() {
-  return `Usage: node scripts/build-goal-completion-audit.mjs --site <dir> [options]\n\nOptions:\n  --project-name <name>             Cloudflare Pages project. Default: enigma-memory.\n  --domain <host>                   Public domain. Default: enigmamemory.com.\n  --live-url <url>                  Current public URL to observe. Default: https://enigmamemory.com/.\n  --expect-title <text>             Expected live title fragment. Default: Enigma.\n  --account-id <id>                 Cloudflare account id or placeholder for token-policy evidence.\n  --infrastructure-readiness <file> Completed infrastructure readiness JSON to summarize.\n  --operator-acceptance-packet <file> Completed operator packet JSON to validate and summarize.\n  --release-audit <file>            Current release audit JSON to summarize.\n  --worker-inspect <file>           Optional Worker inspection result; ready evidence suppresses the standalone probe action.\n  --cloudflare-env-file <file>      Load local Cloudflare env values without printing the path or values.\n  --objective <text>                Override objective text.\n  --out <file>                      Write audit JSON.\n  --help                            Show this help.\n`;
+  return `Usage: node scripts/build-goal-completion-audit.mjs --site <dir> [options]\n\nOptions:\n  --project-name <name>             Cloudflare Pages project. Default: enigma-memory.\n  --domain <host>                   Public domain. Default: enigmamemory.com.\n  --live-url <url>                  Current public URL to observe. Default: https://enigmamemory.com/.\n  --expect-title <text>             Expected live title fragment. Default: Enigma.\n  --account-id <id>                 Cloudflare account id or placeholder for token-policy evidence.\n  --infrastructure-readiness <file> Completed infrastructure readiness JSON to summarize.\n  --operator-acceptance-packet <file> Completed operator packet JSON to validate and summarize.\n  --release-audit <file>            Completed release audit JSON to validate and summarize.\n  --worker-inspect <file>           Cloudflare Worker inspection evidence to suppress completed optional probe actions.\n  --cloudflare-env-file <file>      Optional local secret env file. Values are consumed only for live validation and never printed.\n  --objective <text>                Override objective text.\n  --out <file>                      Write JSON output.\n  --plain                           Print a human-readable audit summary while --out preserves JSON evidence.\n`;
 }
 
 async function readText(path) {
@@ -375,6 +381,28 @@ export async function buildGoalCompletionAudit(input = {}, options = {}) {
   return audit;
 }
 
+export function renderGoalCompletionAuditPlain(audit) {
+  const deliverables = Array.isArray(audit.deliverables) ? audit.deliverables : [];
+  const blockers = Array.isArray(audit.blockers) ? audit.blockers : [];
+  const nextActions = Array.isArray(audit.next_actions) ? audit.next_actions : [];
+  const readyDeliverables = deliverables.filter((item) => item.ok === true).length;
+  const lines = [
+    'Enigma goal completion audit',
+    `Status: ${audit.complete ? 'Ready' : 'Needs attention'}`,
+    `Go-live ready: ${audit.go_live_ready ? 'yes' : 'no'}`,
+    `Release posture: ${audit.release_posture ?? '<unknown>'}`,
+    `Local static artifact: ${audit.local_static_artifact_ready ? 'ready' : 'not ready'}`,
+    `Deliverables: ${readyDeliverables}/${deliverables.length} ready`,
+    `Blockers: ${blockers.length}`,
+    `Next actions: ${nextActions.length}`,
+  ];
+  for (const blocker of blockers.slice(0, 5)) lines.push(`Blocker: ${blocker}`);
+  for (const action of nextActions.slice(0, 5)) lines.push(`Next: ${action.id ?? '<action>'} — ${action.owner ?? 'owner-needed'}`);
+  lines.push('Boundary: public-safe goal audit summary only; no credentials, account ids, local paths, raw memory, prompts, transcripts, provider responses, provider deletion, model behavior, hosted service, launch certification, compliance, benchmark superiority, token ROI, or provider invoice savings claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+
 export async function runCli(argv = process.argv.slice(2), options = {}) {
   const parsed = parseArgs(argv);
   if (parsed.help) return { text: usage() };
@@ -387,7 +415,7 @@ export async function runCli(argv = process.argv.slice(2), options = {}) {
     await mkdir(dirname(outPath), { recursive: true });
     await writeFile(outPath, json, 'utf8');
   }
-  return { json: packet };
+  return parsed.plain ? { text: renderGoalCompletionAuditPlain(packet), json: packet } : { json: packet };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

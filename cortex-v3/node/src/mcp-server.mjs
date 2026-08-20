@@ -2,14 +2,68 @@ import { createInterface } from "node:readline";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createServer } from "node:http";
 import { randomUUID, createHmac } from "node:crypto";
-import { createStore } from "./store.mjs";
+import { resolve, dirname, join } from "node:path";
+import { mkdirSync } from "node:fs";
+import { Connection, PublicKey } from "@solana/web3.js";
+import { createStore, deriveDataEncryptionKey } from "./store.mjs";
 import { createEmbedder } from "./embed.mjs";
 
 let defaultStore;
 let defaultEmbedder;
 
+// Fixed test entropy used only when no wallet entropy is configured. This
+// makes local/test stores deterministic and reproducible, but it is NOT
+// secrets-manager grade: any party that knows this constant can derive the
+// same per-user keys. Production deployments MUST supply wallet entropy via
+// options.getOwnerEntropy.
+const TEST_MASTER_ENTROPY = Buffer.from(
+  "cortex-deterministic-test-master-entropy-v1",
+  "utf8"
+);
+
+function getOwnerEntropy(owner, options = {}) {
+  if (typeof options.getOwnerEntropy === "function") {
+    return options.getOwnerEntropy(owner);
+  }
+  return null;
+}
+
+function deriveDekForOwner(owner, options = {}) {
+  const entropy = getOwnerEntropy(owner, options);
+  if (entropy) {
+    return deriveDataEncryptionKey(entropy, options.passphrase);
+  }
+  return deriveDataEncryptionKey(TEST_MASTER_ENTROPY, owner);
+}
+
+function makeUserStorePath(owner, options = {}) {
+  if (options.storePath) {
+    return join(options.storePath, `${owner}.sqlite`);
+  }
+  return resolve(`data/cortex-stores/${owner}.sqlite`);
+}
+
 function getStore(options = {}) {
   return options.store ?? (defaultStore ??= createStore());
+}
+
+function getStoreForUser(options = {}, userId) {
+  if (options.store) {
+    return options.store;
+  }
+  if (!userId) {
+    return getStore(options);
+  }
+  const stores = options.stores ?? (options.stores = new Map());
+  if (stores.has(userId)) {
+    return stores.get(userId);
+  }
+  const dek = deriveDekForOwner(userId, options);
+  const path = makeUserStorePath(userId, options);
+  mkdirSync(dirname(path), { recursive: true });
+  const store = createStore({ path, dek });
+  stores.set(userId, store);
+  return store;
 }
 
 function getEmbedder(options = {}) {
@@ -156,6 +210,214 @@ const RESOURCE_SCOPES = {
   "cortex://budget/{user_id}": "budget:spend",
   "cortex://capability/{model_id}": "capability:grant",
 };
+
+const DEFAULT_SOLANA_RPC = "http://127.0.0.1:8899";
+const CAPABILITY_REGISTRY_PROGRAM_ID = new PublicKey(
+  process.env.CORTEX_CAPABILITY_REGISTRY_ID ||
+    "CiDwVBFgWV9E5MvXWoLgnEgn2hK7rJikbvfWavzAQz3"
+);
+
+// Capability registry scope bits (must match capability_registry/src/lib.rs)
+const MEMORY_CREATE = 1 << 0;
+const MEMORY_UPDATE = 1 << 1;
+const MEMORY_DELETE = 1 << 2;
+const BUDGET_SPEND = 1 << 3;
+const ROYALTY_ROUTE = 1 << 4;
+const CAPABILITY_REVOKE_SELF = 1 << 5;
+
+function getSolanaConnection(options = {}) {
+  if (options.solanaConnection) return options.solanaConnection;
+  const rpcUrl = process.env.SOLANA_RPC_URL || DEFAULT_SOLANA_RPC;
+  return new Connection(rpcUrl, "confirmed");
+}
+
+function scopeBitForTool(toolName) {
+  switch (toolName) {
+    case "store_memory":
+    case "add_memory":
+    case "update_memory":
+    case "delete_memory":
+      return MEMORY_CREATE | MEMORY_UPDATE | MEMORY_DELETE;
+    case "retrieve_memory":
+    case "search_memory":
+      return MEMORY_CREATE | MEMORY_UPDATE | MEMORY_DELETE;
+    case "spend_budget":
+      return BUDGET_SPEND;
+    default:
+      return 0;
+  }
+}
+
+function parsePubkey(value, label) {
+  if (!value) return null;
+  try {
+    return new PublicKey(value);
+  } catch {
+    throw new Error(`Invalid ${label} public key`);
+  }
+}
+
+function readLE64(buffer, offset) {
+  const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+  return view.getBigUint64(offset, true);
+}
+
+function readLE32(buffer, offset) {
+  const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+  return view.getUint32(offset, true);
+}
+
+function readLEI64(buffer, offset) {
+  const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+  return view.getBigInt64(offset, true);
+}
+
+function decodeCapability(data) {
+  const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
+  // Skip 8-byte discriminator
+  const owner = new PublicKey(buf.slice(8, 40));
+  const grantedTo = new PublicKey(buf.slice(40, 72));
+  const scopeLen = readLE32(buf, 72);
+  const scope = buf.slice(76, 76 + scopeLen).toString("utf8");
+  const expiresAt = Number(readLEI64(buf, 140));
+  const createdAt = Number(readLEI64(buf, 148));
+  const bump = buf[156];
+  return { owner, grantedTo, scope, expiresAt, createdAt, bump };
+}
+
+function decodeSession(data) {
+  const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
+  const owner = new PublicKey(buf.slice(8, 40));
+  const sessionKey = new PublicKey(buf.slice(40, 72));
+  const nonce = readLE64(buf, 72);
+  const ownerNonce = readLE64(buf, 80);
+  const scope = readLE32(buf, 88);
+  const categoriesHash = buf.slice(92, 124);
+  const maxSpendPerTx = readLE64(buf, 124);
+  const maxSpendPerDay = readLE64(buf, 132);
+  const spentToday = readLE64(buf, 140);
+  const maxOpsPerDay = readLE32(buf, 148);
+  const opsToday = readLE32(buf, 152);
+  const windowStart = Number(readLEI64(buf, 156));
+  const expiresAt = Number(readLEI64(buf, 164));
+  const revoked = buf[172] !== 0;
+  const bump = buf[173];
+  return {
+    owner,
+    sessionKey,
+    nonce,
+    ownerNonce,
+    scope,
+    categoriesHash,
+    maxSpendPerTx,
+    maxSpendPerDay,
+    spentToday,
+    maxOpsPerDay,
+    opsToday,
+    windowStart,
+    expiresAt,
+    revoked,
+    bump,
+  };
+}
+
+function deriveCapabilityPda(owner, grantedTo, scope) {
+  return PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("capability"),
+      owner.toBuffer(),
+      grantedTo.toBuffer(),
+      Buffer.from(scope, "utf8"),
+    ],
+    CAPABILITY_REGISTRY_PROGRAM_ID
+  )[0];
+}
+
+function deriveSessionPda(owner, sessionKey, nonce) {
+  const nonceBuf = Buffer.alloc(8);
+  nonceBuf.writeBigUInt64LE(BigInt.asUintN(64, BigInt(nonce)));
+  return PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("session"),
+      owner.toBuffer(),
+      sessionKey.toBuffer(),
+      nonceBuf,
+    ],
+    CAPABILITY_REGISTRY_PROGRAM_ID
+  )[0];
+}
+
+export async function verifyOnChainSession(auth, toolName, options = {}) {
+  const solana = auth?.solana;
+  if (!solana) return;
+
+  const owner = parsePubkey(solana.owner, "owner");
+  const sessionKey = parsePubkey(solana.sessionKey, "sessionKey");
+  const grantedTo = solana.grantedTo
+    ? parsePubkey(solana.grantedTo, "grantedTo")
+    : sessionKey;
+  const nonce = solana.nonce ?? 0;
+  const capabilityScope = solana.capabilityScope || "";
+
+  const expectedCapabilityPda = deriveCapabilityPda(
+    owner,
+    grantedTo,
+    capabilityScope
+  );
+  const expectedSessionPda = deriveSessionPda(owner, sessionKey, nonce);
+
+  if (solana.capabilityPda && expectedCapabilityPda.toBase58() !== solana.capabilityPda) {
+    throw new Error("Capability PDA mismatch");
+  }
+  if (solana.sessionPda && expectedSessionPda.toBase58() !== solana.sessionPda) {
+    throw new Error("Session PDA mismatch");
+  }
+
+  const connection = getSolanaConnection(options);
+
+  const [capabilityInfo, sessionInfo] = await Promise.all([
+    connection.getAccountInfo(expectedCapabilityPda),
+    connection.getAccountInfo(expectedSessionPda),
+  ]);
+
+  if (!capabilityInfo?.data) {
+    throw new Error("Capability not found on-chain");
+  }
+  if (!sessionInfo?.data) {
+    throw new Error("Session not found on-chain");
+  }
+
+  const capability = decodeCapability(capabilityInfo.data);
+  if (capability.owner.toBase58() !== owner.toBase58()) {
+    throw new Error("Capability owner mismatch");
+  }
+  if (capability.grantedTo.toBase58() !== grantedTo.toBase58()) {
+    throw new Error("Capability grantee mismatch");
+  }
+  const now = Math.floor(Date.now() / 1000);
+  if (capability.expiresAt <= now) {
+    throw new Error("Capability expired");
+  }
+
+  const session = decodeSession(sessionInfo.data);
+  if (session.owner.toBase58() !== owner.toBase58()) {
+    throw new Error("Session owner mismatch");
+  }
+  if (session.sessionKey.toBase58() !== sessionKey.toBase58()) {
+    throw new Error("Session key mismatch");
+  }
+  if (session.revoked) {
+    throw new Error("Session revoked");
+  }
+  if (session.expiresAt <= now) {
+    throw new Error("Session expired");
+  }
+
+  const requiredScope = scopeBitForTool(toolName);
+  if (requiredScope && (session.scope & requiredScope) === 0) {
+    throw new Error("Session scope not granted");
+  }
+}
 
 function log(level, message) {
   if (process.env.CORTEX_MCP_QUIET === "1") return;
@@ -327,7 +589,6 @@ function readResource(store, uri) {
 }
 
 async function handle(request, options = {}) {
-  const store = getStore(options);
   const embedder = getEmbedder(options);
   const auth = options.auth ?? { userId: undefined, scopes: ["*"] };
 
@@ -347,6 +608,11 @@ async function handle(request, options = {}) {
   if (request.method === "tools/call") {
     const { name, arguments: args = {} } = request.params;
     authorizeTool(auth, name);
+    if (!options.skipSessionVerification) {
+      await verifyOnChainSession(auth, name, options);
+    }
+
+    const store = getStoreForUser(options, auth.userId);
 
     if (name === "store_memory") {
       const { id, text, owner } = args;
@@ -402,11 +668,19 @@ async function handle(request, options = {}) {
       return uri.startsWith(prefix.split("//")[0]) || uri.startsWith(prefix);
     })?.uriTemplate;
     authorizeResource(auth, template);
+    let resourceUserId = auth.userId;
+    if (uri.startsWith("cortex://memory/")) {
+      resourceUserId = uri.slice("cortex://memory/".length);
+    } else if (uri.startsWith("cortex://budget/")) {
+      resourceUserId = uri.slice("cortex://budget/".length);
+    }
+    const store = getStoreForUser(options, resourceUserId);
     const content = readResource(store, uri);
     return { contents: [content] };
   }
   throw new Error(`Unknown method: ${request.method}`);
 }
+export { handle };
 
 export async function startMcpServer(options = {}) {
   const store = getStore(options);
@@ -550,6 +824,7 @@ export function startMcpHttpServer(port = 3001, options = {}) {
       for (const request of requests) {
         try {
           const result = await handle(request, {
+            ...options,
             store,
             embedder,
             auth: session.auth,
@@ -577,11 +852,17 @@ export function startMcpHttpServer(port = 3001, options = {}) {
     res.writeHead(404, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ error: "not found" }));
   });
-
   server.on("close", () => {
     try {
       store.close();
     } catch {}
+    if (options.stores) {
+      for (const userStore of options.stores.values()) {
+        try {
+          userStore.close();
+        } catch {}
+      }
+    }
   });
 
   return new Promise((resolve) => {

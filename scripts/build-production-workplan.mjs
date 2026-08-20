@@ -16,6 +16,7 @@ function parseArgs(argv = process.argv.slice(2)) {
     hostedRefCatalog: null,
     out: null,
     help: false,
+    plain: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
@@ -30,13 +31,17 @@ function parseArgs(argv = process.argv.slice(2)) {
     else if (token === '--hosted-ref-catalog' || token === '--hostedRefCatalog') out.hostedRefCatalog = readValue();
     else if (token === '--out') out.out = readValue();
     else if (token === '--help' || token === '-h') out.help = true;
+    else if (token === '--plain' || token === '--text' || token === '--format=text' || (token === '--format' && argv[index + 1] === 'text')) {
+      out.plain = true;
+      if (token === '--format') index += 1;
+    }
     else throw new Error(`Unknown production workplan option: ${token}`);
   }
   return out;
 }
 
 function usage() {
-  return 'Usage: node scripts/build-production-workplan.mjs --dependencies <production-dependencies.json> [--operator-acceptance <result.json>] [--hosted-ref-catalog <catalog.json>] [--out <file>]\n\nBuilds a public-safe ordered launch workplan from current dependency and operator evidence.\n';
+  return 'Usage: node scripts/build-production-workplan.mjs --dependencies <production-dependencies.json> [--operator-acceptance <result.json>] [--hosted-ref-catalog <catalog.json>] [--out <file>] [--plain]\n\nBuilds a public-safe ordered launch workplan from current dependency and operator evidence. --plain prints a human-readable ordered plan while --out preserves JSON evidence.\n';
 }
 
 async function readJson(path, label) {
@@ -345,6 +350,26 @@ export function buildProductionWorkplan(inputs = {}, options = {}) {
   return report;
 }
 
+export function renderProductionWorkplanPlain(report) {
+  const lines = [
+    'Enigma production workplan',
+    `Status: ${report.status ?? 'blocked'}`,
+    `Launch ready: ${report.launch_ready ? 'yes' : 'no'}`,
+    `Dependency status: ${report.dependency_status ?? '<unknown>'}`,
+    `Phases: ${report.phase_count ?? 0}`,
+    `Blocked phases: ${report.blocked_phase_count ?? 0}`,
+    `Next phase: ${report.next_phase_id ?? 'none'}`,
+  ];
+  for (const phase of Array.isArray(report.phases) ? report.phases.slice(0, 6) : []) {
+    lines.push(`Phase: ${phase.id} — ${phase.ready ? 'ready' : 'blocked'}; ${phase.blocker_count ?? 0} blockers`);
+  }
+  const next = Array.isArray(report.phases) ? report.phases.find((phase) => phase.id === report.next_phase_id) : null;
+  for (const command of (Array.isArray(next?.commands) ? next.commands.slice(0, 5) : [])) lines.push(`Next: ${command}`);
+  lines.push('Boundary: public-safe ordered workplan only; no credentials, account ids, local paths, raw memory, prompts, transcripts, provider responses, provider deletion, model behavior, hosted service, infrastructure deployment, operator approval, launch certification, compliance, benchmark superiority, token ROI, or provider invoice savings claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+
 export async function main(argv = process.argv.slice(2)) {
   const args = parseArgs(argv);
   if (args.help) return { text: usage(), status: 0 };
@@ -359,7 +384,7 @@ export async function main(argv = process.argv.slice(2)) {
     await mkdir(dirname(args.out), { recursive: true });
     await writeFile(args.out, json, 'utf8');
   }
-  return { text: json, status: report.launch_ready ? 0 : 1 };
+  return { text: args.plain ? renderProductionWorkplanPlain(report) : json, status: report.launch_ready ? 0 : 1 };
 }
 
 if (fileURLToPath(import.meta.url) === process.argv[1]) {

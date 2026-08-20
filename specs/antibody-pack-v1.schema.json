@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.enigma.ai/antibody-pack-v1.schema.json",
+  "title": "Enigma Antibody Pack v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "antibody_pack_id",
+    "created_at",
+    "version",
+    "policy_fingerprints",
+    "pack_root",
+    "signatures",
+    "public_payload_only",
+    "private_inputs_included"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "enigma.antibody_pack.v1" },
+    "antibody_pack_id": { "$ref": "#/$defs/publicId" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?$" },
+    "policy_fingerprints": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/policyFingerprint" }
+    },
+    "pack_root": { "$ref": "#/$defs/sha256Digest" },
+    "signatures": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/signatureRef" }
+    },
+    "public_payload_only": { "const": true },
+    "private_inputs_included": { "const": false }
+  },
+  "$defs": {
+    "sha256Digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "publicId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._:-]{7,127}$" },
+    "publicRef": { "type": "string", "pattern": "^ref:[A-Za-z0-9][A-Za-z0-9._~:@#?=&%+-]{0,255}$" },
+    "detectorId": { "type": "string", "pattern": "^detector:[A-Za-z0-9][A-Za-z0-9._~:@#?=&%+-]{0,191}$" },
+    "policyId": { "type": "string", "pattern": "^policy:[A-Za-z0-9][A-Za-z0-9._~:@#?=&%+-]{0,191}$" },
+    "signerRef": { "type": "string", "pattern": "^signer:[A-Za-z0-9][A-Za-z0-9._~:@#?=&%+-]{0,191}$" },
+    "signaturePublicRef": { "type": "string", "pattern": "^sigref:[A-Za-z0-9][A-Za-z0-9._~:@#?=&%+-]{0,191}$" },
+    "policyFingerprint": {
+      "type": "object",
+      "required": [
+        "policy_id",
+        "detector_id",
+        "detector_ref",
+        "policy_hash",
+        "risk_labels",
+        "threshold_commitment",
+        "private_inputs_included"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "policy_id": { "$ref": "#/$defs/policyId" },
+        "detector_id": { "$ref": "#/$defs/detectorId" },
+        "detector_ref": { "$ref": "#/$defs/publicRef" },
+        "policy_hash": { "$ref": "#/$defs/sha256Digest" },
+        "risk_labels": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/riskLabel" },
+          "uniqueItems": true
+        },
+        "threshold_commitment": { "$ref": "#/$defs/sha256Digest" },
+        "private_inputs_included": { "const": false }
+      }
+    },
+    "signatureRef": {
+      "type": "object",
+      "required": ["signer_ref", "signature_ref", "signature_hash", "alg"],
+      "additionalProperties": false,
+      "properties": {
+        "signer_ref": { "$ref": "#/$defs/signerRef" },
+        "signature_ref": { "$ref": "#/$defs/signaturePublicRef" },
+        "signature_hash": { "$ref": "#/$defs/sha256Digest" },
+        "alg": { "type": "string", "enum": ["Ed25519", "ECDSA-P256-SHA256"] }
+      }
+    },
+    "riskLabel": {
+      "type": "string",
+      "enum": [
+        "untrusted_origin",
+        "prompt_injection",
+        "data_exfiltration",
+        "secret_material",
+        "memory_poisoning",
+        "policy_violation",
+        "unknown"
+      ]
+    }
+  }
+}

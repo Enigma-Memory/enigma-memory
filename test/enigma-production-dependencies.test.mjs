@@ -8,6 +8,7 @@ import { promisify } from 'node:util';
 import {
   PRODUCTION_DEPENDENCY_REPORT_SCHEMA,
   buildProductionDependencyReport,
+  renderProductionDependencyReportPlain,
 } from '../scripts/build-production-dependency-report.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -168,6 +169,26 @@ test('production dependency report summarizes launch blockers without overclaimi
   assert.ok(actionIds.includes('generate-operator-evidence-starter'));
   assert.ok(actionIds.indexOf('generate-operator-evidence-starter') < actionIds.indexOf('generate-backend-env-kit'));
   assert.ok(actionIds.indexOf('generate-operator-evidence-starter') < actionIds.indexOf('complete-operator-acceptance'));
+});
+
+test('production dependency report plain output is readable and claim-bounded', () => {
+  const report = buildProductionDependencyReport({
+    goalAudit: goalAudit(),
+    releaseAudit: releaseAudit(),
+    workerInspect: workerInspect(),
+    whitepaper: whitepaper(),
+  }, { generated_at: '2026-06-24T00:00:00.000Z' });
+  const plain = renderProductionDependencyReportPlain(report);
+
+  assert.match(plain, /^Enigma production dependency report\n/);
+  assert.match(plain, /Status: blocked/);
+  assert.match(plain, /Launch ready: no/);
+  assert.match(plain, /Ready groups: /);
+  assert.match(plain, /Blocked: cloudflare_credentials/);
+  assert.match(plain, /Next: /);
+  assert.match(plain, /Boundary: public-safe dependency summary only/);
+  assert.doesNotMatch(plain, /^\s*\{/);
+  assert.doesNotMatch(plain, /Bearer\s+[A-Za-z0-9._~+/=-]{12,}|C:\\Users\\|\/home\/|raw_memory|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/i);
 });
 
 test('production dependency report surfaces edge backend deployment evidence', () => {
@@ -440,4 +461,47 @@ test('production dependency report CLI writes blocked public-safe JSON with exit
   assert.equal(stdoutReport.schema, PRODUCTION_DEPENDENCY_REPORT_SCHEMA);
   assert.equal(stdoutReport.launch_ready, false);
   assert.doesNotMatch(error.stdout, /Bearer|PRIVATE KEY|sk-[A-Za-z0-9_-]{16,}|11112222333344445555666677778888|C:\\Users\\/i);
+});
+
+test('production dependency report CLI writes JSON evidence while printing plain output', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-dependency-report-plain-'));
+  const paths = {
+    goal: join(dir, 'goal.json'),
+    release: join(dir, 'release.json'),
+    worker: join(dir, 'worker.json'),
+    whitepaper: join(dir, 'whitepaper.json'),
+    credentials: join(dir, 'credentials.json'),
+    out: join(dir, 'report.json'),
+  };
+  await writeFile(paths.goal, `${JSON.stringify(goalAudit(), null, 2)}\n`, 'utf8');
+  await writeFile(paths.release, `${JSON.stringify(releaseAudit(), null, 2)}\n`, 'utf8');
+  await writeFile(paths.worker, `${JSON.stringify(workerInspect(), null, 2)}\n`, 'utf8');
+  await writeFile(paths.whitepaper, `${JSON.stringify(whitepaper(), null, 2)}\n`, 'utf8');
+  await writeFile(paths.credentials, `${JSON.stringify(cloudflareCredentials(), null, 2)}\n`, 'utf8');
+  let error;
+  try {
+    await execFileAsync(process.execPath, [
+      'scripts/build-production-dependency-report.mjs',
+      '--goal-audit', paths.goal,
+      '--release-audit', paths.release,
+      '--worker-inspect', paths.worker,
+      '--whitepaper', paths.whitepaper,
+      '--cloudflare-credentials', paths.credentials,
+      '--out', paths.out,
+      '--plain',
+    ], { cwd: process.cwd(), timeout: 10000, windowsHide: true });
+  } catch (caught) {
+    error = caught;
+  }
+  assert.equal(error?.code, 1);
+  assert.equal(error.stderr, '');
+  assert.match(error.stdout, /^Enigma production dependency report\n/);
+  assert.match(error.stdout, /Status: blocked/);
+  assert.match(error.stdout, /Boundary: public-safe dependency summary only/);
+  assert.doesNotMatch(error.stdout, /^\s*\{/);
+  assert.equal(error.stdout.includes(dir), false);
+  assert.equal(error.stdout.includes(paths.out), false);
+  const fileReport = JSON.parse(await readFile(paths.out, 'utf8'));
+  assert.equal(fileReport.schema, PRODUCTION_DEPENDENCY_REPORT_SCHEMA);
+  assert.equal(fileReport.launch_ready, false);
 });

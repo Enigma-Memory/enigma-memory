@@ -33,7 +33,8 @@ function getFlag(flags, names, fallback = undefined) {
 
 function outputFormat(flags) {
   const format = String(getFlag(flags, ['format'], 'json')).toLowerCase();
-  if (!['json', 'sql'].includes(format)) throw new Error('--format must be json or sql');
+  if (format === 'text') return 'json';
+  if (!['json', 'sql'].includes(format)) throw new Error('--format must be json, sql, or text');
   return format;
 }
 
@@ -59,11 +60,30 @@ export function buildProductionStorageMigrationArtifact(options = {}) {
   };
 }
 
+export function renderProductionStorageMigrationPlain(artifact, { outWritten = false } = {}) {
+  const lines = [
+    'Enigma production storage migration',
+    'Status: Ready',
+    `Format: ${artifact.format ?? 'json'}`,
+    `Migration schema id: ${artifact.migration?.schema ?? '<schema>'}`,
+    `Database schema: ${/CREATE SCHEMA IF NOT EXISTS "([^"]+)"/u.exec(artifact.migration?.sql ?? '')?.[1] ?? '<database-schema>'}`,
+    `Migration: ${artifact.migration?.migration_id ?? '<migration-id>'}`,
+    `Tables: ${Array.isArray(artifact.contract?.tables) ? artifact.contract.tables.length : 0}`,
+    `SQL bytes: ${typeof artifact.migration?.sql === 'string' ? Buffer.byteLength(artifact.migration.sql) : 0}`,
+    `Output written: ${outWritten ? 'yes' : 'no'}`,
+  ];
+  for (const table of (Array.isArray(artifact.contract?.tables) ? artifact.contract.tables.slice(0, 8) : [])) lines.push(`Table: ${table.name ?? table}`);
+  lines.push('Boundary: public-safe local storage migration artifact only; no database connection, database mutation, credentials, account ids, local paths, raw memory, prompts, transcripts, provider responses, hosted readiness completion, backup verification, provider deletion, model behavior, compliance, benchmark superiority, token ROI, or provider invoice savings claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+
 async function main() {
   const flags = parseArgs();
   const artifact = buildProductionStorageMigrationArtifact({ flags });
   const format = artifact.format;
   const out = getFlag(flags, ['out']);
+  const plain = getFlag(flags, ['plain', 'text']) === true || String(getFlag(flags, ['format'], '')).toLowerCase() === 'text';
   const content = format === 'sql'
     ? `${artifact.migration.sql}\n`
     : `${JSON.stringify(artifact, null, 2)}\n`;
@@ -71,10 +91,11 @@ async function main() {
     const path = resolve(String(out));
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, content, 'utf8');
-    process.stdout.write(`${JSON.stringify({ ok: true, out: path, schema: artifact.schema, format, table_count: artifact.contract.tables.length }, null, 2)}\n`);
+    if (plain) process.stdout.write(renderProductionStorageMigrationPlain(artifact, { outWritten: true }));
+    else process.stdout.write(`${JSON.stringify({ ok: true, out: path, schema: artifact.schema, format, table_count: artifact.contract.tables.length }, null, 2)}\n`);
     return;
   }
-  process.stdout.write(content);
+  process.stdout.write(plain ? renderProductionStorageMigrationPlain(artifact) : content);
 }
 
 const invokedPath = process.argv[1] ? resolve(process.argv[1]) : '';

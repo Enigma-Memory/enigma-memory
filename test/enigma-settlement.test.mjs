@@ -202,6 +202,15 @@ function makeIo() {
   };
 }
 
+function assertPlainSettlement(stdout, title, dir) {
+  assert.match(stdout, new RegExp(`^${title}\\n`));
+  assert.match(stdout, /Status: Ready/);
+  assert.match(stdout, /Boundary: local settlement/);
+  assert.doesNotMatch(stdout, /^\s*\{/);
+  assert.equal(stdout.includes(dir), false);
+}
+
+
 test('CLI creates and verifies settlement artifacts', async () => {
   const { main } = await import('../apps/cli/bin/enigma.mjs');
   const dir = await mkdtemp(join(tmpdir(), 'enigma-settlement-cli-'));
@@ -339,4 +348,110 @@ test('CLI creates and verifies settlement artifacts', async () => {
   assert.equal(batch.schema, SETTLEMENT_BATCH_SCHEMA);
   assert.equal(batch.receipt_count, 1);
   assert.equal(batch.total_settled_amount, 0.4);
+
+  const plainJobPath = join(dir, 'job-plain.json');
+  const plainJobIo = makeIo();
+  assert.equal(await main([
+    'settlement', 'job',
+    '--tenant', 'tenant-a',
+    '--job-type', 'context.pack',
+    '--memory-root', ROOT_A,
+    '--policy-hash', ROOT_B,
+    '--usage-event-hash', ROOT_C,
+    '--max-price-amount', '5',
+    '--payment-asset', 'USDC',
+    '--requested-at', '2026-06-23T12:00:00.000Z',
+    '--expires-at', '2026-06-23T12:10:00.000Z',
+    '--out', plainJobPath,
+    '--plain',
+  ], plainJobIo.io), 0, plainJobIo.stderr());
+  assertPlainSettlement(plainJobIo.stdout(), 'Enigma settlement job', dir);
+  assert.match(plainJobIo.stdout(), /Job: pjob_/);
+  assert.match(plainJobIo.stdout(), /Job file: written to <out>/);
+  assert.equal(plainJobIo.stdout().includes(plainJobPath), false);
+
+  const plainCapacityPath = join(dir, 'capacity-plain.json');
+  const plainCapacityIo = makeIo();
+  assert.equal(await main([
+    'settlement', 'capacity',
+    '--operator', 'operator-a',
+    '--accelerator-class', 'consumer_gpu',
+    '--hardware-ref', 'hardware://operator-a/rtx-4090-slot-7',
+    '--region', 'us-central',
+    '--model-family', 'memory-optimizer',
+    '--model-ref', 'glm-5.2-memory-optimizer',
+    '--observed-at', '2026-06-23T12:00:00.000Z',
+    '--expires-at', '2026-06-23T12:05:00.000Z',
+    '--vram-gb', '24',
+    '--max-context-window-tokens', '131072',
+    '--available-context-tokens-per-minute', '900000',
+    '--p95-latency-ms', '180',
+    '--price-per-million-context-tokens', '0.42',
+    '--asset', 'USDC',
+    '--capacity-ref', 'capacity://operator-a/consumer-gpu/slot-7',
+    '--terms-ref', 'terms://enigma/consumer-gpu-memory-v1',
+    '--out', plainCapacityPath,
+    '--plain',
+  ], plainCapacityIo.io), 0, plainCapacityIo.stderr());
+  assertPlainSettlement(plainCapacityIo.stdout(), 'Enigma settlement capacity', dir);
+  assert.match(plainCapacityIo.stdout(), /Capacity file: written to <out>/);
+  assert.equal(plainCapacityIo.stdout().includes(plainCapacityPath), false);
+
+  const plainQuotePath = join(dir, 'quote-plain.json');
+  const plainQuoteIo = makeIo();
+  assert.equal(await main([
+    'settlement', 'quote',
+    '--job', jobPath,
+    '--operator', 'operator-a',
+    '--service-kind', 'memory_optimizer',
+    '--quoted-at', '2026-06-23T12:01:00.000Z',
+    '--expires-at', '2026-06-23T12:09:00.000Z',
+    '--price-amount', '0.42',
+    '--asset', 'USDC',
+    '--capacity-profile', capacityPath,
+    '--terms-ref', 'terms://enigma/service-v1',
+    '--out', plainQuotePath,
+    '--plain',
+  ], plainQuoteIo.io), 0, plainQuoteIo.stderr());
+  assertPlainSettlement(plainQuoteIo.stdout(), 'Enigma settlement quote', dir);
+  assert.match(plainQuoteIo.stdout(), /Quote file: written to <out>/);
+  assert.equal(plainQuoteIo.stdout().includes(plainQuotePath), false);
+  assert.equal(plainQuoteIo.stdout().includes(jobPath), false);
+  assert.equal(plainQuoteIo.stdout().includes(capacityPath), false);
+
+  const plainReceiptPath = join(dir, 'receipt-plain.json');
+  const plainReceiptIo = makeIo();
+  assert.equal(await main([
+    'settlement', 'receipt',
+    '--job', jobPath,
+    '--quote', quotePath,
+    '--completed-at', '2026-06-23T12:04:00.000Z',
+    '--settled-amount', '0.4',
+    '--settlement-ref', 'settlement://ledger/a',
+    '--service-receipt-ref', 'receipt://gateway/decision/hash-only',
+    '--out', plainReceiptPath,
+    '--plain',
+  ], plainReceiptIo.io), 0, plainReceiptIo.stderr());
+  assertPlainSettlement(plainReceiptIo.stdout(), 'Enigma settlement receipt', dir);
+  assert.match(plainReceiptIo.stdout(), /Receipt file: written to <out>/);
+  assert.equal(plainReceiptIo.stdout().includes(plainReceiptPath), false);
+  assert.equal(plainReceiptIo.stdout().includes(jobPath), false);
+  assert.equal(plainReceiptIo.stdout().includes(quotePath), false);
+
+  const plainVerifyIo = makeIo();
+  assert.equal(await main(['settlement', 'verify', '--job', jobPath, '--quote', quotePath, '--receipt', receiptPath, '--plain'], plainVerifyIo.io), 0, plainVerifyIo.stderr());
+  assertPlainSettlement(plainVerifyIo.stdout(), 'Enigma settlement verify', dir);
+  assert.match(plainVerifyIo.stdout(), /Errors: 0/);
+  assert.equal(plainVerifyIo.stdout().includes(jobPath), false);
+  assert.equal(plainVerifyIo.stdout().includes(quotePath), false);
+  assert.equal(plainVerifyIo.stdout().includes(receiptPath), false);
+
+  const plainBatchPath = join(dir, 'batch-plain.json');
+  const plainBatchIo = makeIo();
+  assert.equal(await main(['settlement', 'batch', '--receipts', batchInputPath, '--batch-ref', 'batch://settlement/plain', '--asset', 'USDC', '--out', plainBatchPath, '--plain'], plainBatchIo.io), 0, plainBatchIo.stderr());
+  assertPlainSettlement(plainBatchIo.stdout(), 'Enigma settlement batch', dir);
+  assert.match(plainBatchIo.stdout(), /Batch file: written to <out>/);
+  assert.match(plainBatchIo.stdout(), /Receipts: 1/);
+  assert.equal(plainBatchIo.stdout().includes(batchInputPath), false);
+  assert.equal(plainBatchIo.stdout().includes(plainBatchPath), false);
 });

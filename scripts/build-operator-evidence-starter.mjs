@@ -16,7 +16,7 @@ export const OPERATOR_HOSTED_REF_WORKSTREAMS_SCHEMA = 'enigma.operator_hosted_re
 const HOSTED_REF_KEYS = Object.freeze([...REQUIRED_REF_KEYS]);
 
 function parseArgs(argv = process.argv.slice(2)) {
-  const out = { outDir: null, domain: 'enigmamemory.com', projectName: 'enigma-memory', environment: 'production', tenant: 'enigma-memory' };
+  const out = { outDir: null, domain: 'enigmamemory.com', projectName: 'enigma-memory', environment: 'production', tenant: 'enigma-memory', plain: false };
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     const next = () => {
@@ -36,6 +36,10 @@ function parseArgs(argv = process.argv.slice(2)) {
     else if (typeof token === 'string' && token.startsWith('--environment=')) out.environment = token.slice('--environment='.length);
     else if (typeof token === 'string' && token.startsWith('--tenant=')) out.tenant = token.slice('--tenant='.length);
     else if (token === '--help' || token === '-h') out.help = true;
+    else if (token === '--plain' || token === '--text' || token === '--format=text' || (token === '--format' && argv[index + 1] === 'text')) {
+      out.plain = true;
+      if (token === '--format') index += 1;
+    }
     else throw new Error(`Unknown operator evidence starter option: ${token}`);
   }
   return out;
@@ -501,8 +505,26 @@ export async function writeOperatorEvidenceStarter(starter, outDir) {
   };
 }
 
+export function renderOperatorEvidenceStarterPlain(result) {
+  const lines = [
+    'Enigma operator evidence starter',
+    `Status: ${result.status ?? 'blocked_until_operator_evidence'}`,
+    `Files: ${result.file_count ?? 0}`,
+    `Hosted refs: ${result.hosted_ref_count ?? result.counts?.hosted_ref_count ?? 0}`,
+    `Evidence items: ${result.evidence_item_count ?? result.counts?.evidence_item_count ?? 0}`,
+    `Output written: ${result.ok === true ? 'yes' : 'no'}`,
+  ];
+  const generatedFiles = Array.isArray(result.generated_files) ? result.generated_files : [];
+  for (const file of generatedFiles.slice(0, 8)) lines.push(`File: ${file}`);
+  lines.push('Next: fill owner-approval-refs.template.json and evidence-refs.template.json with public refs, never secrets.');
+  lines.push('Next: run npm run production:acceptance after evidence is filled.');
+  lines.push('Boundary: public-safe operator evidence starter only; no credentials, account ids, local paths, raw memory, prompts, transcripts, provider responses, hosted readiness completion, infrastructure deployment, operator approval, provider deletion, model behavior, compliance, benchmark superiority, token ROI, or provider invoice savings claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+
 function usage() {
-  return 'Usage: node scripts/build-operator-evidence-starter.mjs --out-dir <dir> [--domain enigmamemory.com] [--project-name enigma-memory] [--environment production] [--tenant enigma-memory]\n\nWrites public-safe starter JSON files for the operator evidence repository. It creates no cloud resources and does not mark hosted readiness complete.\n';
+  return 'Usage: node scripts/build-operator-evidence-starter.mjs --out-dir <dir> [--domain enigmamemory.com] [--project-name enigma-memory] [--environment production] [--tenant enigma-memory] [--plain]\n\nWrites public-safe starter JSON files for the operator evidence repository. It creates no cloud resources and does not mark hosted readiness complete. --plain prints a human-readable summary.\n';
 }
 
 const invokedPath = process.argv[1] ? resolve(process.argv[1]) : '';
@@ -515,8 +537,12 @@ if (invokedPath === fileURLToPath(import.meta.url)) {
         return;
       }
       const starter = await buildOperatorEvidenceStarter({ args, generated_at: new Date().toISOString() });
-      if (args.outDir) process.stdout.write(`${JSON.stringify(await writeOperatorEvidenceStarter(starter, args.outDir), null, 2)}\n`);
-      else process.stdout.write(`${JSON.stringify(starter, null, 2)}\n`);
+      if (args.outDir) {
+        const summary = await writeOperatorEvidenceStarter(starter, args.outDir);
+        process.stdout.write(args.plain ? renderOperatorEvidenceStarterPlain(summary) : `${JSON.stringify(summary, null, 2)}\n`);
+      } else {
+        process.stdout.write(args.plain ? renderOperatorEvidenceStarterPlain(starter) : `${JSON.stringify(starter, null, 2)}\n`);
+      }
     } catch (error) {
       process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
       process.exitCode = 1;

@@ -8,6 +8,7 @@ import { promisify } from 'node:util';
 import {
   CLOUDFLARE_TOKEN_POLICY_SCHEMA,
   buildCloudflareTokenPolicy,
+  renderCloudflareTokenPolicyPlain,
 } from '../scripts/build-cloudflare-token-policy.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -59,6 +60,21 @@ test('Cloudflare token policy scopes pages-deploy without registrar mutation cal
   assert.match(hostedProbe.verification_commands.join('\n'), /workers inspect-probe --name enigma-hosted-probe/);
 });
 
+test('Cloudflare token policy plain output is readable and claim-bounded', () => {
+  const policy = buildCloudflareTokenPolicy({ mode: 'all', accountId: 'acct_1234567890abcdef', projectName: 'enigma-memory', domain: 'enigmamemory.com' });
+  const plain = renderCloudflareTokenPolicyPlain(policy);
+
+  assert.match(plain, /^Enigma Cloudflare token policy\n/);
+  assert.match(plain, /Status: Ready/);
+  assert.match(plain, /Mode: all/);
+  assert.match(plain, /Permission groups: /);
+  assert.match(plain, /Planned API calls: /);
+  assert.match(plain, /Token value printed: no/);
+  assert.match(plain, /Boundary: public-safe Cloudflare token policy only/);
+  assert.doesNotMatch(plain, /^\s*\{/);
+  assert.doesNotMatch(plain, /Bearer|PRIVATE KEY|sk-|cf-token|raw_memory|C:\\Users\\|\/home\/|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/i);
+});
+
 test('Cloudflare token policy CLI writes public-safe JSON', async () => {
   const outPath = join(await mkdtemp(join(tmpdir(), 'enigma-token-policy-')), 'policy.json');
   const result = await execFileAsync(process.execPath, [
@@ -81,4 +97,34 @@ test('Cloudflare token policy CLI writes public-safe JSON', async () => {
   assert.equal(filePolicy.mode, 'all');
   assert.equal(stdoutPolicy.mutation_boundaries.token_value_printed, false);
   assert.doesNotMatch(result.stdout, /cf-token-present-but-never-printed|Bearer|PRIVATE KEY|sk-/i);
+});
+
+test('Cloudflare token policy CLI writes JSON while printing plain output', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-token-policy-plain-'));
+  const outPath = join(dir, 'policy.json');
+  const result = await execFileAsync(process.execPath, [
+    'scripts/build-cloudflare-token-policy.mjs',
+    '--mode', 'hosted-probe',
+    '--account-id', 'acct_1234567890abcdef',
+    '--project-name', 'enigma-memory',
+    '--domain', 'enigmamemory.com',
+    '--out', outPath,
+    '--plain',
+  ], {
+    cwd: process.cwd(),
+    env: { ...process.env, CLOUDFLARE_API_TOKEN: 'cf-token-present-but-never-printed' },
+    timeout: 10000,
+    windowsHide: true,
+  });
+  assert.equal(result.stderr, '');
+  assert.match(result.stdout, /^Enigma Cloudflare token policy\n/);
+  assert.match(result.stdout, /Mode: hosted-probe/);
+  assert.match(result.stdout, /Boundary: public-safe Cloudflare token policy only/);
+  assert.doesNotMatch(result.stdout, /^\s*\{/);
+  assert.equal(result.stdout.includes(dir), false);
+  assert.equal(result.stdout.includes(outPath), false);
+  assert.doesNotMatch(result.stdout, /cf-token-present-but-never-printed|Bearer|PRIVATE KEY|sk-/i);
+  const filePolicy = JSON.parse(await readFile(outPath, 'utf8'));
+  assert.equal(filePolicy.schema, CLOUDFLARE_TOKEN_POLICY_SCHEMA);
+  assert.equal(filePolicy.mode, 'hosted-probe');
 });

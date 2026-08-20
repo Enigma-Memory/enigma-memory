@@ -28,6 +28,7 @@ function parseArgs(argv = process.argv.slice(2)) {
     domain: 'enigmamemory.com',
     tokenName: 'enigma-memory-pages-deploy',
     out: null,
+    plain: false,
   };
   for (let index = 0; index < argv.length;) {
     const token = argv[index];
@@ -46,13 +47,17 @@ function parseArgs(argv = process.argv.slice(2)) {
     else if (token === '--domain') out.domain = readValue(token);
     else if (token === '--token-name') out.tokenName = readValue(token);
     else if (token === '--out') out.out = readValue(token);
+    else if (token === '--plain' || token === '--text' || token === '--format=text' || (token === '--format' && argv[index + 1] === 'text')) {
+      out.plain = true;
+      index += token === '--format' ? 2 : 1;
+    }
     else throw new UsageError(`unknown option ${token}`);
   }
   return out;
 }
 
 function usage() {
-  return `Usage: node scripts/build-cloudflare-token-request.mjs --permission-groups <json> --account-id <id> [options]\n\nOptions:\n  --mode <pages-deploy|pages-observe|domain-registrar|hosted-probe|all>  Default: pages-deploy.\n  --project-name <name>                                                 Default: enigma-memory.\n  --domain <host>                                                       Default: enigmamemory.com.\n  --token-name <name>                                                   Default: enigma-memory-pages-deploy.\n  --user-id <id>                                                        Only needed if adding user-scoped permissions.\n  --out <file>                                                          Write JSON and print the same JSON.\n\nInput should be the JSON returned by Cloudflare /user/tokens/permission_groups. The output is a request-body skeleton; it does not create or print a token.\n`;
+  return `Usage: node scripts/build-cloudflare-token-request.mjs --permission-groups <json> --account-id <id> [options]\n\nOptions:\n  --mode <pages-deploy|pages-observe|domain-registrar|hosted-probe|all>  Default: pages-deploy.\n  --project-name <name>                                                 Default: enigma-memory.\n  --domain <host>                                                       Default: enigmamemory.com.\n  --token-name <name>                                                   Default: enigma-memory-pages-deploy.\n  --user-id <id>                                                        Only needed if adding user-scoped permissions.\n  --out <file>                                                          Write JSON evidence.\n  --plain                                                               Print a human-readable token request summary.\n\nThis prints a public-safe API-token request body skeleton for the Cloudflare dashboard/API.\nIt lists matched permission group counts and boundaries only; it never creates a token or prints token values.\n`;
 }
 
 function requiredText(name, value) {
@@ -288,6 +293,27 @@ export async function buildCloudflareTokenRequest(input = {}) {
   return output;
 }
 
+export function renderCloudflareTokenRequestPlain(packet) {
+  const lines = [
+    'Enigma Cloudflare token request',
+    `Status: ${packet.ok ? 'Ready' : 'Needs attention'}`,
+    `Mode: ${packet.mode ?? '<mode>'}`,
+    `Token name: ${packet.token_name ?? '<token-name>'}`,
+    `Required permissions: ${packet.required_permission_count ?? 0}`,
+    `Resolved permissions: ${packet.resolved_permission_count ?? 0}`,
+    `Unresolved permissions: ${packet.unresolved_permission_count ?? 0}`,
+    `Policy blocks: ${Array.isArray(packet.token_request?.policies) ? packet.token_request.policies.length : 0}`,
+    `Token created: ${packet.mutation_boundaries?.token_created ? 'yes' : 'no'}`,
+    `Token value printed: ${packet.mutation_boundaries?.token_value_printed ? 'yes' : 'no'}`,
+  ];
+  for (const item of (Array.isArray(packet.unresolved_permission_groups) ? packet.unresolved_permission_groups.slice(0, 5) : [])) lines.push(`Missing permission: ${item.key}`);
+  for (const item of (Array.isArray(packet.resolved_permission_groups) ? packet.resolved_permission_groups.slice(0, 6) : [])) lines.push(`Resolved: ${item.key} — ${item.name}`);
+  lines.push('Next: create the token in Cloudflare only after a release owner reviews the JSON body and stores the generated token in a secret manager.');
+  lines.push('Boundary: public-safe Cloudflare token request skeleton only; no API token, credentials, account ids, permission-group secret values, local paths, deploy, domain purchase, Worker deploy, raw memory, prompts, transcripts, provider responses, provider deletion, model behavior, hosted-service certification, compliance, benchmark superiority, token ROI, or provider invoice savings claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+
 export async function runCli(argv = process.argv.slice(2), options = {}) {
   const parsed = parseArgs(argv);
   if (parsed.help) return { text: usage() };
@@ -298,7 +324,7 @@ export async function runCli(argv = process.argv.slice(2), options = {}) {
     await mkdir(dirname(outPath), { recursive: true });
     await writeFile(outPath, json, 'utf8');
   }
-  return { json: packet };
+  return parsed.plain ? { text: renderCloudflareTokenRequestPlain(packet), json: packet } : { json: packet };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

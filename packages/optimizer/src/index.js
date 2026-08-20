@@ -1,4 +1,18 @@
 import { createHash } from 'node:crypto';
+import { estimateTextTokens } from './text-estimate.js';
+
+export { estimateTextTokens };
+export {
+  VISUAL_CONTEXT_CARRIER_MANIFEST_SCHEMA,
+  VISUAL_CONTEXT_CARRIER_PRODUCT_THESIS,
+  VISUAL_CONTEXT_CARRIER_SCHEMA_ID,
+  createVisualContextCarrier,
+  decodeVisualContextText,
+  encodeVisualContextText,
+  estimateVisualImageTokens,
+  verifyVisualContextCarrier,
+  visualContextCarrierManifest,
+} from './visual-context.js';
 
 const SHA256_PREFIX = 'sha256:';
 const HASH_RE = /^(?:sha256:)?[a-f0-9]{64}$/i;
@@ -189,32 +203,6 @@ export const MEMORY_ACCESS_RECEIPT_SCHEMA = Object.freeze({
   }
 });
 
-export function estimateTextTokens(text) {
-  if (text === null || text === undefined) return 0;
-  const source = String(text);
-  let tokens = 0;
-  let inAsciiWord = false;
-  let asciiWordLength = 0;
-
-  for (let index = 0; index < source.length; index += 1) {
-    const code = source.charCodeAt(index);
-    const isAsciiWord = (code >= 48 && code <= 57) || (code >= 65 && code <= 90) || (code >= 97 && code <= 122) || code === 95;
-    if (isAsciiWord) {
-      inAsciiWord = true;
-      asciiWordLength += 1;
-      continue;
-    }
-    if (inAsciiWord) {
-      tokens += Math.max(1, Math.ceil(asciiWordLength / 4));
-      inAsciiWord = false;
-      asciiWordLength = 0;
-    }
-    if (code > 32) tokens += 1;
-  }
-
-  if (inAsciiWord) tokens += Math.max(1, Math.ceil(asciiWordLength / 4));
-  return tokens;
-}
 
 export function estimateTokenCost(tokensOrArgs, maybePricePerMillionTokens) {
   const args = isPlainObject(tokensOrArgs)

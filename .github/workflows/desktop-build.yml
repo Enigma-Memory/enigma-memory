@@ -1,0 +1,150 @@
+name: Desktop build (unsigned dry-run)
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+env:
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: short
+  UPDATER_MANIFEST_URL: "https://example.com/enigma-desktop/updater.json"
+
+jobs:
+  build:
+    name: Build desktop app (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            bundle: nsis
+          - os: macos-latest
+            bundle: dmg
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set up Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop-tauri
+
+      - name: Cache Tauri CLI
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin
+          key: ${{ runner.os }}-tauri-cli-v2
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version ^2 --locked
+
+      - name: Run package metadata check
+        run: npm run check
+
+      - name: Run secret scan
+        run: npm run secret-scan
+
+      - name: Run clippy
+        working-directory: apps/desktop-tauri
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Check Tauri app
+        working-directory: apps/desktop-tauri
+        run: cargo check --bin enigma-desktop-tauri
+
+      - name: Run desktop tests
+        working-directory: apps/desktop-tauri
+        run: cargo test
+
+      - name: Generate dry-run updater signing key
+        id: keygen
+        working-directory: apps/desktop-tauri
+        shell: bash
+        run: |
+          # Generate a one-time Ed25519 key pair for this dry-run build so the
+          # updater plugin can sign bundles without requiring repository secrets.
+          cargo tauri signer generate --ci -w .tauri-dry-run.key
+          echo "private_key_path=$(pwd)/.tauri-dry-run.key" >> "$GITHUB_OUTPUT"
+          echo "public_key=$(cat .tauri-dry-run.key.pub)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Azure Code Signing (Windows)
+        if: matrix.os == 'windows-latest' && secrets.AZURE_CODESIGN_ACCOUNT_NAME != ''
+        shell: pwsh
+        env:
+          AZURE_CODESIGN_ACCOUNT_NAME: ${{ secrets.AZURE_CODESIGN_ACCOUNT_NAME }}
+        run: |
+          # Install the Azure Code Signing client tools.
+          # URLs are pinned to known stable releases; update as needed.
+          $toolsDir = "$env:RUNNER_TEMP\acs"
+          New-Item -ItemType Directory -Force -Path $toolsDir | Out-Null
+          Invoke-WebRequest -Uri "https://www.nuget.org/api/v2/package/Azure.CodeSigning/" -OutFile "$toolsDir\acs.zip"
+          Expand-Archive -Path "$toolsDir\acs.zip" -DestinationPath "$toolsDir\acs" -Force
+          # Add nuget tool binaries to PATH
+          $acsBin = Get-ChildItem -Path "$toolsDir\acs" -Recurse -Filter "Azure.CodeSigning.Dlib.dll" | Select-Object -First 1
+          if (-not $acsBin) { throw "Azure.CodeSigning.Dlib.dll not found" }
+          $env:PATH = "$($acsBin.DirectoryName);$env:PATH"
+          Write-Output "ACS_TOOLS_DIR=$($acsBin.DirectoryName)" >> $env:GITHUB_ENV
+          # Export signing secrets for the build step only when they are present.
+          "AZURE_TENANT_ID=${{ secrets.AZURE_TENANT_ID }}" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "AZURE_CLIENT_ID=${{ secrets.AZURE_CLIENT_ID }}" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "AZURE_CLIENT_SECRET=${{ secrets.AZURE_CLIENT_SECRET }}" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "AZURE_CODESIGN_ACCOUNT_NAME=${{ secrets.AZURE_CODESIGN_ACCOUNT_NAME }}" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "AZURE_CODESIGN_CERT_PROFILE_NAME=${{ secrets.AZURE_CODESIGN_CERT_PROFILE_NAME }}" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "AZURE_CODESIGN_ENDPOINT=${{ secrets.AZURE_CODESIGN_ENDPOINT }}" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Set up macOS code signing
+        if: matrix.os == 'macos-latest' && secrets.APPLE_CERTIFICATE != ''
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+        run: |
+          # Export signing secrets for the build step only when they are present.
+          {
+            echo "APPLE_CERTIFICATE<<EOF"
+            printf '%s\n' "$APPLE_CERTIFICATE"
+            echo "EOF"
+            echo "APPLE_CERTIFICATE_PASSWORD=${{ secrets.APPLE_CERTIFICATE_PASSWORD }}"
+            echo "APPLE_ID=${{ secrets.APPLE_ID }}"
+            echo "APPLE_PASSWORD=${{ secrets.APPLE_PASSWORD }}"
+            echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}"
+          } >> "$GITHUB_ENV"
+
+      - name: Build Tauri app
+        working-directory: apps/desktop-tauri
+        env:
+          TAURI_SIGNING_PRIVATE_KEY_PATH: ${{ steps.keygen.outputs.private_key_path }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+        run: |
+          cargo tauri build --bundles ${{ matrix.bundle }} \
+            --config '{"plugins":{"updater":{"pubkey":"${{ steps.keygen.outputs.public_key }}"}}}'
+
+      - name: Upload installer artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: enigma-desktop-${{ matrix.os }}-dry-run
+          path: |
+            apps/desktop-tauri/target/release/bundle/nsis/*.exe
+            apps/desktop-tauri/target/release/bundle/dmg/*.dmg
+            apps/desktop-tauri/target/release/bundle/app/*.app

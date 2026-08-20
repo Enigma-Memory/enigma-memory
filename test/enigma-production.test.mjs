@@ -20,6 +20,8 @@ const DESKTOP_INDEX_URL = new URL('../apps/desktop/src/index.html', import.meta.
 const NATIVE_HOST_BIN_URL = new URL('../apps/native-host/bin/enigma-native-host.mjs', import.meta.url);
 const NATIVE_HOST_BIN_PATH = fileURLToPath(NATIVE_HOST_BIN_URL);
 const CLI_BIN_URL = new URL('../apps/cli/bin/enigma.mjs', import.meta.url);
+const CI_WORKFLOW_URL = new URL('../.github/workflows/ci.yml', import.meta.url);
+const NPM_PUBLISH_WORKFLOW_URL = new URL('../.github/workflows/npm-publish.yml', import.meta.url);
 const RAW_MEMORY = 'private launch-code phrase must not leave local memory';
 const REQUIRED_BIN_NAMES = Object.freeze(['enigma', 'enigma-verify', 'enigma-mcp', 'enigma-relay', 'enigma-gateway', 'enigma-native-host']);
 const NODE_SHEBANG = '#!/usr/bin/env node';
@@ -31,6 +33,11 @@ const PRODUCTION_WORKPLAN_SCRIPT = 'scripts/build-production-workplan.mjs';
 const PRODUCTION_STATUS_BOARD_SCRIPT = 'scripts/build-production-status-board.mjs';
 const AI_ORCHESTRATION_PLAN_SCRIPT = 'scripts/build-ai-orchestration-plan.mjs';
 const CLOUDFLARE_CREDENTIALS_SCRIPT = 'scripts/validate-cloudflare-credentials.mjs';
+const PUBLIC_BETA_QA_MATRIX_SCRIPT = 'scripts/run-public-beta-qa-matrix.mjs';
+const CLEAN_MACHINE_SMOKE_SCRIPT = 'scripts/run-clean-machine-smoke.mjs';
+const SUPPORT_DRY_RUN_SCRIPT = 'scripts/build-support-dry-run-summary.mjs';
+const CLAUDE_MCPB_PACKAGE_SCRIPT = 'scripts/build-claude-mcpb-package.mjs';
+const LOCAL_PACK_INSTALL_SCRIPT = 'scripts/verify-local-pack-install.mjs';
 const INFRASTRUCTURE_READINESS_SCHEMA = 'enigma.infrastructure_readiness.v1';
 const INFRASTRUCTURE_READINESS_MANIFEST_SCHEMA = 'enigma.infrastructure_readiness_manifest.v1';
 const INFRASTRUCTURE_READINESS_SCRIPT = 'scripts/infrastructure-readiness.mjs';
@@ -1552,10 +1559,30 @@ test('preflight release audit wiring is local-only and documented', async () => 
   assert.equal(packageFilesCover(pkg, AI_ORCHESTRATION_PLAN_SCRIPT), true, 'AI orchestration plan script must be included in the package file list');
   assert.equal(pkg.scripts?.['production:cloudflare-credentials'], `node ${CLOUDFLARE_CREDENTIALS_SCRIPT}`);
   assert.equal(packageFilesCover(pkg, CLOUDFLARE_CREDENTIALS_SCRIPT), true, 'Cloudflare credentials validator must be included in the package file list');
+  assert.equal(pkg.scripts?.['public-beta-qa'], `node ${PUBLIC_BETA_QA_MATRIX_SCRIPT} --json`);
+  assert.equal(pkg.scripts?.['public-beta:status'], `node scripts/run-public-beta-review.mjs --plain`);
+  assert.equal(packageFilesCover(pkg, PUBLIC_BETA_QA_MATRIX_SCRIPT), true, 'public beta QA matrix script must be included in the package file list');
+  assert.equal(pkg.scripts?.['clean-machine-smoke'], `node ${CLEAN_MACHINE_SMOKE_SCRIPT} --json`);
+  assert.equal(pkg.scripts?.['production:clean-machine-smoke'], `node ${CLEAN_MACHINE_SMOKE_SCRIPT}`);
+  assert.equal(packageFilesCover(pkg, CLEAN_MACHINE_SMOKE_SCRIPT), true, 'clean-machine smoke script must be included in the package file list');
+  assert.equal(pkg.scripts?.['production:support-dry-run'], `node ${SUPPORT_DRY_RUN_SCRIPT}`);
+  assert.equal(packageFilesCover(pkg, SUPPORT_DRY_RUN_SCRIPT), true, 'support dry-run script must be included in the package file list');
+  assert.equal(pkg.scripts?.['claude:mcpb:package'], `node ${CLAUDE_MCPB_PACKAGE_SCRIPT}`);
+  assert.equal(packageFilesCover(pkg, CLAUDE_MCPB_PACKAGE_SCRIPT), true, 'Claude MCPB package script must be included in the package file list');
+  assert.equal(pkg.scripts?.['package:install-smoke'], `node ${LOCAL_PACK_INSTALL_SCRIPT}`);
+  assert.equal(packageFilesCover(pkg, LOCAL_PACK_INSTALL_SCRIPT), true, 'local pack install smoke script must be included in the package file list');
 
   const auditSource = await readFile(new URL(`../${RELEASE_AUDIT_SCRIPT}`, import.meta.url), 'utf8');
   assert.match(auditSource, /nodeTestInvocation/, 'release audit must run the Node test runner directly instead of nesting npm test inside npm run release:audit');
   assert.doesNotMatch(auditSource, /const test = npmInvocation\(\['test'\]\)/, 'release audit must avoid nested npm test lifecycle flake');
+  assert.match(auditSource, /\.map\(\(entry\) => `test\/\$\{entry\.name\}`\)/, 'release audit must pass POSIX-style test paths to match npm test across Windows runners');
+  assert.match(auditSource, /--test-concurrency=1/, 'release audit must serialize direct test-runner files on Windows to avoid child-process temp-path flake');
+  assert.match(auditSource, /local-pack-install-smoke/, 'release audit must include local packed install smoke coverage');
+  assert.match(auditSource, /verify-local-pack-install\.mjs/, 'release audit must execute the local packed install verifier');
+  assert.match(auditSource, /summarizeLocalPackInstall/, 'release audit must validate local packed install output');
+  assert.match(auditSource, /optional_dependencies_omitted/, 'release audit must verify optional dependencies are omitted in local packed install smoke');
+  assert.match(auditSource, /offline_mode/, 'release audit must verify npm offline mode in local packed install smoke');
+  assert.match(auditSource, /export_specifier_count/, 'release audit must summarize installed package export coverage');
   assert.match(auditSource, /runNativeHostInstallPlanGate/, 'release audit must include native install-plan coverage');
   assert.match(auditSource, /native-host['"],\s*['"]install-plan/, 'release audit must execute the native install-plan command shape');
   assert.match(auditSource, /writes_performed/, 'release audit must validate that install-plan does not write browser or OS registration state');
@@ -1618,6 +1645,8 @@ test('preflight release audit wiring is local-only and documented', async () => 
   assert.match(auditSource, /source_status_fresh_input_evidence/, 'AI orchestration plan gate must validate source status freshness');
   assert.match(auditSource, /kimi_coding/, 'AI orchestration plan gate must validate Kimi lane names');
   assert.match(auditSource, /gpt55_architecture/, 'AI orchestration plan gate must validate GPT lane names');
+  assert.match(auditSource, /no_friction_advisor/, 'AI orchestration plan gate must validate Advisor lane names');
+  assert.match(auditSource, /advisor_lane_present/, 'AI orchestration plan gate must report Advisor lane evidence');
   assert.match(auditSource, /non_delegable_controls/, 'AI orchestration plan gate must validate non-delegable controls');
   assert.match(auditSource, /AI orchestration plan must emit claim_boundary strings/, 'AI orchestration plan gate must validate claim boundaries');
   assert.match(auditSource, /tempPathNeedles/, 'AI orchestration plan gate must check for temporary fixture path leaks');
@@ -1744,6 +1773,26 @@ test('preflight release audit wiring is local-only and documented', async () => 
   assert.match(docs['docs/cloudflare-token-and-domain-runbook.md'], /Do not paste API tokens into chat/i, 'Cloudflare runbook must forbid pasting tokens into chat');
   assert.match(docs['docs/cloudflare-token-and-domain-runbook.md'], /dry-run registration plan unless `--execute` is present/i, 'Cloudflare runbook must document registration dry-run defaults');
   assert.match(docs['docs/cloudflare-token-and-domain-runbook.md'], /Exact domain name/i, 'Cloudflare runbook must document exact registration domain confirmation boundaries');
+});
+
+
+test('npm publish workflow reuses local pack install smoke before publication', async () => {
+  const workflow = await readFile(NPM_PUBLISH_WORKFLOW_URL, 'utf8');
+  assert.match(workflow, /workflow_dispatch/);
+  assert.match(workflow, /npm audit --audit-level=moderate/);
+  assert.match(workflow, /Verify local packed install[\s\S]*?npm run package:install-smoke/);
+  assert.match(workflow, /Re-run local packed install[\s\S]*?npm run package:install-smoke/);
+  assert.match(workflow, /environment:\s*npm-publish/);
+  assert.match(workflow, /id-token:\s*write/);
+  assert.doesNotMatch(workflow, /NPM_TOKEN|NODE_AUTH_TOKEN/);
+});
+test('CI blocks moderate dependency advisories and runs packed install smoke', async () => {
+  const ciWorkflow = await readFile(CI_WORKFLOW_URL, 'utf8');
+  assert.match(ciWorkflow, /name:\s*Run security audit/);
+  assert.match(ciWorkflow, /npm audit --audit-level=moderate/);
+  assert.match(ciWorkflow, /Verify local packed install[\s\S]*?npm run package:install-smoke/);
+  assert.match(ciWorkflow, /Run release audit when available[\s\S]*?npm run release:audit/);
+  assert.doesNotMatch(ciWorkflow, /npm audit --audit-level=high/);
 });
 
 test('review packet builder and CLI copy safe public-site artifacts and release audit validates the manifest', async () => {
@@ -2007,21 +2056,27 @@ test('doctor returns ok and install creates bundle and MCP config', async () => 
 });
 
 test('doctor fails closed when a required package bin is missing', async () => {
-  const original = await readFile(PACKAGE_JSON_URL, 'utf8');
-  try {
-    const broken = JSON.parse(original);
+  await withTempDir('enigma-production-missing-bin-', async (dir) => {
+    const original = JSON.parse(await readFile(PACKAGE_JSON_URL, 'utf8'));
+    const broken = { ...original, bin: { ...original.bin } };
     delete broken.bin['enigma-relay'];
-    await writeFile(PACKAGE_JSON_URL, `${JSON.stringify(broken, null, 2)}\n`, 'utf8');
+    const packagePath = join(dir, 'package.json');
+    await writeFile(packagePath, `${JSON.stringify(broken, null, 2)}\n`, 'utf8');
 
-    const { main } = await import('../apps/cli/bin/enigma.mjs');
-    const doctor = makeIo();
-    assert.equal(await main(['doctor'], doctor.io), 1, doctor.stderr());
-    const result = doctor.json();
-    assert.equal(result.ok, false);
-    assert.deepEqual(result.package_bins.missing, ['enigma-relay']);
-  } finally {
-    await writeFile(PACKAGE_JSON_URL, original, 'utf8');
-  }
+    const previousPackageJsonPath = process.env.ENIGMA_PACKAGE_JSON_PATH;
+    process.env.ENIGMA_PACKAGE_JSON_PATH = packagePath;
+    try {
+      const { main } = await import(`${CLI_BIN_URL.href}?missingBin=${Date.now()}`);
+      const doctor = makeIo();
+      assert.equal(await main(['doctor'], doctor.io), 1, doctor.stderr());
+      const result = doctor.json();
+      assert.equal(result.ok, false);
+      assert.deepEqual(result.package_bins.missing, ['enigma-relay']);
+    } finally {
+      if (previousPackageJsonPath === undefined) delete process.env.ENIGMA_PACKAGE_JSON_PATH;
+      else process.env.ENIGMA_PACKAGE_JSON_PATH = previousPackageJsonPath;
+    }
+  });
 });
 
 test('package check catches missing bins, unsafe bins, and packaged review docs', async () => {
@@ -2069,6 +2124,15 @@ test('connector dry-run connect and disconnect produce parseable MCP config JSON
     assert.equal(cliConnectResult.ok, true);
     const cliConnectConfig = JSON.parse(cliConnectResult.generatedJson);
     assert.equal(cliConnectConfig.mcpServers?.enigma?.command, 'enigma-mcp');
+
+    const cliConnectPlain = makeIo();
+    assert.equal(await main(['connect', 'generic-mcp', '--bundle', bundlePath, '--config', cliConfigPath, '--dry-run', '--plain'], cliConnectPlain.io), 0, cliConnectPlain.stderr());
+    assert.match(cliConnectPlain.stdout(), /^Enigma connect\n/);
+    assert.match(cliConnectPlain.stdout(), /Client: generic-mcp/);
+    assert.match(cliConnectPlain.stdout(), /Config: <client-config-path>/);
+    assert.match(cliConnectPlain.stdout(), /Boundary: local client config only/);
+    assert.doesNotMatch(cliConnectPlain.stdout(), /^\s*\{/);
+    assert.equal(cliConnectPlain.stdout().includes(dir), false);
     await writeFile(cliConfigPath, cliConnectResult.generatedJson, 'utf8');
 
     const cliDisconnect = makeIo();
@@ -2076,6 +2140,14 @@ test('connector dry-run connect and disconnect produce parseable MCP config JSON
     const cliDisconnectResult = cliDisconnect.json();
     assert.equal(cliDisconnectResult.ok, true);
     const cliDisconnectConfig = JSON.parse(cliDisconnectResult.generatedJson);
+
+    const cliDisconnectPlain = makeIo();
+    assert.equal(await main(['disconnect', 'generic-mcp', '--config', cliConfigPath, '--dry-run', '--plain'], cliDisconnectPlain.io), 0, cliDisconnectPlain.stderr());
+    assert.match(cliDisconnectPlain.stdout(), /^Enigma disconnect\n/);
+    assert.match(cliDisconnectPlain.stdout(), /Client: generic-mcp/);
+    assert.match(cliDisconnectPlain.stdout(), /Config: <client-config-path>/);
+    assert.doesNotMatch(cliDisconnectPlain.stdout(), /^\s*\{/);
+    assert.equal(cliDisconnectPlain.stdout().includes(dir), false);
     assert.equal(cliDisconnectConfig.mcpServers?.enigma, undefined);
   });
 });
@@ -2413,6 +2485,36 @@ test('importer capsules keep custody roots private and fail closed before vault 
   ]);
   assert.equal(forgedReceiptCapsule.verifier_metadata.canonical_candidate_count, 0);
   assert.equal(forgedReceiptCapsule.verifier_metadata.candidate_only_count, 1);
+
+  await withTempDir('enigma-capsule-plain-', async (dir) => {
+    const { main: cliMain } = await import(`${CLI_BIN_URL.href}?capsulePlain=${Date.now()}`);
+    const reportPath = join(dir, 'report.json');
+    const capsulePath = join(dir, 'capsule.json');
+    await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+
+    const exported = makeIo();
+    assert.equal(await cliMain(['capsule', 'export', '--file', reportPath, '--out', capsulePath, '--plain'], exported.io), 0, exported.stderr());
+    assert.match(exported.stdout(), /^Enigma capsule export\n/);
+    assert.match(exported.stdout(), /Status: Ready/);
+    assert.match(exported.stdout(), /Capsule file: written to <out>/);
+    assert.match(exported.stdout(), /Boundary: public-safe local import capsule export only/);
+    assert.doesNotMatch(exported.stdout(), /^\s*\{/);
+    assert.equal(exported.stdout().includes(dir), false);
+    assert.equal(exported.stdout().includes(reportPath), false);
+    assert.equal(exported.stdout().includes(capsulePath), false);
+    assertNoTextLeak(exported.stdout(), RAW_MEMORY);
+
+    const imported = makeIo();
+    assert.equal(await cliMain(['capsule', 'import', '--file', capsulePath, '--plain'], imported.io), 1, imported.stderr());
+    assert.match(imported.stdout(), /^Enigma capsule import\n/);
+    assert.match(imported.stdout(), /Status: Needs attention/);
+    assert.match(imported.stdout(), /Memory Drive: not written/);
+    assert.match(imported.stdout(), /Boundary: public-safe local import capsule verification only/);
+    assert.doesNotMatch(imported.stdout(), /^\s*\{/);
+    assert.equal(imported.stdout().includes(dir), false);
+    assert.equal(imported.stdout().includes(capsulePath), false);
+    assertNoTextLeak(imported.stdout(), RAW_MEMORY);
+  });
 });
 
 test('package vault receipts verify prefix roots and redact source ref plaintext', async () => {
@@ -3596,7 +3698,7 @@ test('public collateral keeps proof, token, hosted, and raw-memory claim boundar
   const proofBoundaryRequirements = Object.freeze({
     'README.md': [
       /Enigma does not claim that a closed provider deleted internal data/i,
-      /proves facts about Enigma-controlled vault state, receipts, checkpoints, and declared boundary operations/i,
+      /proves facts about Enigma-controlled Memory Drive state, receipts, checkpoints, and declared boundary operations/i,
       /Register host name `com\.enigma\.native_host` by generating a browser-specific manifest/i,
       /Provider-native memory remains cache only; Enigma receipts do not prove provider deletion or model forgetting/i,
     ],
@@ -3635,6 +3737,9 @@ test('public collateral keeps proof, token, hosted, and raw-memory claim boundar
       /native messaging host name `com\.enigma\.native_host`/i,
       /requires explicit user action before requesting or inserting context/i,
       /must not store raw memory in browser sync storage/i,
+      /POSIX-style `test\/\*\.test\.mjs` paths/i,
+      /--test-concurrency=1/i,
+      /without nested npm lifecycle scripts/i,
     ],
     'launch/02_WHITEPAPER.md': [
       /Enigma does not claim to make providers forget/i,
@@ -3776,6 +3881,8 @@ test('public collateral keeps proof, token, hosted, and raw-memory claim boundar
     assert.match(checklist, new RegExp(statusLabel.replace(/[\/]/g, '\\$&'), 'i'), `checklist missing ${statusLabel} status`);
   }
 
+  assert.doesNotMatch(checklist, /quickstart --bundle \.\/\.enigma\/bundle\.json --overwrite/);
+  assert.match(checklist, /enigma claude-mcpb package --plain/);
   for (const rel of hostedByocDocs) {
     assert.match(docs[rel], /hosted|BYOC|cloud|deployment/i, `${rel} should state hosted/BYOC deployment posture`);
     assert.match(docs[rel], /requires?|do not mark|do not market|before|only after|without/i, `${rel} should frame hosted/BYOC as blocked until prerequisites exist`);

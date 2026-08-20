@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Download status for the Enigma Memory desktop app, including signing status and advanced CLI alternatives.">
+  <title>Download status — Enigma Memory</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="site-logo" href="./index.html">Enigma Memory</a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="./download.html">Download</a>
+        <a href="./launch-status.html">Launch status</a>
+        <a href="./setup.html">How it works</a>
+        <a href="./privacy.html">Privacy</a>
+        <a href="./help/index.html">Help</a>
+        <a href="./faq.html">FAQ</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <span class="eyebrow">Download</span>
+      <h1>Installer status for the desktop app.</h1>
+      <p>Signed installers are not ready yet. The consumer path is still the desktop app with a guided first-run wizard, but today’s shared builds are testing-only until this page marks them signed and ready.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="#platforms">See installer status</a>
+        <a class="btn btn-secondary" href="./launch-status.html">Launch status</a>
+      </div>
+      <p class="trust-note">Unsigned builds are for testing and development only. Developer command-line setup belongs in the advanced appendix.</p>
+    </section>
+
+    <section class="content-section" id="platforms" aria-labelledby="platforms-heading">
+      <h2 id="platforms-heading">Current platform status</h2>
+      <div class="platform-grid">
+        <article class="platform-card">
+          <h3>macOS — signing in progress</h3>
+          <span class="status-label status-label--pending">Unsigned/testing today</span>
+          <p>Signed, notarized, and stapled macOS installers are not complete yet. If a macOS build is provided before notarization, treat it as an unsigned development build and expect Gatekeeper warnings.</p>
+          <a class="btn btn-secondary" href="#signing">macOS signing notes</a>
+        </article>
+        <article class="platform-card">
+          <h3>Windows — signing in progress</h3>
+          <span class="status-label status-label--pending">Unsigned/testing today</span>
+          <p>Windows signed installer is not ready yet. If a Windows build is shared before signing, treat it as testing-only and expect a Windows security warning. Wait until this page says signed and ready before recommending it to a general user.</p>
+          <a class="btn btn-secondary" href="./launch-status.html">Check launch status</a>
+        </article>
+        <article class="platform-card">
+          <h3>Linux — testing-only package</h3>
+          <span class="status-label status-label--testing">Testing only</span>
+          <p>Linux packages are pre-launch testing artifacts unless this page marks them ready. Use published checksums or signatures when provided, and do not treat Linux package availability as Windows or macOS signing evidence.</p>
+          <a class="btn btn-secondary" href="#signing">Linux notes</a>
+        </article>
+      </div>
+
+      <details>
+        <summary>Advanced: command line</summary>
+        <p>If you prefer terminal setup, see the <a href="./developers/cli.html">CLI appendix</a>. This is advanced developer and troubleshooting material, not the default consumer path.</p>
+      </details>
+    </section>
+
+    <section class="content-section" aria-labelledby="next-heading">
+      <h2 id="next-heading">When you have an installer</h2>
+      <div class="card-grid">
+        <article class="card">
+          <h3>1. Open Enigma Memory</h3>
+          <p>Use a signed desktop app when available. If you intentionally test an unsigned build, confirm this page labeled it testing-only before install.</p>
+        </article>
+        <article class="card">
+          <h3>2. Create your Memory Drive</h3>
+          <p>The app creates a private Memory Drive, resumes the wizard if you close it, and keeps paths out of the public support view.</p>
+        </article>
+        <article class="card">
+          <h3>3. Connect and test an app</h3>
+          <p>Pick an AI app, preview what Enigma will change, test the local connection, and restart the app only when Enigma asks.</p>
+        </article>
+        <article class="card">
+          <h3>4. Import and review proof</h3>
+          <p>Paste starter memories, approve a local write, then check proof counts without exposing raw text.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="content-section" id="signing" aria-labelledby="signing-heading">
+      <h2 id="signing-heading">About signing and security warnings</h2>
+      <p>Signed Windows and macOS installers are not ready yet. Until launch status shows signed installers, current desktop builds must be treated as unsigned testing and development builds.</p>
+      <p>If you intentionally test an unsigned build and your operating system warns before launch:</p>
+      <ul>
+        <li><strong>macOS:</strong> Only continue if you meant to test an Enigma development build from an official Enigma distribution channel.</li>
+        <li><strong>Windows:</strong> Only continue if you meant to test an Enigma development build from an official Enigma distribution channel.</li>
+        <li><strong>Linux:</strong> Verify the package checksum or signature through your distribution tools when one is provided.</li>
+      </ul>
+      <p>Do not bypass security warnings for installers from unknown sources. See the current <a href="./launch-status.html">launch status</a> for code-signing progress before recommending Enigma to a general consumer.</p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer__inner">
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="./download.html">Download</a></li>
+          <li><a href="./setup.html">How it works</a></li>
+          <li><a href="./privacy.html">Privacy</a></li>
+          <li><a href="./launch-status.html">Launch status</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Support</h4>
+        <ul>
+          <li><a href="./help/index.html">Help hub</a></li>
+          <li><a href="./help/install.html">Install guide</a></li>
+          <li><a href="./help/troubleshooting.html">Troubleshooting</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Developers</h4>
+        <ul>
+          <li><a href="./developers/cli.html">CLI appendix</a></li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

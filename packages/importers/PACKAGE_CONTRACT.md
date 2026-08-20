@@ -4,6 +4,7 @@ This package implements Enigma's provider-neutral import/export surface for AI m
 
 Required named exports:
 
+- `importTextMemoryList(input, options)`
 - `importChatGptExport(input, options)`
 - `importClaudeMemory(input, options)`
 - `importMem0Export(input, options)`
@@ -12,13 +13,19 @@ Required named exports:
 - `importZepGraphitiExport(input, options)`
 - `exportEnigmaCapsule(options)`
 - `importEnigmaCapsule(capsule, options)`
+- `createImportPreview(reportOrReports, options)`
+- `createImportBatchReceipt(input, options)`
 - `runImporterDemo(options)`
 
 Invariants:
 
 - Importers accept already-parsed JSON objects, arrays, or text strings; they never call external provider services.
 - Import reports use `schema: enigma.import_report.v1`, return `memory_candidates`, `source_refs`, `limitations`, `confidence`, and a source fingerprint.
+- Import previews use `schema: enigma.import_preview.v1` and expose only counts, refs, commitments, limitations, recommended review/import actions, duplicate groups, a public-safe `primary_action`, and an `enigma.import_preview_receipt.v1`. They never return `memory_candidates.content`.
 - Import reports preserve source limitations and add an explicit completeness limitation unless the source includes a positive completeness flag. `complete: true` is emitted only from explicit source completeness.
+- `importTextMemoryList` is the consumer-safe curated `.txt`/`.md` path: it treats local non-empty lines or structured `memories`/`items` as candidates, preserves raw text only in the private report, and relies on preview receipts before any vault write.
+- Duplicate detection is content-commitment based and public-safe: previews emit `duplicate_groups` and dedupe counts, not duplicated plaintext.
+- Approved vault writes can emit `enigma.import_batch_receipt.v1`: public refs, commitments, receipt hashes, roots, and rollback boundaries only; no raw memory or local paths.
 - Provider-native memory remains a cache. Imported candidates become canonical only when written through an Enigma vault.
 - When `options.vault` is supplied, importers call the local vault `remember` API and return only safe `vault_writes` metadata: candidate id, memory address, receipt hash, and event id.
 - Capsule manifests follow mesh capsule-manifest style: signed manifest, encrypted/payload hash commitment, receipt-log root, active-set root, owner-scope commitment, holder, issuer, and expiry.

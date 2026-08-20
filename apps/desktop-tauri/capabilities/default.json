@@ -1,0 +1,6 @@
+{
+  "identifier": "default",
+  "description": "Default capability for the Enigma Memory desktop app.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

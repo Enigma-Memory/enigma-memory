@@ -25,3 +25,10 @@ webapp/next-env.d.ts
 # Secrets
 deploy/devnet-wallet.json
 *.key
+
+
+# Runtime / test artifacts
+.anchor/
+node/data/
+*.sqlite
+*.sqlite-journal

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Enigma Memory proofs show Memory Drive events without publishing your memory.">
+  <title>Proofs — Enigma Memory</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="site-logo" href="./index.html">Enigma Memory</a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="./download.html">Download</a>
+        <a href="./launch-status.html">Launch status</a>
+        <a href="./setup.html">How it works</a>
+        <a href="./privacy.html">Privacy</a>
+        <a href="./help/index.html">Help</a>
+        <a href="./faq.html">FAQ</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <span class="eyebrow">Proofs</span>
+      <h1>Proof without publishing your memory.</h1>
+      <p>Enigma proof artifacts can show hashes, roots, counts, timestamps, signatures, opaque references, and validation results without exposing raw memory text.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="./setup.html">See setup flow</a>
+      </div>
+    </section>
+
+    <section class="content-section" aria-labelledby="show-heading">
+      <h2 id="show-heading">What a proof can show</h2>
+      <ul>
+        <li>A memory create, retrieval, context-pack, update, or tombstone event produced a receipt.</li>
+        <li>The receipt verifies offline against Enigma-controlled Memory Drive state.</li>
+        <li>Exported artifacts contain commitments and metadata, not raw memory plaintext.</li>
+      </ul>
+    </section>
+
+    <section class="content-section" aria-labelledby="exclude-heading">
+      <h2 id="exclude-heading">What a proof must never contain</h2>
+      <ul>
+        <li>Private memory text, conversation content, completions, or embeddings.</li>
+        <li>Provider output, provider-specific identifiers, tenant names, or sign-in material.</li>
+        <li>Local locations or restricted signing material.</li>
+      </ul>
+    </section>
+
+    <section class="content-section" aria-labelledby="rejected-heading">
+      <h2 id="rejected-heading">How unsafe artifacts are rejected</h2>
+      <p>Enigma scans exports for plaintext-like fields before producing a public-safe proof. If private data is detected, the export is rejected with guidance on what to remove. Public examples use synthetic opaque refs only, such as <code>ref_abc123</code>.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="not-prove-heading">
+      <h2 id="not-prove-heading">What local proof is not</h2>
+      <p>Local proof is not proof about provider-side erasure or model state changes. It shows what Enigma did in its own Memory Drive. Solana-ready means prepared for review, not submitted to a chain unless separate transaction evidence exists.</p>
+      <div class="boundary-callout">
+        <strong>Boundary note:</strong> Enigma proves Memory Drive and receipt events. It does not prove that a closed provider removed hidden copies or that a model changed training, fine-tuning, cache, or personalization state.
+      </div>
+    </section>
+
+    <section class="content-section">
+      <details>
+        <summary>Advanced proof details</summary>
+        <p>Advanced proof details include schemas, validators, signatures, roots, nullifiers, and Solana-ready payload language. These are available in the source checkout and API reference for developers and auditors.</p>
+      </details>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer__inner">
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="./download.html">Download</a></li>
+          <li><a href="./setup.html">How it works</a></li>
+          <li><a href="./privacy.html">Privacy</a></li>
+          <li><a href="./launch-status.html">Launch status</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Support</h4>
+        <ul>
+          <li><a href="./help/index.html">Help hub</a></li>
+          <li><a href="./help/install.html">Install guide</a></li>
+          <li><a href="./help/troubleshooting.html">Troubleshooting</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Developers</h4>
+        <ul>
+          <li><a href="./developers/cli.html">CLI appendix</a></li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.enigma.ai/quarantine-record-v1.schema.json",
+  "title": "Enigma Quarantine Record v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "quarantine_record_id",
+    "created_at",
+    "antigen_ref",
+    "quarantine_ref",
+    "subject_commitment",
+    "transition",
+    "decision",
+    "receipts",
+    "roots",
+    "claim_boundary",
+    "public_payload_only",
+    "payload_included"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "enigma.quarantine_record.v1" },
+    "quarantine_record_id": { "$ref": "#/$defs/publicId" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "antigen_ref": { "$ref": "#/$defs/publicRef" },
+    "quarantine_ref": { "$ref": "#/$defs/publicRef" },
+    "subject_commitment": { "$ref": "#/$defs/sha256Digest" },
+    "transition": { "type": "string", "enum": ["isolated", "reintegrated", "tombstoned"] },
+    "decision": {
+      "type": "object",
+      "required": ["decision_id", "decided_at", "action", "reason_labels", "policy_id"],
+      "additionalProperties": false,
+      "properties": {
+        "decision_id": { "$ref": "#/$defs/publicId" },
+        "decided_at": { "type": "string", "format": "date-time" },
+        "action": { "type": "string", "enum": ["isolate", "reintegrate", "tombstone"] },
+        "reason_labels": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/reasonLabel" },
+          "uniqueItems": true
+        },
+        "policy_id": { "$ref": "#/$defs/policyId" }
+      }
+    },
+    "receipts": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/receiptCommitment" }
+    },
+    "roots": { "$ref": "#/$defs/quarantineRoots" },
+    "claim_boundary": { "$ref": "#/$defs/claimBoundary" },
+    "public_payload_only": { "const": true },
+    "payload_included": { "const": false }
+  },
+  "$defs": {
+    "sha256Digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "publicId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._:-]{7,127}$" },
+    "publicRef": { "type": "string", "pattern": "^ref:[A-Za-z0-9][A-Za-z0-9._~:@#?=&%+-]{0,255}$" },
+    "policyId": { "type": "string", "pattern": "^policy:[A-Za-z0-9][A-Za-z0-9._~:@#?=&%+-]{0,191}$" },
+    "receiptCommitment": {
+      "type": "object",
+      "required": ["receipt_ref", "receipt_hash", "sequence", "operation"],
+      "additionalProperties": false,
+      "properties": {
+        "receipt_ref": { "$ref": "#/$defs/publicRef" },
+        "receipt_hash": { "$ref": "#/$defs/sha256Digest" },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "operation": { "type": "string", "enum": ["quarantine", "isolate", "review", "reintegrate", "tombstone"] }
+      }
+    },
+    "quarantineRoots": {
+      "type": "object",
+      "required": [
+        "previous_active_root",
+        "previous_quarantine_root",
+        "previous_tombstone_root",
+        "next_active_root",
+        "next_quarantine_root",
+        "next_tombstone_root",
+        "receipt_chain_root"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "previous_active_root": { "$ref": "#/$defs/sha256Digest" },
+        "previous_quarantine_root": { "$ref": "#/$defs/sha256Digest" },
+        "previous_tombstone_root": { "$ref": "#/$defs/sha256Digest" },
+        "next_active_root": { "$ref": "#/$defs/sha256Digest" },
+        "next_quarantine_root": { "$ref": "#/$defs/sha256Digest" },
+        "next_tombstone_root": { "$ref": "#/$defs/sha256Digest" },
+        "receipt_chain_root": { "$ref": "#/$defs/sha256Digest" }
+      }
+    },
+    "claimBoundary": {
+      "type": "object",
+      "required": [
+        "local_state_transition_claim",
+        "provider_deletion_claim",
+        "model_forgetting_claim",
+        "raw_payload_public",
+        "hardware_tamper_proof_claim"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "local_state_transition_claim": { "const": true },
+        "provider_deletion_claim": { "const": false },
+        "model_forgetting_claim": { "const": false },
+        "raw_payload_public": { "const": false },
+        "hardware_tamper_proof_claim": { "const": false }
+      }
+    },
+    "reasonLabel": {
+      "type": "string",
+      "enum": [
+        "untrusted_origin",
+        "prompt_injection",
+        "data_exfiltration",
+        "secret_material",
+        "memory_poisoning",
+        "policy_violation",
+        "manual_review"
+      ]
+    }
+  }
+}

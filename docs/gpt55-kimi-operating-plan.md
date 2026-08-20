@@ -69,11 +69,11 @@ Acceptance:
 
 ### Slice 2 — MCP client connectors
 
-Goal: one command writes MCP config for common AI tools.
+Goal: one extension handoff or preview command connects common AI tools.
 
 Kimi builds:
 
-- `enigma connect claude-desktop`,
+- `enigma claude-mcpb package --plain`,
 - `enigma connect cursor`,
 - `enigma connect kimi-code`,
 - `enigma connect vscode-cline`,

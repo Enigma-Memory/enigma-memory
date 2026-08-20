@@ -667,6 +667,31 @@ test('native host manifest generator emits browser-specific manifests and reject
     assert.equal(writeResult.path, outPath);
     assertGeneratedNativeHostManifest(JSON.parse(await readFile(outPath, 'utf8')), { ...fileModeCase, hostPath });
 
+    const plainManifest = await runCli([
+      'native-host',
+      'manifest',
+      '--browser',
+      fileModeCase.browser,
+      '--host-path',
+      hostPath,
+      '--extension-id',
+      fileModeCase.extensionId,
+      '--out',
+      outPath,
+      '--plain',
+    ]);
+    assert.match(plainManifest.stdout, /^Enigma native host manifest\n/);
+    assert.match(plainManifest.stdout, /Status: Ready/);
+    assert.match(plainManifest.stdout, /Browser: firefox/);
+    assert.match(plainManifest.stdout, /Allowed apps: 1/);
+    assert.match(plainManifest.stdout, /Manifest: written to <out>/);
+    assert.match(plainManifest.stdout, /Boundary: local native-host manifest planning only/);
+    assert.doesNotMatch(plainManifest.stdout, /^\s*\{/);
+    assert.equal(plainManifest.stdout.includes(dir), false);
+    assert.equal(plainManifest.stdout.includes(hostPath), false);
+    assert.equal(plainManifest.stdout.includes(outPath), false);
+
+
     for (const testCase of NATIVE_HOST_MANIFEST_GENERATION_CASES) {
       const failure = await runCliJson([
         'native-host',
@@ -1018,6 +1043,32 @@ test('native host install-plan CLI previews registration targets without writes'
     assert.equal(firefoxPlan.firefox_manifest_directory, '/home/enigma/.mozilla/native-messaging-hosts');
     assert.deepEqual(firefoxPlan.target_manifest_paths, ['/home/enigma/.mozilla/native-messaging-hosts/com.enigma.native_host.json']);
     assert.doesNotMatch(JSON.stringify(firefoxPlan), RAW_MEMORY_EXAMPLE_FIELD);
+
+    const plainPlan = await runCli([
+      'native-host',
+      'install-plan',
+      '--browser',
+      'chrome',
+      '--manifest',
+      chromeManifestPath,
+      '--os',
+      'windows',
+      '--home',
+      homePath,
+      '--plain',
+    ]);
+    assert.match(plainPlan.stdout, /^Enigma native host install plan\n/);
+    assert.match(plainPlan.stdout, /Status: Ready/);
+    assert.match(plainPlan.stdout, /Browser: chrome/);
+    assert.match(plainPlan.stdout, /OS: windows/);
+    assert.match(plainPlan.stdout, /Writes performed: no/);
+    assert.match(plainPlan.stdout, /Registration targets: 1/);
+    assert.match(plainPlan.stdout, /Boundary: local native-host registration plan only/);
+    assert.doesNotMatch(plainPlan.stdout, /^\s*\{/);
+    assert.equal(plainPlan.stdout.includes(dir), false);
+    assert.equal(plainPlan.stdout.includes(chromeManifestPath), false);
+    assert.equal(plainPlan.stdout.includes(homePath), false);
+
 
     const failure = await runCliJson([
       'native-host',

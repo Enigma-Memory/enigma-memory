@@ -29,7 +29,7 @@ const UTF8_FLAG = 0x0800;
 let crcTable;
 
 export function usage() {
-  return `Usage: node scripts/package-browser-extension.mjs [--extension-dir <path>] [--zip <path>] [--out <path>]\n\nValidates the Enigma browser extension directory and emits a deterministic public-safe package manifest.\n--zip writes a deterministic ZIP archive with fixed timestamps and sorted entries. No store submission is performed.\n`;
+  return `Usage: node scripts/package-browser-extension.mjs [--extension-dir <path>] [--zip <path>] [--out <path>] [--plain]\n\nValidates the Enigma browser extension directory and emits a deterministic public-safe package manifest.\n--zip writes a deterministic ZIP archive with fixed timestamps and sorted entries. No store submission is performed.\n--plain prints a human-readable, path-redacted summary while --out still writes JSON.\n`;
 }
 
 function readRequiredValue(argv, index, flag) {
@@ -43,6 +43,7 @@ export function parseBrowserExtensionPackageArgs(argv = process.argv.slice(2)) {
     extensionDir: DEFAULT_EXTENSION_DIR,
     zipPath: null,
     outPath: null,
+    plain: false,
     help: false,
   };
 
@@ -58,6 +59,13 @@ export function parseBrowserExtensionPackageArgs(argv = process.argv.slice(2)) {
       index += 1;
     } else if (arg === '--out') {
       options.outPath = readRequiredValue(argv, index, arg);
+      index += 1;
+    } else if (arg === '--plain' || arg === '--text') {
+      options.plain = true;
+    } else if (arg === '--format') {
+      const value = readRequiredValue(argv, index, arg);
+      if (value === 'plain' || value === 'text') options.plain = true;
+      else if (value !== 'json') throw new Error('Unknown argument.');
       index += 1;
     } else {
       throw new Error('Unknown argument.');
@@ -403,6 +411,43 @@ function buildPublicReport({ manifest, files, zipBuffer, zipRequested, zipWritte
   };
 }
 
+function attachPlainPreference(report, plain) {
+  Object.defineProperty(report, '__plain', {
+    value: Boolean(plain),
+    enumerable: false,
+    configurable: true,
+  });
+  return report;
+}
+
+function argvRequestsPlain(argv) {
+  if (!Array.isArray(argv)) return Boolean(argv?.plain);
+  return argv.some((arg, index) => arg === '--plain' || arg === '--text' || (arg === '--format' && (argv[index + 1] === 'plain' || argv[index + 1] === 'text')));
+}
+
+export function renderBrowserExtensionPackagePlain(report) {
+  const pkg = report?.package && typeof report.package === 'object' ? report.package : {};
+  const safety = report?.safety && typeof report.safety === 'object' ? report.safety : {};
+  const status = report?.ok ? 'Ready' : 'Blocked';
+  const lines = [
+    'Enigma browser extension package',
+    `Status: ${status}`,
+    `Root: ${pkg.root ?? PACKAGE_ROOT_LABEL}`,
+    `Files: ${Number.isInteger(pkg.file_count) ? pkg.file_count : 0}`,
+  ];
+  if (Number.isInteger(pkg.total_bytes)) lines.push(`Bytes: ${pkg.total_bytes}`);
+  if (pkg.zip_written) lines.push(`ZIP: written`);
+  else if (pkg.zip_requested) lines.push('ZIP: requested but not written');
+  else lines.push('ZIP: not requested');
+  if (pkg.zip_sha256) lines.push(`ZIP SHA-256: ${pkg.zip_sha256}`);
+  if (report?.error?.message) lines.push(`Issue: ${report.error.message}`);
+  if (pkg.blocker) lines.push(`Blocker: ${pkg.blocker}`);
+  lines.push(`Safety: source maps ${safety.source_maps_denied === false ? 'unchecked' : 'denied'}, private files ${safety.private_files_denied === false ? 'unchecked' : 'denied'}, credential text ${safety.token_patterns_denied === false ? 'unchecked' : 'denied'}, local paths ${safety.local_paths_denied === false ? 'unchecked' : 'denied'}, sync storage ${safety.sync_storage_denied === false ? 'unchecked' : 'denied'}`);
+  lines.push('Boundary: local package validation only; no browser-store submission, signing, upload, provider launch, auto-injection, raw memory, local paths, or network claims.');
+  return `${lines.join('\n')}\n`;
+}
+
+
 export async function buildBrowserExtensionPackage(options = {}) {
   const extensionDir = options.extensionDir ?? DEFAULT_EXTENSION_DIR;
   const zipPath = options.zipPath ? resolve(String(options.zipPath)) : null;
@@ -422,18 +467,19 @@ function safePackageErrorMessage(error) {
 }
 
 export async function runPackageBrowserExtension(argv = process.argv.slice(2)) {
+  const plainRequested = argvRequestsPlain(argv);
   try {
     const options = Array.isArray(argv) ? parseBrowserExtensionPackageArgs(argv) : { ...argv };
-    if (options.help) return { help: usage() };
+    if (options.help) return attachPlainPreference({ help: usage() }, options.plain);
     const report = await buildBrowserExtensionPackage(options);
     if (options.outPath) {
       const outPath = resolve(String(options.outPath));
       await mkdir(dirname(outPath), { recursive: true });
       await writeFile(outPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
     }
-    return report;
+    return attachPlainPreference(report, options.plain);
   } catch (error) {
-    return {
+    return attachPlainPreference({
       schema: BROWSER_EXTENSION_PACKAGE_SCHEMA,
       ok: false,
       public_safe: true,
@@ -451,7 +497,7 @@ export async function runPackageBrowserExtension(argv = process.argv.slice(2)) {
         store_submission_performed: false,
         external_network_performed: false,
       },
-    };
+    }, plainRequested);
   }
 }
 
@@ -461,7 +507,7 @@ async function main() {
     process.stdout.write(result.help);
     return;
   }
-  process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+  process.stdout.write(result.__plain ? renderBrowserExtensionPackagePlain(result) : `${JSON.stringify(result, null, 2)}\n`);
   if (result.ok === false) process.exitCode = 1;
 }
 

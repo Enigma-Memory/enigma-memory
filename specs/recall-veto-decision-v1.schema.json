@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.enigma.ai/recall-veto-decision-v1.schema.json",
+  "title": "Enigma Recall Veto Decision v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "request_ref",
+    "app_ref",
+    "policy_ref",
+    "decision",
+    "reason_codes",
+    "candidate_count",
+    "sensitive_count",
+    "tombstone_count",
+    "grant_refs",
+    "proof_refs",
+    "receipt_refs",
+    "safe_to_share",
+    "public_payload_only",
+    "memory_payload_absent",
+    "prompt_payload_absent",
+    "transcript_payload_absent",
+    "embedding_payload_absent",
+    "provider_output_absent",
+    "secret_material_absent",
+    "device_path_absent",
+    "account_identifier_absent",
+    "customer_identifier_absent",
+    "evidence_refs_only",
+    "provider_deletion_claim",
+    "model_forgetting_claim",
+    "provider_native_memory_control_claim",
+    "compliance_certification_claim"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "enigma.recall_veto_decision.v1" },
+    "request_ref": { "$ref": "#/$defs/publicRef" },
+    "app_ref": { "$ref": "#/$defs/publicRef" },
+    "policy_ref": { "$ref": "#/$defs/publicRef" },
+    "decision": { "type": "string", "enum": ["allow", "ask", "deny"] },
+    "reason_codes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/reasonCode" },
+      "uniqueItems": true
+    },
+    "candidate_count": { "type": "integer", "minimum": 0 },
+    "sensitive_count": { "type": "integer", "minimum": 0 },
+    "tombstone_count": { "type": "integer", "minimum": 0 },
+    "grant_refs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/publicRef" },
+      "uniqueItems": true
+    },
+    "proof_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/publicRef" },
+      "uniqueItems": true
+    },
+    "receipt_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/publicRef" },
+      "uniqueItems": true
+    },
+    "safe_to_share": { "type": "boolean" },
+    "public_payload_only": { "const": true },
+    "memory_payload_absent": { "const": true },
+    "prompt_payload_absent": { "const": true },
+    "transcript_payload_absent": { "const": true },
+    "embedding_payload_absent": { "const": true },
+    "provider_output_absent": { "const": true },
+    "secret_material_absent": { "const": true },
+    "device_path_absent": { "const": true },
+    "account_identifier_absent": { "const": true },
+    "customer_identifier_absent": { "const": true },
+    "evidence_refs_only": { "const": true },
+    "provider_deletion_claim": { "const": false },
+    "model_forgetting_claim": { "const": false },
+    "provider_native_memory_control_claim": { "const": false },
+    "compliance_certification_claim": { "const": false }
+  },
+  "$defs": {
+    "publicRef": {
+      "type": "string",
+      "pattern": "^ref:[A-Za-z0-9][A-Za-z0-9._~:@#?=&%+-]{0,255}$"
+    },
+    "reasonCode": {
+      "type": "string",
+      "enum": [
+        "grant_missing",
+        "grant_expired",
+        "purpose_mismatch",
+        "zone_not_allowed",
+        "sensitivity_blocked",
+        "tombstone_present",
+        "private_bubble_open",
+        "policy_requires_ask",
+        "policy_denies_recall",
+        "candidate_limit_exceeded"
+      ]
+    }
+  }
+}

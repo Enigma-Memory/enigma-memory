@@ -20,8 +20,7 @@ Goal: run the public local test drive, then produce a Solana-ready anchor batch 
 node -e "require('node:fs').mkdirSync('.enigma/proof-network',{recursive:true})"
 
 enigma test-drive \
-  --out-dir .enigma/proof-network/test-drive \
-  --overwrite
+  --out-dir .enigma/proof-network/test-drive
 
 enigma chain anchor \
   --root sha256:1111111111111111111111111111111111111111111111111111111111111111 \
@@ -94,8 +93,7 @@ Goal: show one local Enigma bundle producing public receipt summaries for multip
 node -e "require('node:fs').mkdirSync('.enigma/proof-network',{recursive:true})"
 
 enigma test-drive \
-  --out-dir .enigma/proof-network/cross-model \
-  --overwrite
+  --out-dir .enigma/proof-network/cross-model
 
 enigma demo cross-model \
   --bundle .enigma/proof-network/cross-model/bundle.json \

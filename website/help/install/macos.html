@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Install Enigma Memory on macOS.">
+  <title>Install Enigma Memory on macOS</title>
+  <link rel="stylesheet" href="../../styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="site-logo" href="../../index.html">Enigma Memory</a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="../../download.html">Download</a>
+        <a href="../../setup.html">How it works</a>
+        <a href="../../privacy.html">Privacy</a>
+        <a href="../index.html">Help</a>
+        <a href="../../faq.html">FAQ</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <span class="eyebrow">Install guide</span>
+      <h1>Install Enigma Memory on macOS when signing is ready.</h1>
+      <p>General consumers should wait until macOS is marked signed, notarized, stapled, and ready on the Enigma download page. No terminal or Node install is required for the signed desktop path.</p>
+    </section>
+
+    <section class="content-section" aria-labelledby="steps-heading">
+      <h2 id="steps-heading">macOS install steps</h2>
+      <ol>
+        <li>Confirm the <a href="../../download.html">download page</a> marks macOS as signed, notarized, stapled, and ready for public install.</li>
+        <li>Download the macOS installer only from the official Enigma download channel after that status is ready.</li>
+        <li>Open the disk image or package, then follow the prompts or drag Enigma Memory into Applications.</li>
+        <li>If macOS says the app cannot be verified, stop and check the <a href="../../launch-status.html">launch status</a>.</li>
+        <li>Open Enigma Memory from Applications after install. The first-run wizard creates your Memory Drive.</li>
+      </ol>
+
+      <div class="boundary-callout">
+        <strong>Boundary note:</strong> The desktop app bundles its runtime. Consumers should not install Node or npm for the default path.
+      </div>
+    </section>
+
+    <section class="content-section" aria-labelledby="blocked-heading">
+      <h2 id="blocked-heading">If macOS blocks the installer</h2>
+      <p>macOS Gatekeeper may warn about apps downloaded from the web. Do not continue past it by default.</p>
+      <ul>
+        <li><strong>Recommended for consumers:</strong> Stop, check the <a href="../../launch-status.html">launch status</a>, and wait for a signed build marked ready for public install.</li>
+        <li><strong>Testing-only:</strong> If you are validating a pre-launch build from an official Enigma channel, right-click the installer or app, choose <strong>Open</strong>, then confirm.</li>
+      </ul>
+      <p>Do not bypass security warnings for unknown publishers, unofficial mirrors, email attachments, or copied links. See the <a href="../troubleshooting/installer-blocked.html">installer blocked</a> article for more details.</p>
+    </section>
+
+    <section class="content-section">
+      <details>
+        <summary>Install from npm or source</summary>
+        <p>This is the advanced developer path. For the default consumer experience, use the desktop app above.</p>
+        <p>If you want the command-line engine instead, see the <a href="../../developers/cli.html">CLI appendix</a> for npm install, Node requirements, setup commands, and source checkout.</p>
+      </details>
+    </section>
+    <section class="content-section">
+      <p><a href="../index.html">Back to help hub</a></p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer__inner">
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="../../download.html">Download</a></li>
+          <li><a href="../../setup.html">How it works</a></li>
+          <li><a href="../../privacy.html">Privacy</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Support</h4>
+        <ul>
+          <li><a href="../index.html">Help hub</a></li>
+          <li><a href="../install.html">Install guide</a></li>
+          <li><a href="../connect-apps.html">Connect apps</a></li>
+          <li><a href="../troubleshooting.html">Troubleshooting</a></li>
+          <li><a href="../support-safe-sharing.html">Safe support sharing</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Developers</h4>
+        <ul>
+          <li><a href="../../developers/cli.html">CLI appendix</a></li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

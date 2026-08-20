@@ -1,12 +1,36 @@
 import { access, copyFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, posix, win32 } from 'node:path';
 import { homedir } from 'node:os';
+import { canonicalize, MerkleSet, sha256Hex } from '../../core/src/index.js';
 
 const PROFILE_SCHEMA = 'enigma.connector_profile.v1';
 const DEFAULT_SERVER_NAME = 'enigma';
 const MCP_COMMAND = 'enigma-mcp';
 const MCP_CONTAINER_PATH = Object.freeze(['mcpServers']);
 const SUPPORTED_PLATFORMS = Object.freeze(['win32', 'darwin', 'linux']);
+const TRUST_CARD_SCHEMA = 'enigma.trust_card.v1';
+const CLAUDE_DESKTOP_MCPB_SCHEMA = 'enigma.claude_desktop_mcpb_manifest.v1';
+const CLAUDE_DESKTOP_MCPB_PLAN_SCHEMA = 'enigma.claude_desktop_mcpb_connection_plan.v1';
+const CLAUDE_DESKTOP_MCPB_HEALTH_SCHEMA = 'enigma.claude_desktop_mcpb_health.v1';
+const CLAUDE_DESKTOP_MCPB_ENVIRONMENT_NAMES = Object.freeze(['ENIGMA_BUNDLE']);
+const CLAUDE_DESKTOP_MCPB_STATES = Object.freeze([
+  'detect',
+  'preview',
+  'consent',
+  'install_handoff',
+  'restart',
+  'test',
+  'ready',
+]);
+const CLAUDE_DESKTOP_MCPB_HEALTH_STATES = Object.freeze([
+  'not_installed',
+  'mcpb_ready',
+  'restart_required',
+  'testing',
+  'ready',
+  'repair_required',
+  'advanced_fallback',
+]);
 
 const CLIENT_DEFINITIONS = Object.freeze({
   'claude-desktop': Object.freeze({
@@ -562,17 +586,31 @@ function publicDefaultConfigPath(clientId, platform) {
   return CLIENT_DEFINITIONS[clientId].default_config_paths[platform];
 }
 
-function connectCommandFor(clientId, platform) {
-  return `enigma connect ${clientId} --bundle "${publicBundlePlaceholder(platform)}"`;
+function connectCommandFor(clientId, platform, { dryRun = false } = {}) {
+  const suffix = dryRun ? ' --dry-run' : '';
+  return `enigma connect ${clientId} --bundle "${publicBundlePlaceholder(platform)}"${suffix}`;
 }
 
-function setupConnectCommandFor(clientId, platform) {
-  return `enigma setup --client ${clientId} --write-connectors --bundle "${publicBundlePlaceholder(platform)}" --overwrite`;
+function claudeMcpbPackageCommand() {
+  return 'enigma claude-mcpb package --plain';
 }
 
-function installConnectCommandFor(clientId, platform) {
-  return `npm install -g enigma-memory && ${setupConnectCommandFor(clientId, platform)}`;
+function preferredConnectCommandFor(clientId, platform) {
+  return clientId === 'claude-desktop' ? claudeMcpbPackageCommand() : previewConnectCommandFor(clientId, platform);
 }
+
+function setupPreferredConnectCommandFor(clientId, platform) {
+  return `enigma quickstart --bundle "${publicBundlePlaceholder(platform)}" && ${preferredConnectCommandFor(clientId, platform)}`;
+}
+
+function installPreferredConnectCommandFor(clientId, platform) {
+  return `npm install -g enigma-memory && ${setupPreferredConnectCommandFor(clientId, platform)}`;
+}
+
+function previewConnectCommandFor(clientId, platform) {
+  return connectCommandFor(clientId, platform, { dryRun: true });
+}
+
 
 
 function wizardStepsForClient(clientId, platform) {
@@ -587,13 +625,53 @@ function wizardStepsForClient(clientId, platform) {
     {
       order: 2,
       id: 'create_local_bundle',
-      title: 'Create and verify the local Enigma bundle.',
+      title: 'Create and verify the local Memory Drive.',
       commands: [
-        `enigma quickstart --bundle "${publicBundlePlaceholder(platform)}" --overwrite`,
+        `enigma quickstart --bundle "${publicBundlePlaceholder(platform)}"`,
         `enigma verify --bundle "${publicBundlePlaceholder(platform)}"`,
       ],
       writes: 'local_enigma_bundle',
     },
+  ];
+  if (clientId === 'claude-desktop') {
+    steps.push(
+      {
+        order: 3,
+        id: 'package_claude_mcpb',
+        title: 'Build the Claude Desktop Extension package.',
+        command: claudeMcpbPackageCommand(),
+        writes: 'local_mcpb_package',
+      },
+      {
+        order: 4,
+        id: 'install_claude_mcpb',
+        title: 'Open Claude Desktop Settings → Extensions and drag in the Enigma .mcpb package.',
+        writes: false,
+      },
+      {
+        order: 5,
+        id: 'select_memory_drive',
+        title: 'When Claude asks, select the local Memory Drive file for Enigma.',
+        writes: false,
+      },
+      {
+        order: 6,
+        id: 'test_claude_mcpb',
+        title: 'Ask Claude to run read-only enigma_support_summary or enigma_next_action; success is a public-safe Enigma schema response.',
+        writes: false,
+      },
+      {
+        order: 7,
+        id: 'advanced_config_fallback',
+        title: 'Only if support asks: preview manual Claude settings.',
+        command: previewConnectCommandFor(clientId, platform),
+        writes: false,
+        advanced_only: true,
+      },
+    );
+    return steps;
+  }
+  steps.push(
     {
       order: 3,
       id: 'doctor_client',
@@ -604,9 +682,9 @@ function wizardStepsForClient(clientId, platform) {
     {
       order: 4,
       id: 'connect_client',
-      title: 'Merge only the Enigma MCP server entry into the client config.',
-      command: connectCommandFor(clientId, platform),
-      writes: 'client_config_when_user_runs_command',
+      title: 'Preview the app connection before writing settings.',
+      command: previewConnectCommandFor(clientId, platform),
+      writes: false,
     },
     {
       order: 5,
@@ -614,14 +692,14 @@ function wizardStepsForClient(clientId, platform) {
       title: 'Restart or reload the client so it re-reads MCP settings.',
       writes: false,
     },
-  ];
+  );
   if (clientId === 'kimi-code') {
     steps.splice(4, 0, {
       order: 5,
       id: 'kimi_gui_path_caveat',
       title: 'If Kimi Code was launched from the GUI and cannot find enigma-mcp, reconnect with an absolute command path.',
-      command: `${connectCommandFor(clientId, platform)} --mcp-command "/absolute/path/to/enigma-mcp"`,
-      writes: 'client_config_when_user_runs_command',
+      command: `${previewConnectCommandFor(clientId, platform)} --mcp-command "/absolute/path/to/enigma-mcp"`,
+      writes: false,
     });
     for (let index = 5; index < steps.length; index += 1) steps[index].order = index + 1;
   }
@@ -644,11 +722,287 @@ export function planConnectWizard(clientIdOrOptions = {}, maybeOptions = {}) {
       display_name: CLIENT_DEFINITIONS[clientId].display_name,
       default_config_path: publicDefaultConfigPath(clientId, platform),
       steps: wizardStepsForClient(clientId, platform),
-      one_command_install_connect: installConnectCommandFor(clientId, platform),
-      setup_connect_command: setupConnectCommandFor(clientId, platform),
-      connect_command: connectCommandFor(clientId, platform),
-      mcp_config_preview: renderMcpConfig(clientId, { platform, bundlePath: publicBundlePlaceholder(platform) }),
+      one_command_install_connect: installPreferredConnectCommandFor(clientId, platform),
+      setup_connect_command: setupPreferredConnectCommandFor(clientId, platform),
+      connect_command: preferredConnectCommandFor(clientId, platform),
+      advanced_fallback_connect_command: clientId === 'claude-desktop' ? previewConnectCommandFor(clientId, platform) : null,
+      mcp_config_preview: clientId === 'claude-desktop' ? null : renderMcpConfig(clientId, { platform, bundlePath: publicBundlePlaceholder(platform) }),
+      mcpb_connection_plan: clientId === 'claude-desktop' ? createClaudeDesktopMcpbConnectionPlan({ platform }) : null,
     })),
+  };
+}
+
+function claudeDesktopMcpbClaimBoundary() {
+  return {
+    ...connectorTrustBoundary(),
+    provider_native_memory_control_claim: false,
+    compliance_certification_claim: false,
+    benchmark_superiority_claim: false,
+    legal_or_patent_conclusion_claim: false,
+    chain_submission_claim: false,
+    tamper_proof_claim: false,
+  };
+}
+
+export function createClaudeDesktopMcpbManifest(options = {}) {
+  return {
+    ok: true,
+    schema: CLAUDE_DESKTOP_MCPB_SCHEMA,
+    manifest_version: '0.3',
+    name: 'enigma-memory',
+    display_name: 'Enigma Memory',
+    version: String(options.version ?? options.manifestVersion ?? options.manifest_version ?? '0.0.0'),
+    author: {
+      name: 'Enigma Memory',
+    },
+    description: 'Claude Desktop extension contract for the local Enigma Memory MCP bridge.',
+    server: {
+      type: 'node',
+      entry_point: 'packages/mcp-server/bin/enigma-mcp.mjs',
+      mcp_config: {
+        command: 'node',
+        args: ['${__dirname}/packages/mcp-server/bin/enigma-mcp.mjs'],
+        env: {
+          ENIGMA_BUNDLE: '${user_config.enigma_bundle}',
+        },
+      },
+    },
+    user_config: {
+      enigma_bundle: {
+        type: 'file',
+        title: 'Enigma Memory bundle',
+        description: 'Select the Memory Drive file created by Enigma. Claude stores this choice in its extension settings and passes it only to the local Enigma bridge.',
+        required: true,
+      },
+    },
+    repository: {
+      type: 'git',
+      url: 'https://github.com/Enigma-Memory/enigma-memory',
+    },
+    documentation: 'https://github.com/Enigma-Memory/enigma-memory/tree/main/docs',
+    support: 'https://github.com/Enigma-Memory/enigma-memory/issues',
+    keywords: ['memory', 'mcp', 'claude-desktop', 'local-first'],
+    environment_names: [...CLAUDE_DESKTOP_MCPB_ENVIRONMENT_NAMES],
+    supported_platforms: [...SUPPORTED_PLATFORMS],
+    compatibility: {
+      platforms: [...SUPPORTED_PLATFORMS],
+      runtimes: {
+        enigma_desktop: 'bundled-runtime-required',
+      },
+    },
+    required_runtime: {
+      note: 'Requires Enigma Desktop bundled runtime or an Enigma-managed MCP bridge; the public manifest does not carry local paths or config bodies.',
+    },
+    required_runtime_note: 'Requires Enigma Desktop bundled runtime or an Enigma-managed MCP bridge; the public manifest does not carry local paths or config bodies.',
+    runtime_package_scope: {
+      package_json_included: true,
+      package_json_path: 'package.json',
+      module_type: 'module',
+      scripts_included: false,
+      dependencies_included: false,
+    },
+    spec_reference: {
+      manifest_spec: 'modelcontextprotocol/mcpb MANIFEST.md',
+      package_shape: 'zip_with_manifest_json',
+      server_type: 'node',
+    },
+    claim_boundary: claudeDesktopMcpbClaimBoundary(),
+    public_safety: {
+      public_payload_only: true,
+      raw_config_body_included: false,
+      local_absolute_path_included: false,
+      credential_included: false,
+      token_included: false,
+      signing_secret_included: false,
+    },
+  };
+}
+
+export function createClaudeDesktopMcpbConnectionPlan(options = {}) {
+  const platform = normalizePlatform(options.platform ?? process.platform);
+  return {
+    ok: true,
+    schema: CLAUDE_DESKTOP_MCPB_PLAN_SCHEMA,
+    client_id: 'claude-desktop',
+    display_name: CLIENT_DEFINITIONS['claude-desktop'].display_name,
+    platform,
+    preferred_path: 'mcpb_extension',
+    writes_performed: false,
+    writesPerformed: false,
+    automatic_config_write: false,
+    default_manual_json_fallback: false,
+    states: CLAUDE_DESKTOP_MCPB_STATES.map((id, index) => ({
+      order: index + 1,
+      id,
+      write: false,
+    })),
+    install_handoff: {
+      artifact: '.mcpb',
+      user_confirms_in_claude: true,
+      enigma_writes_claude_config: false,
+    },
+    bridge_pairing: {
+      scope: 'current_os_user',
+      local_service_required: true,
+      public_payload_only: true,
+      pairing_secret_in_manifest: false,
+      pairing_secret_in_support_export: false,
+      raw_local_service_endpoint_included: false,
+    },
+    repair_boundaries: {
+      primary_action_per_state: true,
+      writes_only_after_explicit_consent: true,
+      public_logs_redacted: true,
+      raw_config_body_included: false,
+    },
+    disconnect_boundaries: {
+      mcpb_path: 'Guide the user to remove or disable the Enigma Memory extension in Claude Desktop.',
+      fallback_path: 'Remove only the Enigma MCP server entry after advanced-user consent.',
+      automatic_config_write: false,
+    },
+    fallback_boundaries: {
+      manual_json: {
+        available: true,
+        default: false,
+        audience: 'advanced',
+        requires_explicit_selection: true,
+        automatic_config_write: false,
+      },
+    },
+    manual_json_fallback: {
+      available: true,
+      default: false,
+      audience: 'advanced',
+      advanced_only: true,
+      requires_explicit_selection: true,
+      automatic_config_write: false,
+    },
+    test_boundary: {
+      ready_requires_test_evidence: true,
+      local_checks_only_before_user_test: true,
+    },
+    claim_boundary: claudeDesktopMcpbClaimBoundary(),
+  };
+}
+
+function hasPassingClaudeMcpbTestEvidence(evidence) {
+  if (evidence === true) return true;
+  if (!isPlainObject(evidence)) return false;
+  return evidence.passed === true || evidence.ok === true || evidence.status === 'passed';
+}
+
+function hasFailingClaudeMcpbTestEvidence(evidence) {
+  if (evidence === false) return true;
+  if (!isPlainObject(evidence)) return false;
+  return evidence.passed === false || evidence.ok === false || evidence.status === 'failed';
+}
+
+function publicReasonCodes(values) {
+  if (!Array.isArray(values)) return [];
+  return uniqueSortedStrings(values.filter((value) => /^[a-z0-9_.:-]+$/i.test(String(value))));
+}
+
+function claudeDesktopMcpbPrimaryAction(status) {
+  const actions = {
+    not_installed: {
+      id: 'install_mcpb',
+      label: 'Install Claude extension',
+      description: 'Open the Enigma Claude extension package in Claude Desktop and confirm install.',
+      kind: 'user_action',
+    },
+    mcpb_ready: {
+      id: 'restart_claude',
+      label: 'Restart Claude Desktop',
+      description: 'Fully quit and reopen Claude Desktop, choose the Memory Drive if prompted, then ask Claude to run read-only enigma_support_summary or enigma_next_action.',
+      kind: 'user_action',
+    },
+    restart_required: {
+      id: 'restart_claude',
+      label: 'Restart Claude Desktop',
+      description: 'Fully quit and reopen Claude Desktop, choose the Memory Drive if prompted, then ask Claude to run read-only enigma_support_summary or enigma_next_action.',
+      kind: 'user_action',
+    },
+    testing: {
+      id: 'wait_for_connection_test',
+      label: 'Wait for connection test',
+      description: 'Keep Claude Desktop open while Enigma waits for a read-only public-safe schema response.',
+      kind: 'status',
+    },
+    ready: {
+      id: 'open_claude_desktop',
+      label: 'Open Claude Desktop',
+      description: 'Claude Desktop is connected to the local Enigma bridge.',
+      kind: 'status',
+    },
+    repair_required: {
+      id: 'repair_claude_extension',
+      label: 'Repair Claude connection',
+      description: 'Enable or reinstall Enigma Memory in Claude Settings → Extensions, reselect the Memory Drive, fully quit and reopen Claude, then use the dry-run fallback only if support asks.',
+      kind: 'repair',
+    },
+    advanced_fallback: {
+      id: 'use_advanced_config_fallback',
+      label: 'Use advanced config fallback',
+      description: 'Review and approve the manual MCP config fallback only if the extension path is unavailable.',
+      kind: 'advanced',
+    },
+  };
+  return {
+    ...actions[status],
+    writes_config: false,
+    public_safe: true,
+  };
+}
+
+export function createClaudeDesktopMcpbHealth(options = {}) {
+  const testEvidence = options.testEvidence ?? options.test_evidence;
+  const mcpbInstalled = options.mcpbInstalled === true
+    || options.mcpb_installed === true
+    || options.extensionInstalled === true
+    || options.extension_installed === true
+    || options.installed === true;
+  const restartRequired = options.restartRequired === true || options.restart_required === true;
+  const testing = options.testing === true;
+  const advancedFallback = options.advancedFallback === true || options.advanced_fallback === true;
+  const repairRequired = options.repairRequired === true
+    || options.repair_required === true
+    || hasFailingClaudeMcpbTestEvidence(testEvidence);
+  const testPassed = hasPassingClaudeMcpbTestEvidence(testEvidence);
+  const testEvidencePresent = testEvidence !== undefined;
+  let status = 'not_installed';
+
+  if (advancedFallback) status = 'advanced_fallback';
+  else if (testing) status = 'testing';
+  else if (repairRequired) status = 'repair_required';
+  else if (!mcpbInstalled) status = 'not_installed';
+  else if (restartRequired) status = 'restart_required';
+  else if (testPassed) status = 'ready';
+  else status = 'mcpb_ready';
+
+  const primaryAction = claudeDesktopMcpbPrimaryAction(status);
+  return {
+    ok: status === 'ready',
+    schema: CLAUDE_DESKTOP_MCPB_HEALTH_SCHEMA,
+    client_id: 'claude-desktop',
+    display_name: CLIENT_DEFINITIONS['claude-desktop'].display_name,
+    status,
+    state: status,
+    health_status: status,
+    supported_statuses: [...CLAUDE_DESKTOP_MCPB_HEALTH_STATES],
+    installed: mcpbInstalled,
+    connected: status === 'ready',
+    ready: status === 'ready',
+    test_evidence_present: testEvidencePresent,
+    test_passed: testPassed,
+    ready_requires_test_evidence: true,
+    repair_reasons: status === 'repair_required'
+      ? publicReasonCodes(options.repairReasons ?? options.repair_reasons ?? ['test_failed_or_repair_required'])
+      : [],
+    advanced_fallback: advancedFallback,
+    automatic_config_write: false,
+    primary_action: primaryAction,
+    next_action_id: primaryAction.id,
+    claim_boundary: claudeDesktopMcpbClaimBoundary(),
   };
 }
 
@@ -724,6 +1078,110 @@ export async function detectConnectors(clientIdOrOptions = {}, maybeOptions = {}
 
 export async function doctorConnectors(clientIdOrOptions = {}, maybeOptions = {}) {
   return detectConnectors(clientIdOrOptions, maybeOptions);
+}
+
+function sha256Root(value) {
+  return `sha256:${sha256Hex(typeof value === 'string' ? value : canonicalize(value))}`;
+}
+
+function publicTrustRef(kind, value) {
+  return `ref:${kind}:${sha256Hex(typeof value === 'string' ? value : canonicalize(value)).slice(0, 32)}`;
+}
+
+function uniqueSortedStrings(values) {
+  return [...new Set(values.map(String).filter((value) => value.length > 0))].sort();
+}
+
+function connectorTrustBoundary() {
+  return {
+    public_payload_only: true,
+    raw_memory_included: false,
+    raw_prompt_included: false,
+    raw_transcript_included: false,
+    raw_embedding_included: false,
+    private_key_included: false,
+    credential_included: false,
+    local_path_included: false,
+    provider_deletion_claim: false,
+    model_forgetting_claim: false,
+    hosted_saas_ready_claim: false,
+  };
+}
+
+function connectorTrustEvidenceRefs(clientId, profile) {
+  return uniqueSortedStrings([
+    publicTrustRef('connector_profile', {
+      schema: PROFILE_SCHEMA,
+      client_id: clientId,
+      display_name: profile.display_name,
+      command: profile.command,
+      server_name: profile.server_name,
+      server_container_path: profile.server_container_path,
+    }),
+    publicTrustRef('mcp_command', {
+      command: profile.command,
+      server_name: profile.server_name,
+    }),
+  ]);
+}
+
+export function createConnectorTrustCard(clientIdOrOptions = 'generic-mcp', maybeOptions = {}) {
+  const options = normalizeOptions(clientIdOrOptions, maybeOptions);
+  const clientId = normalizeClientId(options.clientId ?? options.client_id ?? 'generic-mcp');
+  const profile = getClientProfile(clientId, options);
+  const generatedAt = String(options.generated_at ?? options.generatedAt ?? options.now ?? new Date().toISOString());
+  const evidenceRefs = connectorTrustEvidenceRefs(clientId, profile);
+  const claims = [
+    {
+      claim_id: 'claim:connector.local_mcp_profile',
+      claim_type: PROFILE_SCHEMA,
+      status: 'supported',
+      evidence_refs: [evidenceRefs[0]],
+    },
+    {
+      claim_id: 'claim:connector.public_payload_only',
+      claim_type: 'enigma.trust_boundary.v1',
+      status: 'supported',
+      evidence_refs: [evidenceRefs[1]],
+    },
+  ];
+  const claimIds = claims.map((claim) => claim.claim_id);
+  return {
+    schema: TRUST_CARD_SCHEMA,
+    trust_card_id: `trustcard:connector:${clientId}`,
+    generated_at: generatedAt,
+    subject: {
+      subject_type: 'connector',
+      subject_id: `connector:${clientId}`,
+      subject_ref: `ref:connector:${clientId}`,
+      subject_hash: sha256Root({
+        schema: 'enigma.connector_trust_subject.v1',
+        client_id: clientId,
+        command: profile.command,
+        server_name: profile.server_name,
+      }),
+    },
+    posture: options.posture ?? 'reviewed',
+    claim_ids: claimIds,
+    claims,
+    evidence_refs: evidenceRefs,
+    roots: {
+      claim_root: new MerkleSet(claimIds).root(),
+      evidence_root: new MerkleSet(evidenceRefs).root(),
+      receipt_chain_root: options.receipt_chain_root ?? options.receiptChainRoot ?? sha256Root({
+        schema: 'enigma.connector_trust_card.empty_receipt_chain.v1',
+        client_id: clientId,
+      }),
+    },
+    boundary: connectorTrustBoundary(),
+  };
+}
+
+export function createConnectorTrustCards(options = {}) {
+  const selected = options.clientId ?? options.client_id
+    ? [normalizeClientId(options.clientId ?? options.client_id)]
+    : supportedClients;
+  return selected.map((clientId) => createConnectorTrustCard({ ...options, clientId }));
 }
 
 export function runConnectorDemo(input = {}) {

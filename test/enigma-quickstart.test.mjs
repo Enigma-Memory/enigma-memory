@@ -77,7 +77,35 @@ test('quickstart fails closed when an output file already exists', async () => {
   assert.equal(summary.error.code, 'CLI_ERROR');
   assert.match(summary.error.message, /already exists/);
   assert.equal(summary.error.message.includes(dir), false);
+
+  const plainIo = makeIo();
+  assert.equal(await main(['quickstart', '--bundle', bundlePath, '--out-dir', dir, '--plain'], plainIo.io), 2);
+  assert.match(plainIo.stdout(), /^Enigma quickstart\n/);
+  assert.match(plainIo.stdout(), /Status: Needs attention/);
+  assert.match(plainIo.stdout(), /Issue: Quickstart output already exists/);
+  assert.match(plainIo.stdout(), /Next: enigma quickstart --bundle <new-bundle-path> --out-dir <new-empty-out-dir>/);
+  assert.doesNotMatch(plainIo.stdout().split('\n').find((line) => line.startsWith('Next:')) ?? '', /--overwrite/);
+  assert.match(plainIo.stdout(), /Boundary: local Enigma error summary only/);
+  assert.doesNotMatch(plainIo.stdout(), /^\s*\{/);
+  assert.equal(plainIo.stdout().includes(dir), false);
   assert.equal(await readFile(bundlePath, 'utf8'), '{}\n');
+});
+
+test('quickstart explains colliding bundle and generated artifact paths', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-quickstart-collision-'));
+  const bundlePath = join(dir, 'context-pack.json');
+
+  const io = makeIo();
+  assert.equal(await main(['quickstart', '--bundle', bundlePath, '--out-dir', dir, '--plain'], io.io), 2);
+  const stdout = io.stdout();
+
+  assert.match(stdout, /^Enigma quickstart\n/);
+  assert.match(stdout, /Issue: Quickstart output paths overlap: bundle and context_pack resolve to the same file/);
+  assert.match(stdout, /Choose a bundle filename that is not context-pack\.json, export\.json, verify-report\.json/);
+  assert.match(stdout, /--bundle <out-dir>\/bundle\.json --out-dir <out-dir>/);
+  assert.match(stdout, /Next: enigma quickstart --bundle <bundle-path> --out-dir <out-dir>/);
+  assert.doesNotMatch(stdout, /--overwrite/);
+  assert.equal(stdout.includes(dir), false);
 });
 
 test('quickstart overwrite replaces existing output files', async () => {

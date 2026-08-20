@@ -478,9 +478,17 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
   assert.equal(list.id, 'tools');
   const names = list.result.tools.map((tool) => tool.name);
   assert.ok(names.includes('enigma_init'));
+  assert.ok(names.includes('enigma_next_action'));
   assert.ok(names.includes('enigma_remember'));
   assert.ok(names.includes('enigma_search'));
+  assert.ok(names.includes('enigma_import_preview'));
+  assert.ok(names.includes('enigma_import_approve'));
+  assert.ok(names.includes('enigma_support_summary'));
+  const importApproveTool = list.result.tools.find((tool) => tool.name === 'enigma_import_approve');
+  assert.deepEqual(importApproveTool.inputSchema.required, ['approved', 'approval_token']);
   assert.ok(names.includes('enigma_context_pack'));
+  const contextPackTool = list.result.tools.find((tool) => tool.name === 'enigma_context_pack');
+  assert.equal(contextPackTool.inputSchema.properties.revoked_grant_refs.items.pattern.startsWith('^ref:'), true);
   assert.ok(names.includes('enigma_delete'));
   assert.ok(names.includes('enigma_verify_receipts'));
   assert.ok(names.includes('enigma_meter_usage'));
@@ -490,10 +498,70 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
   assert.ok(names.includes('enigma_settlement_receipt'));
   assert.ok(names.includes('enigma_settlement_verify'));
   assert.ok(names.includes('enigma_settlement_batch'));
+  const previewText = 'mcp import preview private sentinel';
+  const importPreview = await callTool('import-preview', 'enigma_import_preview', {
+    text: `- ${previewText}\n- ${previewText}`,
+    complete: true,
+    now: '2026-06-28T13:30:00.000Z',
+  });
+  assert.equal(importPreview.result.schema, 'enigma.import_preview.v1');
+  assert.equal(importPreview.result.mcp_tool, 'enigma_import_preview');
+  assert.equal(importPreview.result.vault_write_performed, false);
+  assert.match(importPreview.result.approval_token, /^ref:import-approval:/);
+  assert.equal(importPreview.result.import_decision, 'needs_review');
+  assert.equal(importPreview.result.duplicate_groups.length, 1);
+  assert.equal(importPreview.result.claim_boundaries.raw_memory_returned, false);
+  assert.doesNotMatch(JSON.stringify(importPreview.response), /mcp import preview private sentinel/);
+  const unapprovedImport = await callTool('import-approve-unapproved', 'enigma_import_approve', {
+    text: previewText,
+    complete: true,
+    approved: false,
+  });
+  assert.equal(unapprovedImport.result.schema, 'enigma.import_approval_blocked.v1');
+  assert.equal(unapprovedImport.result.reason_code, 'explicit_approval_required');
+  assert.equal(unapprovedImport.result.vault_write_performed, false);
+  const missingTokenImport = await callTool('import-approve-missing-token', 'enigma_import_approve', {
+    text: previewText,
+    complete: true,
+    approved: true,
+  });
+  assert.equal(missingTokenImport.result.schema, 'enigma.import_approval_blocked.v1');
+  assert.equal(missingTokenImport.result.reason_code, 'approval_token_required');
+  assert.equal(missingTokenImport.result.vault_write_performed, false);
+  assert.doesNotMatch(JSON.stringify(missingTokenImport.response), /mcp import preview private sentinel/);
 
+  const emptyPreview = await callTool('import-preview-empty', 'enigma_import_preview', {
+    text: '',
+    complete: true,
+  });
+  const emptyApproval = await callTool('import-approve-empty', 'enigma_import_approve', {
+    text: '',
+    complete: true,
+    approved: true,
+    reviewed: true,
+    approval_token: emptyPreview.result.approval_token,
+  });
   const tempRoot = process.env.TEMP ?? process.env.TMP ?? '.';
   const dir = `${tempRoot}/enigma-network-${process.pid}-${Date.now()}`;
   const bundlePath = `${dir}/bundle.json`;
+
+  const supportMissing = await callTool('support-missing-bundle', 'enigma_support_summary', { bundlePath });
+  assert.equal(supportMissing.result.schema, 'enigma.support_summary.v1');
+  assert.equal(supportMissing.result.setup_state, 'setup_needed');
+  assert.equal(supportMissing.result.redaction.raw_memory_included, false);
+  assert.equal(supportMissing.result.privacy_scan.schema, 'enigma.support_privacy_scan.v1');
+  assert.equal(supportMissing.result.privacy_scan.detected_private_field_count, 0);
+  assert.doesNotMatch(JSON.stringify(supportMissing.response), new RegExp(dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.equal(emptyApproval.result.schema, 'enigma.import_approval_blocked.v1');
+  assert.equal(emptyApproval.result.reason_code, 'empty_import');
+  assert.equal(emptyApproval.result.vault_write_performed, false);
+  assert.doesNotMatch(JSON.stringify(unapprovedImport.response), /mcp import preview private sentinel/);
+
+  const missingNext = await callTool('next-missing-bundle', 'enigma_next_action', { bundlePath });
+  assert.equal(missingNext.result.schema, 'enigma.next_action.v1');
+  assert.equal(missingNext.result.state, 'setup_needed');
+  assert.equal(missingNext.result.primary_action.tool, 'enigma_init');
+  assert.doesNotMatch(JSON.stringify(missingNext.response), new RegExp(dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   try {
     const { resolve } = await import('node:path');
     const initialized = await callTool('init', 'enigma_init', { bundlePath });
@@ -502,6 +570,44 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
     assert.equal(initialized.result.schema, 'enigma.vault_bundle.v1');
     assert.equal(typeof initialized.result.bundlePath, 'string');
     assert.equal(resolve(initialized.result.bundlePath), resolve(bundlePath));
+
+    const emptyNext = await callTool('next-empty-bundle', 'enigma_next_action', { bundlePath });
+    assert.equal(emptyNext.result.state, 'needs_first_memory');
+    assert.equal(emptyNext.result.primary_action.tool, 'enigma_remember');
+    assert.equal(emptyNext.result.lanes.memory_inventory.status, 'empty');
+
+    const duplicatePreview = await callTool('import-preview-duplicate', 'enigma_import_preview', {
+      text: '- duplicate mcp import note\n- duplicate mcp import note',
+      complete: true,
+    });
+    const duplicateApproval = await callTool('import-approve-duplicate-blocked', 'enigma_import_approve', {
+      bundlePath,
+      text: '- duplicate mcp import note\n- duplicate mcp import note',
+      complete: true,
+      approved: true,
+      approval_token: duplicatePreview.result.approval_token,
+    });
+    assert.equal(duplicateApproval.result.schema, 'enigma.import_approval_blocked.v1');
+    assert.equal(duplicateApproval.result.reason_code, 'review_required_before_write');
+    assert.equal(duplicateApproval.result.vault_write_performed, false);
+    assert.doesNotMatch(JSON.stringify(duplicateApproval.response), /duplicate mcp import note/);
+
+    const approvalPreview = await callTool('import-preview-approval', 'enigma_import_preview', {
+      text: '- approved mcp import private note',
+      complete: true,
+      now: '2026-06-28T13:45:00.000Z',
+    });
+    const approvedImport = await callTool('import-approve-write', 'enigma_import_approve', {
+      bundlePath,
+      text: '- approved mcp import private note',
+      complete: true,
+      approved: true,
+      approval_token: approvalPreview.result.approval_token,
+      now: '2026-06-28T13:45:00.000Z',
+    });
+
+    const postImportNext = await callTool('next-after-approved-import', 'enigma_next_action', { bundlePath });
+    assert.equal(postImportNext.result.lanes.memory_inventory.active_count, 1);
     assert.ok(initialized.result.bundlePath.endsWith('bundle.json'));
     assert.equal(typeof initialized.result.vault_id, 'string');
     assert.ok(initialized.result.vault_id.length > 0);
@@ -520,6 +626,12 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
     assert.equal(typeof remembered.result.receipt_id, 'string');
     assert.doesNotMatch(JSON.stringify(remembered.response), /network plaintext sentinel/);
 
+    const populatedNext = await callTool('next-populated-bundle', 'enigma_next_action', { bundlePath });
+    assert.equal(populatedNext.result.state, 'ready_for_app_connection');
+    assert.equal(populatedNext.result.primary_action.id, 'connect_ai_app');
+    assert.equal(populatedNext.result.lanes.memory_inventory.active_count, 2);
+    assert.doesNotMatch(JSON.stringify(populatedNext.response), /network plaintext sentinel/);
+
     const searched = await callTool('search', 'enigma_search', { bundlePath, query: 'plaintext sentinel', limit: 1 });
     assert.ok(Array.isArray(searched.result.memories));
     assert.ok(searched.result.memories.length >= 1);
@@ -527,8 +639,101 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
 
     const context = await callTool('context-pack', 'enigma_context_pack', { bundlePath, query: 'plaintext sentinel', purpose: 'integration_test', limit: 1 });
     assert.ok(Array.isArray(context.result.memories));
+
+    const supportSummary = await callTool('support-populated-bundle', 'enigma_support_summary', { bundlePath });
+    assert.equal(supportSummary.result.schema, 'enigma.support_summary.v1');
+    assert.equal(supportSummary.result.setup_state, 'ready_for_app_connection');
+    assert.equal(supportSummary.result.counts.active_memory_addresses, 2);
+    assert.equal(supportSummary.result.redaction.provider_responses_included, false);
+    assert.equal(supportSummary.result.privacy_scan.status, 'pass');
+    assert.ok(supportSummary.result.privacy_scan.checked_categories.includes('provider_outputs'));
+    assert.doesNotMatch(JSON.stringify(supportSummary.response), /network plaintext sentinel|approved mcp import private note/);
     assert.ok(context.result.memories.length >= 1);
     assert.ok(Array.isArray(context.result.retrieval_receipts ?? context.result.receipts));
+
+    const blockedContext = await callTool('context-pack-blocked-by-grant', 'enigma_context_pack', {
+      bundlePath,
+      query: 'plaintext sentinel',
+      purpose: 'integration_test',
+      limit: 1,
+      require_grant: true,
+      app_ref: 'ref:app:mcp-test',
+      purpose_ref: 'ref:purpose:integration-test',
+      memory_zone_ref: 'ref:zone:default',
+    });
+    assert.equal(blockedContext.result.schema, 'enigma.context_pack_recall_blocked.v1');
+    assert.equal(blockedContext.result.context_pack_returned, false);
+    assert.equal(blockedContext.result.recall_veto.safe_to_share, false);
+    assert.doesNotMatch(JSON.stringify(blockedContext.result), /network plaintext sentinel/);
+
+    const grant = await callTool('context-pack-consent-grant', 'enigma_consent_grant', {
+      app_ref: 'ref:app:mcp-test',
+      purpose_ref: 'ref:purpose:integration-test',
+      operation: 'recall_context',
+      memory_zone_ref: 'ref:zone:default',
+      issued_at: '2099-06-28T12:00:00.000Z',
+      expires_at: '2099-06-28T12:05:00.000Z',
+    });
+    const gatedContext = await callTool('context-pack-allowed-by-grant', 'enigma_context_pack', {
+      bundlePath,
+      query: 'plaintext sentinel',
+      purpose: 'integration_test',
+      limit: 1,
+      require_grant: true,
+      grant: grant.result,
+      app_ref: 'ref:app:mcp-test',
+      purpose_ref: 'ref:purpose:integration-test',
+      memory_zone_ref: 'ref:zone:default',
+    });
+    assert.ok(Array.isArray(gatedContext.result.memories));
+    assert.ok(gatedContext.result.memories.length >= 1);
+    assert.equal(gatedContext.result.memory_controller.context_pack_returned, true);
+    assert.equal(gatedContext.result.memory_controller.recall_veto.safe_to_share, true);
+    assert.deepEqual(gatedContext.result.memory_controller.recall_veto.grant_refs, [grant.result.grant_ref]);
+
+    const revokedGatedContext = await callTool('context-pack-revoked-grant-ref', 'enigma_context_pack', {
+      bundlePath,
+      query: 'plaintext sentinel',
+      purpose: 'integration_test',
+      limit: 1,
+      require_grant: true,
+      grant: grant.result,
+      revoked_grant_refs: [grant.result.grant_ref],
+      app_ref: 'ref:app:mcp-test',
+      purpose_ref: 'ref:purpose:integration-test',
+      memory_zone_ref: 'ref:zone:default',
+    });
+    assert.equal(revokedGatedContext.result.schema, 'enigma.context_pack_recall_blocked.v1');
+    assert.equal(revokedGatedContext.result.context_pack_returned, false);
+    assert.equal(revokedGatedContext.result.recall_veto.decision, 'deny');
+    assert.deepEqual(revokedGatedContext.result.recall_veto.grant_refs, [grant.result.grant_ref]);
+    assert.ok(revokedGatedContext.result.recall_veto.reason_codes.includes('policy_denies_recall'));
+    assert.doesNotMatch(JSON.stringify(revokedGatedContext.result), /network plaintext sentinel/);
+
+    const expiredGrant = await callTool('context-pack-expired-consent-grant', 'enigma_consent_grant', {
+      app_ref: 'ref:app:mcp-test',
+      purpose_ref: 'ref:purpose:integration-test',
+      operation: 'recall_context',
+      memory_zone_ref: 'ref:zone:default',
+      issued_at: '2026-01-01T00:00:00.000Z',
+      expires_at: '2026-01-01T00:00:01.000Z',
+    });
+    const expiredContext = await callTool('context-pack-expired-grant', 'enigma_context_pack', {
+      bundlePath,
+      query: 'plaintext sentinel',
+      purpose: 'integration_test',
+      limit: 1,
+      require_grant: true,
+      grant: expiredGrant.result,
+      app_ref: 'ref:app:mcp-test',
+      purpose_ref: 'ref:purpose:integration-test',
+      memory_zone_ref: 'ref:zone:default',
+    });
+    assert.equal(expiredContext.result.schema, 'enigma.context_pack_recall_blocked.v1');
+    assert.equal(expiredContext.result.context_pack_returned, false);
+    assert.equal(expiredContext.result.recall_veto.safe_to_share, false);
+    assert.ok(expiredContext.result.recall_veto.reason_codes.includes('grant_expired'));
+    assert.doesNotMatch(JSON.stringify(expiredContext.result), /network plaintext sentinel/);
 
     const optimizedContext = await callTool('optimized-context-pack', 'enigma_context_pack', {
       bundlePath,
@@ -654,7 +859,7 @@ test('MCP lists tools and initializes/remembers through JSON-RPC', async () => {
     assert.equal(resource.error, undefined);
     const summary = JSON.parse(resource.result.contents[0].text);
     assert.equal(summary.ok, true);
-    assert.equal(summary.counts.memory_objects, 1);
+    assert.equal(summary.counts.memory_objects, 2);
 
     const prompt = await handleJsonRpcRequest({
       jsonrpc: '2.0',
@@ -768,6 +973,7 @@ test('MCP JSON-RPC hardening returns typed errors and preserves notification sem
     { jsonrpc: '2.0', id: 'bad-array', method: 'tools/call', params: { name: 'enigma_remember', arguments: { text: 'ok', tags: ['ok', 7] } } },
     { jsonrpc: '2.0', id: 'bad-search-limit', method: 'tools/call', params: { name: 'enigma_search', arguments: { limit: 0 } } },
     { jsonrpc: '2.0', id: 'bad-context-limit', method: 'tools/call', params: { name: 'enigma_context_pack', arguments: { limit: 51 } } },
+    { jsonrpc: '2.0', id: 'bad-context-revoked-ref', method: 'tools/call', params: { name: 'enigma_context_pack', arguments: { revoked_grant_refs: ['not-a-public-ref'] } } },
     { jsonrpc: '2.0', id: 'unknown-resource', method: 'resources/read', params: { uri: rawSentinel } },
     { jsonrpc: '2.0', id: 'extra-resource-param', method: 'resources/read', params: { uri: 'enigma://passport/summary', unexpected: rawSentinel } },
     { jsonrpc: '2.0', id: 'extra-prompt-argument', method: 'prompts/get', params: { name: 'enigma_standard_memory_prompt', arguments: { question: 'ok', unexpected: rawSentinel } } },

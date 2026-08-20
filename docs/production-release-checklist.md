@@ -35,12 +35,13 @@ Before enabling live monitoring, analytics, or token rotation, use [`live-endpoi
 ## Package and installability
 
 - [ ] Package name is `enigma-memory`.
-- [ ] Public install command is `npm install -g enigma-memory`; one-off quickstart command is `npx --yes --package enigma-memory enigma quickstart --bundle ./.enigma/bundle.json --overwrite`.
+- [ ] Public install command is `npm install -g enigma-memory`; one-off quickstart command is `npx --yes --package enigma-memory enigma quickstart --bundle ./.enigma/bundle.json`.
 - [ ] Published npm package is visible as `enigma-memory` before public npm-install claims are made.
 - [ ] Registry verification script is present and run as `npm run registry:verify -- --execute` before public npm-install claims; keep its evidence bounded to registry installability only.
-- [ ] Published-package quickstart smoke uses `npm install -g enigma-memory`, `enigma quickstart --bundle ./.enigma/bundle.json --overwrite`, `enigma doctor`, `enigma-relay demo`, and `enigma-gateway demo` in that order.
+- [ ] Published-package quickstart smoke uses `npm install -g enigma-memory`, `enigma quickstart --bundle ./.enigma/bundle.json`, `enigma doctor --bundle ./.enigma/bundle.json`, `enigma claude-mcpb package --plain`, `enigma connect cursor --bundle ./.enigma/bundle.json --dry-run`, `enigma-relay demo`, and `enigma-gateway demo` in that order.
 - [ ] Quickstart output is described as a local vault bundle, context pack, export proof bundle, and verify report; that evidence is local Enigma-controlled proof only, not provider deletion, model forgetting, hosted/BYOC readiness, legal approval, or compliance certification.
-- [ ] `docs/npm-publishing.md` is followed before any future npm publication attempt, including package preflight, `npm pack --dry-run`, manual approval, `NPM_TOKEN` secret handling, provenance/SBOM boundaries, and rollback/deprecation notes.
+- [ ] `docs/npm-publishing.md` is followed before any future npm publication attempt, including package preflight, `npm pack --dry-run`, npm trusted publishing setup for `.github/workflows/npm-publish.yml`, `npm-publish` environment approval, no long-lived npm publish token secrets, provenance/SBOM boundaries, and rollback/deprecation notes.
+- [ ] No new npm automation token or long-lived npm publish token is created for publication; any exposed publish token has been manually revoked in npm and replaced by trusted publishing.
 - [ ] `private` is not set for the publish artifact.
 - [ ] Node engine is `>=24`.
 - [ ] Package import has no side effects: importing modules must not start servers, read user files, mutate configs, or open network connections.
@@ -108,7 +109,7 @@ Before enabling live monitoring, analytics, or token rotation, use [`live-endpoi
 
 ## CI package gate expectations
 
-- [ ] `.github/workflows/ci.yml` runs the same package gates expected locally: `npm run check`, `npm test`, and `npm pack --dry-run`.
+- [ ] `.github/workflows/ci.yml` and `.github/workflows/npm-publish.yml` run the same package gates expected locally: `npm run check`, `npm test`, `npm pack --dry-run`, and `npm run package:install-smoke`.
 - [ ] CI runs on Node 24 on Ubuntu and Windows where GitHub-hosted runners support the package gates.
 - [ ] Ubuntu CI runs `npm run release:audit` only when that script is present.
 - [ ] CI does not require Docker daemon access, cloud credentials, deployment credentials, npm publish credentials, domains, KMS/secrets, SIEM routes, or legal/compliance approvals.
@@ -116,7 +117,7 @@ Before enabling live monitoring, analytics, or token rotation, use [`live-endpoi
 - [ ] CI may upload `.enigma/release-provenance.json` as a build artifact when `npm run provenance:local -- --out ./.enigma/release-provenance.json` is present, but that artifact remains local/build-run checksum evidence unless a separate signing or registry attestation system is added.
 - [ ] CI may upload `.enigma-review-packet/` as a build artifact when `npm run review:packet -- --out ./.enigma-review-packet` is present, but that artifact remains local/build-run evidence unless a separate signing, registry provenance, deployment attestation, or legal/compliance process is added.
 - [ ] `docs/public-github-repo-setup.md` is followed before making a public GitHub repository, including branch protection that requires `Package gates (ubuntu-latest)` and `Package gates (windows-latest)` from `.github/workflows/ci.yml`; seed or refresh those statuses through push, pull request, or CI `workflow_dispatch`.
-- [ ] `.github/workflows/npm-publish.yml` remains manual-only through `workflow_dispatch`, runs on Node 24, requires a `package_version` input matching `package.json`, runs `npm run check`, `npm test`, and `npm pack --dry-run`, uses the `npm-publish` environment for manual approval, and references npm credentials only through the `NPM_TOKEN` secret.
+- [ ] `.github/workflows/npm-publish.yml` remains manual-only through `workflow_dispatch`, runs on Node 24, requires a `package_version` input matching `package.json`, runs `npm run check`, `npm test`, `npm pack --dry-run`, and `npm run package:install-smoke`, uses the `npm-publish` environment for manual approval, grants GitHub OIDC with `id-token: write`, and publishes with `npm publish --access public --provenance` without `NPM_TOKEN`, `NODE_AUTH_TOKEN`, or other npm publish token secrets.
 - [ ] npm publish evidence is bounded to registry publication/provenance for that package version. It does not prove provider deletion, model forgetting, hosted/BYOC readiness, Cloudflare/website deployment, legal approval, compliance certification, or guaranteed financial outcomes.
 
 Package inspection commands:
@@ -128,8 +129,10 @@ node --input-type=module -e "const { readFile } = await import('node:fs/promises
 node --input-type=module -e "await import('./packages/core/src/index.js'); await import('./packages/connectors/src/index.js'); await import('./packages/importers/src/index.js'); await import('./apps/relay/src/server.mjs'); await import('./apps/gateway/src/server.mjs'); const { readFile } = await import('node:fs/promises'); await readFile('./apps/desktop/src/index.html', 'utf8'); console.log('source imports checked')"
 npm run registry:verify -- --execute
 npm install -g enigma-memory
-enigma quickstart --bundle ./.enigma/bundle.json --overwrite
-enigma doctor
+enigma quickstart --bundle ./.enigma/bundle.json
+enigma doctor --bundle ./.enigma/bundle.json
+enigma claude-mcpb package --plain
+enigma connect cursor --bundle ./.enigma/bundle.json --dry-run
 enigma-relay demo
 enigma-gateway demo
 printf '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"manual\",\"version\":\"0\"}}}\\n' | ENIGMA_BUNDLE=\"$PWD/.enigma/bundle.json\" enigma-mcp
@@ -211,7 +214,7 @@ printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion
 
 enigma doctor
 enigma install --bundle "$HOME/.enigma/bundle.json"
-enigma connect claude-desktop --bundle "$HOME/.enigma/bundle.json"
+enigma claude-mcpb package --plain
 enigma connect cursor --bundle "$HOME/.enigma/bundle.json"
 enigma connect kimi-code --bundle "$HOME/.enigma/bundle.json" --mcp-command "/absolute/path/to/enigma-mcp"
 enigma connect vscode-cline --bundle "$HOME/.enigma/bundle.json"

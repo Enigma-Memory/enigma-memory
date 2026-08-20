@@ -307,6 +307,7 @@ function parseArgs(argv = process.argv.slice(2)) {
     storageBootstrap: null,
     out: null,
     help: false,
+    plain: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
@@ -326,13 +327,38 @@ function parseArgs(argv = process.argv.slice(2)) {
     else if (token === '--edge-live') out.edgeLive = readValue();
     else if (token === '--storage-bootstrap') out.storageBootstrap = readValue();
     else if (token === '--out') out.out = readValue();
+    else if (token === '--plain' || token === '--text' || token === '--format=text' || (token === '--format' && argv[index + 1] === 'text')) {
+      out.plain = true;
+      if (token === '--format') index += 1;
+    }
     else throw new Error(`unknown option ${token}`);
   }
   return out;
 }
 
 function usage() {
-  return 'Usage: node scripts/build-production-dependency-report.mjs --goal-audit <goal.json> --release-audit <release.json> --worker-inspect <worker-result.json> --whitepaper <whitepaper-result.json> [--cloudflare-credentials <credentials-result.json>] [--edge-deploy <edge-backend-deployment.json>] [--edge-live <edge-backend-bootstrap-live.json>] [--storage-bootstrap <cloudflare-storage-bootstrap.json>] [--out <file>]\\n\\nBuilds a public-safe launch dependency report from current evidence artifacts.\\n';
+  return 'Usage: node scripts/build-production-dependency-report.mjs --goal-audit <goal.json> --release-audit <release.json> --worker-inspect <worker-result.json> --whitepaper <whitepaper-result.json> [--cloudflare-credentials <credentials-result.json>] [--edge-deploy <edge-backend-deployment.json>] [--edge-live <edge-backend-bootstrap-live.json>] [--storage-bootstrap <cloudflare-storage-bootstrap.json>] [--out <file>] [--plain]\\n\\nBuilds a public-safe launch dependency report from current evidence artifacts. --plain prints a human-readable summary while --out preserves JSON evidence.\\n';
+}
+
+export function renderProductionDependencyReportPlain(report) {
+  const counts = (Array.isArray(report.groups) ? report.groups : []).reduce((acc, groupItem) => {
+    if (groupItem.ready) acc.ready += 1;
+    else acc.blocked += 1;
+    return acc;
+  }, { ready: 0, blocked: 0 });
+  const lines = [
+    'Enigma production dependency report',
+    `Status: ${report.status ?? 'blocked'}`,
+    `Launch ready: ${report.launch_ready ? 'yes' : 'no'}`,
+    `Goal complete: ${report.goal_complete ? 'yes' : 'no'}`,
+    `Ready groups: ${counts.ready}`,
+    `Blocked groups: ${counts.blocked}`,
+    `Next actions: ${Array.isArray(report.next_actions) ? report.next_actions.length : 0}`,
+  ];
+  for (const groupItem of (Array.isArray(report.groups) ? report.groups.filter((item) => item.ready !== true).slice(0, 6) : [])) lines.push(`Blocked: ${groupItem.name} — ${groupItem.blocker_count ?? 0} blockers`);
+  for (const action of (Array.isArray(report.next_actions) ? report.next_actions.slice(0, 5) : [])) lines.push(`Next: ${action.id} — ${action.owner ?? 'owner-needed'}`);
+  lines.push('Boundary: public-safe dependency summary only; no credentials, account ids, local paths, raw memory, prompts, transcripts, provider responses, provider deletion, model behavior, hosted service, launch certification, compliance, benchmark superiority, token ROI, or provider invoice savings claims.');
+  return `${lines.join('\n')}\n`;
 }
 
 async function runCli(argv = process.argv.slice(2)) {
@@ -354,7 +380,7 @@ async function runCli(argv = process.argv.slice(2)) {
     await mkdir(dirname(outPath), { recursive: true });
     await writeFile(outPath, json, 'utf8');
   }
-  return { text: json, code: report.launch_ready ? 0 : 1 };
+  return { text: args.plain ? renderProductionDependencyReportPlain(report) : json, code: report.launch_ready ? 0 : 1 };
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {

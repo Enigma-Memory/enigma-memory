@@ -1,0 +1,28 @@
+# Local reproducible build services for Enigma Memory.
+# These containers replace host-native toolchains that are unavailable or
+# hard to reproduce (Anchor CLI on Windows, Tauri Linux deps).
+#
+# Usage:
+#   docker compose -f docker-compose.build.yml run --rm cortex-v3-build anchor build --no-idl
+#   docker compose -f docker-compose.build.yml run --rm desktop-tauri-build npm run tauri build -- --target nsis
+
+services:
+  cortex-v3-build:
+    build:
+      context: ./cortex-v3
+      dockerfile: Dockerfile
+    image: enigma-cortex-v3-build:latest
+    volumes:
+      - ./cortex-v3:/workspace
+    working_dir: /workspace
+    command: ["anchor", "build", "--no-idl"]
+
+  desktop-tauri-build:
+    build:
+      context: ./apps/desktop-tauri
+      dockerfile: Dockerfile
+    image: enigma-desktop-tauri-build:latest
+    volumes:
+      - .:/workspace
+    working_dir: /workspace/apps/desktop-tauri
+    command: ["cargo", "tauri", "build"]

@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { buildProductionReadinessManifest } from '../scripts/build-production-readiness-manifest.mjs';
+import { buildProductionReadinessManifest, renderProductionReadinessManifestPlain } from '../scripts/build-production-readiness-manifest.mjs';
 import { INFRASTRUCTURE_READINESS_MANIFEST_SCHEMA, validateInfrastructureReadinessManifest } from '../scripts/infrastructure-readiness.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -93,6 +93,30 @@ test('production readiness manifest builder keeps missing refs as explicit block
   assert.equal(manifest.refs.backend_host, undefined);
 });
 
+test('production readiness manifest plain output is readable and claim-bounded', async () => {
+  const manifest = await buildProductionReadinessManifest({
+    env: {
+      ENIGMA_PUBLIC_SITE_URL: 'https://enigmamemory.com/',
+      ENIGMA_RELAY_READY_URL: 'https://relay.enigmamemory.com/readyz',
+      ENIGMA_GATEWAY_READY_URL: 'https://gateway.enigmamemory.com/readyz',
+      ENIGMA_OPERATOR_DECISION: 'pending',
+    },
+    argv: [],
+  });
+  const plain = renderProductionReadinessManifestPlain(manifest);
+
+  assert.match(plain, /^Enigma production readiness manifest\n/);
+  assert.match(plain, /Status: Needs attention/);
+  assert.match(plain, /Mode: hosted-live/);
+  assert.match(plain, /Dependency refs: /);
+  assert.match(plain, /Operator decision: pending/);
+  assert.match(plain, /External blockers: /);
+  assert.match(plain, /Blocker: missing refs\.backend_host/);
+  assert.match(plain, /Boundary: public-safe readiness manifest only/);
+  assert.doesNotMatch(plain, /^\s*\{/);
+  assert.doesNotMatch(plain, /Bearer|Basic|PRIVATE KEY|password|raw_memory|C:\\Users\\|\/home\/|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/i);
+});
+
 test('production readiness manifest builder rejects secret-looking refs', async () => {
   await assert.rejects(
     () => buildProductionReadinessManifest({
@@ -127,4 +151,31 @@ test('production readiness manifest CLI writes validated manifest without printi
   assert.equal(manifest.refs.security_threat_model, 'security-threat-model#manifest-test');
   assert.equal(manifest.external_blockers.length, 0);
   assert.doesNotMatch(stdout + serialized(manifest), /Bearer|Basic|PRIVATE KEY|password|raw memory/i);
+});
+
+test('production readiness manifest CLI writes JSON while printing plain output', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-production-manifest-plain-'));
+  const out = join(dir, 'readiness.json');
+  const { stdout, stderr } = await execFileAsync(process.execPath, [
+    'scripts/build-production-readiness-manifest.mjs',
+    '--out',
+    out,
+    '--plain',
+  ], {
+    cwd: process.cwd(),
+    env: { ...process.env, ...COMPLETE_ENV },
+    timeout: 10000,
+    windowsHide: true,
+  });
+  assert.equal(stderr, '');
+  assert.match(stdout, /^Enigma production readiness manifest\n/);
+  assert.match(stdout, /Status: Ready/);
+  assert.match(stdout, /Dependency refs: 23\/23/);
+  assert.match(stdout, /Boundary: public-safe readiness manifest only/);
+  assert.doesNotMatch(stdout, /^\s*\{/);
+  assert.equal(stdout.includes(dir), false);
+  assert.equal(stdout.includes(out), false);
+  const manifest = JSON.parse(await readFile(out, 'utf8'));
+  assert.equal(manifest.schema, INFRASTRUCTURE_READINESS_MANIFEST_SCHEMA);
+  assert.equal(manifest.external_blockers.length, 0);
 });

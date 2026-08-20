@@ -8,6 +8,7 @@ import { promisify } from 'node:util';
 import {
   buildProductionWorkplan,
   PRODUCTION_WORKPLAN_SCHEMA,
+  renderProductionWorkplanPlain,
   validateProductionWorkplanGraph,
 } from '../scripts/build-production-workplan.mjs';
 
@@ -122,6 +123,27 @@ test('production workplan orders blockers into public-safe phases', () => {
   assert.doesNotMatch(JSON.stringify(workplan), /Bearer\s+[A-Za-z0-9._~+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|sk-[A-Za-z0-9_-]{16,}/i);
 });
 
+test('production workplan plain output is readable and claim-bounded', () => {
+  const workplan = buildProductionWorkplan({
+    dependencyReport: dependencyReport(),
+    operatorAcceptance: operatorAcceptance(),
+    hostedRefCatalog: hostedRefCatalog(),
+  }, { generated_at: '2026-06-24T00:00:00.000Z' });
+  const plain = renderProductionWorkplanPlain(workplan);
+
+  assert.match(plain, /^Enigma production workplan\n/);
+  assert.match(plain, /Status: blocked/);
+  assert.match(plain, /Launch ready: no/);
+  assert.match(plain, /Phases: 6/);
+  assert.match(plain, /Blocked phases: 5/);
+  assert.match(plain, /Next phase: cloudflare_credentials/);
+  assert.match(plain, /Phase: cloudflare_credentials — blocked; 2 blockers/);
+  assert.match(plain, /Next: /);
+  assert.match(plain, /Boundary: public-safe ordered workplan only/);
+  assert.doesNotMatch(plain, /^\s*\{/);
+  assert.doesNotMatch(plain, /Bearer\s+[A-Za-z0-9._~+/=-]{12,}|C:\\Users\\|\/home\/|raw_memory|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/i);
+});
+
 test('production workplan rejects unsafe input evidence', () => {
   assert.throws(() => buildProductionWorkplan({
     dependencyReport: dependencyReport({ groups: [{ name: 'cloudflare_credentials', ready: false, blockers: ['Bearer abcdefghijklmnopqrstuvwxyz'] }] }),
@@ -171,5 +193,41 @@ test('production workplan CLI writes blocked public-safe JSON with exit 1', asyn
     },
   );
   const written = JSON.parse(await readFile(paths.out, 'utf8'));
+  assert.equal(written.next_phase_id, 'cloudflare_credentials');
+});
+
+test('production workplan CLI writes JSON evidence while printing plain output', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'enigma-production-workplan-plain-'));
+  const paths = {
+    dependencies: join(dir, 'dependencies.json'),
+    acceptance: join(dir, 'acceptance.json'),
+    catalog: join(dir, 'catalog.json'),
+    out: join(dir, 'workplan.json'),
+  };
+  await writeFile(paths.dependencies, `${JSON.stringify(dependencyReport(), null, 2)}\n`, 'utf8');
+  await writeFile(paths.acceptance, `${JSON.stringify(operatorAcceptance(), null, 2)}\n`, 'utf8');
+  await writeFile(paths.catalog, `${JSON.stringify(hostedRefCatalog(), null, 2)}\n`, 'utf8');
+  await assert.rejects(
+    () => execFileAsync(process.execPath, [
+      'scripts/build-production-workplan.mjs',
+      '--dependencies', paths.dependencies,
+      '--operator-acceptance', paths.acceptance,
+      '--hosted-ref-catalog', paths.catalog,
+      '--out', paths.out,
+      '--plain',
+    ], { cwd: process.cwd(), timeout: 10000, windowsHide: true }),
+    (error) => {
+      assert.equal(error.code, 1);
+      assert.match(error.stdout, /^Enigma production workplan\n/);
+      assert.match(error.stdout, /Status: blocked/);
+      assert.match(error.stdout, /Boundary: public-safe ordered workplan only/);
+      assert.doesNotMatch(error.stdout, /^\s*\{/);
+      assert.equal(error.stdout.includes(dir), false);
+      assert.equal(error.stdout.includes(paths.out), false);
+      return true;
+    },
+  );
+  const written = JSON.parse(await readFile(paths.out, 'utf8'));
+  assert.equal(written.schema, PRODUCTION_WORKPLAN_SCHEMA);
   assert.equal(written.next_phase_id, 'cloudflare_credentials');
 });

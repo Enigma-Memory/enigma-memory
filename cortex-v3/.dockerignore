@@ -1,0 +1,7 @@
+target/
+.anchor/
+node_modules/
+*.sqlite
+*.sqlite-journal
+test-ledger/
+.env
