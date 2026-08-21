@@ -11,8 +11,12 @@ on:
       - '.github/workflows/cortex-v3-anchor.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 env:
   SOLANA_CLI_VERSION: 1.18.26
+  SOLANA_RELEASE_SHA256: 10246c7f446006036192d81d859e761bcb3e7d1f40059bf27a56e1c29b0dbc40
   ANCHOR_VERSION: 0.30.1
   NODE_VERSION: 20
   RUST_TOOLCHAIN: 1.75.0
@@ -26,21 +30,21 @@ jobs:
         working-directory: cortex-v3
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
 
       - name: Cache Solana CLI
         id: cache-solana
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.local/share/solana
           key: solana-${{ runner.os }}-${{ env.SOLANA_CLI_VERSION }}
@@ -51,6 +55,7 @@ jobs:
           mkdir -p ~/.local/share/solana
           cd ~/.local/share/solana
           curl -L -o solana-release.tar.bz2 "https://github.com/solana-labs/solana/releases/download/v${SOLANA_CLI_VERSION}/solana-release-x86_64-unknown-linux-gnu.tar.bz2"
+          echo "${SOLANA_RELEASE_SHA256}  solana-release.tar.bz2" | sha256sum --check --strict
           tar -xjf solana-release.tar.bz2
           mv solana-release solana-${SOLANA_CLI_VERSION}
           rm solana-release.tar.bz2
@@ -59,13 +64,11 @@ jobs:
       - name: Add Solana to PATH
         run: echo "$HOME/.local/share/solana/solana-${SOLANA_CLI_VERSION}/bin" >> $GITHUB_PATH
 
-      - name: Configure Solana
+      - name: Configure ephemeral test wallet
         run: |
-          mkdir -p ~/.config/solana
-          echo '${{ secrets.SOLANA_DEVNET_WALLET }}' > ~/.config/solana/id.json
-          solana config set --url devnet
-          solana config get
-          echo "Public key: $(solana address)"
+          install -m 700 -d ~/.config/solana
+          solana-keygen new --no-bip39-passphrase --silent --force --outfile ~/.config/solana/id.json
+          solana config set --url localhost
 
       - name: Install Anchor CLI
         run: npm install -g @coral-xyz/anchor-cli@${ANCHOR_VERSION}
@@ -88,7 +91,3 @@ jobs:
       - name: Anchor Test
         run: anchor test --skip-build
         timeout-minutes: 15
-
-      - name: Fund devnet wallet
-        run: solana airdrop 2 $(solana address) --url devnet
-        continue-on-error: true

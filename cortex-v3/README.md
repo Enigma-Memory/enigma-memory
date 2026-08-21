@@ -29,7 +29,7 @@ Production-in-progress scaffold with frictionless-first UX implemented.
   - Auto-save policy engine
   - Merkle-based verifiable memory prototype
 - `webapp/` — Next.js consumer PWA:
-  - Privy embedded wallet (passkey/social)
+  - Direct Phantom and Solflare browser-wallet connections
   - One-tap model connection UI (ChatGPT/Claude/Gemini)
   - Session authorization screen
   - Memory vault dashboard

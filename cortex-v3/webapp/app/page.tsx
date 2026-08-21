@@ -1,4 +1,3 @@
-import { LoginButton } from "@/components/LoginButton";
 import { WalletButton } from "@/components/WalletButton";
 import { DEVNET_CLUSTER, PROGRAM_IDS, ProgramName } from "@/lib/programs";
 
@@ -13,7 +12,6 @@ export default function Home() {
         Claude, and Gemini.
       </p>
       <div className="flex flex-col sm:flex-row gap-4 items-center">
-        <LoginButton />
         <WalletButton />
       </div>
       <section className="mt-16 grid gap-6 sm:grid-cols-3 text-left max-w-4xl w-full">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { useEnigmaWallet } from "@/app/providers";
 import { Transaction } from "@solana/web3.js";
 
 import {
@@ -17,8 +17,8 @@ import {
 } from "@/lib/session";
 
 export default function SessionPage() {
-  const wallet = useWallet();
-  const { connection } = useConnection();
+  const wallet = useEnigmaWallet();
+  const { connection } = wallet;
   const [proposal, setProposal] = useState<SessionProposal | null>(null);
   const [status, setStatus] = useState<
     "idle" | "proposing" | "signing" | "sent" | "error"
@@ -26,11 +26,12 @@ export default function SessionPage() {
   const [error, setError] = useState<string | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
 
+  const adapter = wallet.wallet;
   const owner = wallet.publicKey?.toBase58() ?? null;
-  const isReady = wallet.connected && wallet.signTransaction && owner;
+  const isReady = Boolean(wallet.connected && adapter && owner);
 
   async function authorize() {
-    if (!isReady || !wallet.publicKey || !wallet.signTransaction) return;
+    if (!isReady || !adapter) return;
 
     setStatus("proposing");
     setError(null);
@@ -65,7 +66,7 @@ export default function SessionPage() {
       const tx = Transaction.from(
         Buffer.from(result.serializedTransaction, "base64")
       );
-      const signed = await wallet.signTransaction(tx);
+      const signed = await adapter.signTransaction(tx);
       const sig = await connection.sendRawTransaction(signed.serialize());
       await connection.confirmTransaction(sig, "confirmed");
       setSignature(sig);

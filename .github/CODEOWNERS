@@ -1,4 +1,4 @@
-# CODEOWNERS for Enigma Cortex v3
+# CODEOWNERS for Enigma Memory
 # https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 #
 # The LAST matching pattern wins, so keep general patterns first and specific
@@ -6,6 +6,10 @@
 
 # Default owner for everything in the repository
 * @Enigma-Memory
+/.github/** @Enigma-Memory
+/SECURITY.md @Enigma-Memory
+/package.json @Enigma-Memory
+/package-lock.json @Enigma-Memory
 
 # Cortex v3 anchor workspace
 cortex-v3/** @Enigma-Memory

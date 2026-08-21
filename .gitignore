@@ -32,6 +32,15 @@ deploy/secrets-simulation/
 .wrangler/
 wrangler.toml
 
+# Wallet exports, funding sheets, and operational access-control snapshots
+*.xls
+*.xlsx
+*wallet*.json
+*-keypair.json
+id.json
+*.seed
+*.mnemonic
+protection-*.json
 # Generated/private Enigma evidence and review bundles
 .enigma/
 .enigma-review-packet/

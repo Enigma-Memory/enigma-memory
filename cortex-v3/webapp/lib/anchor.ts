@@ -11,11 +11,11 @@ import {
 
 import { DEVNET_CLUSTER, PROGRAM_IDS, ProgramName } from "./programs";
 
-import memoryRegistryIdl from "../../target/idl/memory_registry.json";
-import budgetEscrowIdl from "../../target/idl/budget_escrow.json";
-import capabilityRegistryIdl from "../../target/idl/capability_registry.json";
-import royaltyRouterIdl from "../../target/idl/royalty_router.json";
-import cortexTreasuryIdl from "../../target/idl/cortex_treasury.json";
+import memoryRegistryIdl from "../../idl/memory_registry.json";
+import budgetEscrowIdl from "../../idl/budget_escrow.json";
+import capabilityRegistryIdl from "../../idl/capability_registry.json";
+import royaltyRouterIdl from "../../idl/royalty_router.json";
+import cortexTreasuryIdl from "../../idl/cortex_treasury.json";
 
 export type SolanaWallet = {
   publicKey: PublicKey;

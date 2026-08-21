@@ -6,7 +6,7 @@ Build a complete, production-grade consumer Memory Wallet on Solana that is fric
 
 ## Definition of Done
 
-1. User can install/open the PWA and create a Solana wallet with one tap (Privy passkey/social).
+1. User can install/open the PWA and connect a supported Solana browser wallet without delegating custody to an embedded-wallet provider.
 2. User can connect ChatGPT, Claude, and Gemini through OAuth-style one-tap flows.
 3. User authorizes auto-save once via a Session PDA; no per-memory or per-transaction prompts afterwards.
 4. Memories save automatically and recall automatically across connected models.

@@ -19,7 +19,7 @@
 - ✅ **OAuth 2.1 + PKCE server** and MCP HTTP/SSE transport with Bearer auth.
 - ✅ **Auto-save policy engine** with category-based rules and immunology filtering.
 - ✅ **Verifiable memory prototype** with Merkle proofs and search-commitment guest stub.
-- ✅ **Privy embedded wallet + model connection UI** in webapp; session authorization and dashboard screens built.
+- ✅ **Direct Phantom/Solflare connection UI** in the webapp; session authorization and dashboard screens built without an embedded-wallet dependency.
 - ✅ **MCP server verifies on-chain `Capability`/`Session` PDAs** before memory/budget tool calls.
 - ✅ **`cortex_treasury` custodies real SPL tokens** via CPI `transfer_checked` deposits/withdrawals.
 - ✅ **Vector search is pluggable** — SQLite fallback, pgvector/Qdrant HNSW backends.

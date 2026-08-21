@@ -82,6 +82,10 @@ const DETECTORS = [
     pattern: /\b(?:postgres|postgresql|mysql|mysql2|mongodb|redis|amqp|amqps):\/\/[^:]+:[^@\s]+@[^\/\s]+/i,
   },
   {
+    id: 'personal-contact-email',
+    pattern: /\b[A-Z0-9._%+-]+@(?:gmail|outlook|hotmail|yahoo|icloud|protonmail|proton)\.[A-Z]{2,}\b/i,
+  },
+  {
     id: 'security-placeholder',
     pattern: /REPLACE-WITH/i, // secret-scan:approved self-reference pattern
   },
