@@ -16,12 +16,13 @@ const execFileAsync = promisify(execFile);
 async function writeFixtureSite(options = {}) {
   const dir = await mkdtemp(join(tmpdir(), 'enigma-public-site-security-'));
   await mkdir(join(dir, 'assets'), { recursive: true });
-  await writeFile(join(dir, '_headers'), `/*\n  X-Content-Type-Options: nosniff\n  X-Frame-Options: DENY\n  Referrer-Policy: strict-origin-when-cross-origin\n  Permissions-Policy: camera=(), microphone=(), geolocation=()\n  Content-Security-Policy: default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'\n`, 'utf8');
+  await writeFile(join(dir, '_headers'), `/*\n  X-Content-Type-Options: nosniff\n  X-Frame-Options: DENY\n  Strict-Transport-Security: max-age=63072000; includeSubDomains\n  Referrer-Policy: strict-origin-when-cross-origin\n  Permissions-Policy: camera=(), microphone=(), geolocation=()\n  Content-Security-Policy: default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'\n`, 'utf8');
   await writeFile(join(dir, 'index.html'), `<!doctype html>\n<html><head><title>Enigma Memory</title><link rel="stylesheet" href="/styles.css"></head><body><main><a href="/about.html">About</a><script src="/app.js"></script></main></body></html>\n`, 'utf8');
   await writeFile(join(dir, 'about.html'), `<!doctype html>\n<html><body><a href="/">Home</a><img src="/assets/logo.svg" alt=""></body></html>\n`, 'utf8');
   await writeFile(join(dir, 'styles.css'), 'body{font-family:system-ui,sans-serif}\n', 'utf8');
   await writeFile(join(dir, 'app.js'), 'document.documentElement.dataset.enigma="ready";\n', 'utf8');
   await writeFile(join(dir, 'assets', 'logo.svg'), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"></svg>\n', 'utf8');
+  await writeFile(join(dir, 'assets', 'white-paper.pdf'), '%PDF-1.4\n1 0 obj\n<< /Title (Enigma Test Document) >>\nendobj\n%%EOF\n', 'latin1');
   await writeFile(join(dir, 'docs.md'), 'Security docs may mention raw memory boundaries, localhost demo commands, and security@enigma.ai role contact without exposing actual values.\n', 'utf8');
   if (options.personalInfo) await writeFile(join(dir, 'contact.html'), `Email founder@example.ai or call 202-555-0100 at 123 Example Lane.\n`, 'utf8');
   if (options.sourceMap) await writeFile(join(dir, 'app.js.map'), '{}\n', 'utf8');
@@ -29,6 +30,7 @@ async function writeFixtureSite(options = {}) {
   if (options.externalScript) await writeFile(join(dir, 'index.html'), `<!doctype html><script src="https://cdn.example.invalid/app.js"></script>\n`, 'utf8');
   if (options.privateFile) await writeFile(join(dir, 'private-token-plan.md'), 'do not publish\n', 'utf8');
   if (options.rawJson) await writeFile(join(dir, 'raw.json'), `${JSON.stringify({ [['raw', 'memory'].join('_')]: 'do not publish this private note' })}\n`, 'utf8');
+  if (options.unsafePdf) await writeFile(join(dir, 'assets', 'legacy.pdf'), '%PDF-1.4\n1 0 obj\n<< /Title (Legacy Product) /A << /S /URI /URI (file\\072\\057\\057\\057E\\072\\057legacy\\057document.html) >> >>\nendobj\n%%EOF\n', 'latin1');
   return dir;
 }
 
@@ -83,6 +85,15 @@ test('public site security validator blocks weak headers and external scripts', 
   const messages = result.blockers.map((entry) => entry.message).join('\n');
   assert.match(messages, /missing required security header|must be/);
   assert.match(messages, /external script|local link target is missing/);
+});
+
+test('public site security validator blocks legacy PDF metadata and local build links', async () => {
+  const site = await writeFixtureSite({ unsafePdf: true });
+  const result = await validatePublicSiteSecurity({ site });
+  assert.equal(result.ok, false);
+  const messages = result.blockers.map((entry) => entry.message).join('\n');
+  assert.match(messages, /PDF metadata title/);
+  assert.match(messages, /local build reference/);
 });
 
 test('public site security CLI returns blocked result for unsafe artifact', async () => {

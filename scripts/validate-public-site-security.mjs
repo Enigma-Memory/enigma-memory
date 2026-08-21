@@ -16,9 +16,12 @@ const SSN_RE = /\b\d{3}-\d{2}-\d{4}\b/g;
 const SOURCE_MAP_RE = /sourceMappingURL\s*=|\.map(?:\?|#|$)/iu;
 const EXTERNAL_SCRIPT_RE = /<script\b[^>]*\bsrc=["'](?:https?:)?\/\//giu;
 const HREF_SRC_RE = /\b(?:href|src)=["']([^"'#?]+)(?:[?#][^"']*)?["']/giu;
+const PDF_TITLE_RE = /\/Title\s*\(([^)]{1,512})\)/u;
+const LOCAL_FILE_MARKERS = Object.freeze(['file://', 'file\\072\\057\\057', '\\users\\', ':/users/', '\\tmp\\', ':/tmp/', '/users/', '/home/']);
 const REQUIRED_HEADERS = Object.freeze({
   'x-content-type-options': 'nosniff',
   'x-frame-options': 'DENY',
+  'strict-transport-security': 'max-age=63072000; includeSubDomains',
   'referrer-policy': 'strict-origin-when-cross-origin',
   'permissions-policy': null,
   'content-security-policy': null,
@@ -94,6 +97,15 @@ function scanText(text, rel, blockers) {
   if (SOURCE_MAP_RE.test(text)) blockers.push(blocker('public site references source maps or sourceMappingURL', rel));
   scanEmail(text, rel, blockers);
   if (EXTERNAL_SCRIPT_RE.test(text)) blockers.push(blocker('public site loads external script', rel));
+}
+
+function scanPdfBinary(buffer, rel, blockers) {
+  const text = buffer.toString('latin1');
+  const lower = text.toLowerCase();
+  if (LOCAL_FILE_MARKERS.some((marker) => lower.includes(marker))) blockers.push(blocker('public PDF contains a local build reference', rel));
+  const title = PDF_TITLE_RE.exec(text)?.[1] ?? '';
+  if (!/^Enigma(?:\s|\\040)/iu.test(title)) blockers.push(blocker('public PDF metadata title must identify Enigma', rel));
+  scanEmail(text, rel, blockers);
 }
 
 function isIgnoredLink(value) {
@@ -172,6 +184,14 @@ export async function validatePublicSiteSecurity(input = {}, options = {}) {
   for (const file of files) {
     const rel = toPosix(relative(site, file));
     const ext = extname(file).toLowerCase();
+    if (ext === '.pdf') {
+      try {
+        scanPdfBinary(await readFile(file), rel, blockers);
+      } catch (error) {
+        blockers.push(blocker(`cannot read PDF file: ${error.message}`, rel));
+      }
+      continue;
+    }
     if (!TEXT_EXTENSIONS.has(ext)) continue;
     let text;
     try {
@@ -194,6 +214,7 @@ export async function validatePublicSiteSecurity(input = {}, options = {}) {
     checked: {
       file_count: relFiles.length,
       text_file_count: relFiles.filter((rel) => TEXT_EXTENSIONS.has(extname(rel).toLowerCase())).length,
+      pdf_file_count: relFiles.filter((rel) => extname(rel).toLowerCase() === '.pdf').length,
       has_index: fileSet.has('index.html'),
       has_headers: fileSet.has('_headers'),
       forbidden_path_count: blockers.filter((entry) => /forbidden private\/generated file path/.test(entry.message)).length,
