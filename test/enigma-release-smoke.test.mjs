@@ -446,43 +446,38 @@ test('review packet builder writes local evidence with private collateral and ra
   const { runReleaseAudit, validateReviewPacketManifest } = await import('../scripts/release-audit.mjs');
 
   await withTempDir('enigma-review-packet-smoke-', async (dir) => {
-    const previousNpmExecPath = process.env.npm_execpath;
-    process.env.npm_execpath = 'C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js';
-    try {
-      const outDir = join(dir, 'packet');
-      const manifest = await buildReviewPacket({
-        out: outDir,
-        now: '2026-06-23T00:00:00.000Z',
-        env: { [REVIEW_PACKET_EMBEDDED_ENV]: '1' },
-        commandRunner: reviewPacketCommandRunner(),
-      });
+    const outDir = join(dir, 'packet');
+    const manifest = await buildReviewPacket({
+      out: outDir,
+      now: '2026-06-23T00:00:00.000Z',
+      env: { [REVIEW_PACKET_EMBEDDED_ENV]: '1' },
+      commandRunner: reviewPacketCommandRunner(),
+    });
 
-      await assertReviewPacketFiles(outDir, manifest);
-      assert.deepEqual((await validateReviewPacketManifest(manifest, outDir)).schema, REVIEW_PACKET_SCHEMA);
-      await assert.rejects(
-        () => validateReviewPacketManifest({ ...manifest, schema: 'wrong.schema' }, outDir),
-        /schema/i,
-      );
-      await assert.rejects(
-        () => validateReviewPacketManifest({ ...manifest, files: [{ ...manifest.files[0], sha256: 'not-sha256' }, ...manifest.files.slice(1)] }, outDir),
-        /sha256/i,
-      );
-      await assert.rejects(
-        () => validateReviewPacketManifest({ ...manifest, files: [...manifest.files, { path: 'site/internal-launch-code.md', sha256: `sha256:${'3'.repeat(64)}` }] }, outDir),
-        /private|internal/i,
-      );
-      assert.equal(manifest.directories.evidence, true);
-      assert.equal(manifest.directories.package, true);
-      assert.ok(manifest.commands.some((command) => command.name === 'local-provenance' && command.output === 'evidence/local-provenance.json'));
-      assert.ok(manifest.commands.some((command) => command.name === 'release-audit' && command.output === 'evidence/release-audit.json'));
-      const packCommand = manifest.commands.find((command) => command.name === 'npm-pack-dry-run-json' && command.output === 'package/npm-pack-dry-run.json');
-      assert.ok(packCommand);
-      assert.match(packCommand.command, /node "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli\.js" pack --dry-run --json --ignore-scripts/);
-      assert.match(runReleaseAudit.toString(), /runReviewPacketGate\(\)/);
-    } finally {
-      if (previousNpmExecPath === undefined) delete process.env.npm_execpath;
-      else process.env.npm_execpath = previousNpmExecPath;
-    }
+    await assertReviewPacketFiles(outDir, manifest);
+    assert.deepEqual((await validateReviewPacketManifest(manifest, outDir)).schema, REVIEW_PACKET_SCHEMA);
+    await assert.rejects(
+      () => validateReviewPacketManifest({ ...manifest, schema: 'wrong.schema' }, outDir),
+      /schema/i,
+    );
+    await assert.rejects(
+      () => validateReviewPacketManifest({ ...manifest, files: [{ ...manifest.files[0], sha256: 'not-sha256' }, ...manifest.files.slice(1)] }, outDir),
+      /sha256/i,
+    );
+    await assert.rejects(
+      () => validateReviewPacketManifest({ ...manifest, files: [...manifest.files, { path: 'site/internal-launch-code.md', sha256: `sha256:${'3'.repeat(64)}` }] }, outDir),
+      /private|internal/i,
+    );
+    assert.equal(manifest.directories.evidence, true);
+    assert.equal(manifest.directories.package, true);
+    assert.ok(manifest.commands.some((command) => command.name === 'local-provenance' && command.output === 'evidence/local-provenance.json'));
+    assert.ok(manifest.commands.some((command) => command.name === 'release-audit' && command.output === 'evidence/release-audit.json'));
+    const packCommand = manifest.commands.find((command) => command.name === 'npm-pack-dry-run-json' && command.output === 'package/npm-pack-dry-run.json');
+    assert.ok(packCommand);
+    assert.equal(packCommand.command.startsWith(process.platform === 'win32' ? 'node ' : 'npm '), true);
+    assert.equal(packCommand.command.endsWith(' pack --dry-run --json --ignore-scripts'), true);
+    assert.doesNotMatch(packCommand.command, /(?:cmd(?:\.exe)?|powershell)(?:\s|$)|\s\/[dsc]\s/i);
+    assert.match(runReleaseAudit.toString(), /runReviewPacketGate\(\)/);
   });
 });
 
