@@ -286,8 +286,7 @@ test('Cloudflare Worker edge deploy plans custom domains without route DNS short
   const plan = buildWranglerWorkerDeployPlan(command);
   assert.equal(plan.dryRun, true);
   assert.equal(plan.tokenPrinted, false);
-  assert.ok(plan.args.includes('--domain'));
-  assert.ok(plan.args.includes('relay.enigmamemory.com'));
+  assert.deepEqual(plan.args.slice(-2), ['--domain', 'relay.enigmamemory.com']);
   assert.equal(plan.args.includes('--route'), false);
   assert.throws(() => parseCloudflareOpsCommand([
     'workers',

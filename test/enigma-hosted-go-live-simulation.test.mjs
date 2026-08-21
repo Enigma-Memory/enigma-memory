@@ -197,6 +197,17 @@ async function cleanupLegacySimulationCompose() {
   await tryDocker(['volume', 'rm', ...LEGACY_COMPOSE_VOLUMES]);
 }
 
+test('readiness poller rejects nonnumeric loopback ports', async () => {
+  const result = await execFileAsync(process.execPath, ['scripts/wait-for-backend-ready.mjs', '--timeout', '1'], {
+    cwd: PROJECT_ROOT,
+    env: { ...process.env, ENIGMA_SIM_RELAY_PORT: '8443@example.invalid' },
+    timeout: 5000,
+    windowsHide: true,
+  }).catch((error) => error);
+  assert.equal(result.code, 1);
+  assert.match(String(result.stderr), /ENIGMA_SIM_RELAY_PORT must be an integer from 1 to 65535/);
+});
+
 test('hosted/BYOC go-live simulation produces accepted live evidence', { timeout: 300000 }, async (t) => {
   if (!dockerComposeAvailable() || !dockerLinuxContainersAvailable()) {
     t.skip('Docker Compose with Linux containers not available');

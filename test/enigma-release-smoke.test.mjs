@@ -599,7 +599,7 @@ test('native host release artifacts are package-visible and claim-bounded', asyn
   assert.equal(packageFilesCover(pkg, NATIVE_HOST_BIN_REL), true, 'native host bin must be included in the package file list');
 
   const bridgeSource = await readFile(BROWSER_NATIVE_BRIDGE_URL, 'utf8');
-  assert.match(bridgeSource, new RegExp(`const\\s+NATIVE_HOST\\s*=\\s*['"]${NATIVE_HOST_NAME.replace(/\./g, '\\.')}['"]`));
+  assert.ok(bridgeSource.includes(`const NATIVE_HOST = '${NATIVE_HOST_NAME}';`));
 
   const nativeHostSource = await readProjectText(NATIVE_HOST_BIN_REL);
   assert.match(nativeHostSource.split(/\r?\n/, 1)[0], /^#!\/usr\/bin\/env node$/);

@@ -5,8 +5,16 @@
 import https from 'node:https'
 import { parseArgs } from 'node:util'
 
-const RELAY_PORT = process.env.ENIGMA_SIM_RELAY_PORT || '8443'
-const GATEWAY_PORT = process.env.ENIGMA_SIM_GATEWAY_PORT || '9443'
+function simulationPort(envName, fallback) {
+  const value = process.env[envName] ?? fallback
+  if (!/^\d{1,5}$/u.test(value)) throw new Error(`${envName} must be an integer from 1 to 65535`)
+  const port = Number(value)
+  if (port < 1 || port > 65535) throw new Error(`${envName} must be an integer from 1 to 65535`)
+  return String(port)
+}
+
+const RELAY_PORT = simulationPort('ENIGMA_SIM_RELAY_PORT', '8443')
+const GATEWAY_PORT = simulationPort('ENIGMA_SIM_GATEWAY_PORT', '9443')
 const ENDPOINTS = [
   { name: 'relay', url: `https://localhost:${RELAY_PORT}/readyz` },
   { name: 'gateway', url: `https://localhost:${GATEWAY_PORT}/readyz` },

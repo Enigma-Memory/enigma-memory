@@ -33,7 +33,9 @@ async function pathExists(path) {
 }
 
 function quoted(path) {
-  return `"${String(path).replace(/"/g, '\\"')}"`;
+  const text = String(path);
+  if (!/^[A-Za-z0-9._/\\: <>-]+$/u.test(text) || text.endsWith('\\')) return '"<path>"';
+  return `"${text}"`;
 }
 
 function expectedNextCommands(bundle, crossModelReport) {

@@ -42,7 +42,7 @@ test('Postgres production schema contains durable relay gateway and readiness ta
   const sql = postgresProductionSchemaSql({ schema: 'enigma_prod' });
   assertProductionStorageSqlSafe(sql);
   for (const table of PRODUCTION_STORAGE_TABLES) {
-    assert.match(sql, new RegExp(`CREATE TABLE IF NOT EXISTS "enigma_prod"\."${table}"`, 'i'));
+    assert.match(sql, new RegExp(`CREATE TABLE IF NOT EXISTS "enigma_prod"\\."${table}"`, 'i'));
   }
   assert.match(sql, /encrypted_payload_hash text NOT NULL/i);
   assert.match(sql, /client_public_key_hash text NOT NULL/i);

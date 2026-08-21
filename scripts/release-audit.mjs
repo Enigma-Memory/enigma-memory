@@ -146,12 +146,9 @@ const REDACTED_DIAGNOSTIC_LINE = '<redacted secret-looking output>';
 
 function npmInvocation(args) {
   const label = commandLabel('npm', args);
-  const npmExecPath = process.env.npm_execpath;
-  if (npmExecPath && npmExecPath.endsWith('.js')) {
-    return { command: process.execPath, args: [npmExecPath, ...args], label };
-  }
   if (process.platform === 'win32') {
-    return { command: process.env.ComSpec ?? 'cmd.exe', args: ['/d', '/s', '/c', label], label };
+    const npmCli = resolve(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
+    return { command: process.execPath, args: [npmCli, ...args], label };
   }
   return { command: 'npm', args, label };
 }

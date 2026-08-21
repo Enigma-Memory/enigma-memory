@@ -1128,7 +1128,9 @@ function setupMemorySource(flags) {
 }
 
 function commandPath(path) {
-  return `"${String(path).replace(/"/g, '\\"')}"`;
+  const text = String(path);
+  if (!/^[A-Za-z0-9._/\\: <>-]+$/u.test(text) || text.endsWith('\\')) return '"<path>"';
+  return `"${text}"`;
 }
 
 function publicPathDisplay(path, label) {

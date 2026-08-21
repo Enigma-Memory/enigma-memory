@@ -227,7 +227,7 @@ test('public beta evidence template CLI is non-destructive by default', async ()
     assert.match(first.stdout, /Registry install after npm publish: npm install --prefix <temp-prefix> enigma-memory@0\.1\.19/);
     assert.match(first.stdout, /Desktop release required statuses: windows\.signature\.status=verified with evidence_ref/);
     assert.match(first.stdout, /Production handoff required statuses: release_pr\.approval_status=approved with reviewer_approval_ref/);
-    assert.match(first.stdout, new RegExp(`Evidence manifest: ${outDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\/evidence-manifest\.json`));
+    assert.ok(first.stdout.includes(`Evidence manifest: ${outDir}/evidence-manifest.json`));
     assert.doesNotMatch(first.stdout, /C:\\Users|\/home\/|\/tmp\/|AppData\\Local/i);
 
     const second = await execFileAsync(process.execPath, [SCRIPT, '--out-dir', outDir, '--plain'], {

@@ -3878,7 +3878,7 @@ test('public collateral keeps proof, token, hosted, and raw-memory claim boundar
 
   const checklist = docs['docs/production-release-checklist.md'];
   for (const statusLabel of checklistStatusLabels) {
-    assert.match(checklist, new RegExp(statusLabel.replace(/[\/]/g, '\\$&'), 'i'), `checklist missing ${statusLabel} status`);
+    assert.ok(checklist.toLowerCase().includes(statusLabel.toLowerCase()), `checklist missing ${statusLabel} status`);
   }
 
   assert.doesNotMatch(checklist, /quickstart --bundle \.\/\.enigma\/bundle\.json --overwrite/);

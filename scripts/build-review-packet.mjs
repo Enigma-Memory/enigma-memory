@@ -107,12 +107,9 @@ function normalizeRel(rel) {
 
 function npmInvocation(args) {
   const label = ['npm', ...args].join(' ');
-  const npmExecPath = process.env.npm_execpath;
-  if (npmExecPath && npmExecPath.endsWith('.js')) {
-    return { command: process.execPath, args: [npmExecPath, ...args], label };
-  }
   if (process.platform === 'win32') {
-    return { command: process.env.ComSpec ?? 'cmd.exe', args: ['/d', '/s', '/c', label], label };
+    const npmCli = path.resolve(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
+    return { command: process.execPath, args: [npmCli, ...args], label };
   }
   return { command: 'npm', args, label };
 }
@@ -350,9 +347,8 @@ async function invokeCommand(commandRunner, command, args, options) {
 
 function shellArgLabel(value) {
   const text = String(value);
-  if (text.length === 0) return '""';
-  if (!/[\s"]/u.test(text)) return text;
-  return `"${text.replace(/"/gu, '\\"')}"`;
+  if (!/^[A-Za-z0-9._/\\: @+=,-]+$/u.test(text) || text.endsWith('\\')) return '<redacted-argument>';
+  return text.includes(' ') ? `"${text}"` : text;
 }
 
 function commandSummaryLabel(command, args) {

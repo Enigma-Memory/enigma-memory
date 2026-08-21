@@ -466,13 +466,13 @@ test('proof-network registry rejects unsupported artifact types and non-registry
   const attestation = createBenchmarkAttestation(attestationInput());
   assert.throws(
     () => createRegistryBatch({ entries: [attestation] }),
-    new RegExp(`must be a ${PROOF_NETWORK_REGISTRY_ENTRY_SCHEMA.replace(/\./g, '\\.')}`),
+    { name: 'TypeError', message: `entries[0] must be a ${PROOF_NETWORK_REGISTRY_ENTRY_SCHEMA}` },
   );
   // an anchor batch is not a registry entry either
   const anchor = createProofNetworkAnchorBatch(anchorInput());
   assert.throws(
     () => createRegistryBatch({ entries: [anchor] }),
-    new RegExp(`must be a ${PROOF_NETWORK_REGISTRY_ENTRY_SCHEMA.replace(/\./g, '\\.')}`),
+    { name: 'TypeError', message: `entries[0] must be a ${PROOF_NETWORK_REGISTRY_ENTRY_SCHEMA}` },
   );
   // an empty registry batch is rejected
   assert.throws(() => createRegistryBatch({ entries: [] }), /entries must be non-empty/);

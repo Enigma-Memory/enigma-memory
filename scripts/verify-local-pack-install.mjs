@@ -40,9 +40,10 @@ function usage() {
 }
 
 function npmInvocation(args) {
-  const npmExecPath = process.env.npm_execpath;
-  if (npmExecPath && npmExecPath.endsWith('.js')) return { command: process.execPath, args: [npmExecPath, ...args] };
-  if (process.platform === 'win32') return { command: process.env.ComSpec ?? 'cmd.exe', args: ['/d', '/s', '/c', ['npm', ...args].join(' ')] };
+  if (process.platform === 'win32') {
+    const npmCli = resolve(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
+    return { command: process.execPath, args: [npmCli, ...args] };
+  }
   return { command: 'npm', args };
 }
 

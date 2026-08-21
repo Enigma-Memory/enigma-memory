@@ -98,8 +98,8 @@ function summarizePublicSafeReleasePacketApproval(value) {
 
 function shellArg(value) {
   const text = requireText('command argument', value);
-  if (/^[A-Za-z0-9_./:@%+=,-]+$/u.test(text)) return text;
-  return `"${text.replace(/"/g, '\\"')}"`;
+  if (!/^[A-Za-z0-9_./:@+=,-]+$/u.test(text)) throw new TypeError('command argument contains unsupported characters');
+  return text;
 }
 
 function parseArgs(argv) {
