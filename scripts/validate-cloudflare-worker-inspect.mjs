@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 export const CLOUDFLARE_WORKER_INSPECTION_RESULT_SCHEMA = 'enigma.cloudflare_worker_inspection_result.v1';
 
-const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|cf-[A-Za-z0-9_-]{12,}|raw memory|private prompt|full transcript|decrypted capsule)/iu;
+const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/:@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|cf-[A-Za-z0-9_-]{12,}|raw memory|private prompt|full transcript|decrypted capsule)/iu;
 const ACCOUNT_ID_RE = /\b[0-9a-f]{32}\b/iu;
 const LOCAL_PATH_RE = /(?:[A-Z]:\\Users\\[^\r\n"']+|[A-Z]:\\tmp\\[^\r\n"']+|\/Users\/[^\r\n"']+|\/home\/[^\r\n"']+|\/tmp\/[^\r\n"']+|\/private\/tmp\/[^\r\n"']+|\/var\/folders\/[^\r\n"']+)/iu;
 const FORBIDDEN_KEY_RE = /(?:password|passwd|pwd|api[_-]?key|private[_-]?key|secret|raw[_-]?memory|plaintext|plain[_-]?text|prompt|completion|transcript|provider[_-]?response|cookie|session)/iu;

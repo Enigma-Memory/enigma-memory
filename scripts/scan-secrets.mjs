@@ -20,6 +20,7 @@ const APPROVAL_MARKERS = [
 const SKIP_DIRS = new Set([
   'node_modules',
   '.git',
+  '.wrangler',
   '.enigma',
   '.enigma-review-packet',
   '.enigma-review-packet-debug',

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 export const PRODUCTION_STATUS_BOARD_SCHEMA = 'enigma.production_status_board.v1';
 
-const SECRET_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|sk-[A-Za-z0-9_-]{16,}|https?:\/\/[^\s/@]+:[^\s/@]+@|AKIA[0-9A-Z]{16})/iu;
+const SECRET_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|sk-[A-Za-z0-9_-]{16,}|https?:\/\/[^\s/:@]+:[^\s/@]+@|AKIA[0-9A-Z]{16})/iu;
 const LOCAL_PATH_RE = /(?<![A-Za-z])(?:[A-Za-z]:[\\/]|\\\\[^\\/]+[\\/][^\\/]+|\/(?:Users|home)\/[^\s"']+)/u;
 
 function parseArgs(argv = process.argv.slice(2)) {

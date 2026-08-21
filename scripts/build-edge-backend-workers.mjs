@@ -57,7 +57,7 @@ const CLAIM_BOUNDARY = Object.freeze([
   'Private data-plane routes remain closed by default; raw memory, prompts, transcripts, provider responses, credentials, and private keys must not be returned by these Workers.',
 ]);
 
-const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16})/iu;
+const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/:@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16})/iu;
 
 function sha256(text) {
   return `sha256:${createHash('sha256').update(text).digest('hex')}`;

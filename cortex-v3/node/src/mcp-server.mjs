@@ -2,10 +2,14 @@ import { createInterface } from "node:readline";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createServer } from "node:http";
 import { randomUUID, createHmac } from "node:crypto";
-import { resolve, dirname, join } from "node:path";
+import { dirname, join } from "node:path";
 import { mkdirSync } from "node:fs";
 import { Connection, PublicKey } from "@solana/web3.js";
-import { createStore, deriveDataEncryptionKey } from "./store.mjs";
+import {
+  createStore,
+  deriveDataEncryptionKey,
+  storeFileNameForOwner,
+} from "./store.mjs";
 import { createEmbedder } from "./embed.mjs";
 
 let defaultStore;
@@ -37,10 +41,8 @@ function deriveDekForOwner(owner, options = {}) {
 }
 
 function makeUserStorePath(owner, options = {}) {
-  if (options.storePath) {
-    return join(options.storePath, `${owner}.sqlite`);
-  }
-  return resolve(`data/cortex-stores/${owner}.sqlite`);
+  const filename = storeFileNameForOwner(owner);
+  return join(options.storePath ?? "data/cortex-stores", filename);
 }
 
 function getStore(options = {}) {

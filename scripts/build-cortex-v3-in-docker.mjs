@@ -11,15 +11,8 @@ import { fileURLToPath } from 'node:url';
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const ROOT = path.resolve(path.dirname(SCRIPT_PATH), '..');
 const CORTEX_DIR = path.join(ROOT, 'cortex-v3');
+const EXEC_OPTIONS = Object.freeze({ encoding: 'utf8', stdio: 'inherit', cwd: ROOT });
 
-function run(cmd, args, options = {}) {
-  const isWindows = process.platform === 'win32';
-  return execFileSync(isWindows ? 'cmd' : cmd, isWindows ? ['/c', cmd, ...args] : args, {
-    encoding: 'utf8',
-    stdio: 'inherit',
-    ...options,
-  });
-}
 
 function main() {
   if (!existsSync(path.join(CORTEX_DIR, 'Cargo.toml'))) {
@@ -28,16 +21,16 @@ function main() {
   }
 
   console.log('Building Docker image for Cortex v3 Anchor build environment...');
-  run('docker', ['build', '-t', 'enigma-cortex-v3-build', '-f', path.join('cortex-v3', 'Dockerfile'), 'cortex-v3'], { cwd: ROOT });
+  execFileSync('docker', ['build', '-t', 'enigma-cortex-v3-build', '-f', path.join('cortex-v3', 'Dockerfile'), 'cortex-v3'], EXEC_OPTIONS);
 
   console.log('\nRunning anchor build inside container...');
-  run('docker', [
+  execFileSync('docker', [
     'run', '--rm',
     '-v', `${CORTEX_DIR}:/workspace`,
     '-w', '/workspace',
     'enigma-cortex-v3-build',
     'anchor', 'build', '--no-idl',
-  ], { cwd: ROOT });
+  ], EXEC_OPTIONS);
 
   console.log('\nBuild complete. Check cortex-v3/target/deploy/ for compiled programs.');
 }

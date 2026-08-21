@@ -68,7 +68,7 @@ async function maybeReadJsonFile(path) {
 
 function redactProbeBody(value, path = 'probe.body') {
   const forbidden = /(?:token|api[_-]?key|secret|password|passwd|pwd|private[_-]?key|prompt|completion|transcript|embedding|provider[_-]?response|raw[_-]?memory|plaintext|cookie|session)/iu;
-  const secretValue = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16})/iu;
+  const secretValue = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/:@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16})/iu;
   if (typeof value === 'string') {
     if (secretValue.test(value)) throw new Error(`${path} contains secret-looking data`);
     return value;

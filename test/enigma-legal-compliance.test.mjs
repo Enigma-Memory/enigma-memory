@@ -129,5 +129,5 @@ test('legal compliance CLI returns blocked result for unsafe approved claims', a
   assert.equal(output.schema, LEGAL_COMPLIANCE_APPROVAL_RESULT_SCHEMA);
   assert.equal(output.ok, false);
   assert.match(JSON.stringify(output.blockers), /overclaim/i);
-  assert.doesNotMatch(result.stdout, /Bearer\s+[A-Za-z0-9._~+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@/i);
+  assert.doesNotMatch(result.stdout, /Bearer\s+[A-Za-z0-9._~+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/:@]+:[^\s/@]+@/i);
 });

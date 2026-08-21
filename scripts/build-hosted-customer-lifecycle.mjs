@@ -124,7 +124,7 @@ const LIFECYCLE_EVIDENCE_KEY_SET = new Set([
   ...Object.keys(EVIDENCE_KEY_ALIASES),
 ]);
 
-const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|\b(?:raw memory|plaintext prompts?|plain text prompts?|private prompts?|provider responses?|full transcript|decrypted memory|credentials?|secrets?|passwords?|private keys?|api key secret|api secrets?|access tokens?|refresh tokens?|token values?|credential material)\b)/iu;
+const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/:@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|\b(?:raw memory|plaintext prompts?|plain text prompts?|private prompts?|provider responses?|full transcript|decrypted memory|credentials?|secrets?|passwords?|private keys?|api key secret|api secrets?|access tokens?|refresh tokens?|token values?|credential material)\b)/iu;
 const FORBIDDEN_CLAIM_RE = /(?:token\s+(?:roi|profit|return|investment|price)|financial\s+roi|roi\s+claim|(?:roi|profit|return)\s+(?:from|on)\s+token|guaranteed\s+(?:savings|profit|return)|provider(?:-side|\s+side)?\s+(?:deletion|erasure)|model\s+(?:forgetting|forgot|erasure)|makes?\s+models?\s+forget|deleted\s+from\s+every\s+provider)/iu;
 
 function assertPublicSafeString(value, label) {

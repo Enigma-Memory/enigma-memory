@@ -72,26 +72,11 @@ The content looks like:
 ### 2.3 Set the secret via the `gh` CLI
 
 ```bash
-gh secret set SOLANA_MAINNET_WALLET --body "$(cat ~/.config/solana/mainnet-wallet.json)" --repo Enigma-Memory/enigma-memory
+gh secret set SOLANA_MAINNET_WALLET --repo Enigma-Memory/enigma-memory < ~/.config/solana/mainnet-wallet.json
 ```
 
 Replace `Enigma-Memory/enigma-memory` with the actual owner/repo.
 
-### 2.4 Using `deploy/github-secret.py`
-
-The helper script in this directory can upload a wallet file to GitHub. For mainnet, adapt the configuration at the top of the file:
-
-```python
-SECRET_NAME = "SOLANA_MAINNET_WALLET"
-WALLET_FILE = os.path.join(os.path.dirname(__file__), "mainnet-wallet.json")
-```
-
-Then run:
-
-```bash
-export GITHUB_PAT=<your-pat-with-repo-secrets-scope>
-python deploy/github-secret.py
-```
 
 ---
 

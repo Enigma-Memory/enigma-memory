@@ -140,5 +140,5 @@ test('tenant policy CLI returns blocked result for invalid approval', async () =
   assert.equal(output.schema, TENANT_POLICY_APPROVAL_RESULT_SCHEMA);
   assert.equal(output.ok, false);
   assert.match(JSON.stringify(output.blockers), /retention_days/);
-  assert.doesNotMatch(result.stdout, /Bearer\s+[A-Za-z0-9._~+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@/i);
+  assert.doesNotMatch(result.stdout, /Bearer\s+[A-Za-z0-9._~+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/:@]+:[^\s/@]+@/i);
 });

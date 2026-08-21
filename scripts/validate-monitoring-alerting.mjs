@@ -28,7 +28,7 @@ export const REQUIRED_SYNTHETIC_CHECKS = Object.freeze([
 
 const ACCEPTED_STATUSES = new Set(['approved', 'accepted', 'go', 'verified']);
 const ALERT_SEVERITIES = new Set(['sev1', 'sev2', 'sev3', 'sev4']);
-const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|raw memory|private prompt|full transcript|decrypted capsule|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16})/iu;
+const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/:@]+:[^\s/@]+@|raw memory|private prompt|full transcript|decrypted capsule|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16})/iu;
 const SECRET_KEY_RE = /(?:password|passwd|pwd|token|api[_-]?key|private[_-]?key|secret|raw[_-]?memory|plaintext|plain[_-]?text|prompt|completion|transcript|embedding|provider[_-]?response)/iu;
 const SAFE_FIELD_NAMES = new Set(['kms_or_secret_access_failure', 'plaintext_rejection_spike']);
 const SHA256_PREFIXED_DIGEST = /^sha256:[0-9a-f]{64}$/;

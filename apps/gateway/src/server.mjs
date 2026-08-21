@@ -22,7 +22,11 @@ const GATEWAY_STATE_VERSION = 1;
 const DEFAULT_GATEWAY_ID = 'gateway_local';
 const DEFAULT_ACTIVE_ROOT = `sha256:${sha256Hex('enigma.gateway.empty_active_root.v1')}`;
 const DEFAULT_BODY_LIMIT = 64 * 1024;
-const JSON_HEADERS = Object.freeze({ 'content-type': 'application/json; charset=utf-8' });
+const JSON_HEADERS = Object.freeze({
+  'content-type': 'application/json; charset=utf-8',
+  'content-security-policy': "default-src 'none'; frame-ancestors 'none'",
+  'x-content-type-options': 'nosniff',
+});
 const LOCAL_READINESS_MODES = new Set(['local', 'demo', 'development', 'test']);
 const PRODUCTION_READINESS_MODES = new Set(['production', 'hosted', 'byoc', 'customer_byoc', 'on_prem', 'onprem']);
 const LOCAL_STORAGE_KINDS = new Set(['memory', 'in_memory', 'in-memory', 'local', 'file', 'state_file', 'state-file', 'json']);

@@ -1,4 +1,5 @@
 import {
+  createHash,
   randomBytes,
   createCipheriv,
   createDecipheriv,
@@ -27,6 +28,14 @@ const DEK_SALT = Buffer.from("cortex-v3-dek");
 const DEK_INFO = Buffer.from("cortex-v3-user-dek");
 const DEK_INFO_WITH_PASSPHRASE = (passphrase) =>
   Buffer.from(`cortex-v3-user-dek:${passphrase}`);
+
+export function storeFileNameForOwner(owner) {
+  const normalized = String(owner ?? "").trim();
+  if (normalized.length === 0 || normalized.length > 256) {
+    throw new TypeError("owner must be between 1 and 256 characters");
+  }
+  return `${createHash("sha256").update(normalized, "utf8").digest("hex")}.sqlite`;
+}
 
 function decodeEntropy(input) {
   if (Buffer.isBuffer(input)) return input;

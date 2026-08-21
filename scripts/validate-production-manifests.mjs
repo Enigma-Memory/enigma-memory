@@ -30,7 +30,7 @@ const REQUIRED_HOSTED_ENV_REF_SPECS = Object.freeze([
 
 export const REQUIRED_HOSTED_ENV_REFS = Object.freeze(REQUIRED_HOSTED_ENV_REF_SPECS.map((item) => item.id));
 
-const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|raw memory|private prompt|full transcript|decrypted capsule)/iu;
+const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/:@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|raw memory|private prompt|full transcript|decrypted capsule)/iu;
 
 const CLAIM_BOUNDARY = Object.freeze([
   'This validator checks production-shaped backend manifests for fail-closed safety gates and required public-safe refs only.',

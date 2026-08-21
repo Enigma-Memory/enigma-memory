@@ -126,5 +126,5 @@ test('domain TLS CLI returns blocked result for incomplete evidence', async () =
   assert.equal(output.schema, DOMAIN_TLS_RESULT_SCHEMA);
   assert.equal(output.ok, false);
   assert.match(JSON.stringify(output.blockers), /dns\.records|status_code/);
-  assert.doesNotMatch(result.stdout, /Bearer\s+[A-Za-z0-9._~+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@/i);
+  assert.doesNotMatch(result.stdout, /Bearer\s+[A-Za-z0-9._~+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/:@]+:[^\s/@]+@/i);
 });

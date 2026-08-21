@@ -23,7 +23,7 @@ import { collectHostedBackendLiveEvidence } from '../scripts/collect-hosted-back
 
 const execFileAsync = promisify(execFile);
 
-const SECRET_OR_CREDENTIAL_RE = /Bearer\s+[A-Za-z0-9._~+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@/i;
+const SECRET_OR_CREDENTIAL_RE = /Bearer\s+[A-Za-z0-9._~+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/:@]+:[^\s/@]+@/i;
 
 function collectPlaceholderStrings(value, out = []) {
   if (typeof value === 'string') {
@@ -293,7 +293,7 @@ test('operator acceptance CLI returns blocked status for incomplete packet', asy
   assert.equal(output.ok, false);
   assert.match(JSON.stringify(output.blockers), /manifest external_blockers/);
   assert.equal(output.blocker_breakdown.manifest, 1);
-  assert.doesNotMatch(result.stdout, /Bearer|PRIVATE KEY|https?:\/\/[^\s/@]+:[^\s/@]+@/i);
+  assert.doesNotMatch(result.stdout, /Bearer|PRIVATE KEY|https?:\/\/[^\s/:@]+:[^\s/@]+@/i);
 });
 
 test('operator acceptance packet builder emits blocked template and complete fixture', async () => {
@@ -331,7 +331,7 @@ test('operator acceptance packet builder CLI writes validated complete fixture',
   const validation = validateOperatorAcceptancePacket(written, { generated_at: '2026-06-24T00:00:00.000Z' });
   assert.equal(validation.schema, OPERATOR_ACCEPTANCE_RESULT_SCHEMA);
   assert.equal(validation.ok, true);
-  assert.doesNotMatch(run.stdout + JSON.stringify(written), /Bearer\s+[A-Za-z0-9._~+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@/i);
+  assert.doesNotMatch(run.stdout + JSON.stringify(written), /Bearer\s+[A-Za-z0-9._~+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/:@]+:[^\s/@]+@/i);
 });
 
 test('operator evidence starter emits public-safe fillable operator bundle', async () => {

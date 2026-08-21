@@ -139,5 +139,5 @@ test('security threat model CLI returns blocked result for incomplete model', as
   assert.equal(output.schema, SECURITY_THREAT_MODEL_RESULT_SCHEMA);
   assert.equal(output.ok, false);
   assert.match(JSON.stringify(output.blockers), /risks/);
-  assert.doesNotMatch(result.stdout, /Bearer\s+[A-Za-z0-9._~+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@/i);
+  assert.doesNotMatch(result.stdout, /Bearer\s+[A-Za-z0-9._~+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/:@]+:[^\s/@]+@/i);
 });

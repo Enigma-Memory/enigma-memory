@@ -13,7 +13,7 @@ const STATUS_VALUES = Object.freeze([
   'operator_evidence_required',
 ]);
 
-const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|cf-[A-Za-z0-9_-]{12,})/iu;
+const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/:@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|cf-[A-Za-z0-9_-]{12,})/iu;
 const LOCAL_PATH_RE = /(?<![A-Za-z])(?:[A-Za-z]:[\\/]|\\\\[^\\/]+[\\/][^\\/]+|\/(?:Users|home|tmp|var|etc|mnt|Volumes)\/[^\s"']+)/u;
 const FORBIDDEN_KEY_RE = /(?:password|passwd|pwd|api[_-]?key|private[_-]?key|secret|token|account[_-]?id|raw[_-]?memory|plaintext|plain[_-]?text|prompt|completion|transcript|embedding|provider[_-]?response|cookie|session|seed|mnemonic|wallet[_-]?private|private[_-]?path|customer[_-]?name|tenant[_-]?name)/iu;
 const SAFE_FIELD_NAMES = new Set([

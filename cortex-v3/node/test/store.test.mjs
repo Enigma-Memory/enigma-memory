@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createStore } from "../src/store.mjs";
+import { createStore, storeFileNameForOwner } from "../src/store.mjs";
 
 const TEST_KEY = "a".repeat(64);
 
@@ -19,6 +19,14 @@ describe("EncryptedStore", () => {
     store?.close();
   });
 
+
+  it("maps arbitrary owner identifiers to opaque safe filenames", () => {
+    const filename = storeFileNameForOwner("../../private/user");
+    assert.match(filename, /^[a-f0-9]{64}\.sqlite$/);
+    assert.equal(filename.includes(".."), false);
+    assert.equal(filename.includes("/"), false);
+    assert.equal(filename.includes("\\"), false);
+  });
   it("stores and retrieves a value", () => {
     const path = join(tmpDir, "store1.sqlite");
     store = createStore({ path, key: TEST_KEY });

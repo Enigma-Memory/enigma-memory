@@ -13,7 +13,7 @@ import {
 export const SERVICE_SETTLEMENT_RESULT_SCHEMA = 'enigma.service_settlement_result.v1';
 
 const HASH_RE = /^sha256:[0-9a-f]{64}$/;
-const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|raw memory|private prompt|full transcript|decrypted capsule|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16})/iu;
+const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/:@]+:[^\s/@]+@|raw memory|private prompt|full transcript|decrypted capsule|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16})/iu;
 const FORBIDDEN_KEY_RE = /(?:^|_)(?:raw|plaintext|plain_text|prompt|prompts|message|messages|text|content|document|documents|transcript|response|responses|provider_response|response_body|credential|credentials|api_key|secret|password|private_key|seed|mnemonic)(?:$|_)/iu;
 const SAFE_FIELD_NAMES = new Set(['raw_memory_on_chain', 'raw_memory_in_job', 'raw_memory_in_receipt', 'raw_memory_access_required']);
 
@@ -158,7 +158,12 @@ function validateBatch(batch, receipts, blockers, path) {
     if (finiteNonNegative(batch.total_settled_amount) && Math.abs(batch.total_settled_amount - expectedTotal) > 1e-9) blockers.push(blocker('batch total_settled_amount must equal supplied receipts', `${path}.total_settled_amount`));
   }
   if (!Array.isArray(batch.claim_boundary) || batch.claim_boundary.length === 0) blockers.push(blocker('batch claim_boundary is required', `${path}.claim_boundary`));
-  if (Array.isArray(batch.claim_boundary) && !batch.claim_boundary.some((line) => /not investment|not.*profit|not.*provider invoice/i.test(line))) blockers.push(blocker('batch claim_boundary must reject investment/provider-invoice claims', `${path}.claim_boundary`));
+  if (Array.isArray(batch.claim_boundary) && !batch.claim_boundary.some((line) => {
+    const normalized = String(line).toLowerCase();
+    return normalized.includes('not investment')
+      || (normalized.includes('not') && normalized.includes('profit'))
+      || (normalized.includes('not') && normalized.includes('provider invoice'));
+  })) blockers.push(blocker('batch claim_boundary must reject investment/provider-invoice claims', `${path}.claim_boundary`));
   return true;
 }
 

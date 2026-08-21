@@ -7,7 +7,7 @@ import { groupHostedRefsByWorkstream } from './hosted-ref-workstreams.mjs';
 
 export const HOSTED_REF_DRAFT_SCHEMA = 'enigma.hosted_ref_draft.v1';
 
-const SECRET_LOOKING_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16})/iu;
+const SECRET_LOOKING_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/:@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16})/iu;
 const NON_PUBLIC_KEY_RE = /(?:token|password|secret|cookie|account[_-]?id|raw[_-]?memory|private[_-]?key)/iu;
 const EDGE_TO_PARTIAL_REFS = Object.freeze({
   backend_host: 'Cloudflare Worker custom-domain hosts are live for relay/gateway bootstrap, but not the full hosted data plane.',

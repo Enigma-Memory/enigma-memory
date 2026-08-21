@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 export const PRODUCTION_DEPENDENCY_REPORT_SCHEMA = 'enigma.production_dependency_report.v1';
 
-const SECRET_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|sk-[A-Za-z0-9_-]{16,}|https?:\/\/[^\s/@]+:[^\s/@]+@|\b[0-9a-f]{32}\b|[A-Z]:\\Users\\|\/Users\/|\/home\/|raw memory|private prompt|full transcript|decrypted capsule)/iu;
+const SECRET_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|sk-[A-Za-z0-9_-]{16,}|https?:\/\/[^\s/:@]+:[^\s/@]+@|\b[0-9a-f]{32}\b|[A-Z]:\\Users\\|\/Users\/|\/home\/|raw memory|private prompt|full transcript|decrypted capsule)/iu;
 const FORBIDDEN_KEY_RE = /(?:password|api[_-]?key|private[_-]?key|secret|token|account[_-]?id|raw[_-]?memory|plaintext|prompt|transcript|provider[_-]?response|cookie|session)/iu;
 const SAFE_KEY_RE = /^(?:tokenPrinted|token_printed|token_policy_ready|cloudflare_token_policy|account_id_redacted|account_id_printed|token_value_printed|raw_memory_on_chain)$/u;
 const SAFE_METRIC_KEY_RE = /(?:^token_roi_claim$|^token_value_printed$|^tokenPrinted$|^token_printed$|^token_created$|tokens$|token_count$|prompt_count$|_present$|_findings$)/iu;

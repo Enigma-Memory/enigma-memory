@@ -40,7 +40,7 @@ const SAFE_BOOLEAN_BOUNDARIES = Object.freeze({
 });
 const SAFE_FIELD_NAMES = new Set(Object.keys(SAFE_BOOLEAN_BOUNDARIES));
 const FORBIDDEN_KEY_RE = /(?:^|_)(?:raw|plaintext|plain_text|prompt|prompts|message|messages|text|content|document|documents|transcript|transcripts|completion|completions|embedding|embeddings|acl|acl_body|access_control_list|provider_response|provider_responses|response_body|credential|credentials|api_key|secret|password|private_key|seed|seed_phrase|mnemonic|tenant_name|customer_name|organization_name|org_name)(?:$|_)/iu;
-const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|(?:seed phrase|mnemonic phrase|raw memory|private prompt|full transcript|provider response|embedding vector))/iu;
+const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/:@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|(?:seed phrase|mnemonic phrase|raw memory|private prompt|full transcript|provider response|embedding vector))/iu;
 const SUPPORTED_ARTIFACT_SCHEMAS = new Set(Object.values(PROOF_NETWORK_SCHEMAS));
 const REGISTRY_ENTRY_TYPES = Object.freeze(new Set([
   'anchor_batch',

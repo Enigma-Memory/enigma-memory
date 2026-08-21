@@ -90,5 +90,5 @@ test('usage metering CLI returns blocked result for bad aggregate', async () => 
   assert.equal(output.schema, USAGE_METERING_RESULT_SCHEMA);
   assert.equal(output.ok, false);
   assert.match(JSON.stringify(output.blockers), /event_hashes/);
-  assert.doesNotMatch(result.stdout, /Bearer\s+[A-Za-z0-9._~+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@/i);
+  assert.doesNotMatch(result.stdout, /Bearer\s+[A-Za-z0-9._~+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/:@]+:[^\s/@]+@/i);
 });

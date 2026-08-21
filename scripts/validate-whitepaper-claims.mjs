@@ -32,7 +32,7 @@ const REQUIRED_TERMS = Object.freeze([
 
 const ABSOLUTE_CLAIM_RE = /(?:\$\s*100\s*billion|100\s*billion|best\s+in\s+the\s+world|guaranteed|guarantee|universal\s+(?:invoice\s+)?savings|provider[-\s]?side\s+deletion|model\s+forgetting|token\s+ROI|compliance\s+certification|tamper-proof|live\s+hosted\s+backend\s+readiness)/iu;
 const DENY_CONTEXT_RE = /(?:does\s+\W*not\s+\W*claim|must\s+\W*not\s+\W*claim|must\s+not\s+infer|not\s+a|not\s+provider|not\s+hosted|not\s+ready|without\s+separate\s+evidence|before\s+production\s+dependencies|is\s+not\s+a|should\s+not)/iu;
-const SECRET_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|sk-[A-Za-z0-9_-]{16,}|https?:\/\/[^\s/@]+:[^\s/@]+@)/iu;
+const SECRET_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|sk-[A-Za-z0-9_-]{16,}|https?:\/\/[^\s/:@]+:[^\s/@]+@)/iu;
 const LOCAL_PATH_RE = /(?:[A-Z]:\\Users\\|\/Users\/|\/home\/)/u;
 
 function countRegex(text, regex) {
@@ -45,8 +45,13 @@ function lineNumberedFindings(text, regex, allowedContext) {
   let denyBlock = false;
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
+    if (line.length > 4096) {
+      findings.push({ line: index + 1, text: 'line exceeds 4096-character validation limit' });
+      continue;
+    }
     const normalizedLine = line.replace(/[*_`]/gu, '');
     const normalizedWindow = [lines[index - 2] ?? '', lines[index - 1] ?? '', line]
+      .map((value) => value.slice(0, 4096))
       .join(' ')
       .replace(/[*_`]/gu, '');
     if (/^##\s+/u.test(line) && !/claim boundary/iu.test(line)) denyBlock = false;

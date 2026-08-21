@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 export const INCIDENT_DRILL_SCHEMA = 'enigma.incident_drill.v1';
 export const INCIDENT_DRILL_RESULT_SCHEMA = 'enigma.incident_drill_result.v1';
 
-const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|raw memory|private prompt|full transcript|decrypted capsule|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16})/iu;
+const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/:@]+:[^\s/@]+@|raw memory|private prompt|full transcript|decrypted capsule|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16})/iu;
 const SECRET_KEY_RE = /(?:password|passwd|pwd|token|api[_-]?key|private[_-]?key|secret|raw[_-]?memory|plaintext|plain[_-]?text|prompt|completion|transcript|embedding|provider[_-]?response)/iu;
 const STATUS_PASS = new Set(['pass', 'passed', 'go', 'verified']);
 const REQUIRED_CONTACT_ROLES = Object.freeze(['incident_commander', 'security', 'infrastructure', 'legal_privacy', 'customer_support']);

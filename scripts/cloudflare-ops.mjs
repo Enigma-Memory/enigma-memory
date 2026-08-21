@@ -185,7 +185,7 @@ function summarizeRegistrantContact(contact) {
 }
 
 const REGISTRAR_CONTACT_OUTPUT_FIELD = /^(?:email|phone|fax|name|street|street1|street2|address_line_1|address_line_2|city|postal_code|postalCode|postcode|zip|zip_code)$/iu;
-const SECRET_OUTPUT_VALUE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16})/iu;
+const SECRET_OUTPUT_VALUE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/:@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16})/iu;
 const EMAIL_OUTPUT_VALUE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
 const PHONE_OUTPUT_VALUE = /^\+?[0-9][0-9 .()-]{5,30}[0-9]$/u;
 const PROBE_FORBIDDEN_FIELD = /(?:authorization|bearer|cookie|credential|password|passwd|token|secret|api[_-]?key|private[_-]?key|client[_-]?secret|raw[_-]?memory|plaintext|plain[_-]?text|prompt|completion|transcript|provider[_-]?response|email|phone|address|street)/iu;

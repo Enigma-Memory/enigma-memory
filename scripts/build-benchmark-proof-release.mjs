@@ -60,7 +60,7 @@ const ALLOWED_PUBLIC_REPORT_KEYS = new Set([
   'same_prompts_for_all_rows',
   'prompts_fixed',
 ]);
-const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|(?:seed phrase|mnemonic phrase|raw memory|private prompt|full transcript|provider response|embedding vector))/iu;
+const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/:@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|(?:seed phrase|mnemonic phrase|raw memory|private prompt|full transcript|provider response|embedding vector))/iu;
 const ABSOLUTE_LOCAL_PATH_RE = /^(?:[A-Za-z]:[\\/]|\\\\|\/(?:Users|home|tmp|var|etc|mnt|Volumes)\b)/u;
 const CLAIM_SCORE_KEY_RE = /(?:provider|competitor|roi|profit|savings|solana|transaction|answer_accuracy|leaderboard)/iu;
 const PROOF_COMPATIBLE_REPORT_SCHEMAS = new Set([

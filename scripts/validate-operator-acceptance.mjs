@@ -68,7 +68,7 @@ export const REQUIRED_EVIDENCE_ITEMS = Object.freeze([
 
 const GO_DECISIONS = new Set(['go']);
 const ACCEPTED_STATUSES = new Set(['complete', 'go', 'accepted', 'verified', 'approved']);
-const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|raw memory|private prompt|full transcript|decrypted capsule)/iu;
+const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/:@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|raw memory|private prompt|full transcript|decrypted capsule)/iu;
 const SECRET_KEY_RE = /(?:password|passwd|pwd|token|api[_-]?key|private[_-]?key|secret|raw[_-]?memory|plaintext|plain[_-]?text|prompt|completion|transcript|embedding|provider[_-]?response)/iu;
 const TEMPLATE_PLACEHOLDER_RE = /<[^<>\r\n]+>/u;
 const SAFE_SECRET_NAMED_KEYS = new Set(['kms_secrets_owner', 'relay_plaintext_rejection', 'kms_or_secret_custody', 'cloudflare_token_policy', 'goal_completion_audit', 'production_manifests', 'required_secret_count']);

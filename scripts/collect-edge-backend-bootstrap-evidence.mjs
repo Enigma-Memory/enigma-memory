@@ -19,7 +19,7 @@ const CLAIM_BOUNDARY = Object.freeze([
   'The collector sends no credentials and must not record tokens, account ids, raw memory, prompts, transcripts, provider responses, or private keys.',
 ]);
 
-const SECRET_LOOKING_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16})/iu;
+const SECRET_LOOKING_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/:@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16})/iu;
 
 function sha256(text) {
   return `sha256:${createHash('sha256').update(text).digest('hex')}`;

@@ -6,7 +6,7 @@ import { createGatewayServer } from '../apps/gateway/src/server.mjs';
 
 export const BACKEND_READINESS_SMOKE_SCHEMA = 'enigma.backend_readiness_smoke.v1';
 
-const SECRET_OUTPUT_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|raw memory|private prompt|full transcript|decrypted capsule|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16})/iu;
+const SECRET_OUTPUT_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/:@]+:[^\s/@]+@|raw memory|private prompt|full transcript|decrypted capsule|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16})/iu;
 const SHARED_READINESS_REFS = Object.freeze({
   network_access_policy_ref: 'network-policy-smoke-ref',
   kms_custody_ref: 'kms-custody-smoke-ref',

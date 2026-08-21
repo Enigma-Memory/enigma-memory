@@ -14,7 +14,7 @@ export const PRODUCTION_STORAGE_TABLES = Object.freeze([
 ]);
 
 const FORBIDDEN_STORAGE_SQL_RE = /\b(prompt|completion|transcript|plaintext|raw_memory|memory_text|decrypted|embedding_vector|provider_response_body|api_key|token|password|private_key)\b/i;
-const FORBIDDEN_PUBLIC_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|raw memory|private prompt|full transcript|decrypted capsule)/iu;
+const FORBIDDEN_PUBLIC_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/:@]+:[^\s/@]+@|raw memory|private prompt|full transcript|decrypted capsule)/iu;
 
 function assertNoForbiddenPublicValue(value, path = 'storage') {
   if (typeof value === 'string') {

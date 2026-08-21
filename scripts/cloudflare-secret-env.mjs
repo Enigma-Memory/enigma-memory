@@ -10,7 +10,7 @@ export const CLOUDFLARE_SECRET_ENV_KEYS = Object.freeze([
 ]);
 
 const ALLOWED = new Set(CLOUDFLARE_SECRET_ENV_KEYS);
-const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|AKIA[0-9A-Z]{16})/iu;
+const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/:@]+:[^\s/@]+@|AKIA[0-9A-Z]{16})/iu;
 
 export class CloudflareSecretEnvError extends Error {
   constructor(message) {

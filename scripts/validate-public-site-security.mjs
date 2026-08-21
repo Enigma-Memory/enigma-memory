@@ -8,7 +8,7 @@ export const PUBLIC_SITE_SECURITY_RESULT_SCHEMA = 'enigma.public_site_security_r
 const TEXT_EXTENSIONS = new Set(['.css', '.html', '.js', '.json', '.md', '.svg', '.txt', '.xml', '.yml', '.yaml', '']);
 const BLOCKED_DIR_OR_FILE_RE = /(?:^|[\\/])(?:\.git|\.github|\.env(?:\.|$)|node_modules|__pycache__|private|internal|secrets?|credentials?|api[-_]?keys?|private[-_]?keys?|launch-code|raw[-_]?memory)(?:[\\/]|$|[._-])/iu;
 const BLOCKED_EXTENSION_RE = /\.(?:map|pem|key|p12|pfx|jks|keystore|sqlite|sqlite3|db|log)(?:$|\.)/iu;
-const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|"(?:raw_memory|plaintext|prompt|completion|transcript|provider_response|memory)"\s*:\s*"[^"]+")/iu;
+const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/:@]+:[^\s/@]+@|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|"(?:raw_memory|plaintext|prompt|completion|transcript|provider_response|memory)"\s*:\s*"[^"]+")/iu;
 const EMAIL_RE = /\b[A-Z0-9._%+-]+@([A-Z0-9.-]+\.[A-Z]{2,})\b/giu;
 const PHONE_RE = /(?:\+?1[\s.-]?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b|\b(?:\(\d{3}\)|\d{3}[\s.-])[\s.-]?\d{3}[\s.-]\d{4}\b)/g;
 const ADDRESS_RE = /\b\d{2,6}\s+[A-Z][A-Za-z0-9.'-]*(?:\s+[A-Z][A-Za-z0-9.'-]*){0,5}\s+(?:St|Street|Ave|Avenue|Rd|Road|Ln|Lane|Dr|Drive|Ct|Court|Blvd|Boulevard|Way|Trail|Trl|Pkwy|Parkway)\b/gu;

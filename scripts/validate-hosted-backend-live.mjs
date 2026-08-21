@@ -36,7 +36,7 @@ export const REQUIRED_REF_KEYS = Object.freeze([
 
 const REQUIRED_PROBES = Object.freeze(['relay_livez', 'relay_readyz', 'gateway_livez', 'gateway_readyz']);
 const ACCEPTED_STATUSES = new Set(['observed', 'verified', 'go', 'accepted']);
-const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/@]+:[^\s/@]+@|raw memory|private prompt|full transcript|decrypted capsule|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16})/iu;
+const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|https?:\/\/[^\s/:@]+:[^\s/@]+@|raw memory|private prompt|full transcript|decrypted capsule|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16})/iu;
 const FORBIDDEN_KEY_RE = /(?:password|passwd|pwd|token|api[_-]?key|private[_-]?key|secret|raw[_-]?memory|plaintext|plain[_-]?text|prompt|completion|transcript|embedding|provider[_-]?response|cookie|session)/iu;
 const TEMPLATE_PLACEHOLDER_RE = /<[^<>\r\n]+>/u;
 const SAFE_FIELD_NAMES = new Set(['cloudflare_token_policy_ref', 'token_policy_ref', 'token_value_printed', 'kms_or_secret_custody', 'token_roi_claim', 'cloudflare_credentials_claim', 'provider_deletion_claim']);

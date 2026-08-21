@@ -224,6 +224,8 @@ test('gateway livez and readyz stay JSON safe and non-mutating in local mode', a
   assert.equal(livez.status, 200);
   assert.equal(livez.body.ok, true);
   assertHealthPayloadSafe(livez.body, 'gateway /livez');
+  assert.equal(livez.headers['x-content-type-options'], 'nosniff');
+  assert.match(livez.headers['content-security-policy'], /default-src 'none'/);
 
   const readyz = await handleGatewayRequest(state, { method: 'GET', url: '/readyz' });
   assert.equal(readyz.status, 200);
