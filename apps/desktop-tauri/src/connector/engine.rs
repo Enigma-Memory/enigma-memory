@@ -1443,37 +1443,65 @@ pub fn build_profile(client: ClientId, ctx: &EngineContext) -> ClientProfile {
     }
 }
 
+fn join_target_path(base: &Path, platform: Platform, segments: &[&str]) -> PathBuf {
+    if platform != Platform::Win32 {
+        return segments
+            .iter()
+            .fold(base.to_path_buf(), |path, segment| path.join(segment));
+    }
+
+    let mut joined = base.to_string_lossy().replace('/', "\\");
+    while joined.ends_with('\\') {
+        joined.pop();
+    }
+    for segment in segments {
+        let segment = segment.trim_matches(|character| character == '\\' || character == '/');
+        if segment.is_empty() {
+            continue;
+        }
+        joined.push('\\');
+        joined.push_str(&segment.replace('/', "\\"));
+    }
+    PathBuf::from(joined)
+}
+
 pub fn resolve_default_config_path(
     client: ClientId,
     platform: Platform,
     home: &Path,
     app_data: &Path,
 ) -> PathBuf {
-    match client {
+    let (base, segments): (PathBuf, &[&str]) = match client {
         ClientId::ClaudeDesktop => match platform {
-            Platform::Win32 => app_data.join("Claude").join("claude_desktop_config.json"),
-            Platform::Darwin => home
-                .join("Library")
-                .join("Application Support")
-                .join("Claude")
-                .join("claude_desktop_config.json"),
-            Platform::Linux => home
-                .join(".config")
-                .join("Claude")
-                .join("claude_desktop_config.json"),
+            Platform::Win32 => (
+                app_data.to_path_buf(),
+                &["Claude", "claude_desktop_config.json"],
+            ),
+            Platform::Darwin => (
+                home.to_path_buf(),
+                &[
+                    "Library",
+                    "Application Support",
+                    "Claude",
+                    "claude_desktop_config.json",
+                ],
+            ),
+            Platform::Linux => (
+                home.to_path_buf(),
+                &[".config", "Claude", "claude_desktop_config.json"],
+            ),
         },
-        ClientId::Cursor => match platform {
-            Platform::Win32 => home.join(".cursor").join("mcp.json"),
-            Platform::Darwin | Platform::Linux => home.join(".cursor").join("mcp.json"),
-        },
+        ClientId::Cursor => (home.to_path_buf(), &[".cursor", "mcp.json"]),
         ClientId::Kimi => match platform {
-            Platform::Win32 => app_data.join("Kimi Code").join("mcp.json"),
-            Platform::Darwin => home
-                .join("Library")
-                .join("Application Support")
-                .join("Kimi Code")
-                .join("mcp.json"),
-            Platform::Linux => home.join(".config").join("kimi-code").join("mcp.json"),
+            Platform::Win32 => (app_data.to_path_buf(), &["Kimi Code", "mcp.json"]),
+            Platform::Darwin => (
+                home.to_path_buf(),
+                &["Library", "Application Support", "Kimi Code", "mcp.json"],
+            ),
+            Platform::Linux => (
+                home.to_path_buf(),
+                &[".config", "kimi-code", "mcp.json"],
+            ),
         },
         ClientId::VscodeCline => {
             let base = match platform {
@@ -1481,12 +1509,17 @@ pub fn resolve_default_config_path(
                 Platform::Darwin => home.join("Library").join("Application Support"),
                 Platform::Linux => home.join(".config"),
             };
-            base.join("Code")
-                .join("User")
-                .join("globalStorage")
-                .join("saoudrizwan.claude-dev")
-                .join("settings")
-                .join("cline_mcp_settings.json")
+            (
+                base,
+                &[
+                    "Code",
+                    "User",
+                    "globalStorage",
+                    "saoudrizwan.claude-dev",
+                    "settings",
+                    "cline_mcp_settings.json",
+                ],
+            )
         }
         ClientId::Roo => {
             let base = match platform {
@@ -1494,32 +1527,48 @@ pub fn resolve_default_config_path(
                 Platform::Darwin => home.join("Library").join("Application Support"),
                 Platform::Linux => home.join(".config"),
             };
-            base.join("Code")
-                .join("User")
-                .join("globalStorage")
-                .join("rooveterinaryinc.roo-cline")
-                .join("settings")
-                .join("mcp_settings.json")
+            (
+                base,
+                &[
+                    "Code",
+                    "User",
+                    "globalStorage",
+                    "rooveterinaryinc.roo-cline",
+                    "settings",
+                    "mcp_settings.json",
+                ],
+            )
         }
         ClientId::Opencode => match platform {
-            Platform::Win32 => app_data.join("opencode").join("opencode.json"),
-            Platform::Darwin => home
-                .join("Library")
-                .join("Application Support")
-                .join("opencode")
-                .join("opencode.json"),
-            Platform::Linux => home.join(".config").join("opencode").join("opencode.json"),
+            Platform::Win32 => (app_data.to_path_buf(), &["opencode", "opencode.json"]),
+            Platform::Darwin => (
+                home.to_path_buf(),
+                &[
+                    "Library",
+                    "Application Support",
+                    "opencode",
+                    "opencode.json",
+                ],
+            ),
+            Platform::Linux => (
+                home.to_path_buf(),
+                &[".config", "opencode", "opencode.json"],
+            ),
         },
         ClientId::Generic => match platform {
-            Platform::Win32 => app_data.join("Enigma").join("mcp.json"),
-            Platform::Darwin => home
-                .join("Library")
-                .join("Application Support")
-                .join("Enigma")
-                .join("mcp.json"),
-            Platform::Linux => home.join(".config").join("enigma").join("mcp.json"),
+            Platform::Win32 => (app_data.to_path_buf(), &["Enigma", "mcp.json"]),
+            Platform::Darwin => (
+                home.to_path_buf(),
+                &["Library", "Application Support", "Enigma", "mcp.json"],
+            ),
+            Platform::Linux => (
+                home.to_path_buf(),
+                &[".config", "enigma", "mcp.json"],
+            ),
         },
-    }
+    };
+
+    join_target_path(&base, platform, segments)
 }
 
 // ----------------------------------------------------------------------

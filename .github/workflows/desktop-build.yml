@@ -88,9 +88,9 @@ jobs:
           echo "private_key_path=$(pwd)/.tauri-dry-run.key" >> "$GITHUB_OUTPUT"
           echo "public_key=$(cat .tauri-dry-run.key.pub)" >> "$GITHUB_OUTPUT"
 
-
       - name: Build Tauri app
         working-directory: apps/desktop-tauri
+        shell: bash
         env:
           TAURI_SIGNING_PRIVATE_KEY_PATH: ${{ steps.keygen.outputs.private_key_path }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
