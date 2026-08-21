@@ -1,37 +1,38 @@
 version: 2
+# Version-update PRs stay disabled; repository security updates remain enabled.
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 0
 
   - package-ecosystem: npm
     directory: /
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 0
 
   - package-ecosystem: npm
     directory: /cortex-v3/node
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 0
 
   - package-ecosystem: npm
     directory: /cortex-v3/webapp
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 0
 
   - package-ecosystem: cargo
     directory: /cortex-v3
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 0
 
   - package-ecosystem: cargo
     directory: /apps/desktop-tauri
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 0

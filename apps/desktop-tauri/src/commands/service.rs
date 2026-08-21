@@ -342,7 +342,7 @@ fn push_readiness_issue(
     recovery_actions: &mut Vec<ReadinessAction>,
     code: &'static str,
 ) {
-    if issue_codes.iter().any(|existing| *existing == code) {
+    if issue_codes.contains(&code) {
         return;
     }
 
