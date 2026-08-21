@@ -71,7 +71,8 @@ export const STANDARD_BENCHMARK_DATASETS = Object.freeze({
 });
 
 function joinOutputPath(base, fileName) {
-  const trimmed = String(base).replace(/[\\/]+$/, '');
+  let trimmed = String(base);
+  while (trimmed.endsWith('/') || trimmed.endsWith('\\')) trimmed = trimmed.slice(0, -1);
   if (!trimmed) {
     return fileName;
   }

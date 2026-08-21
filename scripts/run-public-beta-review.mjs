@@ -108,8 +108,10 @@ function isRepositoryRelativePath(value) {
     && !/[\0\r\n]/u.test(normalized);
 }
 
+
 function joinPathLabel(dir, fileName) {
-  const cleanDir = String(dir || DEFAULT_OUT_DIR).replace(/\\/g, '/').replace(/\/+$/u, '');
+  let cleanDir = String(dir || DEFAULT_OUT_DIR).replace(/\\/g, '/');
+  while (cleanDir.endsWith('/')) cleanDir = cleanDir.slice(0, -1);
   return `${cleanDir || '.'}/${fileName}`;
 }
 
@@ -180,7 +182,8 @@ export function renderPublicBetaReviewPlain(result) {
 
 export async function runPublicBetaReview(options = {}) {
   const outDir = String(options.outDir || DEFAULT_OUT_DIR);
-  const normalizedOutDir = outDir.replace(/\\/g, '/').replace(/\/+$/u, '');
+  let normalizedOutDir = outDir.replace(/\\/g, '/');
+  while (normalizedOutDir.endsWith('/')) normalizedOutDir = normalizedOutDir.slice(0, -1);
   const manifestPath = `${normalizedOutDir}/evidence-manifest.json`;
   const matrixPath = `${normalizedOutDir}/qa-matrix.json`;
   const supportDryRunPaths = generatedSupportDryRunPaths(normalizedOutDir);

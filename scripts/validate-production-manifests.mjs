@@ -56,6 +56,18 @@ function requireInclude(text, needle, path, blockers, message) {
   if (!include(text, needle)) blockers.push(blocker(message ?? `missing ${needle}`, path));
 }
 
+function hasMutableImageTag(text) {
+  for (const line of text.split(/\r?\n/u)) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('image:')) continue;
+    const image = trimmed.slice('image:'.length).trim();
+    const separator = image.lastIndexOf(':');
+    const tag = separator === -1 ? '' : image.slice(separator + 1).toLowerCase();
+    if (tag === 'latest' || tag === 'dev' || tag === 'main') return true;
+  }
+  return false;
+}
+
 function assertNoSecretValues(text, path, blockers) {
   const match = SECRET_VALUE_RE.exec(text);
   if (match) blockers.push(blocker('manifest contains secret-looking or raw-memory-looking literal', path));
@@ -73,9 +85,18 @@ function serviceBlock(text, service) {
 }
 
 function composePortEntries(block) {
-  const match = /ports:\s*\n((?:\s*-\s+"[^"]+"\s*\n?)+)/.exec(block);
-  if (!match) return null;
-  return [...match[1].matchAll(/-\s+"([^"]+)"/g)].map((item) => item[1]);
+  const lines = block.split(/\r?\n/u);
+  const start = lines.findIndex((line) => line.trim() === 'ports:');
+  if (start === -1) return null;
+  const entries = [];
+  for (let index = start + 1; index < lines.length; index += 1) {
+    const trimmed = lines[index].trim();
+    if (trimmed.length === 0) continue;
+    if (!trimmed.startsWith('-')) break;
+    const value = trimmed.slice(1).trim();
+    if (value.startsWith('"') && value.endsWith('"') && value.length > 2) entries.push(value.slice(1, -1));
+  }
+  return entries.length > 0 ? entries : null;
 }
 
 function isLoopbackPortMapping(value) {
@@ -109,7 +130,7 @@ function composeServiceChecks(text, service, blockers) {
       if (!isLoopbackPortMapping(entry)) blockers.push(blocker(`${service} port mapping ${entry} must bind to 127.0.0.1 only`, `compose.services.${service}.ports[${index}]`));
     });
   }
-  if (/image:\s*[^\n]*:(?:latest|dev|main)\b/.test(block)) blockers.push(blocker(`${service} image must not use mutable latest/dev/main tag`, `compose.services.${service}.image`));
+  if (hasMutableImageTag(block)) blockers.push(blocker(`${service} image must not use mutable latest/dev/main tag`, `compose.services.${service}.image`));
   const refs = requiredHostedEnvRefCoverage(block);
   for (const name of refs.missing) blockers.push(blocker(`${service} missing hosted readiness ref ${name}`, `compose.services.${service}.environment.${name}`));
   return { service, ok: refs.missing.length === 0, hosted_readiness_ref_count: refs.present.length };
@@ -171,6 +192,21 @@ function ingressPaths(document) {
   return [...document.matchAll(/path:\s*(\/[^\s]+)/g)].map((match) => match[1]);
 }
 
+function exactIngressPaths(document) {
+  const lines = document.split(/\r?\n/u);
+  const paths = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    let trimmed = lines[index].trim();
+    if (trimmed.startsWith('- ')) trimmed = trimmed.slice(2).trimStart();
+    if (!trimmed.startsWith('path:')) continue;
+    const path = trimmed.slice('path:'.length).trim();
+    let next = index + 1;
+    while (next < lines.length && lines[next].trim().length === 0) next += 1;
+    if (lines[next]?.trim() === 'pathType: Exact') paths.push(path);
+  }
+  return paths;
+}
+
 function validatePublicIngressDocument(document, pathBase, blockers) {
   const paths = ingressPaths(document);
   const pathSet = new Set(paths);
@@ -178,7 +214,7 @@ function validatePublicIngressDocument(document, pathBase, blockers) {
   if (/path:\s*\/(?:$|\s)/.test(document)) blockers.push(blocker('public ingress must not expose root path', `${pathBase}.paths`));
   if (/path:\s*\/(?:relay|witness|pairing|gateway|policy|siem|admin|data)\b/i.test(document)) blockers.push(blocker('public ingress must not expose admin or data-plane paths', `${pathBase}.paths`));
   if (paths.length !== 4 || pathSet.size !== 2 || !pathSet.has('/readyz') || !pathSet.has('/livez')) blockers.push(blocker('public ingress must expose only relay/gateway /readyz and /livez paths', `${pathBase}.paths`));
-  const exactPathMatches = [...document.matchAll(/path:\s*(\/[^\s]+)\s*\n\s*pathType:\s*Exact\b/g)].map((match) => match[1]);
+  const exactPathMatches = exactIngressPaths(document);
   if (exactPathMatches.length !== paths.length) blockers.push(blocker('public ingress health paths must all use Exact pathType', `${pathBase}.pathType`));
   return paths;
 }
@@ -197,7 +233,7 @@ function k8sDeploymentChecks(text, name, blockers) {
   requireInclude(block, 'readinessProbe:', `kubernetes.deployments.${name}.readinessProbe`, blockers, `${name} must define readiness probe`);
   requireInclude(block, 'livenessProbe:', `kubernetes.deployments.${name}.livenessProbe`, blockers, `${name} must define liveness probe`);
   requireInclude(block, 'optional: false', `kubernetes.deployments.${name}.secrets`, blockers, `${name} secret refs must be required`);
-  if (/image:\s*[^\n]*:(?:latest|dev|main)\b/.test(block)) blockers.push(blocker(`${name} image must not use mutable latest/dev/main tag`, `kubernetes.deployments.${name}.image`));
+  if (hasMutableImageTag(block)) blockers.push(blocker(`${name} image must not use mutable latest/dev/main tag`, `kubernetes.deployments.${name}.image`));
   return { name, ok: true };
 }
 

@@ -32,14 +32,17 @@ export function parseCloudflareSecretEnvText(text) {
   lines.forEach((line, index) => {
     const trimmed = line.trim();
     if (trimmed.length === 0 || trimmed.startsWith('#')) return;
-    const match = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/.exec(line);
-    if (!match) throw new CloudflareSecretEnvError(`invalid env-file line ${index + 1}`);
-    const key = match[1];
+    let assignment = trimmed;
+    if (assignment.startsWith('export ')) assignment = assignment.slice(7).trimStart();
+    const separator = assignment.indexOf('=');
+    if (separator <= 0) throw new CloudflareSecretEnvError(`invalid env-file line ${index + 1}`);
+    const key = assignment.slice(0, separator).trim();
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/u.test(key)) throw new CloudflareSecretEnvError(`invalid env-file line ${index + 1}`);
     if (!ALLOWED.has(key)) {
       ignored.push(key);
       return;
     }
-    const value = unquote(match[2]);
+    const value = unquote(assignment.slice(separator + 1));
     if (value.length === 0) throw new CloudflareSecretEnvError(`${key} must not be empty`);
     if (key !== 'CLOUDFLARE_API_TOKEN' && SECRET_VALUE_RE.test(value)) throw new CloudflareSecretEnvError(`${key} contains secret-looking data`);
     parsed[key] = value;

@@ -129,7 +129,11 @@ export function normalizeRegistrantContact(value) {
   const postalInfo = requireObject('registrant contact postal_info', contact.postal_info);
   const address = requireObject('registrant contact postal_info.address', postalInfo.address);
   const email = requireNonEmptyString('registrant contact email', contact.email);
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new UsageError('registrant contact email must be a valid email address');
+  const at = email.indexOf('@');
+  const domain = at > 0 ? email.slice(at + 1) : '';
+  if (at <= 0 || at !== email.lastIndexOf('@') || !domain.includes('.') || domain.startsWith('.') || domain.endsWith('.')) {
+    throw new UsageError('registrant contact email must be a valid email address');
+  }
   const phone = requireNonEmptyString('registrant contact phone', contact.phone);
   if (!/^\+[0-9][0-9 .-]{5,30}[0-9]$/.test(phone)) {
     throw new UsageError('registrant contact phone must use international format, for example +1.5555555555');

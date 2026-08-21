@@ -378,7 +378,12 @@ const PROVIDER_RESPONSE_FIELD_RE = /(?:provider.*responses?|responses?.*body)$/u
 const EMBEDDING_FIELD_RE = /(?:embedding|embeddings|embeddingvector|embeddingvectors|vector|vectors)$/u;
 
 function normalizePublicToken(value, fallback) {
-  const token = String(value ?? '').toLowerCase().replace(/[^a-z0-9_.:-]+/gu, '_').replace(/^_+|_+$/gu, '');
+  const normalized = String(value ?? '').toLowerCase().replace(/[^a-z0-9_.:-]+/gu, '_');
+  let start = 0;
+  let end = normalized.length;
+  while (start < end && normalized[start] === '_') start += 1;
+  while (end > start && normalized[end - 1] === '_') end -= 1;
+  const token = normalized.slice(start, end);
   return token.length > 0 && token.length <= 96 ? token : fallback;
 }
 

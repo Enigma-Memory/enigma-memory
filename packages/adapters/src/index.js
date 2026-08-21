@@ -53,7 +53,7 @@ const KEY_SET = new Set(PRODUCTION_DEPENDENCY_KEYS);
 const SAFE_STATUS = new Set(['declared', 'observed', 'verified', 'go']);
 const SECRET_FIELD_RE = /(?:password|passwd|pwd|token|api[_-]?key|private[_-]?key|client[_-]?secret|raw[_-]?memory|plaintext|plain[_-]?text|prompt|completion|transcript|cookie|session)/iu;
 const SECRET_VALUE_RE = /(?:Bearer\s+[A-Za-z0-9._~+/=-]{12,}|Basic\s+[A-Za-z0-9+/=-]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{16,})/u;
-const URL_WITH_CREDENTIALS_RE = /^[a-z][a-z0-9+.-]*:\/\/[^\s/@]+:[^\s/@]+@/iu;
+const URL_WITH_CREDENTIALS_RE = /^[a-z][a-z0-9+.-]*:\/\/[^\s/:@]+:[^\s/@]+@/iu;
 const RAW_MEMORY_VALUE_RE = /(?:raw memory|private prompt|full transcript|decrypted capsule|customer note|launch-code phrase)/iu;
 
 function isPlainObject(value) {

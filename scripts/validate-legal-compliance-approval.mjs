@@ -123,7 +123,8 @@ function validateReviewedStatements(statements, decision, blockers) {
     const status = String(statement.status ?? '').trim().toLowerCase();
     if (statementStatusApproved(status)) {
       approved += 1;
-      if (RISKY_APPROVED_CLAIM_RE.test(String(statement.text ?? ''))) {
+      const text = String(statement.text ?? '');
+      if (text.length > 4096 || RISKY_APPROVED_CLAIM_RE.test(text)) {
         blockers.push(blocker('approved statement contains unsupported or compliance-sensitive overclaim', `${path}.text`));
       }
     } else if (noClaimStatus(status)) {

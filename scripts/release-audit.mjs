@@ -14,6 +14,7 @@ const PROJECT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const COMMAND_TIMEOUT_MS = 120_000;
 const TEST_TIMEOUT_MS = 300_000;
 const MAX_OUTPUT_BYTES = 64 * 1024 * 1024;
+const TAP_COUNT_FIELDS = new Set(['tests', 'pass', 'fail', 'cancelled', 'skipped', 'todo', 'duration_ms']);
 const REQUIRED_TOOL_NAMES = Object.freeze([
   'enigma_init',
   'enigma_remember',
@@ -238,8 +239,12 @@ function lines(value) {
 function tapCounts(output) {
   const counts = {};
   for (const line of lines(output)) {
-    const match = line.match(/^#\s+(tests|pass|fail|cancelled|skipped|todo|duration_ms)\s+(.+)$/);
-    if (match) counts[match[1]] = match[2];
+    if (!line.startsWith('# ')) continue;
+    const content = line.slice(2);
+    const separator = content.indexOf(' ');
+    if (separator <= 0) continue;
+    const name = content.slice(0, separator);
+    if (TAP_COUNT_FIELDS.has(name)) counts[name] = content.slice(separator + 1).trim();
   }
   return counts;
 }
