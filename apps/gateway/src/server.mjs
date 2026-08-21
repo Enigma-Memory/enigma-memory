@@ -515,7 +515,13 @@ function gatewayResponse(status, body, response) {
   const result = { status, headers: JSON_HEADERS, body };
   if (response !== undefined) {
     response.writeHead(status, JSON_HEADERS);
-    response.end(JSON.stringify(body));
+    const serialized = JSON.stringify(body)
+      .replaceAll('&', '\\u0026')
+      .replaceAll('<', '\\u003c')
+      .replaceAll('>', '\\u003e')
+      .replaceAll('\u2028', '\\u2028')
+      .replaceAll('\u2029', '\\u2029');
+    response.end(serialized);
   }
   return result;
 }

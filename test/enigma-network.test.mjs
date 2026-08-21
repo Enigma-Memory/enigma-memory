@@ -240,6 +240,31 @@ test('gateway livez and readyz stay JSON safe and non-mutating in local mode', a
   }, before);
 });
 
+test('gateway HTTP responses escape browser-significant JSON characters', async () => {
+  const gatewayId = '<script>alert("xss")</script>&';
+  const state = createGatewayState({ gateway_id: gatewayId });
+  let status;
+  let headers;
+  let payload;
+  const response = {
+    writeHead(nextStatus, nextHeaders) {
+      status = nextStatus;
+      headers = nextHeaders;
+    },
+    end(nextPayload) {
+      payload = nextPayload;
+    },
+  };
+
+  await handleGatewayRequest(state, { method: 'GET', url: '/health' }, response);
+  assert.equal(status, 200);
+  assert.equal(headers['x-content-type-options'], 'nosniff');
+  assert.equal(payload.includes('<'), false);
+  assert.equal(payload.includes('>'), false);
+  assert.equal(payload.includes('&'), false);
+  assert.equal(JSON.parse(payload).gateway_id, gatewayId);
+});
+
 test('relay production-like readyz fails closed when external dependencies are missing', async () => {
   const state = createRelayState({ mode: 'production', now: '1970-01-01T00:00:00.000Z' });
   const before = JSON.stringify(serializeRelayState(state));
