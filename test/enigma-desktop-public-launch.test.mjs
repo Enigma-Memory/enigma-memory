@@ -401,17 +401,25 @@ test('desktop unknown public-launch action fails closed', async () => {
 });
 
 test('desktop release metadata matches prepared public beta package version', async () => {
-  const [packageJsonText, tauriConfigText, cargoToml, cargoLock, wizard] = await Promise.all([
+  const [packageJsonText, tauriConfigText, cargoToml, cargoLock, wizard, iconPng, iconIco, iconIcns] = await Promise.all([
     readFile(new URL('../package.json', import.meta.url), 'utf8'),
     readFile(new URL('../apps/desktop-tauri/tauri.conf.json', import.meta.url), 'utf8'),
     readFile(new URL('../apps/desktop-tauri/Cargo.toml', import.meta.url), 'utf8'),
     readFile(new URL('../apps/desktop-tauri/Cargo.lock', import.meta.url), 'utf8'),
     readDesktopUiFile('wizard.js'),
+    readFile(new URL('../apps/desktop-tauri/icons/icon.png', import.meta.url)),
+    readFile(new URL('../apps/desktop-tauri/icons/icon.ico', import.meta.url)),
+    readFile(new URL('../apps/desktop-tauri/icons/icon.icns', import.meta.url)),
   ]);
   const packageJson = JSON.parse(packageJsonText);
   const tauriConfig = JSON.parse(tauriConfigText);
   assert.equal(packageJson.version, '0.1.19');
   assert.equal(tauriConfig.version, packageJson.version);
+  assert.deepEqual(tauriConfig.bundle.icon, ['icons/icon.ico', 'icons/icon.icns', 'icons/icon.png']);
+  assert.equal(iconPng.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
+  assert.equal(iconIco.subarray(0, 4).toString('hex'), '00000100');
+  assert.equal(iconIcns.subarray(0, 4).toString('ascii'), 'icns');
+  assert.ok(iconPng.byteLength > 10000 && iconIco.byteLength > 10000 && iconIcns.byteLength > 10000);
   assert.match(cargoToml, new RegExp(`^version = "${packageJson.version}"$`, 'm'));
   assert.match(cargoLock, new RegExp(`name = "enigma-desktop-tauri"\\nversion = "${packageJson.version}"`));
   assert.match(wizard, /current_version: '0\.1\.19'/);
