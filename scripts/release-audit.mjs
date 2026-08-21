@@ -4848,6 +4848,7 @@ export async function runPublicSiteSecurityValidatorGate() {
     await writeFile(join(tempDir, '_headers'), `/*
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
+  Strict-Transport-Security: max-age=63072000; includeSubDomains
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
   Content-Security-Policy: default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'

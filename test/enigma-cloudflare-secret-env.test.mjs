@@ -32,7 +32,7 @@ async function writeEnvFile(dir, body = `CLOUDFLARE_API_TOKEN=${SECRET}\nCLOUDFL
 async function writeSite(dir) {
   const site = join(dir, 'site');
   await mkdir(site, { recursive: true });
-  await writeFile(join(site, '_headers'), `/*\n  X-Content-Type-Options: nosniff\n  X-Frame-Options: DENY\n  Referrer-Policy: strict-origin-when-cross-origin\n  Permissions-Policy: camera=(), microphone=(), geolocation=()\n  Content-Security-Policy: default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'\n`, 'utf8');
+  await writeFile(join(site, '_headers'), `/*\n  X-Content-Type-Options: nosniff\n  X-Frame-Options: DENY\n  Strict-Transport-Security: max-age=63072000; includeSubDomains\n  Referrer-Policy: strict-origin-when-cross-origin\n  Permissions-Policy: camera=(), microphone=(), geolocation=()\n  Content-Security-Policy: default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'\n`, 'utf8');
   await writeFile(join(site, 'index.html'), '<!doctype html><html><head><title>Enigma — Verifiable AI memory plane</title></head><body>Launch</body></html>\n', 'utf8');
   return site;
 }

@@ -17,7 +17,7 @@ const execFileAsync = promisify(execFile);
 async function writeSite() {
   const dir = await mkdtemp(join(tmpdir(), 'enigma production handoff site-'));
   await mkdir(join(dir, 'assets'), { recursive: true });
-  await writeFile(join(dir, '_headers'), `/*\n  X-Content-Type-Options: nosniff\n  X-Frame-Options: DENY\n  Referrer-Policy: strict-origin-when-cross-origin\n  Permissions-Policy: camera=(), microphone=(), geolocation=()\n  Content-Security-Policy: default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'none'\n`, 'utf8');
+  await writeFile(join(dir, '_headers'), `/*\n  X-Content-Type-Options: nosniff\n  X-Frame-Options: DENY\n  Strict-Transport-Security: max-age=63072000; includeSubDomains\n  Referrer-Policy: strict-origin-when-cross-origin\n  Permissions-Policy: camera=(), microphone=(), geolocation=()\n  Content-Security-Policy: default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'none'\n`, 'utf8');
   await writeFile(join(dir, 'index.html'), '<!doctype html><html><head><title>Enigma Memory</title><link rel="stylesheet" href="/style.css"></head><body><script src="/app.js"></script></body></html>\n', 'utf8');
   await writeFile(join(dir, 'style.css'), 'body{font-family:system-ui,sans-serif}\n', 'utf8');
   await writeFile(join(dir, 'app.js'), 'document.body.dataset.ready="true";\n', 'utf8');

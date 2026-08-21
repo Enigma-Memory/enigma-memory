@@ -6,6 +6,7 @@ import { validatePublicSiteSecurity } from './validate-public-site-security.mjs'
 
 const STAGE_SCHEMA = 'enigma.cloudflare_pages_stage.v1';
 const DEFAULT_HEADERS = Object.freeze([
+  ['Strict-Transport-Security', 'max-age=63072000; includeSubDomains'],
   ['Permissions-Policy', 'camera=(), microphone=(), geolocation=()'],
   ['Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.fontshare.com; font-src 'self' https://fonts.gstatic.com https://api.fontshare.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"],
 ]);
