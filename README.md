@@ -1,5 +1,9 @@
 # Enigma Memory
 
+> **Official $ENIGMA Token (Solana Mainnet):**  
+> Contract Address (CA): `EknDj8VZUHL6FhV9pSk3m6xP2U2sDzwjRDVstKeQpump`  
+> [Solscan Explorer](https://solscan.io/token/EknDj8VZUHL6FhV9pSk3m6xP2U2sDzwjRDVstKeQpump) • [Pump.fun](https://pump.fun/coin/EknDj8VZUHL6FhV9pSk3m6xP2U2sDzwjRDVstKeQpump) • [Official Website](https://enigmamemory.com)
+
 A local-first Memory Drive for the AI apps you already use.
 
 For most people, start with the Enigma Memory desktop app. The public launch target is a signed desktop installer with in-app setup; until Windows signing and macOS notarization are complete, use unsigned builds only for testing or wait for the signed release.
